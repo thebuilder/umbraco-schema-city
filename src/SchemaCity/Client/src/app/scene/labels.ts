@@ -17,6 +17,13 @@ export const CHAR_PX = 6.6;
 const BOX_PAD_PX = 18;
 /** Height of one label box, border and padding included. */
 export const LABEL_HEIGHT_PX = 22;
+/**
+ * How much bigger a district's name is than a building's. It is 14 px against 10 px
+ * with the letters spaced out, which measures about half again as wide.
+ */
+export const DISTRICT_SCALE = 1.5;
+/** An island narrower than this on screen carries no name. */
+export const MIN_DISTRICT_PX = 80;
 
 export type LabelCandidate = {
   id: string;
@@ -26,8 +33,13 @@ export type LabelCandidate = {
   /** Anchor in CSS pixels, the point the label sits centred above. */
   x: number;
   y: number;
-  /** The building's footprint on screen, in pixels. 0 when it is behind the camera. */
+  /**
+   * How wide the thing named is on screen, in pixels: a building's footprint, or an
+   * island's longer side. 0 when it is behind the camera.
+   */
   buildingPx: number;
+  /** A district name rather than a building name. Bigger box, its own cull. */
+  kind?: "district";
   /** Skips the size cull. The node you picked or are pointing at keeps its name. */
   pinned?: boolean;
 };
@@ -35,6 +47,7 @@ export type LabelCandidate = {
 export type LabelBox = {
   id: string;
   text: string;
+  kind?: "district";
   left: number;
   top: number;
   width: number;
@@ -84,19 +97,26 @@ export function pickLabels(
   // hundred labels, and the cap is 40.
   for (const candidate of [...candidates].sort((a, b) => a.rank - b.rank)) {
     if (kept.length >= cap) break;
-    if (!candidate.pinned && candidate.buildingPx < minBuildingPx) continue;
+    const scale = candidate.kind === "district" ? DISTRICT_SCALE : 1;
+    // A district's name goes on an island you can still read a name on, which is a
+    // much bigger thing on screen than the smallest building worth naming.
+    const minPx = candidate.kind === "district" ? MIN_DISTRICT_PX : minBuildingPx;
+    if (!candidate.pinned && candidate.buildingPx < minPx) continue;
     if (candidate.x < 0 || candidate.x > width) continue;
     if (candidate.y < 0 || candidate.y > height) continue;
 
-    const boxWidth = labelWidth(candidate.text, charPx);
+    const boxWidth = labelWidth(candidate.text, charPx * scale);
+    const boxHeight = LABEL_HEIGHT_PX * scale;
     const box: LabelBox = {
       id: candidate.id,
       text: candidate.text,
+      kind: candidate.kind,
       left: candidate.x - boxWidth / 2,
-      // The anchor is the top face of the building, so the box sits above it.
-      top: candidate.y - LABEL_HEIGHT_PX,
+      // The anchor is the top face of the building, or the corner of the island, so
+      // the box sits above it.
+      top: candidate.y - boxHeight,
       width: boxWidth,
-      height: LABEL_HEIGHT_PX,
+      height: boxHeight,
     };
     if (kept.some((other) => overlaps(other, box))) continue;
     kept.push(box);

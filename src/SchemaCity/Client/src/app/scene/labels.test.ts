@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   CHAR_PX,
+  DISTRICT_SCALE,
   LABEL_CAP,
   LABEL_HEIGHT_PX,
+  MIN_DISTRICT_PX,
   type LabelCandidate,
   labelWidth,
   pickLabels,
@@ -63,6 +65,29 @@ describe("pickLabels", () => {
       candidate("selected", 100, 100, { rank: 0, buildingPx: 2, pinned: true }),
     ]);
     expect(idsOf(kept)[0]).toBe("selected");
+  });
+
+  it("drops a district name until its island is big enough on screen", () => {
+    const island = (buildingPx: number) =>
+      candidate("Pages", 100, 100, { rank: 3, kind: "district", buildingPx });
+
+    expect(idsOf(pickLabels([island(MIN_DISTRICT_PX - 1)]))).toEqual([]);
+    expect(idsOf(pickLabels([island(MIN_DISTRICT_PX)]))).toEqual(["Pages"]);
+  });
+
+  it("gives a district name a bigger box, and the buildings the pixels", () => {
+    const [box] = pickLabels([
+      candidate("Pages", 100, 100, { rank: 3, kind: "district", buildingPx: 400 }),
+    ]);
+    expect(box?.height).toBeCloseTo(LABEL_HEIGHT_PX * DISTRICT_SCALE);
+    expect(box?.width).toBeGreaterThan(labelWidth("Pages"));
+
+    // Rank 3 against a building's 2, so a name on the island wins the overlap.
+    const kept = pickLabels([
+      candidate("Pages", 100, 100, { rank: 3, kind: "district", buildingPx: 400 }),
+      candidate("home", 104, 100),
+    ]);
+    expect(idsOf(kept)).toEqual(["home"]);
   });
 
   it("keeps the order it was given inside one rank", () => {
