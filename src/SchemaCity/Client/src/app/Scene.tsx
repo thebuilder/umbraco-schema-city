@@ -1684,6 +1684,9 @@ function Flight({ explore }: { explore: boolean }) {
         FLIGHT_STEP.subVectors(camera.position, controls.target),
         turn.x * step,
         turn.y * step,
+        // ponytail: the same clamp `Controls` gives Explore, written twice. Reading
+        // it back off the live controls means typing them wider than the two fields
+        // this rig uses them through.
         Math.PI / 2,
       );
       controls.target.set(

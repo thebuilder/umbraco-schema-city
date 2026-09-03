@@ -173,6 +173,10 @@ export function districtStamp(
   const right = { x: -view.forward.z, z: view.forward.x };
   // Half the ground the turned quad covers along each axis, so the corner it is
   // tucked into holds it whichever way it is facing.
+  // ponytail: an axis-aligned box around a turned quad, so a name at 45 degrees to
+  // the island shrinks a little more than it strictly has to. Fitting the quad's own
+  // corners against the rectangle is a clip test per corner and buys back a few
+  // percent of cap height on the two smallest districts.
   let halfX = (Math.abs(right.x) * width + Math.abs(view.forward.x) * height) / 2;
   let halfZ = (Math.abs(right.z) * width + Math.abs(view.forward.z) * height) / 2;
   const fit = Math.min(1, across / (2 * halfX), down / (2 * halfZ));

@@ -55,7 +55,15 @@ const EASE_REMAINING = 0.0016;
 /** Keeps a turn off the pole and off the ground, where a clamp has no angle left. */
 const POLAR_MARGIN = 0.02;
 
-/** World units per second that move the view `PAN_PIXELS_PER_SECOND` across the screen. */
+/**
+ * World units per second that move the view `PAN_PIXELS_PER_SECOND` across the screen.
+ *
+ * ponytail: the zoom is the only term. A world unit along the screen's up direction
+ * lies on the ground at the camera's elevation, so at the isometric angle W and S
+ * cover about 0.58 of the screen distance D and A do. Dividing the forward component
+ * by the sine of the elevation would even them out, at the price of a second speed
+ * and a camera angle to pass in.
+ */
 export function panSpeed(pixelsPerUnit: number): number {
   return PAN_PIXELS_PER_SECOND / Math.max(pixelsPerUnit, 1e-6);
 }
