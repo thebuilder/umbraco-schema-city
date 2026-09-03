@@ -351,13 +351,21 @@ function Labels({
 /** A (1,1,1) view direction is a true isometric angle: 45° azimuth, ~35.26° elevation. */
 const ISO_POLAR_ANGLE = Math.acos(1 / Math.sqrt(3));
 
+/**
+ * Half the camera's framing distance, in world units. The grid reuses it too,
+ * so the ground always reaches past whatever the camera can see.
+ */
+function citySpan(bounds: CityBounds): number {
+  return Math.max(bounds.width, bounds.depth, 4) * 1.5;
+}
+
 /** Fits the ortho camera to the city bounds, at a true isometric angle. */
 function CameraFrame({ bounds }: { bounds: CityBounds }) {
   const { camera, size } = useThree();
 
   useEffect(() => {
     const ortho = camera as THREE.OrthographicCamera;
-    const span = Math.max(bounds.width, bounds.depth, 4) * 1.5;
+    const span = citySpan(bounds);
     const direction = new THREE.Vector3(1, 1, 1).normalize();
     ortho.position.set(
       bounds.centre.x + direction.x * span,
@@ -366,6 +374,11 @@ function CameraFrame({ bounds }: { bounds: CityBounds }) {
     );
     ortho.lookAt(bounds.centre.x, 0, bounds.centre.z);
     ortho.zoom = Math.min(size.width, size.height) / span;
+    // The camera sits `span` units from its target, so a fixed clip range (the
+    // spike's original 500) clips the whole city once a real schema's bounds
+    // grow past that. Scale it with the city instead.
+    ortho.near = -span * 2;
+    ortho.far = span * 3;
     ortho.updateProjectionMatrix();
   }, [bounds, camera, size]);
 
@@ -387,6 +400,7 @@ export default function Scene({
 
   const placements = useMemo(() => layoutCity(graph), [graph]);
   const bounds = useMemo(() => cityBounds(placements), [placements]);
+  const span = useMemo(() => citySpan(bounds), [bounds]);
   const nodesById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph]);
   const placementsById = useMemo(() => new Map(placements.map((p) => [p.id, p])), [placements]);
   const neighbours = useMemo(
@@ -429,11 +443,13 @@ export default function Scene({
   return (
     <div className="absolute inset-0" ref={host}>
       {palette ? (
-        <Canvas camera={{ far: 500, near: -100 }} orthographic>
+        <Canvas orthographic>
           <ambientLight intensity={1.2} />
           <directionalLight intensity={2.4} position={[8, 16, 6]} />
+          {/* ponytail: a flat, fixed-size grid stands in for real ground. A proper
+              stage (sky, fog, seamless terrain, as fsn does) is a later pass. */}
           <gridHelper
-            args={[Math.max(bounds.width, bounds.depth, 4) * 2, 20, palette.dim, palette.dim]}
+            args={[span * 2, 20, palette.dim, palette.dim]}
             position={[bounds.centre.x, 0, bounds.centre.z]}
           />
           <Buildings
