@@ -1654,7 +1654,12 @@ export default function Scene({
   return (
     <div className="absolute inset-0" ref={host}>
       {palette ? (
-        <Canvas orthographic>
+        <Canvas
+          // A click on paving or on the void is a click on nothing, which is how the
+          // city goes back the way it was without hunting for a close button.
+          onPointerMissed={() => onSelect(null)}
+          orthographic
+        >
           <ambientLight intensity={1.2} />
           <directionalLight intensity={2.4} position={[8, 16, 6]} />
           <Stage
