@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +34,105 @@ const LAYER_LABEL: Record<Layer, string> = {
   blocks: "Blocks",
   references: "References",
 };
+
+/** One edge style, drawn the way the scene draws it. */
+function EdgeMark({
+  className,
+  d,
+  dashed = false,
+  width = 1.25,
+}: {
+  className: string;
+  d: string;
+  dashed?: boolean;
+  width?: number;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      height="12"
+      viewBox="0 0 26 12"
+      width="26"
+    >
+      <path
+        d={d}
+        stroke="currentColor"
+        strokeDasharray={dashed ? "2 3" : undefined}
+        strokeWidth={width}
+      />
+    </svg>
+  );
+}
+
+function LegendRow({ mark, children }: { mark: ReactNode; children: ReactNode }) {
+  return (
+    <li className="flex items-center gap-2.5">
+      <span className="flex w-7 shrink-0 justify-center">{mark}</span>
+      {children}
+    </li>
+  );
+}
+
+function LegendTitle({ children }: { children: ReactNode }) {
+  return (
+    <p className="font-bold text-2xs text-phosphor-bright uppercase tracking-terminal-lg">
+      {children}
+    </p>
+  );
+}
+
+const Tint = ({ className }: { className: string }) => (
+  <span className={`size-3 ${className}`} />
+);
+
+function Legend() {
+  return (
+    <div className="space-y-3.5">
+      <section>
+        <LegendTitle>Buildings</LegendTitle>
+        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
+          <LegendRow mark={<Tint className="bg-phosphor" />}>Own property group</LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor/45" />}>Composed group</LegendRow>
+          <LegendRow mark={<Tint className="bg-amber" />}>Element Type</LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor-dim" />}>Root plaza</LegendRow>
+          <LegendRow mark={<Tint className="bg-signal" />}>Selected</LegendRow>
+        </ul>
+        <p className="mt-2 text-muted-foreground text-xs">
+          One floor per property group, and a wider footprint for more own properties.
+        </p>
+      </section>
+
+      <section>
+        <LegendTitle>Layers</LegendTitle>
+        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
+          <LegendRow
+            mark={
+              <EdgeMark className="text-phosphor-dim" d="M1 6 H25 M13 3 L17 6 L13 9" />
+            }
+          >
+            Allowed child, in the arrow's direction
+          </LegendRow>
+          <LegendRow mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" />}>
+            Composition
+          </LegendRow>
+          <LegendRow
+            mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" width={3} />}
+          >
+            Inheritance
+          </LegendRow>
+          <LegendRow mark={<EdgeMark className="text-amber" d="M1 1 Q13 13 25 1" />}>
+            Block target, dipping to the Element district
+          </LegendRow>
+          <LegendRow mark={<EdgeMark className="text-violet" d="M1 6 H25" dashed />}>
+            Picker reference
+          </LegendRow>
+        </ul>
+      </section>
+    </div>
+  );
+}
 
 // three.js, fiber and drei are a third of the bundle, so they load with the scene
 // rather than with the workspace element.
@@ -138,11 +237,8 @@ export function App({
               <PopoverTrigger render={<Button size="sm" variant="outline" />}>
                 Legend
               </PopoverTrigger>
-              <PopoverContent className="text-sm">
-                <p className="text-phosphor-bright">Building height</p>
-                <p className="text-muted-foreground">
-                  One floor per property, own and composed together.
-                </p>
+              <PopoverContent className="w-80 text-sm">
+                <Legend />
               </PopoverContent>
             </Popover>
 
