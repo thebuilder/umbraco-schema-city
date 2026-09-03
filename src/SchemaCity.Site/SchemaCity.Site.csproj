@@ -7,9 +7,14 @@
   </PropertyGroup>
 
 
+  <PropertyGroup>
+    <!-- Override to build the site against another Umbraco major: dotnet build -p:UmbracoVersion=18.1.1 -->
+    <UmbracoVersion Condition="'$(UmbracoVersion)' == ''">17.6.2</UmbracoVersion>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="Umbraco.Cms" Version="17.6.2" />
-    <PackageReference Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="17.6.2" />
+    <PackageReference Include="Umbraco.Cms" Version="$(UmbracoVersion)" />
+    <PackageReference Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="$(UmbracoVersion)" />
   </ItemGroup>
 
   <PropertyGroup>
