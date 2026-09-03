@@ -131,9 +131,8 @@ export function App({
         </div>
 
         <div className="relative flex-1">
-          {/* drei's Html labels carry a z-index near 2^24, so the scene gets a
-              stacking context of its own and the inspector sits above it on a
-              plain z-10 instead of having to outbid that number. */}
+          {/* The scene and the label layer over it get a stacking context of
+              their own, so the inspector sits above both on a plain z-10. */}
           <div className="absolute inset-0 z-0">
             <Suspense
               fallback={
