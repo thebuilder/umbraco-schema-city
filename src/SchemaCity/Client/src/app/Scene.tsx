@@ -21,6 +21,7 @@ import { type Anchor, buildLinkGeometry, type Layer, type LinkRange } from "./sc
 import { buildRoadGeometry } from "./scene/roads";
 import {
   fogRange,
+  framingAction,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
   stageMetrics,
@@ -802,7 +803,7 @@ function viewOf(bounds: CityBounds, size: { width: number; height: number }): Vi
  * Frames the city, and flies to a new framing when focus changes it. The flight is
  * an establishing shot in fsn's sense: any pointer down on the canvas ends it where
  * it is, because a camera that keeps moving after you grab it is a camera fighting
- * you. A resize is not a new framing, so it snaps.
+ * you. A resize is not a new framing, so the view it has is the view it keeps.
  */
 function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotion: boolean }) {
   const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
@@ -813,7 +814,7 @@ function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotio
   const gl = useThree((state) => state.gl);
   const size = useThree((state) => state.size);
   const flight = useRef<{ from: View; to: View; started: number } | null>(null);
-  const framed = useRef<CityBounds | null>(null);
+  const framed = useRef<{ bounds: CityBounds; controls: unknown } | null>(null);
 
   const view = useMemo(() => viewOf(bounds, size), [bounds, size]);
 
@@ -841,9 +842,14 @@ function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotio
       } else camera.lookAt(to.target);
     };
 
-    const changed = framed.current !== null && framed.current !== bounds;
-    framed.current = bounds;
-    if (!changed || reducedMotion) {
+    // This effect runs again every time the viewport is measured, which a resize
+    // does a dozen times over, and hover, selection and lens changes all re-render
+    // the scene around it. Framing again on any of those puts the camera back where
+    // it started, so only a new set of bounds is allowed to move it.
+    const action = framingAction(framed.current, { bounds, controls });
+    framed.current = { bounds, controls };
+    if (action === "none") return;
+    if (action === "snap" || reducedMotion) {
       apply(view);
       return;
     }

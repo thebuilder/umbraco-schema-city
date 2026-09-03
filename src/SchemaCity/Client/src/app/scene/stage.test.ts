@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { fogRange, groundReach, stageMetrics, zoomRange } from "./stage";
+import { fogRange, framingAction, groundReach, stageMetrics, zoomRange } from "./stage";
 
 /** Wide, square and tall, because the zoom range depends on the viewport's shape. */
 const VIEWPORTS = [
@@ -37,4 +37,17 @@ test("no part of the city is in fog, at any zoom", () => {
   for (const span of [4, 12, 87, 400]) {
     expect(fogRange(span).near).toBeGreaterThan(span + (span + span) / (2 * Math.sqrt(3)));
   }
+});
+
+test("only a new framing moves the camera", () => {
+  const bounds = { width: 40, depth: 87, centre: { x: 0, z: 0 } };
+  const other = { ...bounds };
+  const controls = {};
+
+  expect(framingAction(null, { bounds, controls })).toBe("snap");
+  // The same bounds again is a re-render, a resize or a scroll, and the reader may
+  // be mid-orbit through any of them.
+  expect(framingAction({ bounds, controls }, { bounds, controls })).toBe("none");
+  expect(framingAction({ bounds, controls: null }, { bounds, controls })).toBe("snap");
+  expect(framingAction({ bounds, controls }, { bounds: other, controls })).toBe("fly");
 });

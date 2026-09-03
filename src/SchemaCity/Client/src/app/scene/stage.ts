@@ -68,6 +68,27 @@ export function fogRange(span: number): { near: number; far: number } {
   return { near: span * 1.8, far: span * 5 };
 }
 
+/**
+ * What the camera rig should do when its framing effect runs again.
+ *
+ * The effect's inputs include the viewport, and the viewport is measured again on
+ * every resize and on some scrolls, so most runs are about nothing the camera cares
+ * about. Re-framing on those throws away the orbit, pan and zoom the reader is in
+ * the middle of, which is the whole reason this decision is its own function:
+ * only a new set of bounds moves the camera, and only the first framing and the one
+ * that follows the controls arriving snap instead of flying.
+ */
+export function framingAction<B, C>(
+  last: { bounds: B; controls: C } | null,
+  next: { bounds: B; controls: C },
+): "none" | "snap" | "fly" {
+  if (last === null) return "snap";
+  if (last.bounds !== next.bounds) return "fly";
+  // The orbit controls arrive one render after the first framing, and the target
+  // they were created with is the origin, so that framing has to be applied again.
+  return last.controls === next.controls ? "none" : "snap";
+}
+
 export const GRID_VERTEX_SHADER = /* glsl */ `
   varying vec3 vWorld;
   void main() {
