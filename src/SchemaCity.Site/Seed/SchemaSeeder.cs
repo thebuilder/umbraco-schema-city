@@ -205,6 +205,12 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// 15 Element Types plus <c>elementDoomed</c>, which the broken-block Data Type points at and
     /// <see cref="DeleteDoomedElementType"/> deletes again.
     /// </summary>
+    /// <remarks>
+    /// ponytail: these get built-in editors only, because the block Data Types do not exist yet
+    /// when they are created. The seed therefore has no nested blocks. If the block inspector's
+    /// recursion needs a test bed, add a second pass here that gives one Element Type the Block
+    /// List property after the Data Types exist.
+    /// </remarks>
     private void CreateElementTypes(int folderId)
     {
         string[] aliases =
@@ -559,9 +565,13 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     // ---------------------------------------------------------------- content
 
     /// <summary>
-    /// 193 items in a fixed shape: 183 published, 5 drafts, 5 in the recycle bin. No property
-    /// values, because usage counts only read the node and version tables.
+    /// 193 items in a fixed shape: 183 published, 5 drafts, 5 in the recycle bin.
     /// </summary>
+    /// <remarks>
+    /// ponytail: no property values are written, so every block editor property is empty. The
+    /// usage endpoint only counts nodes and versions, so this is enough for M3. Instance-level
+    /// block usage, which parses property JSON, would need values here first.
+    /// </remarks>
     private void CreateContent()
     {
         IContent site = Publish(Create("Contoso", UmbracoConstants.System.Root, "site"));
