@@ -379,9 +379,11 @@ Determinism: sort nodes and edges by alias before dagre. Dagre is deterministic 
 - block targets to the south-west, block hosts to the south-east
 - reference targets east, reference sources west
 
+The neighbourhood stands on its own focus island drawn under it, with compact spacing: children rows tight to the south, parents just north, compositions and block targets within a couple of streets. Laying it out at the fixed generous distances on top of whichever islands were there read as random (queued).
+
 Only the focused node's edges draw: roads for `allowedChild`, raised azure lines for `composition` and `inherits`, dipped amber lines for `block`, dotted violet lines for `reference`. Everything that is not a neighbour sinks to a flat plate 0.1 units high at about 0.12 opacity, with no label, no road and no picking, so the neighbourhood stands on a flat map that still shows where it is. Leaving focus restores the buildings with the same 400 ms tween. The focus layout is centred on the focused node's city position, so without this its rows landed on top of faded buildings and read as overlap.
 
-Entry is a double-click, Enter on the selected node, or the inspector's Focus button. The camera flies in over 700 ms and any pointer down on the controls interrupts it. Each neighbour tweens from its city placement to its focus placement over 400 ms with smootherstep, and reduced motion skips the tweens. Double-click a neighbour, or pick one in the inspector or the palette, to refocus. The first Escape leaves focus and keeps the selection, the second clears it.
+Entry is a double-click, Enter on the selected node, or the inspector's Focus button. The camera flies in over 700 ms and any pointer down on the controls interrupts it. The flight frames the neighbourhood in the part of the canvas the inspector does not cover (queued). Each neighbour tweens from its city placement to its focus placement over 400 ms with smootherstep, and reduced motion skips the tweens. Double-click a neighbour, or pick one in the inspector or the palette, to refocus. The first Escape leaves focus and keeps the selection, the second clears it.
 
 Ceiling: more than about 30 parents plus compositions at once pushes the outer arc into the north-west grid. Nothing in the seeded schema is close.
 
@@ -436,9 +438,9 @@ The free camera's field of view is 40 degrees; 60 stretched the city.
 | --- | --- |
 | Hover | outline + tooltip (name, alias, counts), label |
 | Click | select a building: unrelated nodes and edges fade to 20%, inspector opens. Clicking bare ground clears the selection (done 2026-09-03) |
-| Double-click / Enter | focus mode: 700 ms camera flight, neighbourhood layout, only the focused node's edges drawn, unrelated buildings sink to faint plates |
+| Double-click / Enter | focus mode: 700 ms camera flight, neighbourhood layout, only the focused node's edges drawn, unrelated buildings sink to faint plates, the camera frames the neighbourhood in the uncovered part of the canvas (queued) |
 | Double-click a neighbour in focus mode | refocus on it, camera flight |
-| Escape | leave focus mode and keep the selection. Escape again clears the selection |
+| Escape | leave focus mode and keep the selection. Escape again clears the selection. Closing the inspector or clicking bare ground leaves focus and clears the selection in one step (queued) |
 | Drag | Iso orbits around the centre at a fixed angle; Free orbits freely. Pan stays in the ground plane, which the grid relies on. Hover, selection and lens changes never move the camera; only focus mode's flight and the camera switch do |
 | Right-drag / two-finger | pan |
 | Wheel | zoom (ortho zoom, not dolly) |
@@ -446,7 +448,7 @@ The free camera's field of view is 40 degrees; 60 stretched the city.
 | `1` `2` `3` `4`, `L`, `E`, `Home`, `?` | Toggle the four layers in toolbar order; list view; switch the camera between Iso and Free; reframe the city with a 400 ms flight (leaves focus first); the control reference. Single keys are ignored while the palette or a dialog is open, while a text field has focus, or with a modifier other than Shift; the target is read off `composedPath` |
 | `W` `A` `S` `D`, arrows, `R` `F`, `Shift` | Iso: W A S D and the arrows pan along the ground in screen directions at 900 CSS pixels a second whatever the zoom, and R and F do nothing. Free: W A S D fly along the heading at 24 units a second, the arrows turn with free yaw and a pitch that stops at the horizon and short of straight down, R and F rise and descend, and Shift doubles both. Keys ease over about 155 ms, move the camera and its orbit target together, cancel a framing flight as a pointer down does, and are ignored while a text field, contenteditable or dialog has focus; a held key drops on blur or on a modifier other than Shift. The control reference lists them in a FLIGHT group between MOUSE and KEYS, with Home moved into it. |
 | Toolbar | Title, then a `Layers` button whose label carries the count (`Layers 2/4`) and opens a checkbox menu of Structure, Compositions, Blocks and References, the registry's base-ui menu with the portal patch; `1`-`4` still toggle the layers and the menu's checkboxes follow. Then a two-segment CAMERA control, ISO and FREE, and the `List` toggle. The right group is the lens picker, `Findings`, `Legend`, a `?` icon button for the control reference (aria-label "Control reference") and `Search` with its Kbd. Neither Search nor Help takes a tooltip, because a tooltip's exit animation played over the opening dialog. Triggers that open something (Layers, Findings, Legend, Help, Search, the lens picker) do not lift on hover; only action buttons do. The row wraps instead of clipping. It holds one line down to 848 px, and below that the right group folds under the title. The type-count badge is gone; the palette's counter and the list view carry the count |
-| List filter | Registry input, type text, border highlight on focus with no ring, an own clear button; the palette's search input shares the same search function. |
+| List filter | Registry input, type text, border highlight on focus with no ring, an own clear button; the palette's search input shares the same search function. The placeholder reads "Filter types" and the input keeps a minimum width |
 | Lens | Picker with six modes; disabled until usage loads; `lens=<name>` in the URL |
 | Findings drawer | Sheet from the toolbar with a count badge, kind chips with counts, matched / total, rows grouped by severity; a row selects its node and closes. |
 | Control reference | a dialog opened by `?` or the Help button: an ESC chip, three groups (mouse, keys, objects), a Kbd column and one line of prose per row, in fsn's `man controls` shape |
@@ -549,10 +551,12 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Stress fixture `pathological.json` (300 types). Done 2026-09-03; it laid out in about 80 ms at first (24 ms after the sparse rank bands) and exposed two layout defects, sparse ranks costing full bands and the unreserved stamp band, both fixed 2026-09-04 (sparse rank bands, a reserved stamp band).
 - District stamp containment: decided 2026-09-04, the name is fixed along the island edge, no camera turn, band about 4 units (in progress).
 - Wider gap between islands, about 18 units (in progress).
-- No hover lift on menu and dialog triggers (in progress).
+- No hover lift on menu and dialog triggers. Done 2026-09-04; the lift was a 1 px hover translate on the registry button, and Layers, Findings, Legend, Help and Search carry a `data-trigger` attribute that cancels it.
 - Roof icon gate 24 px (in progress).
 - Free camera fov 40 degrees (in progress).
-- CAMERA control, ISO and FREE, replacing the Explore toggle (in progress).
+- CAMERA control, ISO and FREE, replacing the Explore toggle. Done 2026-09-04; a two-segment toggle group, `E` flips it, `view=explore` stays the URL value, and the control reference says Iso and Free.
+- List filter placeholder "Filter types", with a minimum width on the input. Done 2026-09-04.
+- Focus mode: a focus island with compact spacing, inspector-aware framing, exit on deselect (queued after the stamp and toolbar branches).
 - Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03. The wrapped row spilling over the canvas was paint order (the absolutely positioned scene painted over the in-flow toolbar) plus a Toggle that could shrink under its label; fixed the same day with a stacking layer and `shrink-0`, measured from 1400 to 600 px.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` on NuGet.
@@ -607,7 +611,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the icon gate, the free camera fov and the camera switch decided, in progress. Next: screenshots for the README and the marketplace, then a final verification on both majors.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the icon gate and the free camera fov decided, in progress. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. Then the focus island, inspector-aware framing and exit on deselect. Next: screenshots for the README and the marketplace, then a final verification on both majors.
 
 ## 13. Resolved questions
 
