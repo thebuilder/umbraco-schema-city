@@ -124,28 +124,70 @@ export const STAMP_CAP = 3;
 const STAMP_INSET = 0.5;
 
 /**
- * Where a district's name lies on its island and how big the quad is, in world units.
- * `island` is the district's box with its padding already added, and `aspect` is the
- * rasterised name's width over its cap height.
+ * The shallowest angle the stamp corrects for. Past it the correction runs away, and
+ * a name stretched to five times its cap covers the district it names.
+ */
+const STAMP_MIN_SINE = 0.2;
+
+/**
+ * Where a district's name lies on its island, how big the quad is and which way it
+ * faces, in world units. `island` is the district's box with its padding already
+ * added, `aspect` is the rasterised name's width over its cap height, and `view` is
+ * the camera's ground direction with how high above the ground it stands.
  *
- * The name is left-aligned at the north-west corner and runs east along the north
- * edge, so it reads as printed in the margin the layout already leaves rather than as
- * a caption placed over the buildings. A name wider than the island shrinks until it
- * fits, which is what a district of two types would otherwise hang over the void.
+ * The name still prints in the north-west margin the layout leaves, but it is turned
+ * to face the camera rather than lying along the island's north edge. Printed along
+ * the edge it came out of the isometric projection as a cramped 30 degree diagonal,
+ * near enough vertical for a long name. Turned, its baseline is square to the view
+ * and it reads horizontally at every azimuth, so the correction is a yaw about its
+ * own vertical axis rather than a billboard: it stays printed on the ground.
+ *
+ * The height is divided by the sine of the elevation, because ground lying that far
+ * from square to the view loses exactly that much of its depth on screen, so a three
+ * unit cap reads as three units. `spin` is the angle to turn the flat quad by, around
+ * the world's vertical.
+ *
+ * A stamp that will not fit in the margin at its turned size shrinks until it does,
+ * which is what a district of two types would otherwise hang over the void.
  */
 export function districtStamp(
-  island: { minX: number; maxX: number; minZ: number },
+  island: { minX: number; maxX: number; minZ: number; maxZ: number },
   aspect: number,
+  view: { forward: { x: number; z: number }; elevation: number },
   cap = STAMP_CAP,
-): { x: number; z: number; width: number; height: number } {
-  const room = island.maxX - island.minX - STAMP_INSET * 2;
-  const height = Math.min(cap, room / Math.max(aspect, 1e-6));
-  const width = height * aspect;
+): { x: number; z: number; width: number; height: number; spin: number } {
+  const across = island.maxX - island.minX - STAMP_INSET * 2;
+  const down = island.maxZ - island.minZ - STAMP_INSET * 2;
+  const shorter = Math.min(across, down);
+  let height = Math.min(
+    cap / Math.max(Math.sin(view.elevation), STAMP_MIN_SINE),
+    shorter / 2,
+  );
+  let width = height * aspect;
+
+  // The baseline runs along the screen's right, a quarter turn from the view
+  // direction on the ground, and the name's own up runs away from the camera. The
+  // quad is laid flat by a quarter turn about x, so this is the spin it takes first,
+  // in its own plane.
+  const spin = Math.atan2(-view.forward.x, -view.forward.z);
+  const right = { x: -view.forward.z, z: view.forward.x };
+  // Half the ground the turned quad covers along each axis, so the corner it is
+  // tucked into holds it whichever way it is facing.
+  let halfX = (Math.abs(right.x) * width + Math.abs(view.forward.x) * height) / 2;
+  let halfZ = (Math.abs(right.z) * width + Math.abs(view.forward.z) * height) / 2;
+  const fit = Math.min(1, across / (2 * halfX), down / (2 * halfZ));
+  if (fit < 1) {
+    width *= fit;
+    height *= fit;
+    halfX *= fit;
+    halfZ *= fit;
+  }
   return {
-    x: island.minX + STAMP_INSET + width / 2,
-    z: island.minZ + STAMP_INSET + height / 2,
+    x: island.minX + STAMP_INSET + halfX,
+    z: island.minZ + STAMP_INSET + halfZ,
     width,
     height,
+    spin,
   };
 }
 
