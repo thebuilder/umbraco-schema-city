@@ -141,6 +141,10 @@ function Buildings({
     () => new Map(placements.map((p) => [p.id, p.flatten ?? 0])),
     [placements],
   );
+  const districtById = useMemo(
+    () => new Map(placements.map((p) => [p.id, p.districtKind])),
+    [placements],
+  );
   const introEnd = useMemo(
     () => Math.max(0, ...placements.map((p) => p.introDelay)) + INTRO_DURATION,
     [placements],
@@ -151,8 +155,6 @@ function Buildings({
     const dim = new THREE.Color(palette.dim);
     return {
       own: phosphor,
-      // Desaturated phosphor: mixed toward phosphor-dim rather than a second hue.
-      composed: phosphor.clone().lerp(dim, 0.55),
       separator: new THREE.Color(palette.separator),
       element: new THREE.Color(palette.amber),
       plaza: dim,
@@ -284,8 +286,26 @@ function Buildings({
       const t = scale?.t.get(buildingId);
       return t === undefined || !scale ? null : rampColour(scale.ramp, t, colors);
     };
+    // A building takes its colour from the district it stands in, not from what it
+    // is: a structure district is phosphor, an element district amber, and a
+    // composition or mixed district phosphor-dim. A composed floor is the same
+    // colour desaturated, whichever district that is.
+    const districtColour = (buildingId: string) => {
+      const district = districtById.get(buildingId);
+      if (district === "elements") return colors.element;
+      if (district === "structure") return colors.own;
+      return colors.dim;
+    };
     const colourFor = (kind: FloorCellKind, buildingId: string) => {
-      const unlit = scale && kind === "element" ? colors.dim : colors[kind];
+      const district = districtColour(buildingId);
+      const unlit =
+        kind === "separator"
+          ? colors.separator
+          : kind === "composed"
+            ? district.clone().lerp(colors.dim, 0.55)
+            : scale && kind === "element"
+              ? colors.dim
+              : district;
       const base =
         buildingId === selected
           ? colors.signal
@@ -330,7 +350,19 @@ function Buildings({
       if (plaza.instanceColor) plaza.instanceColor.needsUpdate = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cellsByKind, windows, plazas, selected, hovered, neighbours, colors, scale, flatById]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    cellsByKind,
+    windows,
+    plazas,
+    selected,
+    hovered,
+    neighbours,
+    colors,
+    scale,
+    flatById,
+    districtById,
+  ]);
 
   const pick = (event: ThreeEvent<MouseEvent | PointerEvent>) => placements[event.instanceId ?? -1];
 

@@ -33,9 +33,8 @@ export type Placement = {
   floors: number;
   /** Id of the district this building stands in. */
   district: string;
-  // ponytail: optional, so a hand-built Placement in a scene test does not have to
-  // name one. The layout always sets it; make it required once the scene reads it.
-  districtKind?: DistrictKind;
+  /** What the district mostly holds. The scene takes each building's colour from it. */
+  districtKind: DistrictKind;
   // ponytail: a nested folder is recorded and nothing else. Buildings stay in their
   // top-level district and the scene tints them by this id. Sub-districts, with their
   // own slab and street, are the upgrade if a real schema nests two levels deep.

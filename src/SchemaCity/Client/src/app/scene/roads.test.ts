@@ -10,7 +10,8 @@ function placement(id: string, x: number, z: number): Placement {
     footprint: 2,
     height: 0.6,
     floors: 1,
-    district: "structure",
+    district: "pages",
+    districtKind: "structure",
     introDelay: 0,
   };
 }

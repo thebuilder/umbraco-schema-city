@@ -45,7 +45,8 @@ function placement(id: string, extra: Partial<Placement> = {}): Placement {
     footprint: 2,
     height: 0.6,
     floors: 1,
-    district: "structure",
+    district: "pages",
+    districtKind: "structure",
     introDelay: 0,
     ...extra,
   };

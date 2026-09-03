@@ -6,16 +6,11 @@ import {
   unsafeCSS,
 } from "@umbraco-cms/backoffice/external/lit";
 import { UmbApiError, tryExecute } from "@umbraco-cms/backoffice/resources";
-import type { ComponentProps, FC } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
 import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
-
-// ponytail: App does not declare `icons` yet. When that prop lands, delete this line and
-// render <App> directly again. The value passed is already the shape the prop will take.
-const IconApp = App as FC<ComponentProps<typeof App> & { icons?: Record<string, string> }>;
 
 /**
  * The one file that knows about Umbraco. It fetches the graph, hands it to the React
@@ -84,7 +79,7 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
 
     this.#root.render(
       this.#graph ? (
-        <IconApp
+        <App
           graph={this.#graph}
           icons={this.#icons}
           onOpenType={openTypeInEditor}

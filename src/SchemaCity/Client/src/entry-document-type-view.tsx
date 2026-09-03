@@ -7,16 +7,11 @@ import {
   unsafeCSS,
 } from "@umbraco-cms/backoffice/external/lit";
 import { UmbApiError, tryExecute } from "@umbraco-cms/backoffice/resources";
-import type { ComponentProps, FC } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
 import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
-
-// ponytail: App does not declare `icons` yet. When that prop lands, delete this line and
-// render <App> directly again. The value passed is already the shape the prop will take.
-const IconApp = App as FC<ComponentProps<typeof App> & { icons?: Record<string, string> }>;
 
 /**
  * The Relationships tab on the Document Type editor. Same React app as the workspace,
@@ -102,7 +97,7 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
     // mounting on the whole city and jumping to the type a moment later.
     this.#root.render(
       this.#graph && this.#unique ? (
-        <IconApp
+        <App
           graph={this.#graph}
           icons={this.#icons}
           initial={{ type: this.#unique, focus: true }}
