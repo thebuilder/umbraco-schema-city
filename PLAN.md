@@ -503,7 +503,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - `app/layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance. Done 2026-09-03, 15 tests, about 30 ms for 300 nodes.
 - Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, a DOM label layer with screen-space culling, intro rise.
 - Inspector with all schema sections. Search palette. Done 2026-09-03; 42 tests.
-- Exit: usable on the seeded schema (the pathological fixture is still to be written); 300 types at 60 fps on an M-series laptop.
+- Exit: usable on the seeded schema (the pathological fixture followed in M4); 300 types at 60 fps on an M-series laptop.
 
 ### M2, Layers and focus (medium)
 
