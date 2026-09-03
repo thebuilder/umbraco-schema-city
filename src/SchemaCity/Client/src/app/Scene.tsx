@@ -19,6 +19,13 @@ import { CHAR_PX, LABEL_CAP, LABEL_HEIGHT_PX, pickLabels } from "./scene/labels"
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { type Anchor, buildLinkGeometry, type Layer, type LinkRange } from "./scene/layers";
 import { buildRoadGeometry } from "./scene/roads";
+import {
+  fogRange,
+  GRID_FRAGMENT_SHADER,
+  GRID_VERTEX_SHADER,
+  stageMetrics,
+  zoomRange,
+} from "./scene/stage";
 
 type Palette = {
   phosphor: string;
@@ -29,6 +36,7 @@ type Palette = {
   violet: string;
   background: string;
   separator: string;
+  land: string;
 };
 
 /** Seconds a building takes to rise, once its own `introDelay` has passed. */
@@ -652,6 +660,96 @@ function Labels({
   return null;
 }
 
+/** Thickness of the slab of land the city stands on, whose top face is y = 0. */
+const SLAB_HEIGHT = 0.4;
+const RIM_HEIGHT = 0.18;
+/** How far the rim stands out past the slab, and the slab past the city. */
+const RIM_OVERHANG = 0.9;
+const SLAB_MARGIN = 2.5;
+/** The grid sits under the rim, so the two can never z-fight. */
+const GRID_Y = -(SLAB_HEIGHT + RIM_HEIGHT + 0.05);
+
+/**
+ * The world stage, borrowed from fsn: a void-coloured background and fog, one grid
+ * plane that follows the camera so the ground never runs out, and the slab of land the
+ * city stands on. `span` is the city's own, not the focus layout's, so entering focus
+ * does not rescale the world; `bounds` is whatever layout is on screen, so the slab
+ * moves with it.
+ *
+ * Three draw calls, and nothing here animates.
+ */
+function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; palette: Palette }) {
+  const controls = useThree((state) => state.controls) as { target: THREE.Vector3 } | null;
+  const grid = useRef<THREE.Mesh>(null);
+  const { fadeNear, fadeFar, plane } = stageMetrics(span);
+  const fog = fogRange(span);
+
+  const uniforms = useMemo(
+    () => ({
+      uCentre: { value: new THREE.Vector2() },
+      // The minor lines are the same phosphor-dim mixed back toward the void, so the
+      // grid reads as one thing at two strengths rather than as two colours.
+      uMinorColour: {
+        value: new THREE.Color(palette.dim).lerp(new THREE.Color(palette.background), 0.5),
+      },
+      uMajorColour: { value: new THREE.Color(palette.dim) },
+      uFadeNear: { value: fadeNear },
+      uFadeFar: { value: fadeFar },
+    }),
+    [palette, fadeNear, fadeFar],
+  );
+
+  useFrame(() => {
+    // ponytail: the target is the ground point at the centre of the screen only
+    // because the controls pan in the ground plane, which holds the target on y = 0.
+    // The Explore perspective camera will have to raycast its own centre ray instead,
+    // and so will anything that turns screen-space panning back on.
+    const target = controls?.target;
+    if (!target || !grid.current) return;
+    grid.current.position.set(target.x, GRID_Y, target.z);
+    uniforms.uCentre.value.set(target.x, target.z);
+  });
+
+  const rim = SLAB_MARGIN + RIM_OVERHANG;
+  return (
+    <>
+      <color args={[palette.background]} attach="background" />
+      {/* Fog and background have to be the exact same colour or the far ground ends
+          in a horizon ring instead of dissolving. */}
+      <fog args={[palette.background, fog.near, fog.far]} attach="fog" />
+      <mesh frustumCulled={false} ref={grid} renderOrder={-1} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[plane, plane]} />
+        <shaderMaterial
+          depthWrite={false}
+          fragmentShader={GRID_FRAGMENT_SHADER}
+          glslVersion={THREE.GLSL3}
+          transparent
+          uniforms={uniforms}
+          vertexShader={GRID_VERTEX_SHADER}
+        />
+      </mesh>
+      {/* ponytail: one rectangle around everything placed. In focus mode that is the
+          city and the focus layout at once, so the land reads as a larger rectangle
+          rather than as ground that follows the layout. Two slabs, or a slab per
+          district, would fix it; the grid under it is the same either way. */}
+      <mesh position={[bounds.centre.x, -SLAB_HEIGHT / 2, bounds.centre.z]}>
+        <boxGeometry
+          args={[bounds.width + SLAB_MARGIN * 2, SLAB_HEIGHT, bounds.depth + SLAB_MARGIN * 2]}
+        />
+        <meshStandardMaterial color={palette.land} metalness={0} roughness={1} />
+      </mesh>
+      <mesh position={[bounds.centre.x, -SLAB_HEIGHT - RIM_HEIGHT / 2, bounds.centre.z]}>
+        <boxGeometry args={[bounds.width + rim * 2, RIM_HEIGHT, bounds.depth + rim * 2]} />
+        <meshStandardMaterial
+          color={new THREE.Color(palette.land).lerp(new THREE.Color(palette.background), 0.6)}
+          metalness={0}
+          roughness={1}
+        />
+      </mesh>
+    </>
+  );
+}
+
 /** A (1,1,1) view direction is a true isometric angle: 45° azimuth, ~35.26° elevation. */
 const ISO_POLAR_ANGLE = Math.acos(1 / Math.sqrt(3));
 
@@ -783,6 +881,26 @@ function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotio
   return null;
 }
 
+/**
+ * Orbit at the fixed isometric angle, inside the zoom range the stage can cover. The
+ * pan is in the ground plane rather than in the screen plane, which is both what a
+ * city wants and what keeps the target on y = 0, where the grid reads it from.
+ */
+function Controls({ span }: { span: number }) {
+  const size = useThree((state) => state.size);
+  const { minZoom, maxZoom } = zoomRange(span, size);
+  return (
+    <OrbitControls
+      makeDefault
+      maxPolarAngle={ISO_POLAR_ANGLE}
+      maxZoom={maxZoom}
+      minPolarAngle={ISO_POLAR_ANGLE}
+      minZoom={minZoom}
+      screenSpacePanning={false}
+    />
+  );
+}
+
 /** Milliseconds a building takes to move between its city spot and its focus spot. */
 const TWEEN_MS = 400;
 
@@ -868,10 +986,13 @@ export default function Scene({
     return () => cancelAnimationFrame(frame);
   }, [target, reducedMotion]);
 
-  // The ground stays the city's however far the focus layout roams, so it never
-  // slides out from under the buildings.
   const ground = useMemo(() => cityBounds(city), [city]);
+  // The stage is scaled by the city's own span, whatever the focus layout does, so
+  // entering focus never rescales the world around it.
   const span = citySpan(ground);
+  // The slab of land follows what is on screen instead, which during a focus tween is
+  // the buildings mid-flight, so it is never out from under them.
+  const land = useMemo(() => cityBounds(placements), [placements]);
   // The camera frames the focus layout instead, which is the focused node and
   // everything moved around it, not the whole city behind them.
   const bounds = useMemo(
@@ -931,6 +1052,7 @@ export default function Scene({
       azure: token("--azure"),
       background: token("--background"),
       dim: token("--phosphor-dim"),
+      land: token("--panel"),
       phosphor: token("--phosphor"),
       separator: token("--panel-sunken"),
       signal: token("--signal"),
@@ -944,12 +1066,7 @@ export default function Scene({
         <Canvas orthographic>
           <ambientLight intensity={1.2} />
           <directionalLight intensity={2.4} position={[8, 16, 6]} />
-          {/* ponytail: a flat, fixed-size grid stands in for real ground. A proper
-              stage (sky, fog, seamless terrain, as fsn does) is a later pass. */}
-          <gridHelper
-            args={[span * 3, 30, palette.dim, palette.dim]}
-            position={[ground.centre.x, 0, ground.centre.z]}
-          />
+          <Stage bounds={land} palette={palette} span={span} />
           <Buildings
             cellsByKind={cellsByKind}
             heights={heights}
@@ -1000,11 +1117,7 @@ export default function Scene({
             selected={selected}
           />
           <CameraRig bounds={bounds} reducedMotion={reducedMotion} />
-          <OrbitControls
-            makeDefault
-            maxPolarAngle={ISO_POLAR_ANGLE}
-            minPolarAngle={ISO_POLAR_ANGLE}
-          />
+          <Controls span={span} />
         </Canvas>
       ) : null}
     </div>
