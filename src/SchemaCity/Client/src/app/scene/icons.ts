@@ -85,3 +85,12 @@ export function rasteriseIcon(key: string, svg: string, colour: string): Promise
   rasters.set(key, made);
   return made;
 }
+
+/**
+ * The icon as a CSS mask value, for the panels. The colour then comes from the
+ * element's own background, and the SVG never becomes markup in the document, so
+ * an icon that arrived with a script or an event handler in it cannot run one.
+ */
+export function iconMask(svg: string): string {
+  return `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}")`;
+}

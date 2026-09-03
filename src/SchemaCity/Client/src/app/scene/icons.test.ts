@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { iconColour, paintedSvg } from "./icons";
+import { iconColour, iconMask, paintedSvg } from "./icons";
 
 test("an icon colour is Umbraco's suffix, or the theme's own", () => {
   expect(iconColour("color-red", "#0f0")).toBe("red");
@@ -30,4 +30,12 @@ test("an outline icon keeps the fill it came with", () => {
   expect(painted).toContain('fill="none"');
   expect(painted).toContain('stroke="red"');
   expect(painted).toContain('width="128"');
+});
+
+test("an icon used as a mask is a data URL, not markup", () => {
+  const mask = iconMask('<svg viewBox="0 0 8 8"><path d="M0 0h8v8H0z"/></svg>');
+
+  expect(mask.startsWith('url("data:image/svg+xml;charset=utf-8,')).toBe(true);
+  // The quotes that would close the CSS url() are encoded away.
+  expect(mask.slice('url("'.length, -2)).not.toContain('"');
 });

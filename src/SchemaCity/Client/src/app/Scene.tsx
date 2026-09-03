@@ -380,13 +380,19 @@ function Buildings({
   );
 }
 
-/** Fraction of the footprint one roof icon covers. */
-const ICON_FOOTPRINT = 0.72;
-/** An icon smaller than this on screen is a smudge, so it is not drawn at all. */
-const ICON_MIN_PX = 12;
+/** Fraction of the footprint one roof icon covers, and the cap under it. */
+const ICON_FOOTPRINT = 0.7;
+const CAP_FOOTPRINT = 0.88;
+/**
+ * A building narrower than this on screen gets no icon. Most of a schema shares two
+ * or three icons, so a city of 12 px smudges reads as noise rather than as identity;
+ * at 40 px an icon is legible and only a handful of buildings are that big at once.
+ * The inspector header carries the same icon at any zoom.
+ */
+const ICON_MIN_PX = 40;
 
-/** One rasterised icon, and the buildings that wear it. */
-type IconGroup = { key: string; texture: THREE.Texture; ids: string[] };
+/** One rasterised icon, the buildings that wear it, and where its caps start. */
+type IconGroup = { key: string; texture: THREE.Texture; ids: string[]; offset: number };
 
 /**
  * The icons, rasterised once per name and colour and kept until the graph changes.
@@ -428,9 +434,19 @@ function useIconGroups(
         if (!canvas) return;
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
-        made.push({ key, texture, ids });
+        made.push({ key, texture, ids, offset: 0 });
       }),
-    ).then(() => live && setGroups(made));
+    ).then(() => {
+      if (!live) return;
+      // The caps are one mesh across every group, so each group is told where its
+      // own instances start in it.
+      let offset = 0;
+      for (const group of made) {
+        group.offset = offset;
+        offset += group.ids.length;
+      }
+      setGroups(made);
+    });
 
     return () => {
       live = false;
@@ -442,33 +458,42 @@ function useIconGroups(
 }
 
 /**
- * The Umbraco icon of each type, standing over its roof as a camera-facing sprite.
- * One instanced mesh per icon and colour, which the seeded schema makes 15 of, and
- * the whole set is rewritten every frame: 78 quaternion copies is nothing next to
- * the buildings under them, and it keeps the sprites facing the Explore camera as
- * it moves.
+ * The Umbraco icon of each type, painted flat on its roof over a darker cap. Flat
+ * rather than billboarded, because a sprite standing over the roof lands behind the
+ * label and the usage badge of the very building it names. One instanced mesh per
+ * icon and colour, which the seeded schema makes 15 of, and the whole set is
+ * rewritten every frame, which is 78 matrices: nothing next to the buildings.
  *
  * An icon whose building is under `ICON_MIN_PX` across is scaled away rather than
- * drawn, the same measure the label layer culls names by.
+ * drawn, the same projected measure the label layer culls names by, except for the
+ * selected and the hovered building, which keep theirs at any zoom. Each icon sits
+ * over a darker cap on the roof, so a pale glyph still has something to read against.
  */
 function RoofIcons({
   groups,
   placementsById,
   heights,
   neighbours,
+  selected,
+  hovered,
   palette,
 }: {
   groups: IconGroup[];
   placementsById: Map<string, Placement>;
   heights: Map<string, number>;
   neighbours: Set<string> | null;
+  selected: string | null;
+  hovered: string | null;
   palette: Palette;
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
   const meshes = useRef(new Map<string, THREE.InstancedMesh>());
+  const capRef = useRef<THREE.InstancedMesh>(null);
   const scratch = useMemo(() => new THREE.Object3D(), []);
+  const cap = useMemo(() => new THREE.Object3D(), []);
   const anchor = useMemo(() => new THREE.Vector3(), []);
+  const caps = groups.reduce((total, group) => total + group.ids.length, 0);
 
   useEffect(() => {
     const lit = new THREE.Color(1, 1, 1);
@@ -484,19 +509,17 @@ function RoofIcons({
   }, [groups, neighbours, palette]);
 
   useFrame(() => {
+    const plate = capRef.current;
     for (const group of groups) {
       const mesh = meshes.current.get(group.key);
       if (!mesh) continue;
       group.ids.forEach((id, index) => {
         const placement = placementsById.get(id);
         const side = (placement?.footprint ?? 0) * ICON_FOOTPRINT;
-        if (placement) {
-          anchor.set(
-            placement.position.x,
-            (placement.y ?? 0) + (heights.get(id) ?? placement.height) + side / 2,
-            placement.position.z,
-          );
-        }
+        const roof = placement
+          ? (placement.y ?? 0) + (heights.get(id) ?? placement.height)
+          : 0;
+        if (placement) anchor.set(placement.position.x, roof, placement.position.z);
         const px = placement
           ? placement.footprint *
             pixelsPerUnit(
@@ -505,18 +528,39 @@ function RoofIcons({
               camera.position.distanceTo(anchor),
             )
           : 0;
-        scratch.position.copy(anchor);
-        scratch.quaternion.copy(camera.quaternion);
-        scratch.scale.setScalar(px < ICON_MIN_PX ? 0 : side);
+        const shown = placement !== undefined && (px >= ICON_MIN_PX || id === selected || id === hovered);
+
+        scratch.position.set(anchor.x, roof + 0.03, anchor.z);
+        scratch.rotation.set(-Math.PI / 2, 0, 0);
+        scratch.scale.setScalar(shown ? side : 0);
         scratch.updateMatrix();
         mesh.setMatrixAt(index, scratch.matrix);
+
+        if (!plate) return;
+        cap.position.set(placement?.position.x ?? 0, roof + 0.02, placement?.position.z ?? 0);
+        cap.rotation.set(-Math.PI / 2, 0, 0);
+        cap.scale.setScalar(shown ? (placement?.footprint ?? 0) * CAP_FOOTPRINT : 0);
+        cap.updateMatrix();
+        plate.setMatrixAt(group.offset + index, cap.matrix);
       });
       mesh.instanceMatrix.needsUpdate = true;
     }
+    if (plate) plate.instanceMatrix.needsUpdate = true;
   });
 
   return (
     <>
+      {caps > 0 && (
+        <instancedMesh args={[undefined, undefined, caps]} frustumCulled={false} ref={capRef}>
+          <planeGeometry />
+          <meshBasicMaterial
+            color={palette.background}
+            depthWrite={false}
+            opacity={0.55}
+            transparent
+          />
+        </instancedMesh>
+      )}
       {groups.map((group) => (
         <instancedMesh
           args={[undefined, undefined, group.ids.length]}
@@ -1324,9 +1368,11 @@ export default function Scene({
             <RoofIcons
               groups={iconGroups}
               heights={heights}
+              hovered={hovered}
               neighbours={neighbours}
               palette={palette}
               placementsById={placementsById}
+              selected={selected}
             />
           ) : null}
           {active.has("structure") ? (

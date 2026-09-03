@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Neighbourhood, PropertyTargets } from "../model/neighbourhood";
 import type { PropertyGroup, SchemaNode, TypeUsage } from "../model/types";
+import { iconMask } from "./scene/icons";
 
 type Lookup = Map<string, SchemaNode>;
 
@@ -203,8 +204,35 @@ function Usage({ usage }: { usage: TypeUsage }) {
   );
 }
 
+/**
+ * The type's Umbraco icon, painted as a CSS mask in the panel's own colour. A mask
+ * rather than inline SVG, because the icon is markup from the host and markup put
+ * into the document can carry an event handler with it.
+ */
+function TypeIcon({ svg }: { svg?: string }) {
+  if (!svg) return <span aria-hidden className="mt-0.5 size-4 shrink-0 border border-line" />;
+  const mask = iconMask(svg);
+  return (
+    <span
+      aria-hidden
+      className="mt-0.5 size-4 shrink-0 bg-phosphor"
+      style={{
+        maskImage: mask,
+        maskPosition: "center",
+        maskRepeat: "no-repeat",
+        maskSize: "contain",
+        WebkitMaskImage: mask,
+        WebkitMaskPosition: "center",
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskSize: "contain",
+      }}
+    />
+  );
+}
+
 export function Inspector({
   focused,
+  icons,
   neighbourhood,
   node,
   nodesById,
@@ -215,6 +243,8 @@ export function Inspector({
   usage,
 }: {
   focused: boolean;
+  /** Umbraco icon name to SVG, the same map the scene puts on the roofs. */
+  icons?: Record<string, string>;
   neighbourhood: Neighbourhood;
   node: SchemaNode;
   nodesById: Lookup;
@@ -235,9 +265,8 @@ export function Inspector({
   return (
     <aside className="absolute inset-y-0 right-0 z-10 flex w-80 flex-col border-line-strong border-l bg-panel shadow-panel">
       <header className="flex items-start gap-2 border-line border-b px-3 py-2.5">
-        {/* Icon slot. The backoffice wrapper resolves Umbraco's icon set; the
-            harness has no icons, so this stays a placeholder until M2. */}
-        <span aria-hidden className="mt-0.5 size-4 shrink-0 border border-line" />
+        {/* The roofs cull their icons by size; this one is here at any zoom. */}
+        <TypeIcon svg={icons?.[node.icon]} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold text-phosphor-bright text-sm">{node.name}</p>
           <p className="truncate font-mono text-2xs text-phosphor-dim">{node.alias}</p>

@@ -413,6 +413,7 @@ export function App({
           {selectedNode && neighbourhood ? (
             <Inspector
               focused={focus === selectedNode.id}
+              icons={icons}
               neighbourhood={neighbourhood}
               node={selectedNode}
               nodesById={nodesById}
