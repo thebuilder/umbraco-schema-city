@@ -32,6 +32,22 @@ npm run build
 `npm run generate-client` regenerates `src/api/` from the running site's Swagger document at
 `/umbraco/swagger/schema-city/swagger.json`, so the site has to be running for that one.
 
+## CI
+
+`.github/workflows/ci.yml` runs on push and pull request. It builds the client with Node 24,
+then builds and tests the solution twice, once against Umbraco 17.6.2 and once against 18.1.1.
+The matrix compiles and runs the unit tests; it does not boot the site.
+
+The site's Umbraco version is the `UmbracoVersion` MSBuild property, default 17.6.2, so the
+same switch works locally:
+
+```bash
+dotnet build SchemaCity.sln -c Release -p:UmbracoVersion=18.1.1
+```
+
+The library project is not affected by it. It keeps the `[17.0.0, 19.0.0)` range, and NuGet
+resolves the floor for its own build.
+
 ## Run the site
 
 ```bash
