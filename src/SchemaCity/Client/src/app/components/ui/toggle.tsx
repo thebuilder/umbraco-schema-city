@@ -6,7 +6,10 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const toggleVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-none border border-transparent font-mono font-semibold uppercase tracking-terminal outline-none transition duration-150 ease-terminal focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-phosphor-bright disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+  // shrink-0, like the button primitive: a toggle whose label cannot wrap must keep
+  // its own width, or a crowded row squeezes the box while the text stays put and the
+  // next control paints over the letters that stick out.
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-none border border-transparent font-mono font-semibold uppercase tracking-terminal outline-none transition duration-150 ease-terminal focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-phosphor-bright disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
   {
     defaultVariants: { size: "default", variant: "default" },
     variants: {
