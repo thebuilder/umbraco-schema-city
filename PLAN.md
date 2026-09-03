@@ -70,6 +70,7 @@ schema-city/
   PLAN.md
   README.md
   LICENSE                          MIT
+  umbraco-marketplace.json         marketplace metadata
   SchemaCity.sln
   src/
     SchemaCity/                      Razor Class Library, the NuGet package
@@ -86,7 +87,7 @@ schema-city/
       Usage/
         UsageCollector.cs            counts, cultures, relations, aggregated by type
       Models/                        DTOs mirrored 1:1 by the TS types
-      wwwroot/App_Plugins/SchemaCity/   Vite output + umbraco-package.json
+      wwwroot/App_Plugins/SchemaCity/   Vite output, generated and gitignored; the BuildClient target fills it for dotnet pack
       Client/
         package.json  vite.config.ts  tsconfig.json  components.json
         public/umbraco-package.json
@@ -98,7 +99,7 @@ schema-city/
           app/                          React: App, layout, scene (R3F), panels, styles.css (Tailwind + afterglow theme)
           components/ui/                afterglow primitives, copy-in via the shadcn CLI
         dev/
-          index.html  main.ts        harness, loads fixtures without Umbraco
+          index.html  main.tsx      harness, loads fixtures without Umbraco
           fixtures/*.json            graph and usage fixtures; the medium ones are exported by the seeder
     SchemaCity.Site/                 throwaway Umbraco 17 site referencing SchemaCity
       Seed/SchemaSeeder.cs           dev-only: creates 78 Document Types on first boot
@@ -336,6 +337,10 @@ Library mode, ES output, `rollupOptions.external: [/^@umbraco/]`. Two entries, `
 
 Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the six chunks measure `workspace.js` 1.0 kB, `document-type-view.js` 1.2 kB, `api.js` 0.4 kB, `app.js` 44 kB, `vendor.js` 170 kB and `Scene.js` 345 kB.
 
+### Packaging
+
+`dotnet pack src/SchemaCity/SchemaCity.csproj -c Release` from a clean clone produces `SchemaCity.1.0.0.nupkg`. It carries the built client as static web assets under `staticwebassets/App_Plugins/SchemaCity/`, which a host serves at `/App_Plugins/SchemaCity/` because `StaticWebAssetBasePath` is `/`, plus the README, the MIT licence, the author and the four Umbraco dependencies at `[17.0.0, 19.0.0)`. A `BuildClient` MSBuild target runs `npm ci` (only when `node_modules` is missing) and `npm run build`, with `BeforeTargets="ResolveProjectStaticWebAssets"`, and only when `wwwroot/App_Plugins/SchemaCity/workspace.js` is missing. The target then adds `wwwroot/**` back as `Content` itself, because the SDK globs `Content` at evaluation time, before Vite has written anything. `-p:SkipClientBuild=true` skips the target, and CI passes it after running its own npm build. The package measured 9.5 MB with 6.9 MB of `.js.map` in it, so the packaged build is being changed to ship no source maps.
+
 ### API client
 
 One hand-written function per endpoint in `src/api.ts`, `getGraph()` and `getUsage(refresh = false)`, each calling `umbHttpClient.get<{ 200: SchemaGraph }>({ security: [{ type: "http", scheme: "bearer" }], url })` and wrapped in `tryExecute` by the caller. The `security` entry is required; without it the backoffice client sends no token. The type parameter is the status map, not the payload, because the client unwraps `Record` types by value. No Swagger document and no generated client: Umbraco 18 replaced Swashbuckle's document generation with Microsoft.AspNetCore.OpenApi, the 17 extension types no longer exist, and a composer deriving from them stops the whole assembly loading at boot on 18.
@@ -507,9 +512,10 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 ### M4, Polish and release (medium)
 
 - World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. (in progress)
-- README with screenshots, NuGet packaging with the `[17.0.0, 19.0.0)` range, Umbraco Marketplace metadata. (in progress)
+- NuGet packaging with the client build wired into `dotnet pack`, README for the package, marketplace metadata. Done 2026-09-03; screenshots still missing.
 - Roof icons, property "windows" on floors, Explore perspective toggle, list view fallback.
-- Empty state (no Document Types), error state (endpoint 403/500), loading skeleton. (in progress)
+- Empty state (no Document Types), error state (HTTP status), lens disabled with a reason when usage fails. Done 2026-09-03.
+- Seeder log noise: application URL set, UI culture pinned to en-US in the demo site (the en-DK warnings were this Mac's locale). Done 2026-09-03; 585 warnings to 19.
 - Perf pass, only if the pathological fixture drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` on NuGet.
 
@@ -561,7 +567,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Fix the editor link (in progress). Then M4: world stage, packaging, states (in progress), then roof icons, property windows, Explore camera, list view. Next.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Fix the editor link (in progress). Then M4: packaging and states. Done. World stage (in progress), then roof icons, property windows, Explore camera, list view. Next.
 
 ## 13. Resolved questions
 
