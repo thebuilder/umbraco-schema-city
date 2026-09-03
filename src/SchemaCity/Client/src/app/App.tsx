@@ -9,6 +9,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
 import {
   Popover,
@@ -23,7 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -48,6 +54,13 @@ const LAYER_LABEL: Record<Layer, string> = {
   blocks: "Blocks",
   references: "References",
 };
+
+/**
+ * `layers` with one layer switched. Rebuilt from LAYERS rather than pushed onto, so
+ * the URL writes its layers in toolbar order however they were switched on.
+ */
+const withLayer = (on: Layer[], layer: Layer): Layer[] =>
+  LAYERS.filter((name) => (name === layer ? !on.includes(name) : on.includes(name)));
 
 /** One edge style, drawn the way the scene draws it. */
 function EdgeMark({
@@ -262,13 +275,7 @@ export function App({
       const digit = Number(event.key);
       if (digit >= 1 && digit <= 4) {
         const layer = LAYERS[digit - 1];
-        // Rebuilt from LAYERS rather than pushed onto, so the URL writes its layers
-        // in toolbar order however they were switched on.
-        setLayers((on) =>
-          LAYERS.filter((name) =>
-            name === layer ? !on.includes(name) : on.includes(name),
-          ),
-        );
+        setLayers((on) => withLayer(on, layer));
         return;
       }
       // Turning either view off goes back to the city, the way the toolbar's two
@@ -391,20 +398,28 @@ export function App({
           </h1>
           <Badge>{nodes.length} types</Badge>
 
-          <ToggleGroup
-            aria-label="Relationship layers"
-            className="ml-4"
-            multiple
-            onValueChange={(value) => setLayers(value as Layer[])}
-            size="sm"
-            value={layers}
-          >
-            {LAYERS.map((layer) => (
-              <ToggleGroupItem key={layer} value={layer}>
-                {LAYER_LABEL[layer]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          {/* One button rather than four, because the backoffice is narrower than
+              the harness and four of them ran off the edge. The count is on the
+              label so the toolbar still says how much of the city is drawn. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button size="sm" variant="outline" />}
+            >
+              Layers {layers.length}/{LAYERS.length}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {LAYERS.map((layer, index) => (
+                <DropdownMenuCheckboxItem
+                  checked={layers.includes(layer)}
+                  key={layer}
+                  onCheckedChange={() => setLayers((on) => withLayer(on, layer))}
+                >
+                  {LAYER_LABEL[layer]}
+                  <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Two ways to look at the same city, and one toggle each rather than a
               picker, because either one is off most of the time. Turning List off
