@@ -1736,6 +1736,7 @@ function ExploreCamera({
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
+  const invalidate = useThree((state) => state.invalidate);
   const controls = useThree((state) => state.controls) as {
     target: THREE.Vector3;
     update: () => void;
@@ -1745,8 +1746,10 @@ function ExploreCamera({
   useEffect(() => {
     const perspective = camera as THREE.PerspectiveCamera;
     // drei swaps the default camera one render after this component mounts, so the
-    // first run of this effect is still the orthographic one.
-    if (!perspective.isPerspectiveCamera || !controls) return;
+    // first run of this effect is still the orthographic one. A viewport of nothing
+    // is the canvas before it has been measured, which a link straight into Explore
+    // arrives at: framing against it puts the camera a NaN away from the city.
+    if (!perspective.isPerspectiveCamera || size.width === 0 || size.height === 0) return;
     // A link straight into Explore has no isometric camera to copy, so the framing
     // that one would have taken is worked out here instead.
     const framing = viewOf(bounds, size);
@@ -1759,14 +1762,22 @@ function ExploreCamera({
       const distance = from.worldHeight / (2 * Math.tan((EXPLORE_FOV * Math.PI) / 360));
       const direction = from.position.clone().sub(from.target).normalize();
       perspective.position.copy(from.target).addScaledVector(direction, distance);
+      // The controls are what aim the camera, on their first update, and they are
+      // rebuilt for the new camera a render after this one. Until then the camera
+      // keeps the rotation it was made with and looks down -z from above the city,
+      // at nothing, which is the black frame the switch used to open on.
+      perspective.lookAt(from.target);
+      perspective.updateProjectionMatrix();
       placed.current = true;
+      invalidate();
     }
+    if (!controls) return;
     // New controls come with the target at the origin, so it is copied over every
     // time they are rebuilt, not only on the first one.
     controls.target.copy(from.target);
     controls.update();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, controls, pose]);
+  }, [camera, controls, invalidate, pose, size]);
 
   return <PerspectiveCamera far={span * 40} fov={EXPLORE_FOV} makeDefault near={0.5} />;
 }
