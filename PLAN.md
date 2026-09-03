@@ -57,7 +57,7 @@ These apply to every commit, every file and every generated sentence.
 
 10. **The seeded schema is the test bed.** No real project is required. The seeder plants known findings (orphans, unused compositions, dead ends, an unused element type) so tests and milestone exits assert against a deterministic expected set.
 
-11. **React inside the Lit wrapper, with R3F and afterglow.** React 19 renders inside the Lit workspace element, the scene runs on React Three Fiber and drei, and the panels are shadcn components on base-ui from the afterglow registry, with Tailwind v4. The reason is the ecosystem around the scene. Event traffic was not the deciding factor, since a store handles that identically in Lit or React. R3F and drei give declarative meshes, instanced picking, camera controls and HTML labels, and shadcn gives the panel chrome, so there is less code we own. No state library until one is needed.
+11. **React inside the Lit wrapper, with R3F and afterglow.** React 19 renders inside the Lit workspace element, the scene runs on React Three Fiber and drei, and the panels are shadcn components on base-ui from the afterglow registry, with Tailwind v4. The reason is the ecosystem around the scene. Event traffic was not the deciding factor, since a store handles that identically in Lit or React. R3F and drei give declarative meshes, camera controls and instanced picking, and shadcn gives the panel chrome, so there is less code we own. No state library until one is needed.
 
 12. **Home is a sidebar workspace, not a dashboard.** A Settings sidebar entry in the Advanced group, next to Log Viewer and Relations, opening a full-area workspace at `/umbraco/section/settings/workspace/schema-city`. A dashboard would share the section landing page with everything else there; the workspace gives the city the whole content area.
 
@@ -256,7 +256,7 @@ GET /umbraco/management/api/v1/schema-city/usage?refresh=false
 ### Module rules
 
 - One React `App` under `src/app/` is the whole application. It imports nothing from `@umbraco-cms/backoffice`, takes the graph and usage objects and a `focus` id as props, and calls back through props (`onOpenType`). There is no custom element for the map, and there will not be one.
-- There is one Lit wrapper per host that mounts that `App`, the home workspace now and the Document Type editor view in M2. The wrappers are the only Umbraco-aware code. They fetch, read the workspace context, resolve icons, and turn `onOpenType` into an editor link.
+- There is one Lit wrapper per host that mounts that `App`, one for the home workspace and one for the Document Type editor view. The wrappers are the only Umbraco-aware code. They fetch, read the workspace context, resolve icons, and turn `onOpenType` into an editor link through `openTypeInEditor` in `api.ts`, which builds the route from Umbraco's `UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN` and pushes it onto the history.
 - The harness renders `App` directly, from fixtures and a query string.
 - `model/` stays pure: no DOM, no three.js, no React. Vitest-tested with fixture JSON. The layout functions (dagre to placements, focus layout) live in `app/layout/` and are pure in the same way.
 - `components/ui/` holds the copied-in afterglow primitives. They are edited in place; there is no upstream to update from.
@@ -294,7 +294,7 @@ GET /umbraco/management/api/v1/schema-city/usage?refresh=false
       "name": "Schema City Relationships View",
       "element": "/App_Plugins/SchemaCity/document-type-view.js",
       "weight": 50,
-      "meta": { "label": "Relationships", "pathname": "relationships", "icon": "icon-map" },
+      "meta": { "label": "Relationships", "pathname": "relationships", "icon": "icon-map-alt" },
       "conditions": [{ "alias": "Umb.Condition.WorkspaceAlias", "match": "Umb.Workspace.DocumentType" }]
     }
   ]
@@ -311,7 +311,7 @@ would add a headline and a tab strip, and `kind: "routable"` would add child rou
 use for. The element sets `display: block; height: 100%` to fill that area. Weight 50 puts the
 entry below Umbraco's own four rather than reordering them.
 
-The workspace view consumes `UMB_DOCUMENT_TYPE_WORKSPACE_CONTEXT` (from `@umbraco-cms/backoffice/document-type`) and observes `unique` to get the key. Verify the exact token name against the v17 package when scaffolding; the pattern is the same for every workspace.
+The workspace view wrapper `entry-document-type-view.tsx` consumes `UMB_DOCUMENT_TYPE_WORKSPACE_CONTEXT` from `@umbraco-cms/backoffice/document-type` and observes `unique` for the key. It fetches the graph and mounts the same React `App` with that type pre-selected and focused through an `initial` prop. The icon is `icon-map-alt`, the same one as the sidebar entry, and weight 50 puts the tab after Design, Structure, Settings and Templates.
 
 ### Hosting
 
@@ -333,9 +333,9 @@ The scene reads `--phosphor`, `--signal` and `--phosphor-dim` from computed styl
 
 ### Vite
 
-Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. React, R3F, drei, base-ui, Three.js and dagre are bundled.
+Library mode, ES output, `rollupOptions.external: [/^@umbraco/]`. Two entries, `workspace` and `document-type-view`, sharing `vendor.js` and `app.js`. `api.ts` sits outside `src/app/` and is shared by both, so it becomes its own small `api.js` chunk. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. React, R3F, drei, base-ui, Three.js and dagre are bundled.
 
-Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the four chunks measure `workspace.js` 1.1 kB, `app.js` 37 kB, `vendor.js` 165 kB and `Scene.js` 345 kB.
+Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the six chunks measure `workspace.js` 1.0 kB, `document-type-view.js` 1.2 kB, `api.js` 0.4 kB, `app.js` 37 kB, `vendor.js` 165 kB and `Scene.js` 345 kB.
 
 ### API client
 
@@ -490,7 +490,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Focus mode with camera flight and neighbourhood layout, refocus by double-click, inspector or palette, Escape to return. Done 2026-09-03 (pulled ahead of the layers because a hub selection is a road fan and a list without it).
 - Screen-space label culling. Done 2026-09-03; 17 labels, none overlapping, on the Home focus view.
 - Compositions, Blocks, References layers with their edge styles.
-- A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link.
+- A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link. Done 2026-09-03; visual check in the backoffice pending a login.
 - URL state and deep links.
 - Exit: "Where is this composition used?" and "What uses this Element Type?" are two clicks from the Document Type editor.
 
@@ -527,7 +527,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
 | Hub types (40+ neighbours) make selection views unreadable | Label cap, focus mode with a neighbourhood layout, and only the focused node's edges drawn. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
-| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.1 kB for the entry plus 36 kB of app and 165 kB of vendor, and the 347 kB scene chunk loads only when the workspace opens. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 347 kB proves to matter. |
+| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.4 kB for `api.js`, 37 kB of app and 165 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
 | The manifest entry loaded twice by the backoffice's cache-busting query | The entry chunk exports nothing; shared code and vendors live in their own chunks; the element registration is guarded. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
@@ -557,7 +557,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. Focus mode with the camera flight. Done. Screen-space label culling. Done. Then the edge layers, URL state and the Document Type editor wrapper. Next.
+6. Focus mode with the camera flight. Done. Screen-space label culling. Done. The Document Type editor tab. Done. Then the edge layers and URL state. Next.
 
 ## 13. Resolved questions
 
