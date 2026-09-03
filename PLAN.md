@@ -372,20 +372,18 @@ Determinism: sort nodes and edges by alias before dagre. Dagre is deterministic 
 `layoutFocus(graph, neighbourhood, focusId, cityPlacements)` places the focused node and its neighbours. It takes the graph as well, because the neighbourhood model has no list of the types that compose the focused one.
 
 - focused node at the origin
-- allowed parents in arc rings of at most 8 to the north. An unbounded arc swings into the corner groups
-- allowed children in rows of 8 to the south
-- compositions and the inherited parent on a raised platform to the north-west. `Placement` gained an optional `y` for it
-- types that compose it to the north-east
-- block targets to the south-west, block hosts to the south-east
-- reference targets east, reference sources west
+- the first band in any direction starts at half the focused node's footprint plus a street, 9 units. Later bands sit 3 units past the previous band's far edge
+- rows inside a group pack each building at its own footprint, 3 units apart, and the rows sit 3 units apart
+- allowed children in rows of 8 centred due south
+- allowed parents in one row due north up to 8, and in arc rings past that, at a radius that keeps eight buildings over 120 degrees from touching
+- corner groups stand beside the parent or child band when that widens the neighbourhood by at most one street, otherwise on the next band out, on their own side of the centre line. Compositions and the inherited parent go north-west on a raised platform (`Placement` gained an optional `y` for it), the types that compose it north-east, block targets south-west and block hosts south-east
+- reference targets east and reference sources west, as columns of 8 at one street, placed last so they clear every band
 
-The neighbourhood stands on its own focus island drawn under it, with compact spacing: children rows tight to the south, parents just north, compositions and block targets within a couple of streets. Laying it out at the fixed generous distances on top of whichever islands were there read as random (queued).
+`focusBounds(placements)` returns the neighbourhood's bounds with the island padding, and `focusAnchor` returns the focused node's city position. The scene draws a focus island there and frames it (in progress). Home on the seeded schema, 42 neighbours, went from about 101 by 100 units to 49.5 by 58.5, or 56 by 65 padded; the worst hub on the stress fixture, 62 neighbours, is 67 by 78 padded. Fourteen of the 200 tests cover the focus layout: no two buildings share ground on any type of either fixture, everything sits within three streets on a small neighbourhood, the bounds cover every moved building, an isolated node yields its footprint plus padding, and the same graph lays out the same way twice.
 
 Only the focused node's edges draw: roads for `allowedChild`, raised azure lines for `composition` and `inherits`, dipped amber lines for `block`, dotted violet lines for `reference`. Everything that is not a neighbour sinks to a flat plate 0.1 units high at about 0.12 opacity, with no label, no road and no picking, so the neighbourhood stands on a flat map that still shows where it is. Leaving focus restores the buildings with the same 400 ms tween. The focus layout is centred on the focused node's city position, so without this its rows landed on top of faded buildings and read as overlap.
 
-Entry is a double-click, Enter on the selected node, or the inspector's Focus button. The camera flies in over 700 ms and any pointer down on the controls interrupts it. The flight frames the neighbourhood in the part of the canvas the inspector does not cover (queued). Each neighbour tweens from its city placement to its focus placement over 400 ms with smootherstep, and reduced motion skips the tweens. Double-click a neighbour, or pick one in the inspector or the palette, to refocus. The first Escape leaves focus and keeps the selection, the second clears it.
-
-Ceiling: more than about 30 parents plus compositions at once pushes the outer arc into the north-west grid. Nothing in the seeded schema is close.
+Entry is a double-click, Enter on the selected node, or the inspector's Focus button. The camera flies in over 700 ms and any pointer down on the controls interrupts it. The flight frames the neighbourhood in the part of the canvas the inspector does not cover (in progress). Each neighbour tweens from its city placement to its focus placement over 400 ms with smootherstep, and reduced motion skips the tweens. Double-click a neighbour, or pick one in the inspector or the palette, to refocus. The first Escape leaves focus and keeps the selection, the second clears it.
 
 ### Roads (`app/scene/roads.ts`)
 
@@ -556,7 +554,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Free camera fov 40 degrees, and the black first frame after the switch fixed. Done 2026-09-04.
 - CAMERA control, ISO and FREE, replacing the Explore toggle. Done 2026-09-04; a two-segment toggle group, `E` flips it, `view=explore` stays the URL value, and the control reference says Iso and Free.
 - List filter placeholder "Filter types", with a minimum width on the input. Done 2026-09-04.
-- Focus mode: a focus island with compact spacing, inspector-aware framing, exit on deselect (queued after the stamp and toolbar branches).
+- Focus mode: packed layout done 2026-09-04 (Home from 107 by 106 to 56 by 65 units padded, 200 tests); the focus island, inspector-aware framing and exit on deselect in progress.
 - Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03. The wrapped row spilling over the canvas was paint order (the absolutely positioned scene painted over the in-flow toolbar) plus a Toggle that could shrink under its label; fixed the same day with a stacking layer and `shrink-0`, measured from 1400 to 600 px.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` on NuGet.
@@ -597,7 +595,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layer | How |
 | --- | --- |
 | Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
-| `model/`, `app/` | 192 vitest tests across 16 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
+| `model/`, `app/` | 200 vitest tests across 16 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 after the road routing: green on both majors, nupkg 629 KB. On 18 the manifest is served before seeding ends, so the boot gate there proves less than on 17; the seeder line check covers it. CI also packs and checks the nupkg |
 | Performance | The seeded schema in the dev harness with the browser's own frame profiler; the stress fixture lays out in about 24 ms and a synthetic 300-node graph in 35 ms |
@@ -611,7 +609,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. Then the focus island, inspector-aware framing and exit on deselect. Next: screenshots for the README and the marketplace, then a final verification on both majors.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. In progress: the focus island, inspector-aware framing, exit on deselect, the taller name band. Next: screenshots for the README and the marketplace, then a final verification on both majors.
 
 ## 13. Resolved questions
 
