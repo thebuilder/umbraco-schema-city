@@ -92,7 +92,7 @@ schema-city/
         package.json  vite.config.ts  tsconfig.json  components.json
         public/umbraco-package.json
         src/
-          api.ts                        one typed call per endpoint through umbHttpClient
+          api.ts                  endpoint calls, the editor link and icon resolution for the wrappers
           entry-workspace.tsx           Lit wrapper: fetches, mounts the React root, adopts the stylesheet
           entry-document-type-view.tsx  Lit wrapper for the Document Type editor, mounts App focused on the type
           model/                        graph types, indexes, findings, search   (no DOM, no three)
@@ -536,7 +536,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
 | Hub types (40+ neighbours) make selection views unreadable | Label cap, focus mode with a neighbourhood layout, and only the focused node's edges drawn. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
-| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.4 kB for `api.js`, 44 kB of app and 170 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
+| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.7 kB for `api.js`, 44 kB of app and 170 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
 | The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
 | The app's own URL writing fights the backoffice router | Write URL state only while the location is still the workspace route the app mounted under, and never after navigating away; use the backoffice's own navigation for the editor link. Done 2026-09-03. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
