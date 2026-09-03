@@ -700,9 +700,10 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
   );
 
   useFrame(() => {
-    // The camera holds its target on the ground and looks straight at it, so the target
-    // is the ground point at the centre of the screen. Centring the plane and the fade
-    // there is what keeps the fade concentric with what the camera can see.
+    // ponytail: the target is the ground point at the centre of the screen only
+    // because the controls pan in the ground plane, which holds the target on y = 0.
+    // The Explore perspective camera will have to raycast its own centre ray instead,
+    // and so will anything that turns screen-space panning back on.
     const target = controls?.target;
     if (!target || !grid.current) return;
     grid.current.position.set(target.x, GRID_Y, target.z);
@@ -727,6 +728,10 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
           vertexShader={GRID_VERTEX_SHADER}
         />
       </mesh>
+      {/* ponytail: one rectangle around everything placed. In focus mode that is the
+          city and the focus layout at once, so the land reads as a larger rectangle
+          rather than as ground that follows the layout. Two slabs, or a slab per
+          district, would fix it; the grid under it is the same either way. */}
       <mesh position={[bounds.centre.x, -SLAB_HEIGHT / 2, bounds.centre.z]}>
         <boxGeometry
           args={[bounds.width + SLAB_MARGIN * 2, SLAB_HEIGHT, bounds.depth + SLAB_MARGIN * 2]}
