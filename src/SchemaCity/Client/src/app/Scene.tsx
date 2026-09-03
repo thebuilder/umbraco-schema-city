@@ -352,11 +352,18 @@ function Labels({
 const ISO_POLAR_ANGLE = Math.acos(1 / Math.sqrt(3));
 
 /**
- * Half the camera's framing distance, in world units. The grid reuses it too,
- * so the ground always reaches past whatever the camera can see.
+ * The camera's framing distance, in world units, and the height of what it sees.
+ * The grid reuses it too, so the ground always reaches past whatever the camera
+ * can see.
+ *
+ * At a true isometric angle a city `width` by `depth` on the ground covers
+ * `(width + depth) / sqrt(6)` of that height, so the longer side on its own frames
+ * the whole city with about a quarter of the height left for the buildings
+ * standing up in it. The old 1.5x of that pushed the camera far enough back that
+ * a single-group building came out under three pixels tall.
  */
 function citySpan(bounds: CityBounds): number {
-  return Math.max(bounds.width, bounds.depth, 4) * 1.5;
+  return Math.max(bounds.width, bounds.depth, 4);
 }
 
 /** Fits the ortho camera to the city bounds, at a true isometric angle. */
