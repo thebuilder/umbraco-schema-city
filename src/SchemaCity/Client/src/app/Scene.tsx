@@ -1429,18 +1429,37 @@ const REFRAME_MS = 400;
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
-/** Where the ortho camera stands to frame `bounds` at a true isometric angle. */
-function viewOf(bounds: CityBounds, size: { width: number; height: number }): View {
+/**
+ * Screen-right on the ground at the isometric angle, which is the camera's own x
+ * axis: `cross(up, position - target)` normalised, for a camera on (1, 1, 1).
+ */
+const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
+
+/**
+ * Where the ortho camera stands to frame `bounds` at a true isometric angle.
+ *
+ * `shift` is how many CSS pixels the framed centre moves left on screen, which is
+ * half the inspector's width when it is open. The camera moves the other way, along
+ * its own right, by that many pixels over the framing zoom: an orthographic camera's
+ * zoom is its pixels per world unit, so that is the whole conversion. The framed
+ * centre then lands in the middle of the canvas the panel does not cover.
+ */
+function viewOf(
+  bounds: CityBounds,
+  size: { width: number; height: number },
+  shift = 0,
+): View {
   const span = citySpan(bounds);
+  const zoom = Math.min(size.width, size.height) / span;
   const direction = new THREE.Vector3(1, 1, 1).normalize();
+  const target = new THREE.Vector3(bounds.centre.x, 0, bounds.centre.z).addScaledVector(
+    SCREEN_RIGHT,
+    shift / zoom,
+  );
   return {
-    position: new THREE.Vector3(
-      bounds.centre.x + direction.x * span,
-      direction.y * span,
-      bounds.centre.z + direction.z * span,
-    ),
-    target: new THREE.Vector3(bounds.centre.x, 0, bounds.centre.z),
-    zoom: Math.min(size.width, size.height) / span,
+    position: target.clone().addScaledVector(direction, span),
+    target,
+    zoom,
     span,
   };
 }
@@ -1453,10 +1472,13 @@ function viewOf(bounds: CityBounds, size: { width: number; height: number }): Vi
  */
 function CameraRig({
   bounds,
+  inspectorWidth,
   reframe,
   reducedMotion,
 }: {
   bounds: CityBounds;
+  /** CSS pixels of canvas the inspector covers on the right, 0 when it is closed. */
+  inspectorWidth: number;
   /** Bumped by Home to ask for the same city to be framed again. */
   reframe: number;
   reducedMotion: boolean;
@@ -1481,7 +1503,12 @@ function CameraRig({
     reframe: number;
   } | null>(null);
 
-  const view = useMemo(() => viewOf(bounds, size), [bounds, size]);
+  // Half the panel, because the middle of the uncovered canvas is that far left of
+  // the middle of the whole of it.
+  const view = useMemo(
+    () => viewOf(bounds, size, inspectorWidth / 2),
+    [bounds, inspectorWidth, size],
+  );
 
   useEffect(() => {
     const cancel = () => {
@@ -1540,7 +1567,7 @@ function CameraRig({
       ease: asked ? smootherstep : easeInOutCubic,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, bounds, controls, reframe, reducedMotion]);
+  }, [view, bounds, controls, inspectorWidth, reframe, reducedMotion]);
 
   useFrame(() => {
     const moving = flight.current;
@@ -1865,6 +1892,7 @@ export default function Scene({
   layers,
   icons,
   explore,
+  inspectorWidth = 0,
   reframe = 0,
   onSelect,
   onFocus,
@@ -1880,6 +1908,12 @@ export default function Scene({
   layers: readonly Layer[];
   /** The Explore toggle: a free perspective camera instead of the isometric one. */
   explore?: boolean;
+  /**
+   * CSS pixels of the canvas the inspector covers on the right, 0 when it is closed.
+   * Every framing flight aims at the middle of what it leaves rather than at the
+   * middle of the canvas, so a focused neighbourhood is not half behind the panel.
+   */
+  inspectorWidth?: number;
   /**
    * Bumped to frame the whole city again. It is a count rather than a flag because
    * the camera has to answer Home a second time from wherever the reader took it.
@@ -2178,7 +2212,12 @@ export default function Scene({
             <ExploreCamera bounds={bounds} pose={pose} span={span} />
           ) : (
             <>
-              <CameraRig bounds={bounds} reducedMotion={reducedMotion} reframe={reframe} />
+              <CameraRig
+                bounds={bounds}
+                inspectorWidth={inspectorWidth}
+                reducedMotion={reducedMotion}
+                reframe={reframe}
+              />
               <PoseTracker pose={pose} />
             </>
           )}

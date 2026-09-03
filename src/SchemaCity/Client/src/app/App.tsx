@@ -42,7 +42,7 @@ import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
-import { Inspector } from "./Inspector";
+import { Inspector, INSPECTOR_WIDTH } from "./Inspector";
 import { TypeTable } from "./TypeTable";
 import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
 import { type Lens, LENS_LABEL, LENSES, lensScale, type Ramp } from "./scene/lens";
@@ -580,6 +580,7 @@ export function App({
                   focus={focus}
                   graph={graph}
                   icons={icons}
+                  inspectorWidth={selectedNode && neighbourhood ? INSPECTOR_WIDTH : 0}
                   layers={layers}
                   onFocus={enterFocus}
                   onSelect={setSelected}
