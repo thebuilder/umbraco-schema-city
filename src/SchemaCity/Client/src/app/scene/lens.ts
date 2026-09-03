@@ -3,9 +3,10 @@
 // position into a colour from the theme tokens, and the toolbar legend prints the
 // two ends from the same numbers.
 //
-// A node the lens says nothing about is absent from the map and keeps the colour
-// it has, which is how Element Types stay amber under every lens that is about
-// content instances.
+// A node the lens says nothing about is absent from the map, which is every
+// Element Type under every lens about content instances. Scene.tsx paints those
+// phosphor-dim while a lens is on, so the amber end of a ramp never has an amber
+// district beside it to be confused with.
 import type { SchemaGraph, UsageReport } from "../../model/types";
 
 export type Lens =
