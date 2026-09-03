@@ -1,5 +1,4 @@
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -396,7 +395,6 @@ export function App({
           <h1 className="font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
             Schema City
           </h1>
-          <Badge>{nodes.length} types</Badge>
 
           {/* One button rather than four, because the backoffice is narrower than
               the harness and four of them ran off the edge. The count is on the

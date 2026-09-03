@@ -12,9 +12,10 @@ import { Kbd } from "@/components/ui/kbd";
 type Row = { keys: string[]; does: string };
 
 /**
- * Every binding the city has, printed by the city. The toolbar shows the two
- * shortcuts a first-time reader needs, Search and this page, and the rest live here
- * rather than competing with the view.
+ * Every binding the city has, printed by the city. The toolbar prints the one
+ * shortcut a first-time reader needs, Search, and the button that opens this page is
+ * drawn as the key that opens it. The rest live here rather than competing with the
+ * view.
  */
 const GROUPS: { title: string; rows: Row[] }[] = [
   {
@@ -76,9 +77,14 @@ export function Help({
 }) {
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogTrigger render={<Button size="sm" variant="outline" />}>
-        Help
-        <Kbd>?</Kbd>
+      {/* An icon button, because the backoffice toolbar is narrow and a word plus a
+          key costs four times the width of the glyph. The ? is both the label and
+          the key that opens the same dialog. */}
+      <DialogTrigger
+        aria-label="Control reference"
+        render={<Button className="text-xs" size="icon-sm" variant="outline" />}
+      >
+        ?
       </DialogTrigger>
       <DialogContent className="gap-0 p-0 sm:max-w-2xl" showCloseButton={false}>
         <div className="flex items-center justify-between gap-4 border-line border-b px-4 py-3">
