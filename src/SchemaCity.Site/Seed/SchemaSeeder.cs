@@ -552,7 +552,9 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     }
 
     private void DeleteDoomedElementType() =>
-        _contentTypeService.Delete(_types["elementDoomed"], UmbracoConstants.Security.SuperUserId);
+        _contentTypeService
+            .DeleteAsync(_types["elementDoomed"].Key, UmbracoConstants.Security.SuperUserKey)
+            .GetAwaiter().GetResult();
 
     // ---------------------------------------------------------------- content
 
