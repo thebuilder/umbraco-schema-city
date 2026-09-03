@@ -714,17 +714,19 @@ export default function Scene({
     return () => cancelAnimationFrame(frame);
   }, [target, reducedMotion]);
 
-  // The camera frames the focus layout, which is the focused node and everything
-  // the focus layout moved, not the whole city behind it.
+  // The ground stays the city's however far the focus layout roams, so it never
+  // slides out from under the buildings.
+  const ground = useMemo(() => cityBounds(city), [city]);
+  const span = citySpan(ground);
+  // The camera frames the focus layout instead, which is the focused node and
+  // everything moved around it, not the whole city behind them.
   const bounds = useMemo(
     () =>
-      focus && focusNeighbours
+      focusNeighbours
         ? cityBounds(target.filter((placement) => focusNeighbours.has(placement.id)))
-        : cityBounds(city),
-    [focus, focusNeighbours, target, city],
+        : ground,
+    [focusNeighbours, target, ground],
   );
-  const span = useMemo(() => citySpan(cityBounds(city)), [city]);
-  const groundCentre = useMemo(() => cityBounds(city).centre, [city]);
   const nodesById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph]);
   const placementsById = useMemo(() => new Map(placements.map((p) => [p.id, p])), [placements]);
   const selectionNeighbours = useMemo(
@@ -767,7 +769,7 @@ export default function Scene({
               stage (sky, fog, seamless terrain, as fsn does) is a later pass. */}
           <gridHelper
             args={[span * 3, 30, palette.dim, palette.dim]}
-            position={[groundCentre.x, 0, groundCentre.z]}
+            position={[ground.centre.x, 0, ground.centre.z]}
           />
           <Buildings
             cellsByKind={cellsByKind}
