@@ -72,7 +72,7 @@ schema-city/
       SchemaCity.csproj
       Constants.cs                   API name, route prefix, aliases
       Composers/
-        SchemaCityComposer.cs        DI + Swagger doc registration
+        SchemaCityComposer.cs        registers the builder singleton and its cache-clearing handlers
       Api/
         GraphController.cs           GET graph
         UsageController.cs           GET usage
@@ -109,7 +109,7 @@ Scaffold command (verified against the v17 docs):
 dotnet new umbraco-extension -n SchemaCity -ex
 ```
 
-The `-ex` example gives the controller, Swagger composer and dashboard to replace. Keep its `openapi-ts` wiring and the `umbHttpClient` binding. There is no controller base class until a second controller exists; `GraphController` carries the route and API attributes itself.
+The `-ex` example gives a controller, a Swagger composer and a dashboard. Keep the controller shape, delete the Swagger and generated-client wiring (see section 5), replace the dashboard. There is no controller base class until a second controller exists; `GraphController` carries the route and API attributes itself.
 
 Naming: NuGet id `SchemaCity`, namespace `SchemaCity`, route `schema-city`, custom element prefix `schema-city-`, extension alias prefix `SchemaCity.`.
 
@@ -238,8 +238,6 @@ Caching and invalidation:
 - `UsageCollector` caches for 60 seconds. `?refresh=true` bypasses. No lock around the cold path; the query is one round trip.
 
 Authorization: `[Authorize(Policy = AuthorizationPolicies.SectionAccessSettings)]` on both controllers. The dashboard is only registered under Settings, and the workspace view is inside the Settings section. Access is therefore whatever the administrator grants a user group for Settings; the package adds no permission of its own.
-
-Swagger: register a document named `schema-city` in `SwaggerGenOptions` through the composer the template already generates, so `openapi-ts` reads `/umbraco/swagger/schema-city/swagger.json`.
 
 Resulting routes:
 
@@ -412,7 +410,6 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - `dotnet new umbraco-extension -n SchemaCity -ex`, solution, test site, xUnit project.
 - `SchemaSeeder` creates ~80 Document Types with folders, compositions, inheritance, Block List / Grid / RTE blocks, MNTP filters, roots, a cycle, orphans and element types, plus a few hundred content items so usage counts are non-trivial. It plants a known set of findings, listed in one test in `SchemaCity.Tests`. Runs once in Development only.
-- CI matrix: the site project builds and boots on Umbraco 17 and 18.
 - Dev harness with a hand-written `small.json`.
 - CI: `npm ci`, `npm run build`, `dotnet build`, `dotnet test`, then boot the site and check the manifest, the backoffice and a 401 from the graph endpoint, on Umbraco 17.6.2 and 18.1.1.
 - Done 2026-09-03 on Umbraco 17.6.2, with 18.1.1 as the second CI target.
@@ -488,7 +485,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ## 12. First tasks
 
-1. Run the template, commit the untouched scaffold, then replace the example with `Constants.cs`, the graph controller and the Swagger doc. Done.
+1. Run the template, commit the untouched scaffold, then replace the example with `Constants.cs` and the graph controller. Done.
 2. Write `Models/` and `model/types.ts` together so the contract is fixed before any rendering. Done.
 3. Write `SchemaSeeder` and export `medium.json` from it.
 4. Build `layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings.
