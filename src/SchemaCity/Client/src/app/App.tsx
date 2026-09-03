@@ -22,11 +22,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { PortalContainer } from "@/portal";
+import { findFindings } from "../model/findings";
 import { neighbourhoods } from "../model/neighbourhood";
 import { searchNodes } from "../model/search";
-import type { SchemaGraph } from "../model/types";
+import type { SchemaGraph, UsageReport } from "../model/types";
+import { Findings } from "./Findings";
 import { Inspector } from "./Inspector";
 import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
+import { type Lens, LENS_LABEL, LENSES, lensScale, type Ramp } from "./scene/lens";
 import { parseUrl, serialiseUrl, type UrlState } from "./url";
 
 const LAYER_LABEL: Record<Layer, string> = {
@@ -135,24 +138,34 @@ function Legend() {
   );
 }
 
+/** The legend's colour bar, the same two ends the scene mixes its buildings between. */
+const RAMP_BAR: Record<Ramp, string> = {
+  sequential: "bg-linear-to-r from-amber to-azure",
+  diverging: "bg-linear-to-r from-amber via-phosphor-dim to-azure",
+  binary: "bg-linear-to-r from-phosphor-dim to-signal",
+};
+
 // three.js, fiber and drei are a third of the bundle, so they load with the scene
 // rather than with the workspace element.
 const Scene = lazy(() => import("./Scene"));
 
 export function App({
   graph,
+  usage,
   onOpenType,
   initial,
   onStateChange,
 }: {
   graph: SchemaGraph;
+  /** The usage report, once it has arrived. The city never waits for it. */
+  usage?: UsageReport;
   onOpenType?: (id: string) => void;
   /**
    * Where to start. Left out, the app reads its own query string. `type` is a node
    * id or an alias, because the Document Type editor knows the key it is on and a
    * link knows the alias.
    */
-  initial?: { type?: string | null; focus?: boolean; layers?: Layer[] };
+  initial?: { type?: string | null; focus?: boolean; layers?: Layer[]; lens?: Lens };
   /** Given, the host owns the address bar and the app writes nothing. */
   onStateChange?: (state: UrlState) => void;
 }) {
@@ -166,11 +179,13 @@ export function App({
       id: node?.id ?? null,
       focus: state.focus === true,
       layers: state.layers ?? [...DEFAULT_LAYERS],
+      lens: state.lens ?? "none",
     };
   });
   const [selected, setSelected] = useState<string | null>(start.id);
   const [focus, setFocus] = useState<string | null>(start.focus ? start.id : null);
   const [layers, setLayers] = useState<Layer[]>(start.layers);
+  const [lens, setLens] = useState<Lens>(start.lens);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
@@ -232,13 +247,16 @@ export function App({
       type: at ? aliasById.get(at) ?? null : null,
       focus: focus !== null,
       layers,
+      lens,
     };
     mirror.current?.(state);
     if (!hostOwnsUrl) {
       window.history.replaceState(null, "", window.location.pathname + serialiseUrl(state));
     }
-  }, [selected, focus, layers, aliasById, hostOwnsUrl]);
+  }, [selected, focus, layers, lens, aliasById, hostOwnsUrl]);
   const hits = useMemo(() => searchNodes(nodes, query), [nodes, query]);
+  const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
+  const scale = useMemo(() => lensScale(graph, usage, lens), [graph, usage, lens]);
   const selectedNode = selected ? nodesById.get(selected) : undefined;
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
 
@@ -286,6 +304,34 @@ export function App({
           </ToggleGroup>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* A disabled select swallows its own pointer events, and with them the
+                hover the tooltip needs, so the trigger is the label around it. */}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <label className="flex items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
+                }
+              >
+                Lens
+                <select
+                  aria-label="Usage lens"
+                  className="h-8 border border-line bg-secondary px-2 font-mono text-2xs text-phosphor uppercase tracking-terminal disabled:pointer-events-none disabled:opacity-40"
+                  disabled={!usage}
+                  onChange={(event) => setLens(event.target.value as Lens)}
+                  value={lens}
+                >
+                  {LENSES.map((name) => (
+                    <option key={name} value={name}>
+                      {LENS_LABEL[name]}
+                    </option>
+                  ))}
+                </select>
+              </TooltipTrigger>
+              {usage ? null : <TooltipContent>usage not loaded</TooltipContent>}
+            </Tooltip>
+
+            <Findings findings={findings} nodesById={nodesById} onSelect={followLink} />
+
             <Popover>
               <PopoverTrigger render={<Button size="sm" variant="outline" />}>
                 Legend
@@ -308,6 +354,15 @@ export function App({
           </div>
         </div>
 
+        {scale ? (
+          <div className="flex items-center gap-2 border-line border-b px-4 py-1.5 text-2xs text-phosphor-dim">
+            <span className="font-bold uppercase tracking-terminal">{LENS_LABEL[lens]}</span>
+            <span>{scale.minLabel}</span>
+            <span aria-hidden className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`} />
+            <span>{scale.maxLabel}</span>
+          </div>
+        ) : null}
+
         <div className="relative flex-1">
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
@@ -323,7 +378,9 @@ export function App({
                 layers={layers}
                 onFocus={enterFocus}
                 onSelect={setSelected}
+                scale={scale}
                 selected={selected}
+                usage={usage}
               />
             </Suspense>
           </div>
@@ -340,6 +397,7 @@ export function App({
               onToggleFocus={() =>
                 focus === selectedNode.id ? setFocus(null) : enterFocus(selectedNode.id)
               }
+              usage={usage?.byType[selectedNode.id]}
             />
           ) : null}
         </div>
