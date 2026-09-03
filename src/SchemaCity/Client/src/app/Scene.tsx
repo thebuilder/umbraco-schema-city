@@ -805,26 +805,20 @@ const MAX_NEIGHBOUR_LABELS = 8;
 const LABEL_LIFT = 0.35;
 const LABEL_CLASS =
   "absolute top-0 left-0 hidden whitespace-nowrap border border-line-strong bg-panel-raised px-1.5 py-0.5 font-mono text-2xs text-phosphor";
-/** A district's name reads as a place on the map, so it has no chip around it. */
-const DISTRICT_LABEL_CLASS =
-  "absolute top-0 left-0 hidden whitespace-nowrap font-mono text-sm uppercase tracking-widest text-phosphor-dim";
-/** Districts sort after the hovered and selected buildings and their neighbours. */
-const DISTRICT_RANK = 3;
 /** A cut fan's count sorts last of all, so it only takes pixels nothing else wants. */
 const FAN_MARKER_RANK = 4;
 
 /**
- * The names on the city, in one DOM layer over the canvas. Candidates are the
- * same as they always were, but which of them are drawn is decided in screen
- * space every time the camera or the layout moves: `pickLabels` keeps the best
- * ranked ones that do not land on each other, and drops the rest.
+ * The building names, in one DOM layer over the canvas. Which of the candidates are
+ * drawn is decided in screen space every time the camera or the layout moves.
+ * `pickLabels` keeps the best ranked ones that do not land on each other, and drops
+ * the rest. District names are not candidates: they are printed on the ground.
  *
  * The layer is built and written to by hand rather than through React, because
  * this runs inside the frame loop and forty spans that only ever change their
  * transform are not worth a render each.
  */
 function Labels({
-  districts,
   nodesById,
   placementsById,
   heights,
@@ -835,8 +829,6 @@ function Labels({
   badge,
   fanMarkers,
 }: {
-  /** The city's districts, each named at the north corner of its island. */
-  districts: District[];
   nodesById: Map<string, SchemaNode>;
   placementsById: Map<string, Placement>;
   heights: Map<string, number>;
@@ -888,31 +880,7 @@ function Labels({
       z: number;
       /** Pixels to raise the box by after projection, so it clears the name below it. */
       lift: number;
-      kind?: "district";
     }[] = [];
-    // The north corner of each island, which is the top corner of the diamond it
-    // draws as under the isometric camera, so the name sits clear of the buildings.
-    // Biggest island first, so when two corners land close enough for one name to
-    // cull the other it is the small district that loses it.
-    for (const district of [...districts].sort(
-      (a, b) =>
-        (b.maxX - b.minX) * (b.maxZ - b.minZ) - (a.maxX - a.minX) * (a.maxZ - a.minZ),
-    )) {
-      built.push({
-        id: `district:${district.id}`,
-        text: district.name.toUpperCase(),
-        rank: DISTRICT_RANK,
-        footprint: Math.max(
-          district.maxX - district.minX,
-          district.maxZ - district.minZ,
-        ) + ISLAND_PAD * 2,
-        x: district.minX - ISLAND_PAD,
-        y: 0,
-        z: district.minZ - ISLAND_PAD,
-        lift: 0,
-        kind: "district",
-      });
-    }
     for (const id of ids) {
       const node = nodesById.get(id);
       const placement = placementsById.get(id);
@@ -962,7 +930,6 @@ function Labels({
     }
     return built;
   }, [
-    districts,
     fanMarkers,
     hovered,
     selected,
@@ -1034,7 +1001,6 @@ function Labels({
         return {
           id: candidate.id,
           text: candidate.text,
-          kind: candidate.kind,
           rank: candidate.rank,
           pinned: candidate.rank < 2,
           x: (anchor.x * 0.5 + 0.5) * size.width,
@@ -1052,8 +1018,6 @@ function Labels({
         return;
       }
       span.style.display = "block";
-      const className = box.kind === "district" ? DISTRICT_LABEL_CLASS : LABEL_CLASS;
-      if (span.className !== className) span.className = className;
       span.style.transform = `translate(${Math.round(box.left)}px, ${Math.round(box.top)}px)`;
       if (span.textContent !== box.text) span.textContent = box.text;
     });
@@ -1889,7 +1853,6 @@ export default function Scene({
           )}
           <Labels
             badge={selected ? usageBadge(usage, selected) : null}
-            districts={city.districts}
             fanMarkers={fan.markers}
             focusNeighbours={focusNeighbours}
             heights={heights}
