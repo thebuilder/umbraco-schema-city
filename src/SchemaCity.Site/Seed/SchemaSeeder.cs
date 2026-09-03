@@ -342,6 +342,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             EditorUiAlias = editorUiAlias,
             DatabaseType = ValueStorageType.Ntext,
             ConfigurationData = editor.GetConfigurationEditor().FromConfigurationObject(configuration, _serializer),
+            Key = KeyFor(name),
         };
 
         Attempt<IDataType, DataTypeOperationStatus> attempt =
@@ -381,6 +382,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
                 type.AddPropertyType(NewProperty(specs[i].Properties[p], _editors[(i + p) % _editors.Count]), specs[i].Group, Title(specs[i].Group));
             }
 
+            type.PropertyGroups[specs[i].Group].Key = KeyFor($"{specs[i].Alias}/{specs[i].Group}");
             Save(type);
         }
     }
@@ -739,6 +741,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             property.Variations = varies && i % 2 == 0 ? ContentVariation.Culture : ContentVariation.Nothing;
             type.AddPropertyType(property, groupAlias, Title(groupAlias));
             type.PropertyGroups[groupAlias].Type = groupType;
+            type.PropertyGroups[groupAlias].Key = KeyFor($"{type.Alias}/{groupAlias}");
         }
     }
 
@@ -765,11 +768,12 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     }
 
     /// <summary>
-    /// A stable key per alias, so reseeding a deleted database rebuilds the same graph and the
-    /// exported fixture does not change. MD5 is a name-to-bytes function here, not a hash of
-    /// anything secret.
+    /// A stable key derived from a name, so reseeding a deleted database rebuilds the same graph
+    /// and the exported fixture does not change. Used for content type and composition aliases,
+    /// property group keys (as <c>"{contentTypeAlias}/{groupAlias}"</c>) and seeded Data Type
+    /// names. MD5 is a name-to-bytes function here, not a hash of anything secret.
     /// </summary>
-    private static Guid KeyFor(string alias) => new(MD5.HashData(Encoding.UTF8.GetBytes(alias)));
+    private static Guid KeyFor(string name) => new(MD5.HashData(Encoding.UTF8.GetBytes(name)));
 
     /// <summary>"newsLanding" becomes "News Landing".</summary>
     private static string Title(string alias)
