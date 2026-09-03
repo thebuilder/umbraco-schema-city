@@ -14,6 +14,8 @@ export type District = "structure" | "detached" | "element";
 export type Placement = {
   id: string;
   position: { x: number; z: number };
+  /** Height above the ground. Only the focus layout raises anything off it. */
+  y?: number;
   footprint: number;
   height: number;
   floors: number;
@@ -154,6 +156,14 @@ function reachableFromRoots(
 function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
   if (nodes.length === 0) return [];
 
+  const parents = new Map<string, string[]>();
+  for (const road of roads) {
+    if (road.from === road.to) continue;
+    const list = parents.get(road.to);
+    if (list) list.push(road.from);
+    else parents.set(road.to, [road.from]);
+  }
+
   const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>();
   // Only the rank and the left-to-right order inside it are read back, so dagre needs
   // no separation settings. Its own x would be useless here: an allowed-child graph is
@@ -183,19 +193,34 @@ function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
   }
 
   const placements: Placement[] = [];
+  // Where each already-placed building sits, so the next rank can line up under it.
+  const placedX = new Map<string, number>();
+  // A node whose parents are all further up, or absent, sorts to the right of every
+  // node that has one in the rank the roads come from.
+  const parentColumn = (id: string) => {
+    let leftmost = Infinity;
+    for (const parent of parents.get(id) ?? []) {
+      const x = placedX.get(parent);
+      if (x !== undefined && x < leftmost) leftmost = x;
+    }
+    return leftmost;
+  };
+
   let z = 0;
   for (const [step, y] of [...ranks.keys()].sort((a, b) => a - b).entries()) {
+    // Ordering a rank by the column its parents landed in is what keeps the roads
+    // into a folded rank from crossing each other. Dagre's own order breaks the tie,
+    // which is what rank 0 and any node with no placed parent sort on.
     const members = (ranks.get(y) as SchemaNode[]).sort(
-      (a, b) => at(a.id).x - at(b.id).x || compare(a.alias, b.alias),
+      (a, b) =>
+        parentColumn(a.id) - parentColumn(b.id) ||
+        at(a.id).x - at(b.id).x ||
+        compare(a.alias, b.alias),
     );
     // One depth for the whole rank, so a row of narrow buildings cannot slide under the
     // row behind it. Rows sit one footprint plus a gap apart inside the rank's band.
     const depth = Math.max(...members.map(footprintOf));
     const rows = Math.ceil(members.length / ROW_LIMIT);
-    // ponytail: a row keeps dagre's order and nothing else, so a road to a child on
-    // the second or third row of a rank crosses the rows in front of it. Ordering each
-    // rank by the column its parent landed in would fix that, and is worth the work
-    // once roads on a real schema read as a tangle.
     for (let i = 0; i < members.length; i += ROW_LIMIT) {
       const row = members.slice(i, i + ROW_LIMIT);
       const width =
@@ -204,7 +229,9 @@ function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
       const rowZ = z + (i / ROW_LIMIT) * (depth + FOOTPRINT) + depth / 2;
       let x = -width / 2;
       for (const node of row) {
-        placements.push(place(node, x + footprintOf(node) / 2, rowZ, "structure", step));
+        const centre = x + footprintOf(node) / 2;
+        placements.push(place(node, centre, rowZ, "structure", step));
+        placedX.set(node.id, centre);
         x += footprintOf(node) + FOOTPRINT;
       }
     }

@@ -140,6 +140,43 @@ describe("layoutCity", () => {
     expect(overlaps(placements)).toEqual([]);
   });
 
+  it("orders every rank by the column its parents landed in", () => {
+    const placements = layoutCity(medium);
+    const byId = new Map(placements.map((p) => [p.id, p]));
+    const parents = new Map<string, string[]>();
+    for (const edge of medium.edges) {
+      if (edge.kind !== "allowedChild" || edge.from === edge.to) continue;
+      parents.set(edge.to, [...(parents.get(edge.to) ?? []), edge.from]);
+    }
+    // introDelay is the rank number times a fixed stagger, so it is the only place
+    // the rank survives into the output.
+    const ranks = new Map<number, Placement[]>();
+    for (const p of placements) {
+      if (p.district !== "structure") continue;
+      ranks.set(p.introDelay, [...(ranks.get(p.introDelay) ?? []), p]);
+    }
+
+    const ordered = [...ranks.keys()].sort((a, b) => a - b);
+    const placedBefore = new Set<string>();
+    for (const delay of ordered) {
+      const rank = ranks.get(delay) as Placement[];
+      // Row-major order inside the rank: rows front to back, left to right in each.
+      const inOrder = [...rank].sort((a, b) => a.position.z - b.position.z || a.position.x - b.position.x);
+      const column = (p: Placement) =>
+        Math.min(
+          Infinity,
+          ...(parents.get(p.id) ?? [])
+            .filter((id) => placedBefore.has(id))
+            .map((id) => (byId.get(id) as Placement).position.x),
+        );
+      const columns = inOrder.map(column);
+
+      expect(columns).toEqual([...columns].sort((a, b) => a - b));
+      for (const p of rank) placedBefore.add(p.id);
+    }
+    expect(ordered.length).toBeGreaterThan(2);
+  });
+
   it("gives every building in the medium fixture its own spot", () => {
     const placements = layoutCity(medium);
     const spots = placements.map((p) => `${p.position.x},${p.position.z}`);
