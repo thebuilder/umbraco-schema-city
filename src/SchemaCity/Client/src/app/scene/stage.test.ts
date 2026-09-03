@@ -1,9 +1,11 @@
 import { expect, test } from "vitest";
 import {
+  districtStamp,
   fogRange,
   framingAction,
   groundReach,
   pixelsPerUnit,
+  STAMP_CAP,
   stageMetrics,
   zoomRange,
 } from "./stage";
@@ -76,4 +78,25 @@ test("a world unit measures the same on screen through either camera", () => {
   expect(pixelsPerUnit({ zoom: 1, fov }, size.height, distance)).toBeCloseTo(zoom);
   // Twice as far away is half the size.
   expect(pixelsPerUnit({ zoom: 1, fov }, size.height, distance * 2)).toBeCloseTo(zoom / 2);
+});
+
+test("a district's name prints at the north-west corner of its island", () => {
+  // "PAGES" tracked out, rasterised: about seven cap heights wide.
+  const stamp = districtStamp({ minX: -20, maxX: 40, minZ: -10 }, 7);
+
+  expect(stamp.height).toBe(STAMP_CAP);
+  expect(stamp.width).toBeCloseTo(STAMP_CAP * 7);
+  // Left edge and north edge, both half an inset in from the island's own.
+  expect(stamp.x - stamp.width / 2).toBeCloseTo(-19.5);
+  expect(stamp.z - stamp.height / 2).toBeCloseTo(-9.5);
+});
+
+test("a name too wide for its island shrinks instead of hanging over the void", () => {
+  const island = { minX: 0, maxX: 14, minZ: 0 };
+  const stamp = districtStamp(island, 7);
+
+  expect(stamp.height).toBeLessThan(STAMP_CAP);
+  expect(stamp.x + stamp.width / 2).toBeLessThanOrEqual(island.maxX);
+  // Cap height and width shrink together, so the letters keep their shape.
+  expect(stamp.width / stamp.height).toBeCloseTo(7);
 });

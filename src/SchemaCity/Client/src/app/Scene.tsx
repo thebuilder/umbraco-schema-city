@@ -35,6 +35,7 @@ import {
   framingAction,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
+  districtStamp,
   pixelsPerUnit,
   stageMetrics,
   zoomRange,
@@ -50,6 +51,8 @@ type Palette = {
   background: string;
   separator: string;
   land: string;
+  /** The theme's mono stack, for the names printed on the ground. */
+  mono: string;
 };
 
 /** Seconds a building takes to rise, once its own `introDelay` has passed. */
@@ -1089,6 +1092,72 @@ function tint(base: string, toward: string, amount: number): THREE.Color {
 const WHITE = "#ffffff";
 
 /**
+ * Font size a district's name is rasterised at. Its cap height comes out around 72 px,
+ * and the stamp is at most 3 world units tall, so the print carries about 24 px of
+ * texture per world unit. The ground needs 2 to stay crisp at the framing zoom, and
+ * the rest is what Explore leans on when the camera comes down to street level.
+ */
+const STAMP_FONT_PX = 100;
+/** Silkscreen text is spaced out. Ems of extra gap between two letters. */
+const STAMP_TRACKING = "0.32em";
+/** How solid the print reads against the island under it. */
+const STAMP_OPACITY = 0.55;
+/**
+ * How far the print stands off the slab it is on. Above the slab so the two never
+ * z-fight, and under the road ribbons at 0.015, so a road crossing an island's margin
+ * runs over the name the way a trace runs over a board's silkscreen.
+ */
+const STAMP_Y = 0.01;
+
+/** One texture per name and font, kept for the life of the page. */
+const stamps = new Map<string, THREE.CanvasTexture>();
+
+/**
+ * A district's name rasterised into a texture that is exactly the ink: as wide as the
+ * tracked-out name and as tall as its cap height. Sizing the texture to the cap rather
+ * than to the font's line box is what lets the caller place the quad by cap height
+ * alone, with no per-font fudge for the ascender and descender space around it.
+ */
+function stampTexture(name: string, font: string): THREE.CanvasTexture {
+  const key = `${name}|${font}`;
+  const found = stamps.get(key);
+  if (found) return found;
+
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const style = () => {
+    if (!context) return;
+    context.font = `${STAMP_FONT_PX}px ${font}`;
+    // letterSpacing is Chrome 99 and Safari 17.4. Older than that prints the name
+    // without the tracking rather than not at all.
+    context.letterSpacing = STAMP_TRACKING;
+    // White ink, because the material's colour is what tints it to the theme.
+    context.fillStyle = "#ffffff";
+    context.textBaseline = "alphabetic";
+  };
+  if (context) {
+    style();
+    const measured = context.measureText(name);
+    // The ink's own ascent, which for an uppercase name is its cap height.
+    const cap = Math.max(Math.ceil(measured.actualBoundingBoxAscent), 1);
+    canvas.width = Math.max(Math.ceil(measured.width), 1);
+    canvas.height = cap;
+    // Sizing a canvas resets every drawing state it had, the font included.
+    style();
+    context.fillText(name, 0, cap);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  // The stamp lies on the ground, so every camera reads it at a grazing angle and a
+  // plain mipmap turns the letters to mush. The renderer clamps this to what the
+  // hardware has.
+  texture.anisotropy = 8;
+  stamps.set(key, texture);
+  return texture;
+}
+
+/**
  * The land under a district. Structure is the same panel colour the chrome uses,
  * compositions and mixed are a touch lighter and elements a touch warmer, so the
  * islands read as different places without turning into four colours.
@@ -1106,7 +1175,8 @@ function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
  * does not rescale the world, and the islands come from the city layout as well, so
  * the focused neighbourhood stands on whatever island it lands over.
  *
- * Two draw calls per district plus one per nested folder, and nothing here animates.
+ * Three draw calls per district, the name printed on it included, plus one per nested
+ * folder. Nothing here animates.
  */
 function Stage({
   districts,
@@ -1217,6 +1287,36 @@ function Stage({
           <meshStandardMaterial color={folderColour} metalness={0} roughness={1} />
         </mesh>
       ))}
+      {/* The district's name printed flat on its island, in the margin along the north
+          edge. It writes no depth, so the buildings, the roads and every link stand
+          over it. */}
+      {districts.map((district) => {
+        const texture = stampTexture(district.name.toUpperCase(), palette.mono);
+        const stamp = districtStamp(
+          {
+            minX: district.minX - ISLAND_PAD,
+            maxX: district.maxX + ISLAND_PAD,
+            minZ: district.minZ - ISLAND_PAD,
+          },
+          texture.image.width / texture.image.height,
+        );
+        return (
+          <mesh
+            key={district.id}
+            position={[stamp.x, STAMP_Y, stamp.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <planeGeometry args={[stamp.width, stamp.height]} />
+            <meshBasicMaterial
+              color={palette.dim}
+              depthWrite={false}
+              map={texture}
+              opacity={STAMP_OPACITY}
+              transparent
+            />
+          </mesh>
+        );
+      })}
     </>
   );
 }
@@ -1710,6 +1810,7 @@ export default function Scene({
       background: token("--background"),
       dim: token("--phosphor-dim"),
       land: token("--panel"),
+      mono: token("--font-mono") || "ui-monospace, monospace",
       phosphor: token("--phosphor"),
       separator: token("--panel-sunken"),
       signal: token("--signal"),
