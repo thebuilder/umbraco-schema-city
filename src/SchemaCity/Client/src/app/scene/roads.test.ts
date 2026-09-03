@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SchemaEdge } from "../../model/types";
 import type { Placement } from "../layout/city";
-import { buildRoadGeometry, planRoads, type RoadSegment } from "./roads";
+import { buildRoadGeometry, planRoads, roadFan, type RoadSegment } from "./roads";
 
 function placement(id: string, x: number, z: number): Placement {
   return {
@@ -172,6 +172,43 @@ function straightCrossings(
   }
   return count;
 }
+
+describe("roadFan", () => {
+  const wide = new Map<string, Placement>([["child", placement("child", 0, 11)]]);
+  for (let i = 0; i < 4; i++) wide.set(`p${i}`, placement(`p${i}`, i * 5, 0));
+  const fanEdges = [...Array(4).keys()].map((i) => road(`p${i}`, "child"));
+
+  it("draws one road of a four-parent fan in the overview", () => {
+    const fan = roadFan(wide, fanEdges, new Set());
+    expect(fan.edges).toHaveLength(1);
+    // The nearest parent is the leftmost of the four, which are all one street away.
+    expect((fan.edges[0] as SchemaEdge).from).toBe("p0");
+    expect(fan.markers).toEqual([{ id: "child", hidden: 3 }]);
+  });
+
+  it("draws the whole fan once the child is selected", () => {
+    const fan = roadFan(wide, fanEdges, new Set(["child"]));
+    expect(fan.edges).toHaveLength(4);
+    expect(fan.markers).toEqual([]);
+  });
+
+  it("draws the whole fan in focus mode", () => {
+    expect(roadFan(wide, fanEdges, null).edges).toHaveLength(4);
+  });
+
+  it("leaves a three-parent fan alone", () => {
+    const fan = roadFan(wide, fanEdges.slice(0, 3), new Set());
+    expect(fan.edges).toHaveLength(3);
+    expect(fan.markers).toEqual([]);
+  });
+
+  it("keeps a parent's own children, however many it has", () => {
+    const hub = new Map<string, Placement>([["hub", placement("hub", 0, 0)]]);
+    for (let i = 0; i < 6; i++) hub.set(`c${i}`, placement(`c${i}`, i * 5, 11));
+    const edges = [...Array(6).keys()].map((i) => road("hub", `c${i}`));
+    expect(roadFan(hub, edges, new Set()).edges).toHaveLength(6);
+  });
+});
 
 describe("buildRoadGeometry", () => {
   it("draws nothing for an empty edge list", () => {

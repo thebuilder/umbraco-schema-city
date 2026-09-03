@@ -50,6 +50,8 @@ const LOOP_SEGMENTS = 14;
 /** Sideways step between two parents' runs on one street. */
 const LANE_STEP = 0.35;
 const EPS = 1e-6;
+/** More allowed parents than this and the overview draws one road and a count. */
+export const FAN_LIMIT = 3;
 
 /**
  * `positions` is a flat xyz triangle list. `ranges` marks which vertices came from
@@ -211,6 +213,57 @@ export function routePoints(
   });
   points.push({ x: to.position.x, z: enterZ });
   return points;
+}
+
+export type RoadFan = {
+  edges: SchemaEdge[];
+  /** Buildings whose fan was cut, and how many roads the overview is not drawing. */
+  markers: { id: string; hidden: number }[];
+};
+
+/**
+ * Which roads the overview draws. A child with more than `FAN_LIMIT` allowed parents
+ * keeps only its nearest one, because twenty ribbons converging on one roof say
+ * nothing that "+19 parents" does not. `expanded` is the hovered and selected
+ * buildings, whose full fan draws; `null` draws every road, which is focus mode.
+ */
+export function roadFan(
+  placementsById: Map<string, Placement>,
+  edges: SchemaEdge[],
+  expanded: ReadonlySet<string> | null,
+): RoadFan {
+  if (expanded === null) return { edges, markers: [] };
+
+  const grid = roadGrid(placementsById.values());
+  const fans = new Map<string, SchemaEdge[]>();
+  for (const edge of edges) {
+    if (edge.kind !== "allowedChild" || edge.from === edge.to) continue;
+    if (!placementsById.has(edge.from) || !placementsById.has(edge.to)) continue;
+    const fan = fans.get(edge.to);
+    if (fan) fan.push(edge);
+    else fans.set(edge.to, [edge]);
+  }
+
+  const dropped = new Set<SchemaEdge>();
+  const markers: { id: string; hidden: number }[] = [];
+  for (const [child, fan] of fans) {
+    if (fan.length <= FAN_LIMIT || expanded.has(child)) continue;
+    const childRow = grid.rowAt((placementsById.get(child) as Placement).position.z);
+    const parent = (id: string) => placementsById.get(id) as Placement;
+    // The nearest parent is the one whose road crosses fewest streets, and the
+    // leftmost of those, so the road that stays is the shortest and the answer does
+    // not move when an unrelated type is added.
+    const nearest = [...fan].sort(
+      (a, b) =>
+        Math.abs(grid.rowAt(parent(a.from).position.z) - childRow) -
+          Math.abs(grid.rowAt(parent(b.from).position.z) - childRow) ||
+        parent(a.from).position.x - parent(b.from).position.x,
+    )[0] as SchemaEdge;
+    for (const edge of fan) if (edge !== nearest) dropped.add(edge);
+    markers.push({ id: child, hidden: fan.length - 1 });
+  }
+
+  return { edges: edges.filter((edge) => !dropped.has(edge)), markers };
 }
 
 /** The streets a road crosses, in travel order. Never empty. */

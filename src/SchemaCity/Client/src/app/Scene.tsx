@@ -29,7 +29,7 @@ import { iconColour, rasteriseIcon } from "./scene/icons";
 import { CHAR_PX, LABEL_CAP, LABEL_HEIGHT_PX, pickLabels } from "./scene/labels";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
-import { buildRoadGeometry } from "./scene/roads";
+import { buildRoadGeometry, roadFan } from "./scene/roads";
 import {
   fogRange,
   framingAction,
@@ -807,6 +807,8 @@ const DISTRICT_LABEL_CLASS =
   "absolute top-0 left-0 hidden whitespace-nowrap font-mono text-sm uppercase tracking-widest text-phosphor-dim";
 /** Districts sort after the hovered and selected buildings and their neighbours. */
 const DISTRICT_RANK = 3;
+/** A cut fan's count sorts last of all, so it only takes pixels nothing else wants. */
+const FAN_MARKER_RANK = 4;
 
 /**
  * The names on the city, in one DOM layer over the canvas. Candidates are the
@@ -828,6 +830,7 @@ function Labels({
   neighbours,
   focusNeighbours,
   badge,
+  fanMarkers,
 }: {
   /** The city's districts, each named at the north corner of its island. */
   districts: District[];
@@ -840,6 +843,8 @@ function Labels({
   focusNeighbours: Set<string> | null;
   /** The selected building's usage line, drawn as a second label over its name. */
   badge: string | null;
+  /** Buildings whose road fan is cut, and how many roads are not drawn. */
+  fanMarkers: { id: string; hidden: number }[];
 }) {
   const camera = useThree((state) => state.camera) as THREE.OrthographicCamera & {
     fov?: number;
@@ -936,9 +941,26 @@ function Labels({
         });
       }
     }
+    // The count of the roads a fan cut, over the roof they would land on. It is the
+    // last thing that gets pixels, so a screen full of names never loses one to it.
+    for (const marker of fanMarkers) {
+      const placement = placementsById.get(marker.id);
+      if (!placement || ids.has(marker.id)) continue;
+      built.push({
+        id: `${marker.id}:parents`,
+        text: `+${marker.hidden} parents`,
+        rank: FAN_MARKER_RANK,
+        footprint: placement.footprint,
+        x: placement.position.x,
+        y: (placement.y ?? 0) + (heights.get(marker.id) ?? placement.height) + LABEL_LIFT,
+        z: placement.position.z,
+        lift: 0,
+      });
+    }
     return built;
   }, [
     districts,
+    fanMarkers,
     hovered,
     selected,
     neighbours,
@@ -1650,6 +1672,19 @@ export default function Scene({
     () => new Set<Layer>(focus ? [...layers, "structure"] : layers),
     [layers, focus],
   );
+  // Twenty roads landing on one roof is the wiring mess the overview is meant to
+  // avoid, so a building with more allowed parents than the fan limit keeps the
+  // nearest road and a count. Pointing at it or picking it draws the rest, and
+  // focus mode is already about one node, so nothing is cut there.
+  const fan = useMemo(
+    () =>
+      roadFan(
+        placementsById,
+        drawnEdges,
+        focus ? null : new Set([hovered, selected].filter((id): id is string => id !== null)),
+      ),
+    [placementsById, drawnEdges, focus, hovered, selected],
+  );
   // A link leaves from the roof of the building it belongs to, so it stays visible
   // over a tall neighbour and moves with the focus tween.
   const anchors = useMemo(() => {
@@ -1728,7 +1763,7 @@ export default function Scene({
           ) : null}
           {active.has("structure") ? (
             <Roads
-              edges={drawnEdges}
+              edges={fan.edges}
               focus={focus}
               palette={palette}
               placementsById={placementsById}
@@ -1754,6 +1789,7 @@ export default function Scene({
           <Labels
             badge={selected ? usageBadge(usage, selected) : null}
             districts={city.districts}
+            fanMarkers={fan.markers}
             focusNeighbours={focusNeighbours}
             heights={heights}
             hovered={hovered}
