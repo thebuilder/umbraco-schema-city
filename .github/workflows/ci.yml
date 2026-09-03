@@ -28,7 +28,8 @@ jobs:
       - run: npm run build
         working-directory: src/SchemaCity/Client
 
-      - run: dotnet build SchemaCity.sln -c Release -p:UmbracoVersion=${{ matrix.umbraco }}
+      # npm ran above, so the library's own client build target has nothing to do.
+      - run: dotnet build SchemaCity.sln -c Release -p:UmbracoVersion=${{ matrix.umbraco }} -p:SkipClientBuild=true
 
       - run: dotnet test SchemaCity.sln -c Release --no-build
 

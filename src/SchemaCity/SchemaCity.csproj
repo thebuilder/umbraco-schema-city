@@ -16,6 +16,8 @@
     <Authors>Daniel Schmidt</Authors>
     <Description>Renders the Umbraco content model as an isometric city in the backoffice.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>umbraco umbraco-marketplace backoffice document-types visualisation</PackageTags>
   </PropertyGroup>
 
   <!-- One package for Umbraco 17 and 18. NuGet resolves the lowest version in the range here and
@@ -31,10 +33,29 @@
     <!-- The client sources are build input, not package content. -->
     <Content Remove="Client\**" />
     <None Include="Client\public\umbraco-package.json" Pack="false" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="wwwroot\" />
   </ItemGroup>
+
+  <!-- The package ships the built client, so a clean checkout has to build it before the
+       static web assets are collected. wwwroot/ is generated and gitignored, and the SDK
+       globs Content at evaluation time, before any target runs, so the files Vite has just
+       written are added back to Content here. Set SkipClientBuild=true where npm has
+       already run, as CI does. -->
+  <Target Name="BuildClient"
+          BeforeTargets="ResolveProjectStaticWebAssets"
+          Condition="'$(SkipClientBuild)' != 'true' And !Exists('$(MSBuildProjectDirectory)/wwwroot/App_Plugins/SchemaCity/workspace.js')">
+    <!-- ponytail: missing output only, not a timestamp comparison against the client
+         sources. Editing the client and building only the .NET side leaves stale JS, which
+         is what `npm run watch` is for. Add Inputs/Outputs if that ever bites. -->
+    <Exec Command="npm ci" WorkingDirectory="Client" Condition="!Exists('$(MSBuildProjectDirectory)/Client/node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="Client" />
+    <ItemGroup>
+      <Content Include="wwwroot\**" Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
 
 </Project>

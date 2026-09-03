@@ -1,0 +1,15 @@
+{
+  "$schema": "https://marketplace.umbraco.com/umbraco-marketplace-schema.json",
+  "PackageType": "Package",
+  "Category": "Developer Tools",
+  "AlternateCategory": "Editor Tools",
+  "LicenseTypes": [
+    "Free"
+  ],
+  "Tags": [
+    "document types",
+    "content model",
+    "visualisation",
+    "backoffice"
+  ]
+}
