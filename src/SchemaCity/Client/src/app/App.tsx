@@ -391,7 +391,12 @@ export function App({
   return (
     <PortalContainer value={portal}>
       <div className="flex h-full flex-col bg-background font-mono text-foreground">
-        <div className="flex items-center gap-3 border-line border-b px-4 py-2.5">
+        {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
+            fitting, which is 848 px with the lens picker reading None and earlier
+            once a longer lens name widens it. The backoffice is narrower than the
+            harness, and a media query would have to guess by how much. ml-auto still
+            holds the right group against the right edge on whichever row it lands. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-line border-b px-4 py-2.5">
           <h1 className="font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
             Schema City
           </h1>
@@ -439,7 +444,7 @@ export function App({
             List
           </Toggle>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* A disabled trigger swallows its own pointer events, and with them
                 the hover the tooltip needs, so the tooltip wraps the label. */}
             <Tooltip>
