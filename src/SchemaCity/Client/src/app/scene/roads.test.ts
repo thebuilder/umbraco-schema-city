@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { SchemaEdge } from "../../model/types";
-import type { Placement } from "../layout/city";
+import mediumFixture from "../../../dev/fixtures/medium.json";
+import pathologicalFixture from "../../../dev/fixtures/pathological.json";
+import type { SchemaEdge, SchemaGraph } from "../../model/types";
+import { cityDistricts, type Placement } from "../layout/city";
 import { buildRoadGeometry, planRoads, roadFan, type RoadSegment } from "./roads";
+
+const medium = mediumFixture as unknown as SchemaGraph;
+const pathological = pathologicalFixture as unknown as SchemaGraph;
 
 function placement(id: string, x: number, z: number): Placement {
   return {
@@ -172,6 +177,44 @@ function straightCrossings(
   }
   return count;
 }
+
+describe("crossings on the fixtures", () => {
+  // The reason roads follow the streets at all: straight centre-to-centre ribbons
+  // read as wiring rather than as a city. This is the measurement PLAN section 6
+  // quotes, run over both fixtures rather than over a hand-built grid.
+  for (const [name, graph] of [
+    ["medium", medium],
+    ["pathological", pathological],
+  ] as const) {
+    it(`routes ${name}'s roads over fewer crossings than straight ribbons`, () => {
+      const byId = new Map(
+        cityDistricts(graph).placements.map((p) => [p.id, p] as const),
+      );
+      const edges = graph.edges.filter(
+        (edge) =>
+          edge.kind === "allowedChild" &&
+          edge.from !== edge.to &&
+          byId.has(edge.from) &&
+          byId.has(edge.to),
+      );
+      const straight = edges.map((edge) => ({
+        x0: (byId.get(edge.from) as Placement).position.x,
+        z0: (byId.get(edge.from) as Placement).position.z,
+        x1: (byId.get(edge.to) as Placement).position.x,
+        z1: (byId.get(edge.to) as Placement).position.z,
+      }));
+
+      const ribbons = straightCrossings(straight);
+      const routed = crossings(planRoads(byId, edges));
+      console.log(`${name}: ${edges.length} roads, ${ribbons} straight, ${routed} routed`);
+      // Measured at the time of writing: medium 64 roads, 282 straight, 168 routed;
+      // pathological 246 roads, 1246 straight, 390 routed. The assertion is the rule
+      // the routing exists for rather than either number, because both move whenever
+      // the layout does and neither is a target.
+      expect(routed).toBeLessThan(ribbons);
+    });
+  }
+});
 
 describe("roadFan", () => {
   const wide = new Map<string, Placement>([["child", placement("child", 0, 11)]]);
