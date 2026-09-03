@@ -101,7 +101,7 @@ schema-city/
           index.html  main.ts        harness, loads fixtures without Umbraco
           fixtures/*.json            graph and usage fixtures; the medium ones are exported by the seeder
     SchemaCity.Site/                 throwaway Umbraco 17 site referencing SchemaCity
-      Seed/SchemaSeeder.cs           dev-only: creates ~80 Document Types on first boot
+      Seed/SchemaSeeder.cs           dev-only: creates 78 Document Types on first boot
   tests/
     SchemaCity.Tests/                xUnit: graph builder, block inspector, usage aggregation
 ```
@@ -468,11 +468,11 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 ### M0, Scaffold (small)
 
 - `dotnet new umbraco-extension -n SchemaCity -ex`, solution, test site, xUnit project.
-- `SchemaSeeder` creates ~80 Document Types with folders, compositions, inheritance, Block List / Grid / RTE blocks, MNTP filters, roots, a cycle, orphans and element types, plus a few hundred content items so usage counts are non-trivial. It plants a known set of findings, listed in one test in `SchemaCity.Tests`. Runs once in Development only. The seeder writes no property values, so the seeded site has no instance references and the incoming-references lens is flat there.
+- `SchemaSeeder` creates 78 Document Types with folders, compositions, inheritance, Block List / Grid / RTE blocks, MNTP filters, roots, a cycle, orphans and element types, plus a few hundred content items so usage counts are non-trivial. It plants a known set of findings, listed in one test in `SchemaCity.Tests`. Runs once in Development only. The seeder writes no property values, so the seeded site has no instance references and the incoming-references lens is flat there.
 - Dev harness with a hand-written `small.json`.
 - CI: `npm ci`, `npm run build`, `dotnet build`, `dotnet test`, then boot the site and check the manifest, the backoffice and a 401 from the graph endpoint, on Umbraco 17.6.2 and 18.1.1.
 - Done 2026-09-03 on Umbraco 17.6.2, with 18.1.1 as the second CI target.
-- Exit: the Schema City entry in the Settings sidebar shows "Schema City, 80 types" from the real endpoint.
+- Exit: the Schema City entry in the Settings sidebar shows "Schema City, 78 types" from the real endpoint.
 
 ### M1, The city (large)
 
@@ -498,6 +498,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - `UsageCollector` and `usage` endpoint with caching. Tests for the aggregation. Done 2026-09-03; four queries, 17 backend tests, and a deterministic `medium-usage.json` exported by the seeder.
 - Usage lens with six modes, a legend row and a usage badge on the selected node. Done 2026-09-03.
+- Both wrappers fetch the usage report after the graph without blocking the first render; a failed usage call leaves the lens disabled. Done 2026-09-03.
 - `findings.ts` with tests. Findings drawer listing unused types, unused element types, structural dead ends, duplicate property aliases, broken block references, types with no properties, types with no template, pure mixins and the top complexity tier, each linking to its node. Done 2026-09-03; every planted alias reported; 122 vitest tests.
 - Tidy-up done 2026-09-03: dead end absorbs unused composition, no-template notes only for placeable types on schemas that use templates, element types neutral under a lens; the seeded schema reports 115 findings with usage, every planted alias once.
 - Exit: met 2026-09-03. The findings drawer reports every planted alias once on the seeded site, on both Umbraco majors, plus the 47 genuinely unused seeded types.
@@ -507,7 +508,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. (in progress)
 - README with screenshots, NuGet packaging with the `[17.0.0, 19.0.0)` range, Umbraco Marketplace metadata. (in progress)
 - Roof icons, property "windows" on floors, Explore perspective toggle, list view fallback.
-- Empty state (no Document Types), error state (endpoint 403/500), loading skeleton.
+- Empty state (no Document Types), error state (endpoint 403/500), loading skeleton. (in progress)
 - Perf pass, only if the pathological fixture drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` on NuGet.
 
@@ -546,7 +547,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
 | `model/`, `app/` | 122 vitest tests across 12 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
-| End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 at the M3 merge, green on both majors |
+| End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 at the M3 merge, green on both majors |
 | Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |
 
 ---
