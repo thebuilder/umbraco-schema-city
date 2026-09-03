@@ -91,12 +91,12 @@ schema-city/
         package.json  vite.config.ts  tsconfig.json  components.json
         public/umbraco-package.json
         src/
-          api.ts                  one typed call per endpoint through umbHttpClient
-          entry-workspace.ts      Lit wrapper: fetches, mounts the React root, adopts the stylesheet
-          document-type-view.ts   Lit wrapper for the Document Type editor (M2)
-          model/                  graph types, indexes, findings, search   (no DOM, no three)
-          app/                    React: App, layout, scene (R3F), panels, styles.css (Tailwind + afterglow theme)
-          components/ui/          afterglow primitives, copy-in via the shadcn CLI
+          api.ts                        one typed call per endpoint through umbHttpClient
+          entry-workspace.tsx           Lit wrapper: fetches, mounts the React root, adopts the stylesheet
+          entry-document-type-view.tsx  Lit wrapper for the Document Type editor, mounts App focused on the type
+          model/                        graph types, indexes, findings, search   (no DOM, no three)
+          app/                          React: App, layout, scene (R3F), panels, styles.css (Tailwind + afterglow theme)
+          components/ui/                afterglow primitives, copy-in via the shadcn CLI
         dev/
           index.html  main.ts        harness, loads fixtures without Umbraco
           fixtures/*.json
@@ -528,7 +528,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Hub types (40+ neighbours) make selection views unreadable | Label cap, focus mode with a neighbourhood layout, and only the focused node's edges drawn. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
 | Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.4 kB for `api.js`, 37 kB of app and 165 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
-| The manifest entry loaded twice by the backoffice's cache-busting query | The entry chunk exports nothing; shared code and vendors live in their own chunks; the element registration is guarded. |
+| The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
 | Usage queries slow on large installs | One grouped query for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
