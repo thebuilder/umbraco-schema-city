@@ -30,7 +30,7 @@ These apply to every commit, every file and every generated sentence.
 - Relationship layers, never all edges at once: `Structure`, `Compositions`, `Blocks`, `References`, plus a `Usage` lens.
 - Selecting a node fades everything unrelated and opens an inspector sidebar. Double-click flies into the node (focus mode).
 - Home is a Settings sidebar entry (Advanced group) that opens a full-area workspace. A `Relationships` workspace view on the Document Type editor opens the same map pre-focused.
-- Lit + Three.js, following the v17 extension architecture. Detailed data lives in the inspector, not floating in the scene.
+- Lit wrappers around a React application, Three.js through React Three Fiber, following the v17 extension architecture. Detailed data lives in the inspector, not floating in the scene.
 - Reuse fsn's ideas and small mechanisms; do not adapt fsn into a third adapter and do not extract a shared framework before a second graph exists.
 - Content mode (real content instances) is out of v1.
 
@@ -56,6 +56,10 @@ These apply to every commit, every file and every generated sentence.
 9. **Settings tool only, gated by Umbraco's own permissions.** The menu item is conditioned on the Settings section and both endpoints require `SectionAccessSettings`, so administrators control access per user group through the normal Users area. No custom permission or editor-facing view in v1.
 
 10. **The seeded schema is the test bed.** No real project is required. The seeder plants known findings (orphans, unused compositions, dead ends, an unused element type) so tests and milestone exits assert against a deterministic expected set.
+
+11. **React inside the Lit wrapper, with R3F and afterglow.** React 19 renders inside the Lit workspace element, the scene runs on React Three Fiber and drei, and the panels are shadcn components on base-ui from the afterglow registry, with Tailwind v4. The reason is the ecosystem around the scene. Event traffic was not the deciding factor, since a store handles that identically in Lit or React. R3F and drei give declarative meshes, instanced picking, camera controls and HTML labels, and shadcn gives the panel chrome, so there is less code we own. No state library until one is needed.
+
+12. **Home is a sidebar workspace, not a dashboard.** A Settings sidebar entry in the Advanced group, next to Log Viewer and Relations, opening a full-area workspace at `/umbraco/section/settings/workspace/schema-city`. A dashboard would share the section landing page with everything else there; the workspace gives the city the whole content area.
 
 ---
 
@@ -84,16 +88,15 @@ schema-city/
       Models/                        DTOs mirrored 1:1 by the TS types
       wwwroot/App_Plugins/SchemaCity/   Vite output + umbraco-package.json
       Client/
-        package.json  vite.config.ts  tsconfig.json
+        package.json  vite.config.ts  tsconfig.json  components.json
         public/umbraco-package.json
         src/
-          api.ts                     one typed call per endpoint through umbHttpClient
-          model/                     graph types, indexes, findings, search  (no DOM, no three)
-          layout/                    dagre -> placements, focus layout
-          scene/                     three.js: buildings, roads, camera, picking, labels
-          ui/                        Lit elements: map host, toolbar, inspector, search, legend
-          workspace/                 Document Type workspace view
-          entry-workspace.ts  entry-document-type-view.ts
+          api.ts                  one typed call per endpoint through umbHttpClient
+          entry-workspace.ts      Lit wrapper: fetches, mounts the React root, adopts the stylesheet
+          document-type-view.ts   Lit wrapper for the Document Type editor (M2)
+          model/                  graph types, indexes, findings, search   (no DOM, no three)
+          app/                    React: App, layout, scene (R3F), panels, styles.css (Tailwind + afterglow theme)
+          components/ui/          afterglow primitives, copy-in via the shadcn CLI
         dev/
           index.html  main.ts        harness, loads fixtures without Umbraco
           fixtures/*.json
@@ -252,11 +255,11 @@ GET /umbraco/management/api/v1/schema-city/usage?refresh=false
 
 ### Module rules
 
-- `model/` and `layout/` are pure: no DOM, no three.js, no Lit. Vitest-tested with fixture JSON.
-- `scene/` owns three.js and knows nothing about Umbraco. It takes `Placement[]` and `SchemaGraph` and emits events (`select`, `open`, `hover`).
-- `ui/` is Lit elements using `uui-*` components and Umbraco contexts. It is the only layer that talks to the API client.
-- `workspace/` reuses `<schema-city-map>` with a `focus` attribute.
-- `<schema-city-map>` imports nothing from `@umbraco-cms/backoffice`. It takes the graph and usage objects as properties, takes `focus` as an attribute, and emits an `open-type` event with the type id. The workspace and workspace-view wrappers are the only Umbraco-aware code: they fetch, read the workspace context, resolve icons, and turn `open-type` into an editor link. The harness fills the same inputs from fixtures and a query string.
+- `src/app/` is the React application and imports nothing from `@umbraco-cms/backoffice`. It takes the graph and usage objects and a `focus` id as props, and calls back through props (`onOpenType`).
+- The two wrapper elements, the home workspace and the Document Type editor view, are the only Umbraco-aware code. They fetch, read the workspace context, resolve icons, and turn `onOpenType` into an editor link.
+- The harness renders the same `App` from fixtures and a query string.
+- `model/` stays pure: no DOM, no three.js, no React. Vitest-tested with fixture JSON. The layout functions (dagre to placements, focus layout) live under `app/` beside the scene and are pure in the same way.
+- `components/ui/` holds the copied-in afterglow primitives. They are edited in place; there is no upstream to update from.
 
 ### Extension manifests (`public/umbraco-package.json`)
 
@@ -310,9 +313,17 @@ entry below Umbraco's own four rather than reordering them.
 
 The workspace view consumes `UMB_DOCUMENT_TYPE_WORKSPACE_CONTEXT` (from `@umbraco-cms/backoffice/document-type`) and observes `unique` to get the key. Verify the exact token name against the v17 package when scaffolding; the pattern is the same for every workspace.
 
+### Hosting
+
+The wrapper is a Lit element that renders one container div, creates the React root once, re-renders it with new props on update, and unmounts it on disconnect. It never re-roots. An R3F canvas that a re-render unmounts loses its WebGL context and its camera. These facts come from a working React-in-Umbraco project, not from the docs.
+
+### Styling
+
+One CSS entry compiled by Tailwind v4, imported `?inline`, attached to the shadow root through `adoptedStyleSheets` and to `document` in the harness. The afterglow theme's `:root` and `.dark` selectors are rewritten to `:host`, and its html and body base rules are dropped. The UI is shadcn components on base-ui, copied in from the afterglow registry (https://afterglow.thebuilder.dk/, MIT): the theme plus button, dialog, popover, tooltip, command, badge, kbd, scroll-area, table, tabs, sheet and alert. Not the preset, and none of the terminal-costume pieces (terminal window, shell, boot log, LED, scanlines, grain, glitch). The base-ui portals (dialog, popover, tooltip, command) are pinned to a container inside our shadow root, or they escape to `document.body` and lose the stylesheet.
+
 ### Vite
 
-Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`, no `base` until M1 splits the three.js chunk out, at which point `base: "/App_Plugins/SchemaCity/"` is needed so chunk URLs resolve. Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the workspace element, so opening Settings never pays for three.js. Only opening Schema City does.
+Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. Chunk URLs resolve relative to the loaded module, so no `base` is needed and chunk names stay flat. React, R3F, drei, base-ui, Three.js and dagre are bundled. The scene is a separate chunk behind a lazy import, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either.
 
 ### API client
 
@@ -320,7 +331,7 @@ One hand-written function per endpoint in `src/api.ts`, calling `umbHttpClient.g
 
 ### Dev harness
 
-`Client/dev/index.html` mounts `<schema-city-map>` and hands it a fixture graph; there is no HTTP layer to fake. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
+`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
 
 ---
 
@@ -358,13 +369,14 @@ Everything else stays in the city at reduced opacity. The scene tweens each buil
 | --- | --- |
 | Building | Document Type |
 | Floors (stacked boxes, 0.6 units each) | property groups, in editor order; tabs get a thin slab separator |
-| Floor tint | own group: primary tint; composed group: desaturated tint with a diagonal hatch in the shader |
+| Floor tint | own group: phosphor; composed group: desaturated phosphor with a diagonal hatch in the shader |
 | Footprint | `2 + 0.25 * clamp(ownPropertyCount, 0, 12)` units square, so it never dominates |
 | Roof cap colour | Umbraco icon colour suffix if present, else neutral |
 | Roof icon | Umbraco icon rasterised to a sprite (M4) |
 | Root plaza | flat disc under `allowedAsRoot` buildings with a small flag |
-| Element Type form | low, wide, chamfered "warehouse" with no roof cap, distinct material |
+| Element Type form | low, wide, chamfered "warehouse" in amber, no roof cap, distinct material |
 | Usage badge | small numeric sprite above the roof when the Usage lens is on |
+| Selection | signal pink outline and label |
 | Road (`allowedChild`) | flat ribbon on the ground with animated chevrons in the direction of the edge |
 | Bridge (`composition` / `inherits`) | elevated quadratic arc at roof height, thicker for `inherits` |
 | Block link | thin dashed line dipping to ground level toward the element district |
@@ -373,7 +385,7 @@ Everything else stays in the city at reduced opacity. The scene tweens each buil
 
 ### Usage lens
 
-Same placements, different colours. Modes: content count (sequential ramp), published share (diverging around 50%), cultures, incoming references, unused/dead (binary highlight). Legend in the toolbar. Colours come from a fixed palette in `scene/palette.ts` that is colour-blind safe and uses `--uui-color-*` for UI chrome only.
+Same placements, different colours. Modes: content count (sequential ramp), published share (diverging around 50%), cultures, incoming references, unused/dead (binary highlight). Legend in the toolbar. Colours come from the afterglow theme tokens: phosphor green on void, pink signal, amber, azure and violet. Own groups are phosphor, composed groups desaturated phosphor, element types amber, selection signal. Any diverging or sequential ramp uses amber and azure, never phosphor against signal, because green against pink is the worst pair for colour-vision deficiency. Dark only, by choice. The theme has no light mode.
 
 ---
 
@@ -390,7 +402,7 @@ Same placements, different colours. Modes: content count (sequential ramp), publ
 | Right-drag / two-finger | pan |
 | Wheel | zoom (ortho zoom, not dolly) |
 | `Cmd/Ctrl + K` or `/` | search palette, fuzzy on type name, alias and property alias, so "heroImage" finds every type that has that field. Enter selects and flies |
-| Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer |
+| Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer, and the command palette, which is cmdk through afterglow's `command` component |
 | Findings drawer | grouped by severity, filter by kind, each row links to its node. Counts shown as matched / total |
 | Inspector | header (icon, name, alias, badges), Compositions, Allowed parents, Allowed children, Templates, Usage, then floors as a collapsible tree; every type name is a link that selects it. Every type name also has an edit link that opens the real Document Type editor |
 | URL | `?type=<alias>&layer=<layer>&lens=<lens>` so the workspace view and findings can deep link |
@@ -407,13 +419,12 @@ fsn is pnpm + Turborepo, Vite, three.js 0.179, Biome lint-only, vitest. Its `pac
 | --- | --- | --- |
 | Pure layout returning `Placement[]`, scene consumes it | `packages/app/src/layout.ts` header | Keep this separation exactly |
 | Camera flight type, `smootherstep`, `easeInOutCubic`, interruptible establishing shot | `scene.ts` `CameraFlight` | reuse verbatim |
-| Instanced meshes with per-instance pick maps | `scene.ts` `pickMeshes` | one `InstancedMesh` per material |
-| Sprite labels built on demand, distance-scaled, lane-staggered | `scene.ts` `labelScaleFor`, `layout.ts` `LABEL_LANE` | port the lane idea to ranks |
 | Activation dimming (1 = lit, 0 = background) | `DirectoryArea.activation` | becomes the selection fade |
 | Staggered intro rise | `introDelay`, `INTRO_STAGGER` | ripple outward from roots |
-| Light dismiss helper | `light-dismiss.ts` | search palette |
-| `textContent`-only DOM helper | `viewers/dom.ts` | inspector rendering, names are untrusted |
+| Names rendered as text, never as HTML | `viewers/dom.ts` | React does this by default; never `dangerouslySetInnerHTML`, because names and aliases are untrusted |
 | Conventions | `CLAUDE.md` | why-comments, colocated behaviour tests, no snapshot tests |
+
+Three of fsn's mechanisms are not ported: drei's `Html` component replaces the sprite labels, R3F does instanced picking without the per-instance pick maps, and base-ui's dialog and popover cover light dismiss.
 
 ### From flat diagnostics dashboards
 
@@ -438,10 +449,12 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ### M1, The city (large)
 
+- Spike first: a Lit wrapper hosting a React root, the afterglow theme adapted to `:host`, a base-ui dialog, popover, tooltip and command palette pinned inside the shadow root, and a 12-box R3F canvas with hover and click, running in the harness and in the backoffice on 17.6.2 and 18.1.1. If it fails, fall back to Lit before any city code exists.
+  - Exit for the spike: the four base-ui surfaces and the R3F canvas work in the harness and inside the backoffice on both majors.
 - `SchemaGraphBuilder` complete for identity, behaviour, groups, properties, compositions, inheritance, allowed children, templates. Unit tests against hand-built `ContentType` instances.
 - `BlockEditorInspector` for Block List, Block Grid, RTE blocks, MNTP filter. Unit tests per editor.
 - `layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance.
-- Scene: ground, buildings with floors and tints, roads with chevrons, ortho camera, orbit and zoom, hover, select, fade, labels, intro rise.
+- Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, drei `Html` labels, intro rise.
 - Inspector with all schema sections. Search palette.
 - Exit: usable on the seeded schema and `pathological.json`; 300 types at 60 fps on an M-series laptop.
 
@@ -484,7 +497,9 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | --- | --- |
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
-| Three.js bundle size in the backoffice | Separate chunk, loaded only when the workspace opens. |
+| React, R3F, drei and base-ui on top of Three.js, about 150 kB gzipped | Loaded only when the workspace opens; the scene chunk is lazy. Measure at the spike and again at M1 exit. |
+| base-ui portals and focus inside a shadow root | Portal container inside our root, proven in the spike before any other UI is written. |
+| Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
 | Usage queries slow on large installs | One grouped query for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
 | Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements, and let the CI boot step on both majors be the detector. |
 | Shadow DOM and WebGL canvas sizing | `ResizeObserver` on the host element, `devicePixelRatio` cap at 2. |
@@ -498,7 +513,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | --- | --- |
 | Graph builder, block inspector, usage aggregation | xUnit with hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
 | `model/`, `layout/` | vitest on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 50 ms, findings rules |
-| Scene | vitest with jsdom for placement to mesh mapping and pick maps, as fsn does; visual checks in the dev harness |
+| Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
 | Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |
 
