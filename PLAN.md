@@ -355,16 +355,15 @@ Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.
 
 ### Layout (`app/layout/city.ts`)
 
-1. Districts follow the schema's folders. One district per top-level Document Type folder, named after it, plus **Unfiled** for types outside any folder.
-   - With no folders, derive the districts by role and name them: **Pages** (reachable from a root along `allowedChild` edges, plus the roots), **Compositions** (composed by something, never placed), **Elements** (`isElement` types) and **Unplaced** (the rest). Pages is the fallback name only, because not every schema is pages.
-   - Each district carries a kind, one of structure, compositions, elements or mixed, which the colour rules read.
-   - One structure district was a single pile. Folder blocks cut it into clusters, and the labels say what each block is.
-2. Inside each district, run dagre (rank direction top-to-bottom, `ranker: "network-simplex"`) over the members joined by `allowedChild` edges. Roots get rank 0. Cycles are fine, dagre reverses back edges. Read back the rank and the left-to-right order inside it, and nothing else. Dagre's own `x` is unusable on a real schema: an allowed-child graph is shallow and wide, and every edge that skips a rank threads a dummy node through the ranks between it, so the seeded 78-type fixture ranked into a district 624 units wide and 66 deep, which frames as a diagonal line of buildings a pixel or two tall.
-3. Fold each rank into rows of at most 8 buildings, each row centred on the district's axis. The order within a rank follows the leftmost already-placed parent from any earlier rank, not only the rank above, which also handles edges that skip a rank. Dagre's order breaks ties. Rows inside one rank sit a footprint plus a gap apart, and the next rank starts after the last of them plus the rank gap. The same fixture then measures 40 by 87. Eight is the number of buildings that stay legible side by side once the camera frames the whole city, and it is the same limit the packed grids use. Members that no `allowedChild` edge joins pack into a grid below the ranked block, sorted by alias, at most 8 per row.
-4. Place the districts by kind. Structure districts sit in the middle row, largest first. Compositions go north, so their bridges rise. Elements go south, so block links dip. Unfiled and unplaced sit east. Streets of at least 6 units run between districts.
-5. Nested folders stay inside their top-level district for now, tinting the slab under their members rather than getting a district of their own.
+1. Districts follow the schema's folders. One district per top-level Document Type folder, named after it, plus **Unfiled** for types outside any folder. A nested folder stays inside its top-level district and records its id on each member's placement, which tints the slab under them. One structure district was a single pile. Folder blocks cut it into clusters, and the labels say what each block is.
+2. With no folders, derive the districts by role and name them: **Pages** (reachable from a root along `allowedChild` edges, plus the roots), **Compositions** (composed by something, never placed), **Elements** (`isElement` types) and **Unplaced** (the rest). Pages is the fallback name only, because not every schema is pages. On the small fixture that gives Pages 6, Compositions 1, Elements 3 and Unplaced 2, which comes out mixed.
+3. A district's kind is the role more than half its members share, one of structure, compositions, elements or mixed. The scene reads it for the building colours and the district label.
+4. Inside a district, run dagre (rank direction top-to-bottom, `ranker: "network-simplex"`) over the members joined by `allowedChild` edges. Roots get rank 0. Cycles are fine, dagre reverses back edges. Read back the rank and the left-to-right order inside it, and nothing else. Dagre's own `x` is unusable on a real schema. An allowed-child graph is shallow and wide, and every edge that skips a rank threads a dummy node through the ranks between it, so the seeded 78-type fixture ranked into a district 624 units wide and 66 deep, which frames as a diagonal line of buildings a pixel or two tall. Each rank folds into rows of at most 8 buildings, each row centred on the district's axis. The order within a rank follows the leftmost already-placed parent from any earlier rank, not only the rank above, which also handles edges that skip a rank. Dagre's order breaks ties. Rows inside one rank sit a footprint plus a gap apart, and the next rank starts after the last of them plus the rank gap. Eight is the number of buildings that stay legible side by side once the camera frames the whole city, and it is the same limit the packed grids use. Members that no `allowedChild` edge joins pack into a grid one street below the ranked block, sorted by alias, at most 8 per row. A district with no structure is one grid.
+5. Place the districts by kind. Structure districts, and mixed districts that contain structure, sit in the middle row, largest first. Compositions go north, so their bridges rise. Elements go south, so block links dip. Mixed districts with no structure sit east, and so do Unfiled and Unplaced whatever their kind. Streets are 6 units, the same as the rank gap.
 6. Positions are world units throughout: a building footprint is 2 units, two buildings in a row sit one footprint apart, and a rank gap is 6 units.
-7. Output `Placement { node, position, footprint, height, floors, district, introDelay }`.
+7. `layoutCity(graph)` returns `Placement { id, position, footprint, height, floors, district, districtKind, folder?, introDelay }`; `cityDistricts(graph)` returns those placements plus a `District { id, name, kind, minX, maxX, minZ, maxZ, centre }` per district for the slabs and labels.
+
+On the seeded schema this gives Compositions (7) north, Pages (42) in the middle, Elements (15) south and Unfiled (14) east.
 
 Determinism: sort nodes and edges by alias before dagre. Dagre is deterministic for a given input order, and two nodes that land on the same dagre `x` break the tie by alias, so the layout needs no persistence and no hash.
 
@@ -402,7 +401,7 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Selection | signal pink outline and label |
 | Road (`allowedChild`) | flat ribbon on the ground with animated chevrons in the direction of the edge |
 | Bridge (`composition` / `inherits`) | elevated quadratic arc, apex one arch above the taller roof. `inherits` is drawn as two arcs a hair apart, because WebGL ignores a line width above 1 |
-| Block link | thin solid line dipping to ground level toward the element district. Dashes are what tells a reference apart from it |
+| Block link | thin solid line dipping to ground level toward the target element type. Dashes are what tells a reference apart from it |
 | Reference | dotted line, hidden unless the References layer is on |
 | District | Ground slab with a rim and a name label per district; nested folders tint the slab |
 
@@ -514,7 +513,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. Done 2026-09-03; the slab stays city-sized by choice.
 - NuGet packaging with the client build wired into `dotnet pack`, README for the package, marketplace metadata. Done 2026-09-03; screenshots still missing.
 - Roof icons (size rule, in progress), property "windows" on floors, Explore perspective toggle, list view fallback (icon resolution in the wrappers done 2026-09-03; the scene side in progress).
-- Districts follow folders, with slabs and labels (in progress).
+- Districts follow folders. Layout done 2026-09-03 (140 tests, 300 nodes in 44 ms); slabs and labels in progress.
 - Search palette in fsn's shape, fixed height (in progress).
 - Camera reset on hover: found 2026-09-03, fix in progress.
 - Focus mode sinks the unrelated city to plates (in progress).
@@ -558,7 +557,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layer | How |
 | --- | --- |
 | Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
-| `model/`, `app/` | 125 vitest tests across 13 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
+| `model/`, `app/` | 140 vitest tests across 13 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 at the M3 merge, green on both majors. CI also packs and checks the nupkg |
 | Performance | The seeded schema in the dev harness with the browser's own frame profiler; a pathological fixture (cycles, 40 element types, orphans) is still to be written |
