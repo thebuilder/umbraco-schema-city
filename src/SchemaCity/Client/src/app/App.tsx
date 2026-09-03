@@ -51,7 +51,11 @@ export function App({
         return;
       }
       // The palette owns the keyboard while it is open, including its own Escape.
-      if (paletteOpen) return;
+      // Picking a row closes it inside the same keystroke, and React has swapped
+      // this listener for one that reads the palette as closed by the time the
+      // event reaches the document, so the Enter that chose a type would focus it
+      // too. cmdk calls preventDefault on the key it consumed, which is the tell.
+      if (paletteOpen || event.defaultPrevented) return;
       if (event.key === "Enter" && selected) setFocus(selected);
       // Escape leaves focus first and clears the selection second, so the way out
       // of focus mode never also loses the node you were reading.
@@ -131,9 +135,8 @@ export function App({
         </div>
 
         <div className="relative flex-1">
-          {/* drei's Html labels carry a z-index near 2^24, so the scene gets a
-              stacking context of its own and the inspector sits above it on a
-              plain z-10 instead of having to outbid that number. */}
+          {/* The scene and the label layer over it get a stacking context of
+              their own, so the inspector sits above both on a plain z-10. */}
           <div className="absolute inset-0 z-0">
             <Suspense
               fallback={

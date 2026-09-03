@@ -1,4 +1,4 @@
-import { Html, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import { Canvas, type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -15,6 +15,7 @@ import {
   smootherstep,
 } from "./scene/buildings";
 import { neighboursOf } from "./scene/graph-links";
+import { CHAR_PX, LABEL_CAP, pickLabels } from "./scene/labels";
 import { buildRoadGeometry } from "./scene/roads";
 
 type Palette = {
@@ -438,7 +439,21 @@ function pushDashes(out: number[], from: THREE.Vector3, to: THREE.Vector3) {
 
 /** How many neighbours of the selected node still get a label each. */
 const MAX_NEIGHBOUR_LABELS = 8;
+/** World units between the top face of a building and the bottom of its label. */
+const LABEL_LIFT = 0.35;
+const LABEL_CLASS =
+  "absolute top-0 left-0 hidden whitespace-nowrap border border-line-strong bg-panel-raised px-1.5 py-0.5 font-mono text-2xs text-phosphor";
 
+/**
+ * The names on the city, in one DOM layer over the canvas. Candidates are the
+ * same as they always were, but which of them are drawn is decided in screen
+ * space every time the camera or the layout moves: `pickLabels` keeps the best
+ * ranked ones that do not land on each other, and drops the rest.
+ *
+ * The layer is built and written to by hand rather than through React, because
+ * this runs inside the frame loop and forty spans that only ever change their
+ * transform are not worth a render each.
+ */
 function Labels({
   nodesById,
   placementsById,
@@ -456,53 +471,140 @@ function Labels({
   neighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
 }) {
-  const ids = useMemo(() => {
-    const set = new Set<string>();
-    // A faded building gets no label, not even under the cursor.
-    if (hovered && (neighbours === null || neighbours.has(hovered))) set.add(hovered);
-    // The focus layout spreads the whole neighbourhood over its own compass, so
-    // there every building has room for its name, however many there are.
-    if (focusNeighbours) {
-      for (const id of focusNeighbours) set.add(id);
-      return set;
-    }
-    if (selected) {
-      set.add(selected);
-      const direct = [...(neighbours ?? [])].filter((id) => id !== selected);
-      // Home has 42 neighbours in the seeded schema, and 42 labels land on top of
-      // each other in a district a few hundred pixels wide. Past this many the
-      // scene shows none and the inspector's lists are where you read them.
-      if (direct.length <= MAX_NEIGHBOUR_LABELS) for (const id of direct) set.add(id);
-    }
-    return set;
-  }, [hovered, selected, neighbours, focusNeighbours]);
+  const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
+  const gl = useThree((state) => state.gl);
+  const size = useThree((state) => state.size);
+  const spans = useRef<HTMLSpanElement[]>([]);
+  const charPx = useRef(CHAR_PX);
+  const anchor = useMemo(() => new THREE.Vector3(), []);
+  // The layer is repainted when the camera has moved or the inputs changed, and
+  // skipped otherwise, so a still city costs one matrix comparison a frame.
+  const dirty = useRef(true);
+  const framedAt = useRef(new THREE.Matrix4());
+  const framedZoom = useRef(0);
 
-  return (
-    <>
-      {[...ids].map((id) => {
-        const node = nodesById.get(id);
-        const placement = placementsById.get(id);
-        if (!node || !placement) return null;
-        const height = heights.get(id) ?? placement.height;
-        return (
-          <Html
-            key={id}
-            position={[
-              placement.position.x,
-              (placement.y ?? 0) + height + 0.35,
-              placement.position.z,
-            ]}
-            style={{ pointerEvents: "none" }}
-            center
-          >
-            <span className="whitespace-nowrap border border-line-strong bg-panel-raised px-1.5 py-0.5 font-mono text-2xs text-phosphor">
-              {node.name}
-            </span>
-          </Html>
-        );
-      })}
-    </>
-  );
+  const candidates = useMemo(() => {
+    const ids = new Set<string>();
+    // A faded building gets no label, not even under the cursor.
+    if (hovered && (neighbours === null || neighbours.has(hovered))) ids.add(hovered);
+    // The focus layout spreads the whole neighbourhood over its own compass, so
+    // every placed building is a candidate there.
+    if (focusNeighbours) for (const id of focusNeighbours) ids.add(id);
+    else if (selected) {
+      ids.add(selected);
+      const direct = [...(neighbours ?? [])].filter((id) => id !== selected);
+      // Past this many the scene stops offering the neighbours at all, so a hub
+      // does not spend the whole screen budget on one selection.
+      if (direct.length <= MAX_NEIGHBOUR_LABELS) for (const id of direct) ids.add(id);
+    }
+
+    const built: {
+      id: string;
+      text: string;
+      rank: number;
+      footprint: number;
+      x: number;
+      y: number;
+      z: number;
+    }[] = [];
+    for (const id of ids) {
+      const node = nodesById.get(id);
+      const placement = placementsById.get(id);
+      if (!node || !placement) continue;
+      built.push({
+        id,
+        text: node.name,
+        rank: id === selected ? 0 : id === hovered ? 1 : 2,
+        footprint: placement.footprint,
+        x: placement.position.x,
+        y: (placement.y ?? 0) + (heights.get(id) ?? placement.height) + LABEL_LIFT,
+        z: placement.position.z,
+      });
+    }
+    return built;
+  }, [hovered, selected, neighbours, focusNeighbours, nodesById, placementsById, heights]);
+
+  useEffect(() => {
+    dirty.current = true;
+  }, [candidates, size]);
+
+  useEffect(() => {
+    const parent = gl.domElement.parentElement;
+    if (!parent) return;
+    const layer = document.createElement("div");
+    layer.className = "pointer-events-none absolute inset-0 overflow-hidden";
+    // The canvas is aria-hidden and so is everything drawn over it; the
+    // inspector and the type list are the accessible reading of the same names.
+    layer.setAttribute("aria-hidden", "true");
+    const made = Array.from({ length: LABEL_CAP }, () => {
+      const span = document.createElement("span");
+      span.className = LABEL_CLASS;
+      layer.append(span);
+      return span;
+    });
+    parent.append(layer);
+    spans.current = made;
+
+    // One measurement of the real font beats a guess at the mono advance, and a
+    // wrong width is either labels that touch or labels dropped for nothing.
+    const context = document.createElement("canvas").getContext("2d");
+    if (context) {
+      const style = getComputedStyle(made[0]);
+      context.font = `${style.fontSize} ${style.fontFamily}`;
+      charPx.current = context.measureText("M").width || CHAR_PX;
+    }
+    dirty.current = true;
+
+    return () => {
+      layer.remove();
+      spans.current = [];
+    };
+  }, [gl]);
+
+  useFrame(() => {
+    if (
+      !dirty.current &&
+      camera.zoom === framedZoom.current &&
+      camera.matrixWorld.equals(framedAt.current)
+    ) {
+      return;
+    }
+    dirty.current = false;
+    framedZoom.current = camera.zoom;
+    framedAt.current.copy(camera.matrixWorld);
+
+    const kept = pickLabels(
+      candidates.map((candidate) => {
+        anchor.set(candidate.x, candidate.y, candidate.z).project(camera);
+        return {
+          id: candidate.id,
+          text: candidate.text,
+          rank: candidate.rank,
+          pinned: candidate.rank < 2,
+          x: (anchor.x * 0.5 + 0.5) * size.width,
+          y: (0.5 - anchor.y * 0.5) * size.height,
+          // ponytail: an orthographic camera's zoom is exactly its pixels per
+          // world unit. The Explore toggle's perspective camera will have to
+          // project a second point instead.
+          buildingPx: anchor.z > 1 ? 0 : candidate.footprint * camera.zoom,
+        };
+      }),
+      { charPx: charPx.current, width: size.width, height: size.height },
+    );
+
+    spans.current.forEach((span, index) => {
+      const box = kept[index];
+      if (!box) {
+        span.style.display = "none";
+        return;
+      }
+      span.style.display = "block";
+      span.style.transform = `translate(${Math.round(box.left)}px, ${Math.round(box.top)}px)`;
+      if (span.textContent !== box.text) span.textContent = box.text;
+    });
+  });
+
+  return null;
 }
 
 /** A (1,1,1) view direction is a true isometric angle: 45° azimuth, ~35.26° elevation. */
