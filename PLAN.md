@@ -333,7 +333,7 @@ The scene reads `--phosphor`, `--signal` and `--phosphor-dim` from computed styl
 
 Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. React, R3F, drei, base-ui, Three.js and dagre are bundled.
 
-Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given.
+Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1.
 
 ### API client
 
@@ -459,7 +459,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ### M1, The city (large)
 
-- Spike first: a Lit wrapper hosting a React root, the afterglow theme adapted to `:host`, a base-ui dialog, popover, tooltip and command palette pinned inside the shadow root, and a 12-box R3F canvas with hover and click, running in the harness and in the backoffice on 17.6.2 and 18.1.1. If it fails, fall back to Lit before any city code exists. Done 2026-09-03; measured 179 kB + 340 kB gzipped.
+- Spike first, done 2026-09-03: a Lit wrapper hosting a React root, the afterglow theme with tokens on `:host, :root`, a base-ui dialog, popover, tooltip and command palette pinned inside the shadow root, and a 12-box R3F canvas with hover and click, working in the harness and served on both majors. Measured 179 kB + 340 kB gzipped.
   - Exit for the spike: the four base-ui surfaces and the R3F canvas worked in the harness and inside the backoffice on both majors.
 - `SchemaGraphBuilder` complete for identity, behaviour, groups, properties, compositions, inheritance, allowed children, templates. Unit tests against hand-built `ContentType` instances.
 - `BlockEditorInspector` for Block List, Block Grid, RTE blocks, MNTP filter. Unit tests per editor.
@@ -533,7 +533,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 1. Run the template, commit the untouched scaffold, then replace the example with `Constants.cs` and the graph controller. Done.
 2. Write `Models/` and `model/types.ts` together so the contract is fixed before any rendering. Done.
-3. Write `SchemaSeeder` and export `medium.json` from it.
+3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Next.
 5. Then buildings, then roads, then the inspector.
 
