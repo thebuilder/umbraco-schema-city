@@ -44,8 +44,8 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// <summary>
     /// The findings the seed data is built to produce, as (kind, Document Type alias). M3's
     /// findings test asserts that its own output contains all of these. It cannot assert equality:
-    /// the no-template and dead-end rules also match every composition and every Element Type,
-    /// and giving 60 Document Types a template would write 60 .cshtml files into the site.
+    /// the no-template rule matches every creatable type the seeder leaves without one, and giving
+    /// 60 Document Types a template would write 60 .cshtml files into the site.
     /// </summary>
     public static readonly (string Kind, string Alias)[] PlantedFindings =
     [
@@ -54,7 +54,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         ("noProperties", "emptyType"),
         ("noTemplate", "noTemplatePage"),
         ("structuralDeadEnd", "deadEndPromo"),
-        ("unusedComposition", "unusedSeoComposition"),
+        ("structuralDeadEnd", "unusedSeoComposition"),
         ("unusedElementType", "unusedElementBanner"),
         ("unusedType", "unusedArticleLegacy"),
     ];

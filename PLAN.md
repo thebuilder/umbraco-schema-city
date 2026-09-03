@@ -201,12 +201,11 @@ Findings are derived in `model/findings.ts`:
 | --- | --- |
 | Unused type | not element, `total === 0` |
 | Unused element type | element, no incoming `block` edge |
-| Unused composition | a type that exists only to be composed (no root, no incoming `allowedChild`, no instances) with zero incoming `composition` edges |
-| Structural dead end | not `allowedAsRoot`, no incoming `allowedChild`, not element |
+| Structural dead end | not `allowedAsRoot`, no incoming `allowedChild`, not element, and zero incoming `composition` edges |
 | Duplicate property alias | two compositions, or a composition and the type's own properties, contribute the same property alias. This is the composition bug that breaks editing |
 | Broken block reference | a block editor configuration names an Element Type key that no longer exists. The block inspector emits this instead of silently dropping the edge |
 | No properties | zero own and zero composed properties |
-| No template | not element, zero allowed templates. Informational tier |
+| No template | not element, creatable (root or an allowed child), zero allowed templates, on a schema where some type has one. Informational tier |
 | Pure mixin | composed but never a child, never root, never a block (a pure mixin, informational) |
 | Complexity | `own + composed properties + 2*compositions + block targets`, bucketed into 5 tiers for the lens |
 
@@ -498,7 +497,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - `UsageCollector` and `usage` endpoint with caching. Tests for the aggregation. Done 2026-09-03; four queries, 17 backend tests, and a deterministic `medium-usage.json` exported by the seeder.
 - Usage lens with five modes and legend, badges on roofs.
-- `findings.ts` with tests. Findings drawer listing unused types, unused element types, dead ends, unused compositions, duplicate property aliases, broken block references, types with no properties, types with no template, and complexity tiers, each linking to its node.
+- `findings.ts` with tests. Findings drawer listing unused types, unused element types, dead ends, duplicate property aliases, broken block references, types with no properties, types with no template, and complexity tiers, each linking to its node.
 - Exit: the findings drawer reports exactly the planted set on the seeded site, on both Umbraco majors.
 
 ### M4, Polish and release (medium)

@@ -118,25 +118,23 @@ describe("findFindings, one rule at a time", () => {
     expect(aliasesFor(graph, "unusedElementType")).toEqual(["spare"]);
   });
 
-  it("reports a composition nothing composes", () => {
-    const graph = graphOf(
-      [node("page", { allowedAsRoot: true }), node("seo"), node("lonely")],
-      [edge("composition", "page", "seo")],
-    );
-    expect(aliasesFor(graph, "unusedComposition")).toEqual(["lonely"]);
-  });
-
-  it("keeps a composition off the list once usage finds content of it", () => {
-    const graph = graphOf([node("page", { allowedAsRoot: true }), node("lonely")]);
-    expect(aliasesFor(graph, "unusedComposition", usageOf(graph))).toEqual([]);
-  });
-
-  it("reports a type no editor can create", () => {
+  it("reports a type no editor can create and nothing composes", () => {
     const graph = graphOf(
       [node("home", { allowedAsRoot: true }), node("child"), node("orphan")],
       [edge("allowedChild", "home", "child")],
     );
     expect(aliasesFor(graph, "deadEnd")).toEqual(["orphan"]);
+  });
+
+  it("leaves a composed type off the dead ends, whatever usage says", () => {
+    const graph = graphOf(
+      [node("page", { allowedAsRoot: true }), node("seo"), node("lonely")],
+      [edge("composition", "page", "seo")],
+    );
+    expect(aliasesFor(graph, "deadEnd")).toEqual(["lonely"]);
+    expect(aliasesFor(graph, "deadEnd", usageOf(graph))).toEqual(["lonely"]);
+    // seo is composed, so it is the pure mixin note and nothing else.
+    expect(kindsFor(graph, "seo")).toEqual(["pureMixin"]);
   });
 
   it("reports a property alias two compositions both contribute", () => {
@@ -188,11 +186,22 @@ describe("findFindings, one rule at a time", () => {
   it("reports a type with no template as a note", () => {
     const graph = graphOf([
       node("bare", { allowedAsRoot: true, templates: [] }),
+      node("templated", { allowedAsRoot: true }),
       node("element", { isElement: true, templates: [] }),
     ]);
     const [finding] = findFindings(graph).filter((f) => f.kind === "noTemplate");
     expect(finding?.nodeId).toBe("bare");
     expect(finding?.severity).toBe("note");
+  });
+
+  it("says nothing about templates on a schema that has none, or about a mixin", () => {
+    const headless = graphOf([node("home", { allowedAsRoot: true, templates: [] })]);
+    expect(aliasesFor(headless, "noTemplate")).toEqual([]);
+    const mixin = graphOf(
+      [node("page", { allowedAsRoot: true }), node("seo", { templates: [] })],
+      [edge("composition", "page", "seo")],
+    );
+    expect(aliasesFor(mixin, "noTemplate")).toEqual([]);
   });
 
   it("reports a composition that is only ever composed", () => {
@@ -260,7 +269,8 @@ describe("findFindings on small.json", () => {
     // Every Element Type in the fixture is in a block editor, so that rule is
     // silent here and the hand-built graph above is what covers it.
     expect(named("unusedElementType")).toEqual([]);
-    expect(named("deadEnd")).toEqual(["legacyWidget", "person", "seoComposition"]);
+    // seoComposition is composed by another type, so it is a mixin, not a dead end.
+    expect(named("deadEnd")).toEqual(["legacyWidget", "person"]);
     expect(named("noProperties")).toEqual(["legacyWidget"]);
     expect(named("pureMixin")).toEqual(["seoComposition"]);
   });
@@ -276,15 +286,11 @@ describe("findFindings on the seeded medium.json", () => {
   // report, so it is given a hand-made one with that type at zero. The two
   // composition-shaped types are at zero as well, because nothing can create
   // content of a type no editor can reach.
-  const usage = usageOf(medium, [
-    "unusedArticleLegacy",
-    "unusedSeoComposition",
-    "deadEndPromo",
-  ]);
+  const usage = usageOf(medium, ["unusedArticleLegacy", "unusedSeoComposition", "deadEndPromo"]);
   const planted: [string, FindingKind][] = [
     ["unusedArticleLegacy", "unusedType"],
     ["unusedElementBanner", "unusedElementType"],
-    ["unusedSeoComposition", "unusedComposition"],
+    ["unusedSeoComposition", "deadEnd"],
     ["deadEndPromo", "deadEnd"],
     ["dupAliasPage", "duplicateAlias"],
     ["brokenBlockHost", "brokenBlock"],
