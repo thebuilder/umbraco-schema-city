@@ -2,29 +2,29 @@
   "generatedAt": "1970-01-01T00:00:00+00:00",
   "folders": [
     {
-      "id": "5940ec7c-5569-4720-b6a5-14763d09026c",
+      "id": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
       "name": "Compositions",
       "parentId": null
     },
     {
-      "id": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "id": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "name": "Elements",
       "parentId": null
     },
     {
-      "id": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "id": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "name": "Pages",
       "parentId": null
     }
   ],
   "nodes": [
     {
-      "id": "5c4a1f10-0000-4000-8000-000000000001",
+      "id": "cbb5a292-699c-0306-5c28-64fa225e1940",
       "alias": "article",
       "name": "Article",
       "icon": "icon-globe",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -34,7 +34,7 @@
       "composedPropertyCount": 8,
       "templates": [
         {
-          "id": "e2892cf3-b340-4a37-9343-c8bd91219331",
+          "id": "7c4e0dc9-71f2-8804-aced-2a69b48b11a5",
           "alias": "scArticle",
           "name": "SC Article",
           "isDefault": true
@@ -42,12 +42,12 @@
       ]
     },
     {
-      "id": "f82ce3f7-cdd6-4107-af3b-d2e9358365c9",
+      "id": "437a3f03-0cc7-7cc1-8931-85d78eb077ba",
       "alias": "blogLanding",
       "name": "Blog Landing",
       "icon": "icon-calendar",
       "iconColor": "color-red",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -58,12 +58,12 @@
       "templates": []
     },
     {
-      "id": "2c2d493e-07d5-4bda-982e-4e91fa484f52",
+      "id": "efe97ed3-eccb-fe5e-5b79-336f4092e275",
       "alias": "blogPost",
       "name": "Blog Post",
       "icon": "icon-globe",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": true,
@@ -74,12 +74,12 @@
       "templates": []
     },
     {
-      "id": "13a1e0ed-ab3c-4b90-901a-75d9ca248a13",
+      "id": "b025ea71-1382-7aa1-d3d4-7205644a34bc",
       "alias": "brokenBlockHost",
       "name": "Broken Block Host",
       "icon": "icon-globe",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -90,12 +90,12 @@
       "templates": []
     },
     {
-      "id": "1e6f95a2-d6c1-4f45-9c2a-eb1ea83ba6de",
+      "id": "52c92789-46c7-979c-aac0-6801de08bcd0",
       "alias": "campaignHub",
       "name": "Campaign Hub",
       "icon": "icon-folder",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -106,7 +106,7 @@
       "templates": []
     },
     {
-      "id": "a4dafb0e-7196-44f8-a752-310478f92b7b",
+      "id": "5a5feca6-d232-1cb2-9e34-e653ae2ea3eb",
       "alias": "campaignPage",
       "name": "Campaign Page",
       "icon": "icon-store",
@@ -122,12 +122,12 @@
       "templates": []
     },
     {
-      "id": "86ad14ba-e659-4b0c-9bb6-f5e67e0d8199",
+      "id": "00e07956-4c73-a094-36f0-b18cfbebedb6",
       "alias": "careersPage",
       "name": "Careers Page",
       "icon": "icon-document",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -138,12 +138,12 @@
       "templates": []
     },
     {
-      "id": "87d22a84-fe55-4667-839d-ff023ffd5be0",
+      "id": "e05ec34e-e052-bd4f-8e0b-fbc110c1f3e1",
       "alias": "contactPage",
       "name": "Contact Page",
       "icon": "icon-users",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -154,7 +154,7 @@
       "templates": []
     },
     {
-      "id": "11217ea7-4efb-445e-9b96-06a80a586c5a",
+      "id": "6f6ff11a-0bc1-5d0c-62ab-fe2787d18b3d",
       "alias": "contentFolder",
       "name": "Content Folder",
       "icon": "icon-tags",
@@ -170,7 +170,7 @@
       "templates": []
     },
     {
-      "id": "d2ea4b0f-159f-4cd7-a660-abc27eaf41f6",
+      "id": "7f24c73b-b0e7-a6df-aaa7-52d185982719",
       "alias": "deadEndPromo",
       "name": "Dead End Promo",
       "icon": "icon-tags",
@@ -186,12 +186,12 @@
       "templates": []
     },
     {
-      "id": "c49021c8-b903-4cda-bbeb-8ec2503f59af",
+      "id": "43f2f3b8-fb33-26bf-c82d-7bb1cd945d63",
       "alias": "dictionaryPage",
       "name": "Dictionary Page",
       "icon": "icon-newspaper",
       "iconColor": "color-blue",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -202,12 +202,12 @@
       "templates": []
     },
     {
-      "id": "f3c59360-2f25-4038-bc31-c2995f38a534",
+      "id": "50436abb-71b9-089e-2fe0-c643b1a1270e",
       "alias": "downloadCenter",
       "name": "Download Center",
       "icon": "icon-document",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -218,12 +218,12 @@
       "templates": []
     },
     {
-      "id": "04d0c590-7fa5-4f1f-acd8-239b9c9b85a4",
+      "id": "adbe6c57-c5b0-b3c9-64d3-0a68249f243b",
       "alias": "downloadPage",
       "name": "Download Page",
       "icon": "icon-newspaper",
       "iconColor": "color-blue",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -234,12 +234,12 @@
       "templates": []
     },
     {
-      "id": "50db4ea4-147c-4392-8dbb-e4beafed28f4",
+      "id": "124d52e7-ef04-6465-0660-bfe7c73c3dea",
       "alias": "dupAliasPage",
       "name": "Dup Alias Page",
       "icon": "icon-calendar",
       "iconColor": "color-red",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -250,12 +250,12 @@
       "templates": []
     },
     {
-      "id": "e504e3c0-4ea1-461a-9e8c-bc434b157eac",
+      "id": "f64e3132-6854-2388-d77e-7fde6ffec4d6",
       "alias": "dupSeoMirror",
       "name": "Dup Seo Mirror",
       "icon": "icon-plugin",
       "iconColor": null,
-      "folderId": "5940ec7c-5569-4720-b6a5-14763d09026c",
+      "folderId": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -266,12 +266,12 @@
       "templates": []
     },
     {
-      "id": "c13e8e6d-2c16-4eed-b342-c4640b34ec64",
+      "id": "e9e5b939-d62a-f40a-c69c-ca0684ccc7e5",
       "alias": "elementAccordionItem",
       "name": "Element Accordion Item",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -282,12 +282,12 @@
       "templates": []
     },
     {
-      "id": "88ba8e0d-383c-4dae-b7e8-291be27a8364",
+      "id": "855571b5-565e-0891-6c6b-7e1d6394fa66",
       "alias": "elementBlockSettings",
       "name": "Element Block Settings",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -298,12 +298,12 @@
       "templates": []
     },
     {
-      "id": "f00da369-d48d-42c3-a354-3d7b1721152b",
+      "id": "62d4c970-6251-4804-8b17-5fbaf4877907",
       "alias": "elementCallToAction",
       "name": "Element Call To Action",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -314,12 +314,12 @@
       "templates": []
     },
     {
-      "id": "16f6d8c1-c2e2-467b-ad9d-702a051ed9b1",
+      "id": "d32b32e8-aa50-6699-2412-1ac6f835034a",
       "alias": "elementCard",
       "name": "Element Card",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -330,12 +330,12 @@
       "templates": []
     },
     {
-      "id": "efc51e49-f890-4e5c-acc1-8d3843985f94",
+      "id": "fc37bea0-55e9-6faa-75d1-aae40af67041",
       "alias": "elementForm",
       "name": "Element Form",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -346,12 +346,12 @@
       "templates": []
     },
     {
-      "id": "b451b1d1-5dce-42de-9eed-02d372be5b5a",
+      "id": "e4165f61-0c65-405e-9b27-4226bc4f1489",
       "alias": "elementGridColumn",
       "name": "Element Grid Column",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -362,12 +362,12 @@
       "templates": []
     },
     {
-      "id": "27af43f1-f012-45d3-bbba-5b7adaade549",
+      "id": "3a1706e8-cbdf-5947-c4ac-ba144a3c1089",
       "alias": "elementGridRow",
       "name": "Element Grid Row",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -378,12 +378,12 @@
       "templates": []
     },
     {
-      "id": "941a1dae-d909-4520-b4e9-bd71241956ae",
+      "id": "f3670c7e-8289-c611-1c85-ea3b84fa2cc6",
       "alias": "elementGridSettings",
       "name": "Element Grid Settings",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -394,12 +394,12 @@
       "templates": []
     },
     {
-      "id": "69e4c7fc-7455-4013-9ba6-7460ed9e948c",
+      "id": "0c477326-3e2b-a647-8d1a-e9fe60ba7746",
       "alias": "elementHeading",
       "name": "Element Heading",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -410,12 +410,12 @@
       "templates": []
     },
     {
-      "id": "ba8fc067-c1b2-46d2-a6a4-7d28da36a464",
+      "id": "3e1522e5-ad9f-e357-9ca0-f9e801bf8942",
       "alias": "elementImage",
       "name": "Element Image",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -426,12 +426,12 @@
       "templates": []
     },
     {
-      "id": "6b83ef78-1751-4582-ac12-93400aa654f4",
+      "id": "42486f7c-60a9-35ad-df00-00d323c4307a",
       "alias": "elementQuote",
       "name": "Element Quote",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -442,12 +442,12 @@
       "templates": []
     },
     {
-      "id": "b8310b88-afff-42e2-94e2-21cf6d6950e9",
+      "id": "ffe7ac94-95e4-c5f3-0e8e-69fe2caa8c7c",
       "alias": "elementRichText",
       "name": "Element Rich Text",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -458,12 +458,12 @@
       "templates": []
     },
     {
-      "id": "577f1810-6cca-4bd7-b7a3-513920e1a110",
+      "id": "6b7e2290-d06a-bcd8-9426-1f3871fc1885",
       "alias": "elementRteFigure",
       "name": "Element Rte Figure",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -474,12 +474,12 @@
       "templates": []
     },
     {
-      "id": "5c615795-4976-4742-aad9-7bee3db6ff30",
+      "id": "00da4cdc-96c1-81f0-5fb0-4998f27014fe",
       "alias": "elementVideo",
       "name": "Element Video",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -490,7 +490,7 @@
       "templates": []
     },
     {
-      "id": "cd3d9061-5760-4c4e-a5d1-22fea7438ceb",
+      "id": "9d1d7f83-699a-18b2-1efc-4fba173fb680",
       "alias": "emptyType",
       "name": "Empty Type",
       "icon": "icon-store",
@@ -506,7 +506,7 @@
       "templates": []
     },
     {
-      "id": "33fdf11a-7436-43b1-9082-8143ac395b40",
+      "id": "425a9d4d-a3cb-5422-18d7-9c0fa9eece0f",
       "alias": "errorPage",
       "name": "Error Page",
       "icon": "icon-tags",
@@ -522,12 +522,12 @@
       "templates": []
     },
     {
-      "id": "1099a593-760d-4716-acf0-3d5a6f3f8945",
+      "id": "70d8edb5-ac46-3efe-ed40-9e349748222b",
       "alias": "eventLanding",
       "name": "Event Landing",
       "icon": "icon-document",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -538,12 +538,12 @@
       "templates": []
     },
     {
-      "id": "65be75e1-a155-4aaa-bc03-5ace9562ca6c",
+      "id": "756ff101-f79f-ffd5-cdf5-399a4b2cc8ee",
       "alias": "eventPage",
       "name": "Event Page",
       "icon": "icon-newspaper",
       "iconColor": "color-blue",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -554,12 +554,12 @@
       "templates": []
     },
     {
-      "id": "e06c740e-0792-4b73-ac45-65f002c997c8",
+      "id": "97c656b3-7b26-6e38-554b-61317103abdf",
       "alias": "eventSession",
       "name": "Event Session",
       "icon": "icon-folder",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -570,12 +570,12 @@
       "templates": []
     },
     {
-      "id": "4ad6b388-7696-4736-be6b-d1f9db20526d",
+      "id": "f06a8ff8-07b8-4660-5a56-a1d30f3190d5",
       "alias": "faqCategory",
       "name": "Faq Category",
       "icon": "icon-calendar",
       "iconColor": "color-red",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -586,12 +586,12 @@
       "templates": []
     },
     {
-      "id": "a19bcfff-ac53-442f-ac6c-9d2b0d6527f4",
+      "id": "b0d4ffda-fd2b-0f2f-d309-68af477d25c7",
       "alias": "faqPage",
       "name": "Faq Page",
       "icon": "icon-users",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -602,12 +602,12 @@
       "templates": []
     },
     {
-      "id": "db9631a9-58e4-42fa-b095-c384ef8034fd",
+      "id": "6db23a43-de02-0ac0-72f2-1fb9ae325246",
       "alias": "formPage",
       "name": "Form Page",
       "icon": "icon-folder",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -618,7 +618,7 @@
       "templates": []
     },
     {
-      "id": "e44d102c-fc67-4649-b74b-0bbf9b9a3e2c",
+      "id": "856a35c1-3470-a0b9-c710-4b23fc5c256e",
       "alias": "formThankYouPage",
       "name": "Form Thank You Page",
       "icon": "icon-store",
@@ -634,7 +634,7 @@
       "templates": []
     },
     {
-      "id": "6fa8e34b-7f34-4d79-bb6c-2497a4bdf4cd",
+      "id": "8a351131-6cad-5807-5ec5-0e2146b355d9",
       "alias": "galleryAlbum",
       "name": "Gallery Album",
       "icon": "icon-tags",
@@ -650,12 +650,12 @@
       "templates": []
     },
     {
-      "id": "96826a5e-db85-46a9-8bd5-c4becf18d565",
+      "id": "885cb832-4ae7-79f2-c752-54b67e288d27",
       "alias": "galleryPage",
       "name": "Gallery Page",
       "icon": "icon-globe",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -666,12 +666,12 @@
       "templates": []
     },
     {
-      "id": "444e87bf-aed9-44f1-a981-89540837c903",
+      "id": "b27f15f4-f4d4-7e7c-7ec6-c968aaa6b4c6",
       "alias": "heroComposition",
       "name": "Hero Composition",
       "icon": "icon-plugin",
       "iconColor": null,
-      "folderId": "5940ec7c-5569-4720-b6a5-14763d09026c",
+      "folderId": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -682,7 +682,7 @@
       "templates": []
     },
     {
-      "id": "6e6e794b-cdb4-4882-9cd3-7ed8e6f4799d",
+      "id": "246c6a10-871b-f597-2e1e-77317b96a201",
       "alias": "home",
       "name": "Home",
       "icon": "icon-store",
@@ -697,7 +697,7 @@
       "composedPropertyCount": 14,
       "templates": [
         {
-          "id": "8ada820a-d56c-41fe-93c6-c38a583e06c7",
+          "id": "0cc09375-c027-fe0c-f776-d5c32f7ac14a",
           "alias": "scHome",
           "name": "SC Home",
           "isDefault": true
@@ -705,12 +705,12 @@
       ]
     },
     {
-      "id": "21d4f3a9-83d2-48f9-bf0c-b1b834d61e55",
+      "id": "4821d8ba-09e5-cf72-4949-73cc2982cdcd",
       "alias": "jobPosting",
       "name": "Job Posting",
       "icon": "icon-newspaper",
       "iconColor": "color-blue",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -721,12 +721,12 @@
       "templates": []
     },
     {
-      "id": "82cd9551-d202-46be-9aae-49be6f4bdb95",
+      "id": "d1f4de76-66fa-f39c-dc3e-224eeec65b55",
       "alias": "landingPage",
       "name": "Landing Page",
       "icon": "icon-folder",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -736,7 +736,7 @@
       "composedPropertyCount": 11,
       "templates": [
         {
-          "id": "2c5c92da-3d7f-442a-92ca-311778e023fb",
+          "id": "0bebd486-f9fb-3a92-731c-624aff4ba682",
           "alias": "scStandardPage",
           "name": "SC Standard Page",
           "isDefault": true
@@ -744,7 +744,7 @@
       ]
     },
     {
-      "id": "7a42c459-88a6-4a6a-8e75-00d82b36532b",
+      "id": "fa1d4adf-637f-9ecb-1745-fa994dd9c0ee",
       "alias": "landingSection",
       "name": "Landing Section",
       "icon": "icon-store",
@@ -760,12 +760,12 @@
       "templates": []
     },
     {
-      "id": "a097c769-3fec-4536-9400-1c62d23c1c57",
+      "id": "bd52e3c1-336a-1b13-cc74-cb6dafe5e51a",
       "alias": "microsite",
       "name": "Microsite",
       "icon": "icon-newspaper",
       "iconColor": "color-blue",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": true,
       "variesByCulture": false,
@@ -776,12 +776,12 @@
       "templates": []
     },
     {
-      "id": "50641be0-ab69-4968-839c-4380fb55edf3",
+      "id": "d696e598-0d76-5b4c-9e29-8fb4e2b1e759",
       "alias": "micrositeHome",
       "name": "Microsite Home",
       "icon": "icon-users",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -791,7 +791,7 @@
       "composedPropertyCount": 11,
       "templates": [
         {
-          "id": "8ada820a-d56c-41fe-93c6-c38a583e06c7",
+          "id": "0cc09375-c027-fe0c-f776-d5c32f7ac14a",
           "alias": "scHome",
           "name": "SC Home",
           "isDefault": true
@@ -799,12 +799,12 @@
       ]
     },
     {
-      "id": "5758a143-95be-4596-94e4-687901361cfa",
+      "id": "20b0ebb1-c48f-4028-97e6-34c4738b589f",
       "alias": "navigationComposition",
       "name": "Navigation Composition",
       "icon": "icon-plugin",
       "iconColor": null,
-      "folderId": "5940ec7c-5569-4720-b6a5-14763d09026c",
+      "folderId": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -815,12 +815,12 @@
       "templates": []
     },
     {
-      "id": "43609472-1689-4fce-a509-3d6ae03692e3",
+      "id": "63bdae29-36c2-5621-d992-ef7d8dbea204",
       "alias": "newsLanding",
       "name": "News Landing",
       "icon": "icon-calendar",
       "iconColor": "color-red",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -831,12 +831,12 @@
       "templates": []
     },
     {
-      "id": "33d48005-2075-4dff-b787-0b56bcc0f499",
+      "id": "2b0c0c53-0c20-881b-e4e1-c5d1a1b44e33",
       "alias": "noTemplatePage",
       "name": "No Template Page",
       "icon": "icon-users",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -847,12 +847,12 @@
       "templates": []
     },
     {
-      "id": "34f5a44a-5d71-49cc-b030-ccc6398e3fda",
+      "id": "0a7f839c-5642-fd19-6564-7dbde4ad2964",
       "alias": "officePage",
       "name": "Office Page",
       "icon": "icon-calendar",
       "iconColor": "color-red",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -863,12 +863,12 @@
       "templates": []
     },
     {
-      "id": "f50fbb11-d868-4724-833c-a592579e7c71",
+      "id": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
       "alias": "openGraphComposition",
       "name": "Open Graph Composition",
       "icon": "icon-plugin",
       "iconColor": null,
-      "folderId": "5940ec7c-5569-4720-b6a5-14763d09026c",
+      "folderId": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -879,7 +879,7 @@
       "templates": []
     },
     {
-      "id": "f2d7b447-bd73-4cd4-9c6b-01e15aff915a",
+      "id": "6ea3fbc5-0efd-c911-e549-493283b011aa",
       "alias": "peopleLanding",
       "name": "People Landing",
       "icon": "icon-tags",
@@ -895,12 +895,12 @@
       "templates": []
     },
     {
-      "id": "90211996-1a48-4058-b912-087b8f6991f6",
+      "id": "2f59404d-90b0-2a41-5284-1656d3bfd672",
       "alias": "personPage",
       "name": "Person Page",
       "icon": "icon-document",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -911,12 +911,12 @@
       "templates": []
     },
     {
-      "id": "3a2201d0-fc4e-4807-915e-e0bde0bf80c9",
+      "id": "62d3b6f5-78f5-8543-4788-9e3c3563b273",
       "alias": "pressLanding",
       "name": "Press Landing",
       "icon": "icon-folder",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -927,7 +927,7 @@
       "templates": []
     },
     {
-      "id": "9528aa6f-4c51-400c-a3ea-0e5fa8ac9d02",
+      "id": "bf7206eb-f246-1061-80b0-97dedde32777",
       "alias": "pressRelease",
       "name": "Press Release",
       "icon": "icon-documents",
@@ -943,12 +943,12 @@
       "templates": []
     },
     {
-      "id": "679dc804-0404-43b4-ab2d-f0d5491eaabf",
+      "id": "59b1e319-110f-981f-9372-6c6dc21ea48c",
       "alias": "pricingPage",
       "name": "Pricing Page",
       "icon": "icon-users",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -959,12 +959,12 @@
       "templates": []
     },
     {
-      "id": "abdbe53f-53c2-43ca-89e4-9151af678836",
+      "id": "beaf7932-e954-cb97-dbaf-fd786aff309f",
       "alias": "pricingTier",
       "name": "Pricing Tier",
       "icon": "icon-calendar",
       "iconColor": "color-red",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -975,12 +975,12 @@
       "templates": []
     },
     {
-      "id": "1f5c9e16-38b4-43a5-bafe-ed305633ec43",
+      "id": "76c765ce-38b6-c641-de72-a1ca7db52462",
       "alias": "productCategory",
       "name": "Product Category",
       "icon": "icon-users",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -991,7 +991,7 @@
       "templates": []
     },
     {
-      "id": "de517663-aaf8-4bcc-a518-3d908bce8066",
+      "id": "e1b351dd-39b3-014f-7eb9-eb5bc4fd0534",
       "alias": "productLanding",
       "name": "Product Landing",
       "icon": "icon-store",
@@ -1007,12 +1007,12 @@
       "templates": []
     },
     {
-      "id": "420ee554-3a66-4c0a-a662-71388be9eb98",
+      "id": "9ed050f3-b38d-8d50-fcb3-ca8da3cb65b6",
       "alias": "productPage",
       "name": "Product Page",
       "icon": "icon-calendar",
       "iconColor": "color-red",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1023,12 +1023,12 @@
       "templates": []
     },
     {
-      "id": "46c2f5ad-dc2f-45f4-ab60-1fd5f0aeb3d7",
+      "id": "bc8006b0-e052-0c91-3a46-b8c4746d6fbd",
       "alias": "productVariant",
       "name": "Product Variant",
       "icon": "icon-globe",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1039,12 +1039,12 @@
       "templates": []
     },
     {
-      "id": "e82c7f8b-99a0-451d-804c-ed2872336871",
+      "id": "35b6cb48-fdb2-ce3b-2ffa-2244632a456c",
       "alias": "redirectPage",
       "name": "Redirect Page",
       "icon": "icon-document",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1055,12 +1055,12 @@
       "templates": []
     },
     {
-      "id": "d450122c-2667-41ee-9d53-1725849612c1",
+      "id": "672e831e-4930-3ab1-c827-6c1a2ce8fe8c",
       "alias": "searchPage",
       "name": "Search Page",
       "icon": "icon-globe",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1071,12 +1071,12 @@
       "templates": []
     },
     {
-      "id": "20cd531d-83c7-49a8-9ea1-6d931b1d63bb",
+      "id": "76bccc6e-b746-508a-d797-4df742a7a61b",
       "alias": "seoComposition",
       "name": "Seo Composition",
       "icon": "icon-plugin",
       "iconColor": null,
-      "folderId": "5940ec7c-5569-4720-b6a5-14763d09026c",
+      "folderId": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1087,12 +1087,12 @@
       "templates": []
     },
     {
-      "id": "d893f07f-1056-4738-a09f-8877c632be56",
+      "id": "a38a5d2e-a8df-34ef-ca51-31d20f9dad51",
       "alias": "settings",
       "name": "Settings",
       "icon": "icon-folder",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": true,
       "variesByCulture": false,
@@ -1103,12 +1103,12 @@
       "templates": []
     },
     {
-      "id": "f46957c8-fbae-4444-a1d6-dc8b6c50d543",
+      "id": "9536edc4-f7c2-fc46-8835-4f27b871f4a4",
       "alias": "settingsComposition",
       "name": "Settings Composition",
       "icon": "icon-plugin",
       "iconColor": null,
-      "folderId": "5940ec7c-5569-4720-b6a5-14763d09026c",
+      "folderId": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1119,12 +1119,12 @@
       "templates": []
     },
     {
-      "id": "522f946d-36f8-4d06-94b5-249f95a49b2f",
+      "id": "a678796b-c9bd-967d-4d27-f166d1448a26",
       "alias": "settingsEntry",
       "name": "Settings Entry",
       "icon": "icon-document",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1135,7 +1135,7 @@
       "templates": []
     },
     {
-      "id": "c1432e49-c724-4e5a-990e-a1e862ca800c",
+      "id": "3ae4c6fe-b6ea-5bc0-7fce-413ab58c2b79",
       "alias": "settingsSection",
       "name": "Settings Section",
       "icon": "icon-tags",
@@ -1151,12 +1151,12 @@
       "templates": []
     },
     {
-      "id": "03c3c60d-2524-43a8-99a4-6cba155fa568",
+      "id": "6efdde98-0de7-1dfb-ea41-6cecdf391f58",
       "alias": "site",
       "name": "Site",
       "icon": "icon-document",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": true,
       "variesByCulture": false,
@@ -1167,12 +1167,12 @@
       "templates": []
     },
     {
-      "id": "822688a3-984f-4d7c-b487-cb3f0937995e",
+      "id": "7b44ce32-fdf4-0009-2e67-225d77864d47",
       "alias": "sitemapPage",
       "name": "Sitemap Page",
       "icon": "icon-newspaper",
       "iconColor": "color-blue",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1183,12 +1183,12 @@
       "templates": []
     },
     {
-      "id": "5c4a1f10-0000-4000-8000-000000000002",
+      "id": "c357bf33-0b06-81e2-c2ba-67442dac8f36",
       "alias": "standardPage",
       "name": "Standard Page",
       "icon": "icon-users",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1198,7 +1198,7 @@
       "composedPropertyCount": 11,
       "templates": [
         {
-          "id": "2c5c92da-3d7f-442a-92ca-311778e023fb",
+          "id": "0bebd486-f9fb-3a92-731c-624aff4ba682",
           "alias": "scStandardPage",
           "name": "SC Standard Page",
           "isDefault": true
@@ -1206,12 +1206,12 @@
       ]
     },
     {
-      "id": "b49294e0-76c9-4462-a1f8-d28c866f5228",
+      "id": "3461a1e5-db48-f51b-865f-10c95e413813",
       "alias": "teamPage",
       "name": "Team Page",
       "icon": "icon-newspaper",
       "iconColor": "color-blue",
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1222,7 +1222,7 @@
       "templates": []
     },
     {
-      "id": "55f462f6-a517-49d5-8bcd-1faafc8c30f8",
+      "id": "87ab11c1-095e-69ec-b87e-bad3a35891e9",
       "alias": "testimonialEntry",
       "name": "Testimonial Entry",
       "icon": "icon-tags",
@@ -1238,12 +1238,12 @@
       "templates": []
     },
     {
-      "id": "9a5d0371-299d-435c-bc35-c5fed841e375",
+      "id": "4b00f6fb-4610-69f9-73de-10a4269bf24f",
       "alias": "testimonialPage",
       "name": "Testimonial Page",
       "icon": "icon-globe",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1254,12 +1254,12 @@
       "templates": []
     },
     {
-      "id": "2b183059-0553-4f98-8771-bcf9d042ffc9",
+      "id": "1edb139e-534b-04d0-5b23-9a5b93b8fe7e",
       "alias": "unusedArticleLegacy",
       "name": "Unused Article Legacy",
       "icon": "icon-folder",
       "iconColor": null,
-      "folderId": "2409cc23-9110-4be2-8fb7-5195c9f1e4d4",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1270,12 +1270,12 @@
       "templates": []
     },
     {
-      "id": "26f0ede4-0937-4620-b090-72eff91cbc97",
+      "id": "fe7b5abd-fff2-438a-d8fb-889a120c6685",
       "alias": "unusedElementBanner",
       "name": "Unused Element Banner",
       "icon": "icon-brick",
       "iconColor": null,
-      "folderId": "8349bc25-cb65-4a26-b82f-a5aa286dadfa",
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
       "isElement": true,
       "allowedAsRoot": false,
       "variesByCulture": false,
@@ -1286,12 +1286,12 @@
       "templates": []
     },
     {
-      "id": "9d23833c-95cd-4a85-b6a3-8c36a1dd64f0",
+      "id": "5e8ef531-3bdd-7922-c31e-18d7b1b99e1a",
       "alias": "unusedSeoComposition",
       "name": "Unused Seo Composition",
       "icon": "icon-plugin",
       "iconColor": null,
-      "folderId": "5940ec7c-5569-4720-b6a5-14763d09026c",
+      "folderId": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
       "isElement": false,
       "allowedAsRoot": false,
       "variesByCulture": false,

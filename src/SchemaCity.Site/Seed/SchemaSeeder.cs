@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -55,18 +57,6 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         ("unusedElementType", "unusedElementBanner"),
         ("unusedType", "unusedArticleLegacy"),
     ];
-
-    /// <summary>
-    /// MultiNodePickerConfiguration.Filter is a comma separated list of Document Type keys, not
-    /// aliases. PLAN.md section 4 says aliases; Umbraco 17 throws "Unrecognized Guid format" from
-    /// the picker's validator on the first publish if you write aliases there. These two types
-    /// therefore get fixed keys, so the Data Type can name them before the types exist.
-    /// </summary>
-    private static readonly Dictionary<string, Guid> FixedTypeKeys = new(StringComparer.Ordinal)
-    {
-        ["article"] = Guid.Parse("5c4a1f10-0000-4000-8000-000000000001"),
-        ["standardPage"] = Guid.Parse("5c4a1f10-0000-4000-8000-000000000002"),
-    };
 
     /// <summary>The unattended install creates en-US. The seeder adds da-DK next to it.</summary>
     private const string DefaultCulture = "en-US";
@@ -192,7 +182,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         foreach (string name in new[] { "Compositions", "Elements", "Pages" })
         {
             Attempt<OperationResult<OperationResultType, EntityContainer>?> attempt =
-                _contentTypeService.CreateContainer(UmbracoConstants.System.Root, Guid.NewGuid(), name);
+                _contentTypeService.CreateContainer(UmbracoConstants.System.Root, KeyFor(name), name);
             folders[name] = attempt.Result!.Entity!.Id;
         }
 
@@ -310,11 +300,13 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             ],
         };
 
-        // The Filter is the comma separated allow list the reference layer draws edges from.
+        // The Filter is a comma separated list of Document Type keys, not aliases. PLAN.md
+        // section 4 says aliases; write those and Umbraco 17 throws "Unrecognized Guid format"
+        // from the picker's validator on the first publish.
         var relatedContent = new MultiNodePickerConfiguration
         {
             MaxNumber = 5,
-            Filter = string.Join(',', FixedTypeKeys.Values),
+            Filter = $"{KeyFor("article")},{KeyFor("standardPage")}",
         };
 
         // elementDoomed is deleted later, which leaves this configuration naming a key that
@@ -531,8 +523,8 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         foreach ((string alias, string name, string[] typeAliases) in specs)
         {
             Attempt<ITemplate, TemplateOperationStatus> attempt = await _templateService.CreateAsync(
-                name, alias, "@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage\n<h1>@Model.Name</h1>\n",
-                UmbracoConstants.Security.SuperUserKey);
+                name, alias, "@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage\n<h1>@Model.Name</h1>",
+                UmbracoConstants.Security.SuperUserKey, KeyFor(alias));
 
             foreach (string typeAlias in typeAliases)
             {
@@ -689,19 +681,25 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 
     private IContentType NewType(string alias, int parentId, string icon)
     {
-        var type = new ContentType(_shortStringHelper, parentId) { Alias = alias, Name = Title(alias), Icon = icon };
-        if (FixedTypeKeys.TryGetValue(alias, out Guid key))
+        var type = new ContentType(_shortStringHelper, parentId)
         {
-            type.Key = key;
-        }
-
+            Alias = alias,
+            Name = Title(alias),
+            Icon = icon,
+            Key = KeyFor(alias),
+        };
         _types[alias] = type;
         return type;
     }
 
     private IContentType NewInheritingType(string alias, IContentType parent)
     {
-        var type = new ContentType(_shortStringHelper, parent, alias) { Name = Title(alias), Icon = "icon-documents" };
+        var type = new ContentType(_shortStringHelper, parent, alias)
+        {
+            Name = Title(alias),
+            Icon = "icon-documents",
+            Key = KeyFor(alias),
+        };
         _types[alias] = type;
         return type;
     }
@@ -739,6 +737,13 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         _contentTypeService.Save(type, UmbracoConstants.Security.SuperUserId);
         _types[type.Alias!] = type;
     }
+
+    /// <summary>
+    /// A stable key per alias, so reseeding a deleted database rebuilds the same graph and the
+    /// exported fixture does not change. MD5 is a name-to-bytes function here, not a hash of
+    /// anything secret.
+    /// </summary>
+    private static Guid KeyFor(string alias) => new(MD5.HashData(Encoding.UTF8.GetBytes(alias)));
 
     /// <summary>"newsLanding" becomes "News Landing".</summary>
     private static string Title(string alias)
