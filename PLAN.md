@@ -542,7 +542,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Empty state (no Document Types), error state (HTTP status), lens disabled with a reason when usage fails. Done 2026-09-03.
 - Seeder log noise: application URL set, UI culture pinned to en-US in the demo site (the en-DK warnings were this Mac's locale). Done 2026-09-03; 585 warnings to 19.
 - Roads follow the streets. Done 2026-09-03; crossings on the seeded schema fell from 292 to 94, fan limit at 3 parents with a `+N parents` marker, chevrons on the last 4.2 units.
-- District names stamped on the islands. Done 2026-09-03; 0.8 opacity because 0.55 vanished into the slab at overview zoom; the stamps do not fade with selection.
+- District names stamped on the islands. Done 2026-09-03; 0.8 opacity because 0.55 vanished into the slab at overview zoom; the stamps do not fade with selection. Laid along the north edge they projected as a compressed diagonal, so they now yaw to the camera azimuth with the height scaled against the foreshortening (in progress).
 - Keyboard flight, W A S D and arrows, isometric pan and Explore flight (in progress).
 - Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03. The wrapped row spilling over the canvas was paint order (the absolutely positioned scene painted over the in-flow toolbar) plus a Toggle that could shrink under its label; fixed the same day with a stacking layer and `shrink-0`, measured from 1400 to 600 px.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
