@@ -81,19 +81,19 @@ export function App({
     if (!open) setQuery("");
   };
 
-  const pick = (id: string) => {
-    setSelected(id);
-    openPalette(false);
-  };
-
   const enterFocus = (id: string) => {
     setSelected(id);
     setFocus(id);
   };
 
-  // Following a link in the inspector while focused moves the whole layout with it,
-  // because the lists you are reading are the thing you are flying between.
+  // Following a link, from the inspector or the palette, while focused moves the
+  // whole layout with it. The lists you are reading are what you fly between.
   const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
+
+  const pick = (id: string) => {
+    followLink(id);
+    openPalette(false);
+  };
 
   return (
     <PortalContainer value={portal}>
