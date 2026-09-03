@@ -773,7 +773,9 @@ function Labels({
   /** The selected building's usage line, drawn as a second label over its name. */
   badge: string | null;
 }) {
-  const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
+  const camera = useThree((state) => state.camera) as THREE.OrthographicCamera & {
+    fov?: number;
+  };
   const gl = useThree((state) => state.gl);
   const size = useThree((state) => state.size);
   const spans = useRef<HTMLSpanElement[]>([]);
@@ -896,7 +898,12 @@ function Labels({
 
     const kept = pickLabels(
       candidates.map((candidate) => {
-        anchor.set(candidate.x, candidate.y, candidate.z).project(camera);
+        anchor.set(candidate.x, candidate.y, candidate.z);
+        // How big the building is on screen, through whichever camera is on: the
+        // orthographic zoom is its pixels per world unit, and the Explore camera's
+        // answer depends on how far away this particular building is.
+        const perUnit = pixelsPerUnit(camera, size.height, camera.position.distanceTo(anchor));
+        anchor.project(camera);
         return {
           id: candidate.id,
           text: candidate.text,
@@ -904,10 +911,7 @@ function Labels({
           pinned: candidate.rank < 2,
           x: (anchor.x * 0.5 + 0.5) * size.width,
           y: (0.5 - anchor.y * 0.5) * size.height - candidate.lift,
-          // ponytail: an orthographic camera's zoom is exactly its pixels per
-          // world unit. The Explore toggle's perspective camera will have to
-          // project a second point instead.
-          buildingPx: anchor.z > 1 ? 0 : candidate.footprint * camera.zoom,
+          buildingPx: anchor.z > 1 ? 0 : candidate.footprint * perUnit,
         };
       }),
       { charPx: charPx.current, width: size.width, height: size.height },
