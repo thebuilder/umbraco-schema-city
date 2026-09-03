@@ -1,7 +1,6 @@
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import {
   css,
-  customElement,
   html,
   LitElement,
   unsafeCSS,
@@ -18,7 +17,6 @@ import type { SchemaGraph } from "./model/types.js";
  * app as a property, and takes the app's callbacks back. Everything under app/ is
  * plain React and runs unchanged in the fixture harness.
  */
-@customElement("schema-city-workspace")
 export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
   #root?: Root;
   #graph?: SchemaGraph;
@@ -82,6 +80,13 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
 
 /** ponytail: M2 turns this into a link to the Document Type editor. */
 const openType = (id: string) => console.log("schema-city: open type", id);
+
+// Belt and braces: the fixed double-fetch in vite.config.ts stops two module instances
+// from existing, but if a host ever serves this chunk twice anyway, a second define()
+// throws and the workspace renders blank instead of just skipping the redundant one.
+if (!customElements.get("schema-city-workspace")) {
+  customElements.define("schema-city-workspace", SchemaCityWorkspaceElement);
+}
 
 export default SchemaCityWorkspaceElement;
 
