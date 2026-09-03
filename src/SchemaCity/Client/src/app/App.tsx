@@ -35,6 +35,7 @@ import { neighbourhoods } from "../model/neighbourhood";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { Findings } from "./Findings";
+import { Help } from "./Help";
 import { Inspector } from "./Inspector";
 import { TypeTable } from "./TypeTable";
 import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
@@ -212,6 +213,13 @@ export function App({
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  // Bumped by Home when there is no focus to leave. ponytail: it remounts the scene,
+  // which replays the intro rise as well as reframing. The camera only flies when its
+  // bounds change identity, and App has no other way to say "same city, frame it
+  // again"; a reframe counter Scene passes to CameraRig would do it without the
+  // remount.
+  const [reframe, setReframe] = useState(0);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
 
@@ -227,7 +235,19 @@ export function App({
       // this listener for one that reads the palette as closed by the time the
       // event reaches the document, so the Enter that chose a type would focus it
       // too. cmdk calls preventDefault on the key it consumed, which is the tell.
-      if (paletteOpen || event.defaultPrevented) return;
+      if (paletteOpen || helpOpen || event.defaultPrevented) return;
+      // The event that crossed a shadow boundary reports the host as its target, so
+      // ask the path where it actually started. A field being typed into keeps every
+      // letter below, and so does anything inside a dialog or a drawer.
+      const from = event.composedPath()[0];
+      if (
+        from instanceof HTMLElement &&
+        (from.isContentEditable ||
+          /^(INPUT|TEXTAREA|SELECT)$/.test(from.tagName) ||
+          from.closest('[role="dialog"]'))
+      ) {
+        return;
+      }
       if (event.key === "Enter" && selected) setFocus(selected);
       // Escape leaves focus first and clears the selection second, so the way out
       // of focus mode never also loses the node you were reading.
@@ -235,12 +255,40 @@ export function App({
         if (focus) setFocus(null);
         else setSelected(null);
       }
+      // The single-key bindings below. A modifier means the key belongs to the
+      // browser or to the backoffice around us, not to the city. Shift is the
+      // exception, because "?" is Shift and a slash.
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const digit = "1234".indexOf(event.key);
+      if (digit >= 0) {
+        const layer = LAYERS[digit];
+        // Rebuilt from LAYERS rather than pushed onto, so the URL writes its layers
+        // in toolbar order however they were switched on.
+        setLayers((on) =>
+          LAYERS.filter((name) =>
+            name === layer ? !on.includes(name) : on.includes(name),
+          ),
+        );
+        return;
+      }
+      // Turning either view off goes back to the city, the way the toolbar's two
+      // toggles do.
+      const key = event.key.toLowerCase();
+      if (key === "l") setView((at) => (at === "list" ? "city" : "list"));
+      if (key === "e") setView((at) => (at === "explore" ? "city" : "explore"));
+      // Leaving focus already flies back to the whole city, so Home only asks for a
+      // fresh framing when there is no focus to leave.
+      if (key === "home") {
+        if (focus) setFocus(null);
+        else setReframe((count) => count + 1);
+      }
+      if (key === "?") setHelpOpen(true);
     };
     // Keyboard events cross the shadow boundary, so one document listener covers
     // both the backoffice and the harness.
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [paletteOpen, selected, focus]);
+  }, [paletteOpen, helpOpen, selected, focus]);
 
   const nodes = graph.nodes;
   const nodesById = useMemo(
@@ -430,6 +478,8 @@ export function App({
               </PopoverContent>
             </Popover>
 
+            <Help onOpenChange={setHelpOpen} open={helpOpen} />
+
             {/* No tooltip on a control that opens a dialog: the tooltip's exit
                 animation plays over the dialog opening, which reads as the label
                 flying away. The shortcut goes in the button instead. */}
@@ -486,6 +536,7 @@ export function App({
                   focus={focus}
                   graph={graph}
                   icons={icons}
+                  key={reframe}
                   layers={layers}
                   onFocus={enterFocus}
                   onSelect={setSelected}
