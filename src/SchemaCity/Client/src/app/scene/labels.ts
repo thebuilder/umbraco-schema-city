@@ -18,8 +18,10 @@ const BOX_PAD_PX = 18;
 /** Height of one label box, border and padding included. */
 export const LABEL_HEIGHT_PX = 22;
 /**
- * How much bigger a district's name is than a building's. It is 14 px against 10 px
- * with the letters spaced out, which measures about half again as wide.
+ * How much wider a district's name runs than a building's. It is 14 px against 10 px
+ * with the letters spaced out, which measures about half again as wide. Only the
+ * width scales: a district name has no chip around it, so its 14 px line stands about
+ * as tall as a building's 10 px line inside its border and padding.
  */
 export const DISTRICT_SCALE = 1.5;
 /** An island narrower than this on screen carries no name. */
@@ -106,7 +108,6 @@ export function pickLabels(
     if (candidate.y < 0 || candidate.y > height) continue;
 
     const boxWidth = labelWidth(candidate.text, charPx * scale);
-    const boxHeight = LABEL_HEIGHT_PX * scale;
     const box: LabelBox = {
       id: candidate.id,
       text: candidate.text,
@@ -114,9 +115,9 @@ export function pickLabels(
       left: candidate.x - boxWidth / 2,
       // The anchor is the top face of the building, or the corner of the island, so
       // the box sits above it.
-      top: candidate.y - boxHeight,
+      top: candidate.y - LABEL_HEIGHT_PX,
       width: boxWidth,
-      height: boxHeight,
+      height: LABEL_HEIGHT_PX,
     };
     if (kept.some((other) => overlaps(other, box))) continue;
     kept.push(box);

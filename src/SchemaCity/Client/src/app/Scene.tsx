@@ -883,7 +883,12 @@ function Labels({
     }[] = [];
     // The north corner of each island, which is the top corner of the diamond it
     // draws as under the isometric camera, so the name sits clear of the buildings.
-    for (const district of districts) {
+    // Biggest island first, so when two corners land close enough for one name to
+    // cull the other it is the small district that loses it.
+    for (const district of [...districts].sort(
+      (a, b) =>
+        (b.maxX - b.minX) * (b.maxZ - b.minZ) - (a.maxX - a.minX) * (a.maxZ - a.minZ),
+    )) {
       built.push({
         id: `district:${district.id}`,
         text: district.name.toUpperCase(),
@@ -1045,8 +1050,20 @@ const FOLDER_TINT_HEIGHT = 0.02;
 /** The grid sits under the rim, so the two can never z-fight. */
 const GRID_Y = -(SLAB_HEIGHT + RIM_HEIGHT + 0.05);
 
-/** Mixed into a slab to lighten it, in the renderer's working space. */
-const WHITE = new THREE.Color(1, 1, 1);
+/**
+ * A hint of `toward` in `base`, mixed the way CSS mixes two colours rather than in
+ * the linear space three works in. A twelfth of amber is a hint of warmth in one and
+ * a brown field in the other, and these colours are picked against the panel colour
+ * as the stylesheet writes it.
+ */
+function tint(base: string, toward: string, amount: number): THREE.Color {
+  return new THREE.Color(base)
+    .convertLinearToSRGB()
+    .lerp(new THREE.Color(toward).convertLinearToSRGB(), amount)
+    .convertSRGBToLinear();
+}
+
+const WHITE = "#ffffff";
 
 /**
  * The land under a district. Structure is the same panel colour the chrome uses,
@@ -1054,10 +1071,9 @@ const WHITE = new THREE.Color(1, 1, 1);
  * islands read as different places without turning into four colours.
  */
 function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
-  const land = new THREE.Color(palette.land);
-  if (kind === "structure") return land;
-  if (kind === "elements") return land.lerp(new THREE.Color(palette.amber), 0.09);
-  return land.lerp(WHITE, 0.06);
+  if (kind === "structure") return new THREE.Color(palette.land);
+  if (kind === "elements") return tint(palette.land, palette.amber, 0.09);
+  return tint(palette.land, WHITE, 0.07);
 }
 
 /**
@@ -1093,10 +1109,7 @@ function Stage({
     () => new THREE.Color(palette.land).lerp(new THREE.Color(palette.background), 0.6),
     [palette],
   );
-  const folderColour = useMemo(
-    () => new THREE.Color(palette.land).lerp(WHITE, 0.14),
-    [palette],
-  );
+  const folderColour = useMemo(() => tint(palette.land, WHITE, 0.15), [palette]);
 
   const uniforms = useMemo(
     () => ({

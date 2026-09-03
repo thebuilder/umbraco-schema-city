@@ -79,8 +79,10 @@ describe("pickLabels", () => {
     const [box] = pickLabels([
       candidate("Pages", 100, 100, { rank: 3, kind: "district", buildingPx: 400 }),
     ]);
-    expect(box?.height).toBeCloseTo(LABEL_HEIGHT_PX * DISTRICT_SCALE);
-    expect(box?.width).toBeGreaterThan(labelWidth("Pages"));
+    expect(box?.width).toBeCloseTo(labelWidth("Pages", CHAR_PX * DISTRICT_SCALE));
+    // The name has no chip around it, so the bigger font is about as tall as a
+    // building's name inside its border.
+    expect(box?.height).toBe(LABEL_HEIGHT_PX);
 
     // Rank 3 against a building's 2, so a name on the island wins the overlap.
     const kept = pickLabels([
