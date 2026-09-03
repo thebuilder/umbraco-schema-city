@@ -292,7 +292,7 @@ The workspace view consumes `UMB_DOCUMENT_TYPE_WORKSPACE_CONTEXT` (from `@umbrac
 
 ### Vite
 
-Library mode, ES output, two entries (`dashboard`, `workspace`), `rollupOptions.external: [/^@umbraco-cms\//]`, `base: "/App_Plugins/SchemaCity/"` (needed from M1, when the three.js chunk is split out). Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the dashboard element, so opening Settings never pays for three.js, only opening the dashboard does. If the template's `openapi-ts` wiring costs more than it saves, a 40-line fetch helper that calls `umbHttpClient` is the fallback; GodMode ships that way.
+Library mode, ES output, two entries (`dashboard`, `workspace`), `rollupOptions.external: [/^@umbraco-cms\//]`, `base: "/App_Plugins/SchemaCity/"` (needed from M1, when the three.js chunk is split out). Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the dashboard element, so opening Settings never pays for three.js, only opening the dashboard does. If the template's `openapi-ts` wiring costs more than it saves, a 40-line fetch helper that calls `umbHttpClient` is the fallback.
 
 ### API client
 
@@ -395,9 +395,9 @@ fsn is pnpm + Turborepo, Vite, three.js 0.179, Biome lint-only, vitest. Its `pac
 | `textContent`-only DOM helper | `viewers/dom.ts` | inspector rendering, names are untrusted |
 | Conventions | `CLAUDE.md` | why-comments, colocated behaviour tests, no snapshot tests |
 
-### From Umbraco.GodMode
+### From flat diagnostics dashboards
 
-Umbraco.GodMode (DanDiplo) answers most of the same questions as flat tables. Taken from its code: the single grouped count query, the block configuration switch including `SingleBlockConfiguration`, composed-property detection by id set difference, the visited sets for nested block recursion, property-alias search, edit links from every type name, and findings with stable ids and severities. Not taken: Data Type nodes, configuration drift heuristics, template diagnostics, a chart toggle, and a lock around the cache.
+Existing table-based Umbraco diagnostics tools answer most of the same questions. Taken from them: the single grouped count query, the block configuration switch including `SingleBlockConfiguration`, composed-property detection by id set difference, the visited sets for nested block recursion, property-alias search, edit links from every type name, and findings with stable ids and severities. Not taken: Data Type nodes, configuration drift heuristics, template diagnostics, a chart toggle, and a lock around the cache.
 
 Leave behind: `FsNode`, categories, directory areas, the route/history model, all viewers, Tauri.
 
