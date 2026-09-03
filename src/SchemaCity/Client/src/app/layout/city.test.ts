@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import mediumFixture from "../../../dev/fixtures/medium.json";
+import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import smallFixture from "../../../dev/fixtures/small.json";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
 import {
@@ -13,6 +14,7 @@ import {
 
 const small = smallFixture as unknown as SchemaGraph;
 const medium = mediumFixture as unknown as SchemaGraph;
+const pathological = pathologicalFixture as unknown as SchemaGraph;
 /** The same schema with nothing filed, which is what the role fallback is for. */
 const folderless: SchemaGraph = {
   ...small,
@@ -556,5 +558,21 @@ describe("layoutCity", () => {
     expect(overlaps(placements)).toEqual([]);
     expect(elapsed).toBeLessThan(200);
     console.log(`300 nodes laid out in ${elapsed.toFixed(1)} ms`);
+  });
+
+  // The stress case the plan has promised since M0: 300 types, six folders of very
+  // unequal size, two cycles, a 60-child hub, a 12-parent child and 15 orphans.
+  // dev/make-pathological.mjs writes it and prints what it planted.
+  it("lays the pathological fixture out in under 200 ms, once per node and with room between the districts", () => {
+    const started = performance.now();
+    const { placements, districts } = cityDistricts(pathological);
+    const elapsed = performance.now() - started;
+
+    expect(placements).toHaveLength(300);
+    expect(new Set(placements.map((p) => p.id)).size).toBe(300);
+    expect(overlaps(placements)).toEqual([]);
+    expect(crowded(districts, STREET)).toEqual([]);
+    expect(elapsed).toBeLessThan(200);
+    console.log(`pathological: 300 nodes laid out in ${elapsed.toFixed(1)} ms`);
   });
 });
