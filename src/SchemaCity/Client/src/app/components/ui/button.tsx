@@ -8,7 +8,13 @@ const buttonVariants = cva(
   {
     compoundVariants: [
       {
-        class: "hover:-translate-y-px active:translate-y-px active:shadow-none",
+        // The lift, and the press that answers it. `data-trigger` cancels the lift
+        // on a button that opens a menu, popover, sheet or dialog: the panel is what
+        // moves when you click, so the button rising first reads as the panel
+        // twitching. The hover colour stays, so the control still reads as live.
+        // The attribute selector outranks the plain hover class, so order is safe.
+        class:
+          "hover:-translate-y-px active:translate-y-px active:shadow-none data-[trigger]:hover:translate-y-0",
         variant: ["default", "destructive", "outline", "primary", "signal"],
       },
     ],
