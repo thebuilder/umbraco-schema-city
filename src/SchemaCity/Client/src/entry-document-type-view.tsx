@@ -6,7 +6,7 @@ import {
   LitElement,
   unsafeCSS,
 } from "@umbraco-cms/backoffice/external/lit";
-import { tryExecute } from "@umbraco-cms/backoffice/resources";
+import { UmbApiError, tryExecute } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
@@ -25,7 +25,7 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
   #graph?: SchemaGraph;
   #usage?: UsageReport;
   #unique?: string;
-  #failed = false;
+  #failed?: string;
 
   constructor() {
     super();
@@ -58,7 +58,12 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
 
   async #load() {
     const { data, error } = await tryExecute(this, getGraph());
-    this.#failed = Boolean(error);
+    // The status is the one thing that tells a 401 apart from a 500 without the console.
+    this.#failed = error
+      ? UmbApiError.isUmbApiError(error)
+        ? `The graph endpoint answered ${error.status}.`
+        : "The graph endpoint did not answer."
+      : undefined;
     this.#graph = data ?? undefined;
     this.#draw();
     if (!this.#graph) return;
@@ -90,7 +95,7 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
         />
       ) : (
         <p className="p-4 font-mono text-sm text-phosphor-dim">
-          {this.#failed ? "The graph endpoint did not answer." : "Loading…"}
+          {this.#failed ?? "Loading…"}
         </p>
       ),
     );

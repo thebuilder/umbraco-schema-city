@@ -329,7 +329,9 @@ export function App({
                   ))}
                 </select>
               </TooltipTrigger>
-              {usage ? null : <TooltipContent>usage not loaded</TooltipContent>}
+              {usage ? null : (
+                <TooltipContent>The usage endpoint did not answer, so the lens is off.</TooltipContent>
+              )}
             </Tooltip>
 
             <Findings findings={findings} nodesById={nodesById} onSelect={followLink} />
@@ -368,24 +370,35 @@ export function App({
         <div className="relative flex-1">
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
-          <div className="absolute inset-0 z-0">
-            <Suspense
-              fallback={
-                <p className="p-4 text-phosphor-dim text-sm">Loading the scene…</p>
-              }
-            >
-              <Scene
-                focus={focus}
-                graph={graph}
-                layers={layers}
-                onFocus={enterFocus}
-                onSelect={setSelected}
-                scale={scale}
-                selected={selected}
-                usage={usage}
-              />
-            </Suspense>
-          </div>
+          {nodes.length === 0 ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-8 text-center">
+              <p className="font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
+                No Document Types yet
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Create one under Settings, Document Types, and it turns up here as a building.
+              </p>
+            </div>
+          ) : (
+            <div className="absolute inset-0 z-0">
+              <Suspense
+                fallback={
+                  <p className="p-4 text-phosphor-dim text-sm">Loading the scene…</p>
+                }
+              >
+                <Scene
+                  focus={focus}
+                  graph={graph}
+                  layers={layers}
+                  onFocus={enterFocus}
+                  onSelect={setSelected}
+                  scale={scale}
+                  selected={selected}
+                  usage={usage}
+                />
+              </Suspense>
+            </div>
+          )}
 
           {selectedNode && neighbourhood ? (
             <Inspector
