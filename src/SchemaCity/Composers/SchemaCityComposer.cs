@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using SchemaCity.Graph;
+using SchemaCity.Usage;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Events;
@@ -19,5 +20,9 @@ public class SchemaCityComposer : IComposer
             x => x.GetRequiredService<SchemaGraphBuilder>());
         builder.Services.AddSingleton<INotificationHandler<DataTypeCacheRefresherNotification>>(
             x => x.GetRequiredService<SchemaGraphBuilder>());
+
+        // Also a singleton for its cache, but it expires on a timer rather than on a notification,
+        // because content changes far more often than the content model does.
+        builder.Services.AddSingleton<UsageCollector>();
     }
 }

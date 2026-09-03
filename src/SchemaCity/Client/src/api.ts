@@ -1,6 +1,6 @@
 import { UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN } from "@umbraco-cms/backoffice/document-type";
 import { umbHttpClient } from "@umbraco-cms/backoffice/http-client";
-import type { SchemaGraph } from "./model/types.js";
+import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
  * The backoffice only attaches its bearer token when the call names the scheme, so the
@@ -12,6 +12,16 @@ export const getGraph = () =>
   umbHttpClient.get<{ 200: SchemaGraph }>({
     security: [{ type: "http", scheme: "bearer" }],
     url: "/umbraco/management/api/v1/schema-city/graph",
+  });
+
+/**
+ * Counts, cultures and instance references, cached for a minute on the server. Pass true to make
+ * the server skip that cache after an editor has changed content.
+ */
+export const getUsage = (refresh = false) =>
+  umbHttpClient.get<{ 200: UsageReport }>({
+    security: [{ type: "http", scheme: "bearer" }],
+    url: `/umbraco/management/api/v1/schema-city/usage?refresh=${refresh}`,
   });
 
 /**
