@@ -165,6 +165,6 @@ describe("layoutFocus", () => {
     const before = city.find((p) => p.id === "blockTarget") as Placement;
 
     expect(at("blockTarget").footprint).toBe(before.footprint);
-    expect(at("blockTarget").district).toBe("element");
+    expect(at("blockTarget").district).toBe("elements");
   });
 });
