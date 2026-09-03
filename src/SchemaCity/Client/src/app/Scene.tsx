@@ -1,4 +1,4 @@
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Canvas, type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -947,8 +947,12 @@ const GRID_Y = -(SLAB_HEIGHT + RIM_HEIGHT + 0.05);
  * Three draw calls, and nothing here animates.
  */
 function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; palette: Palette }) {
-  const controls = useThree((state) => state.controls) as { target: THREE.Vector3 } | null;
+  const camera = useThree((state) => state.camera);
   const grid = useRef<THREE.Mesh>(null);
+  const ray = useMemo(() => new THREE.Raycaster(), []);
+  const ground = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
+  const screenCentre = useMemo(() => new THREE.Vector2(0, 0), []);
+  const centre = useMemo(() => new THREE.Vector3(), []);
   const { fadeNear, fadeFar, plane } = stageMetrics(span);
   const fog = fogRange(span);
 
@@ -968,14 +972,18 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
   );
 
   useFrame(() => {
-    // ponytail: the target is the ground point at the centre of the screen only
-    // because the controls pan in the ground plane, which holds the target on y = 0.
-    // The Explore perspective camera will have to raycast its own centre ray instead,
-    // and so will anything that turns screen-space panning back on.
-    const target = controls?.target;
-    if (!target || !grid.current) return;
-    grid.current.position.set(target.x, GRID_Y, target.z);
-    uniforms.uCentre.value.set(target.x, target.z);
+    // The ground point at the centre of the screen, from the camera's own centre
+    // ray. The orbit target would do under the isometric camera, whose panning holds
+    // it on y = 0, but the Explore camera can look anywhere.
+    if (!grid.current) return;
+    ray.setFromCamera(screenCentre, camera);
+    if (!ray.ray.intersectPlane(ground, centre)) return;
+    // Looking at the horizon puts that point most of a mile away, where re-centring
+    // the plane on it would take the grid out from under the city. Past the fade it
+    // makes no difference to what is drawn, so the grid stays where it was.
+    if (Math.hypot(centre.x - camera.position.x, centre.z - camera.position.z) > fadeFar) return;
+    grid.current.position.set(centre.x, GRID_Y, centre.z);
+    uniforms.uCentre.value.set(centre.x, centre.z);
   });
 
   const rim = SLAB_MARGIN + RIM_OVERHANG;
@@ -1155,13 +1163,30 @@ function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotio
 }
 
 /**
- * Orbit at the fixed isometric angle, inside the zoom range the stage can cover. The
- * pan is in the ground plane rather than in the screen plane, which is both what a
- * city wants and what keeps the target on y = 0, where the grid reads it from.
+ * Orbit at the fixed isometric angle, inside the zoom range the stage can cover, or
+ * free orbit in Explore. The pan is in the ground plane rather than in the screen
+ * plane, which is what a city wants either way.
+ *
+ * Explore keeps one clamp, the ground: the elevation stops at the horizon rather
+ * than carrying on under the slab, and the distance stops where the grid's fade
+ * ends, which is the same edge the isometric zoom stops at.
  */
-function Controls({ span }: { span: number }) {
+function Controls({ span, explore }: { span: number; explore: boolean }) {
   const size = useThree((state) => state.size);
   const { minZoom, maxZoom } = zoomRange(span, size);
+
+  if (explore) {
+    return (
+      <OrbitControls
+        makeDefault
+        maxDistance={stageMetrics(span).fadeFar}
+        maxPolarAngle={Math.PI / 2}
+        minDistance={1}
+        screenSpacePanning={false}
+      />
+    );
+  }
+
   return (
     <OrbitControls
       makeDefault
@@ -1172,6 +1197,69 @@ function Controls({ span }: { span: number }) {
       screenSpacePanning={false}
     />
   );
+}
+
+/** Where the camera stands and what it is looking at, as of the last frame. */
+type Pose = { position: THREE.Vector3; target: THREE.Vector3; worldHeight: number };
+
+/**
+ * Remembers the camera pose every frame, so the Explore camera can be stood up
+ * exactly where the isometric one was looking from. `worldHeight` is how much world
+ * the viewport covers at the target, which is what the two cameras have to agree on
+ * for the switch not to jump.
+ */
+function PoseTracker({ pose }: { pose: React.RefObject<Pose> }) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as { target: THREE.Vector3 } | null;
+  const size = useThree((state) => state.size);
+
+  useFrame(() => {
+    pose.current.position.copy(camera.position);
+    if (controls) pose.current.target.copy(controls.target);
+    const perUnit = pixelsPerUnit(
+      camera as THREE.OrthographicCamera & { fov?: number },
+      size.height,
+      camera.position.distanceTo(pose.current.target),
+    );
+    pose.current.worldHeight = size.height / perUnit;
+  });
+
+  return null;
+}
+
+const EXPLORE_FOV = 45;
+
+/**
+ * The Explore camera. It starts at the isometric camera's own direction and target,
+ * far enough back that the viewport covers the same world height, so turning Explore
+ * on changes the projection and nothing else.
+ */
+function ExploreCamera({ pose, span }: { pose: React.RefObject<Pose>; span: number }) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as {
+    target: THREE.Vector3;
+    update: () => void;
+  } | null;
+  const placed = useRef(false);
+
+  useEffect(() => {
+    const perspective = camera as THREE.PerspectiveCamera;
+    // drei swaps the default camera one render after this component mounts, so the
+    // first run of this effect is still the orthographic one.
+    if (!perspective.isPerspectiveCamera || !controls) return;
+    if (!placed.current) {
+      const distance = pose.current.worldHeight / (2 * Math.tan((EXPLORE_FOV * Math.PI) / 360));
+      const direction = pose.current.position.clone().sub(pose.current.target).normalize();
+      perspective.position.copy(pose.current.target).addScaledVector(direction, distance);
+      placed.current = true;
+    }
+    // New controls come with the target at the origin, so it is copied over every
+    // time they are rebuilt, not only on the first one.
+    controls.target.copy(pose.current.target);
+    controls.update();
+  }, [camera, controls, pose]);
+
+  return <PerspectiveCamera far={span * 40} fov={EXPLORE_FOV} makeDefault near={0.5} />;
 }
 
 /** Milliseconds a building takes to move between its city spot and its focus spot. */
@@ -1187,6 +1275,7 @@ export default function Scene({
   focus,
   layers,
   icons,
+  explore,
   onSelect,
   onFocus,
 }: {
@@ -1199,6 +1288,8 @@ export default function Scene({
   selected: string | null;
   focus: string | null;
   layers: readonly Layer[];
+  /** The Explore toggle: a free perspective camera instead of the isometric one. */
+  explore?: boolean;
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
 }) {
@@ -1206,6 +1297,11 @@ export default function Scene({
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
+  const pose = useRef<Pose>({
+    position: new THREE.Vector3(),
+    target: new THREE.Vector3(),
+    worldHeight: 1,
+  });
   const reducedMotion = useMemo(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     [],
@@ -1409,8 +1505,13 @@ export default function Scene({
             placementsById={placementsById}
             selected={selected}
           />
-          <CameraRig bounds={bounds} reducedMotion={reducedMotion} />
-          <Controls span={span} />
+          {explore ? (
+            <ExploreCamera pose={pose} span={span} />
+          ) : (
+            <CameraRig bounds={bounds} reducedMotion={reducedMotion} />
+          )}
+          <Controls explore={explore === true} span={span} />
+          <PoseTracker pose={pose} />
         </Canvas>
       ) : null}
     </div>

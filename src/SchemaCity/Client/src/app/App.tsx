@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
@@ -30,7 +31,7 @@ import { Findings } from "./Findings";
 import { Inspector } from "./Inspector";
 import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
 import { type Lens, LENS_LABEL, LENSES, lensScale, type Ramp } from "./scene/lens";
-import { parseUrl, type UrlState, urlToWrite } from "./url";
+import { parseUrl, type UrlState, urlToWrite, type View } from "./url";
 
 const LAYER_LABEL: Record<Layer, string> = {
   structure: "Structure",
@@ -173,7 +174,13 @@ export function App({
    * id or an alias, because the Document Type editor knows the key it is on and a
    * link knows the alias.
    */
-  initial?: { type?: string | null; focus?: boolean; layers?: Layer[]; lens?: Lens };
+  initial?: {
+    type?: string | null;
+    focus?: boolean;
+    layers?: Layer[];
+    lens?: Lens;
+    view?: View;
+  };
   /** Given, the host owns the address bar and the app writes nothing. */
   onStateChange?: (state: UrlState) => void;
 }) {
@@ -188,12 +195,14 @@ export function App({
       focus: state.focus === true,
       layers: state.layers ?? [...DEFAULT_LAYERS],
       lens: state.lens ?? "none",
+      view: state.view ?? "city",
     };
   });
   const [selected, setSelected] = useState<string | null>(start.id);
   const [focus, setFocus] = useState<string | null>(start.focus ? start.id : null);
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
+  const [view, setView] = useState<View>(start.view);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
@@ -259,12 +268,13 @@ export function App({
       focus: focus !== null,
       layers,
       lens,
+      view,
     };
     mirror.current?.(state);
     if (hostOwnsUrl) return;
     const url = urlToWrite(state, mountedAt, window.location.pathname);
     if (url !== null) window.history.replaceState(null, "", url);
-  }, [selected, focus, layers, lens, aliasById, hostOwnsUrl, mountedAt]);
+  }, [selected, focus, layers, lens, view, aliasById, hostOwnsUrl, mountedAt]);
   const hits = useMemo(() => searchNodes(nodes, query), [nodes, query]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
   const scale = useMemo(() => lensScale(graph, usage, lens), [graph, usage, lens]);
@@ -313,6 +323,26 @@ export function App({
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
+
+          {/* Two ways to look at the same city, and one toggle each rather than a
+              picker, because either one is off most of the time. Turning List off
+              goes back to the isometric city, not to Explore. */}
+          <Toggle
+            onPressedChange={(on) => setView(on ? "explore" : "city")}
+            pressed={view === "explore"}
+            size="sm"
+            variant="outline"
+          >
+            Explore
+          </Toggle>
+          <Toggle
+            onPressedChange={(on) => setView(on ? "list" : "city")}
+            pressed={view === "list"}
+            size="sm"
+            variant="outline"
+          >
+            List
+          </Toggle>
 
           <div className="ml-auto flex items-center gap-2">
             {/* A disabled select swallows its own pointer events, and with them the
@@ -396,6 +426,7 @@ export function App({
                 }
               >
                 <Scene
+                  explore={view === "explore"}
                   focus={focus}
                   graph={graph}
                   icons={icons}

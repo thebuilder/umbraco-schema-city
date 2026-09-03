@@ -8,12 +8,23 @@
 import { type Lens, LENSES } from "./scene/lens";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 
+/**
+ * Which view is on screen. `city` is the isometric map, `explore` is the same city
+ * under a free perspective camera, and `list` is the table that replaces the canvas.
+ * One value rather than a flag each, because the list has no camera and the camera
+ * has no table.
+ */
+export type View = "city" | "explore" | "list";
+
+export const VIEWS: readonly View[] = ["city", "explore", "list"];
+
 export type UrlState = {
   /** Alias of the type the view is about, or null when nothing is selected. */
   type: string | null;
   focus: boolean;
   layers: Layer[];
   lens: Lens;
+  view: View;
 };
 
 /**
@@ -41,6 +52,9 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
     // A lens the app does not have, and a link written before the usage report
     // existed, both read as no lens rather than as an error.
     lens: LENSES.find((candidate) => candidate === lens) ?? "none",
+    // A view name the app does not have reads as the city, the same way an unknown
+    // lens reads as no lens.
+    view: VIEWS.find((candidate) => candidate === params.get("view")) ?? "city",
   };
 }
 
@@ -68,5 +82,6 @@ export function serialiseUrl(state: UrlState): string {
   // Always written, so that turning every layer off survives a reload.
   parts.push(`layers=${state.layers.join(",")}`);
   if (state.lens !== "none") parts.push(`lens=${state.lens}`);
+  if (state.view !== "city") parts.push(`view=${state.view}`);
   return `?${parts.join("&")}`;
 }

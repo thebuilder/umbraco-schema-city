@@ -11,6 +11,7 @@ describe("parseUrl", () => {
       focus: false,
       layers: ["structure"],
       lens: "none",
+      view: "city",
     });
   });
 
@@ -20,6 +21,7 @@ describe("parseUrl", () => {
       focus: true,
       layers: ["structure", "compositions"],
       lens: "none",
+      view: "city",
     });
   });
 
@@ -29,6 +31,7 @@ describe("parseUrl", () => {
       focus: false,
       layers: ["structure"],
       lens: "none",
+      view: "city",
     });
   });
 
@@ -63,15 +66,15 @@ describe("serialiseUrl", () => {
     expect(parseUrl(serialiseUrl(state), aliases)).toEqual(state);
 
   it("round-trips the default state", () => {
-    roundTrips({ type: null, focus: false, layers: ["structure"], lens: "none" });
+    roundTrips({ type: null, focus: false, layers: ["structure"], lens: "none", view: "city" });
   });
 
   it("round-trips a focused type with every layer on", () => {
-    roundTrips({ type: "blogPost", focus: true, layers: [...LAYERS], lens: "cultures" });
+    roundTrips({ type: "blogPost", focus: true, layers: [...LAYERS], lens: "cultures", view: "city" });
   });
 
   it("round-trips a selection with no layers at all", () => {
-    roundTrips({ type: "home", focus: false, layers: [], lens: "unused" });
+    roundTrips({ type: "home", focus: false, layers: [], lens: "unused", view: "city" });
   });
 
   it("writes the documented shape", () => {
@@ -81,12 +84,13 @@ describe("serialiseUrl", () => {
         focus: true,
         layers: ["structure", "compositions"],
         lens: "count",
+        view: "city",
       }),
     ).toBe("?type=article&focus=1&layers=structure,compositions&lens=count");
   });
 
   it("leaves the focus flag out when there is no type", () => {
-    expect(serialiseUrl({ type: null, focus: true, layers: [], lens: "none" })).toBe(
+    expect(serialiseUrl({ type: null, focus: true, layers: [], lens: "none", view: "city" })).toBe(
       "?layers=",
     );
   });
@@ -100,6 +104,7 @@ describe("urlToWrite", () => {
     focus: false,
     layers: ["structure"],
     lens: "none",
+    view: "city",
   };
 
   it("writes the query onto the route the app was mounted under", () => {
@@ -110,5 +115,16 @@ describe("urlToWrite", () => {
 
   it("writes nothing once Open in editor has pushed the editor route", () => {
     expect(urlToWrite(state, workspace, editor)).toBeNull();
+  });
+});
+
+describe("the view", () => {
+  it("reads and writes the list view, and leaves the city out", () => {
+    expect(parseUrl("?view=list", aliases).view).toBe("list");
+    expect(parseUrl("?view=explore", aliases).view).toBe("explore");
+    expect(parseUrl("?view=orbit", aliases).view).toBe("city");
+    expect(
+      serialiseUrl({ type: null, focus: false, layers: ["structure"], lens: "none", view: "list" }),
+    ).toBe("?layers=structure&view=list");
   });
 });
