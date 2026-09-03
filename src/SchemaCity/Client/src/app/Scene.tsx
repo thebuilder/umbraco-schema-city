@@ -1062,10 +1062,22 @@ const WHITE = "#ffffff";
  * the rest is what Explore leans on when the camera comes down to street level.
  */
 const STAMP_FONT_PX = 100;
+/**
+ * How heavy the letters are cut. A mono face at its normal weight leaves a stroke
+ * about a pixel wide once the whole city is framed, and a stroke that thin at 0.55
+ * opacity averages away into the slab under it.
+ */
+const STAMP_WEIGHT = 600;
 /** Silkscreen text is spaced out. Ems of extra gap between two letters. */
 const STAMP_TRACKING = "0.32em";
-/** How solid the print reads against the island under it. */
-const STAMP_OPACITY = 0.55;
+/**
+ * How solid the print reads against the island under it. Phosphor-dim at 0.8 comes
+ * out around #3f6b60 over the panel colour, which is still darker than any building
+ * and half the strength of a road. Lower than this and the letters go, because the
+ * whole city framed shrinks a 100 px raster to a 17 px cap and the mipmap averages a
+ * thin stroke into the slab.
+ */
+const STAMP_OPACITY = 0.8;
 /**
  * How far the print stands off the slab it is on. Above the slab so the two never
  * z-fight, and under the road ribbons at 0.015, so a road crossing an island's margin
@@ -1091,7 +1103,7 @@ function stampTexture(name: string, font: string): THREE.CanvasTexture {
   const context = canvas.getContext("2d");
   const style = () => {
     if (!context) return;
-    context.font = `${STAMP_FONT_PX}px ${font}`;
+    context.font = `${STAMP_WEIGHT} ${STAMP_FONT_PX}px ${font}`;
     // letterSpacing is Chrome 99 and Safari 17.4. Older than that prints the name
     // without the tracking rather than not at all.
     context.letterSpacing = STAMP_TRACKING;
