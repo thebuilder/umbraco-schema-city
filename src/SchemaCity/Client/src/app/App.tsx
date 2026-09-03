@@ -403,7 +403,11 @@ export function App({
 
           {/* One button rather than four, because the backoffice is narrower than
               the harness and four of them ran off the edge. The count is on the
-              label so the toolbar still says how much of the city is drawn. */}
+              label so the toolbar still says how much of the city is drawn.
+              ponytail: base-ui's Menu is 6.9 kB gzipped of vendor that nothing else
+              here uses. Four checkbox rows in the Popover already in the bundle
+              would be free, at the cost of writing the roving focus and the
+              typeahead this gets for nothing. Swap it if the bundle gets tight. */}
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button size="sm" variant="outline" />}
