@@ -255,9 +255,9 @@ GET /umbraco/management/api/v1/schema-city/usage?refresh=false
 
 ### Module rules
 
-- `src/app/` is the React application and imports nothing from `@umbraco-cms/backoffice`. It takes the graph and usage objects and a `focus` id as props, and calls back through props (`onOpenType`).
-- The two wrapper elements, the home workspace and the Document Type editor view, are the only Umbraco-aware code. They fetch, read the workspace context, resolve icons, and turn `onOpenType` into an editor link.
-- The harness renders the same `App` from fixtures and a query string.
+- One React `App` under `src/app/` is the whole application. It imports nothing from `@umbraco-cms/backoffice`, takes the graph and usage objects and a `focus` id as props, and calls back through props (`onOpenType`). There is no custom element for the map, and there will not be one.
+- There is one Lit wrapper per host that mounts that `App`, the home workspace now and the Document Type editor view in M2. The wrappers are the only Umbraco-aware code. They fetch, read the workspace context, resolve icons, and turn `onOpenType` into an editor link.
+- The harness renders `App` directly, from fixtures and a query string.
 - `model/` stays pure: no DOM, no three.js, no React. Vitest-tested with fixture JSON. The layout functions (dagre to placements, focus layout) live in `app/layout/` and are pure in the same way.
 - `components/ui/` holds the copied-in afterglow primitives. They are edited in place; there is no upstream to update from.
 
@@ -315,15 +315,25 @@ The workspace view consumes `UMB_DOCUMENT_TYPE_WORKSPACE_CONTEXT` (from `@umbrac
 
 ### Hosting
 
-The wrapper is a Lit element that renders one container div, creates the React root once, re-renders it with new props on update, and unmounts it on disconnect. It never re-roots. An R3F canvas that a re-render unmounts loses its WebGL context and its camera. These facts come from a working React-in-Umbraco project, not from the docs.
+The wrapper is a Lit element that renders one container div, creates the React root once, re-renders it with new props on update, and unmounts it on disconnect. One root, never re-created. An R3F canvas that a re-render unmounts loses its WebGL context and its camera. These facts come from a working React-in-Umbraco project, not from the docs.
+
+The wrapper imports `styles.css?inline` and puts it in Lit's `static styles` through `unsafeCSS`. That is one `CSSStyleSheet` per module, attached to each wrapper's shadow root through `adoptedStyleSheets`. The harness builds the same sheet by hand and attaches it to `document`.
 
 ### Styling
 
-One CSS entry compiled by Tailwind v4, imported `?inline`, attached to the shadow root through `adoptedStyleSheets` and to `document` in the harness. The afterglow theme's `:root` and `.dark` selectors are rewritten to `:host`, and its html and body base rules are dropped. The UI is shadcn components on base-ui, copied in from the afterglow registry (https://afterglow.thebuilder.dk/, MIT): the theme plus button, dialog, popover, tooltip, command, badge, kbd, scroll-area, table, tabs, sheet and alert. Not the preset, and none of the terminal-costume pieces (terminal window, shell, boot log, LED, scanlines, grain, glitch). The base-ui portals (dialog, popover, tooltip, command) are pinned to a container inside our shadow root, or they escape to `document.body` and lose the stylesheet.
+One CSS entry compiled by Tailwind v4. The UI is shadcn components on base-ui, copied in from the afterglow registry (https://afterglow.thebuilder.dk/, MIT): the theme plus button, dialog, popover, tooltip, command, badge, kbd, scroll-area, table, tabs, sheet and alert. Not the preset, and none of the terminal-costume pieces (terminal window, shell, boot log, LED, scanlines, grain, glitch).
+
+The theme is edited in place. The token block selector is `:host, :root`. The `.dark` block and every `data-phosphor` preset are deleted, and so are the base layer's `html`, `body` and `:root` rules. `::selection`, the `*` border-color rule and focus-visible stay. `@source "../";` follows the Tailwind import, because Tailwind's automatic source detection is rooted at the Vite root and the harness root is `dev/`.
+
+The portal container is a context in `portal.ts` holding a ref to an empty div that `App` renders last. The copied `dialog`, `popover` and `tooltip` primitives are patched to pass that div as `container`, because the registry's wrappers do not forward it. Without it base-ui escapes to `document.body` and loses the stylesheet. Every portalled primitive copied in from the registry later needs the same one-line patch. `CommandDialog` from the registry is the dialog shell only, so `App` supplies its own `<Command>` root.
+
+The scene reads `--phosphor`, `--signal` and `--phosphor-dim` from computed style on a div inside the shadow root, so there is no separate palette file.
 
 ### Vite
 
-Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. Chunk URLs resolve relative to the loaded module, so no `base` is needed and chunk names stay flat. React, R3F, drei, base-ui, Three.js and dagre are bundled. The scene is a separate chunk behind a lazy import, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either.
+Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. React, R3F, drei, base-ui, Three.js and dagre are bundled.
+
+Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given.
 
 ### API client
 
@@ -331,7 +341,7 @@ One hand-written function per endpoint in `src/api.ts`, calling `umbHttpClient.g
 
 ### Dev harness
 
-`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
+`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. The harness root is `dev/`, which is why the Tailwind entry carries `@source "../";`. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
 
 ---
 
@@ -449,8 +459,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ### M1, The city (large)
 
-- Spike first: a Lit wrapper hosting a React root, the afterglow theme adapted to `:host`, a base-ui dialog, popover, tooltip and command palette pinned inside the shadow root, and a 12-box R3F canvas with hover and click, running in the harness and in the backoffice on 17.6.2 and 18.1.1. If it fails, fall back to Lit before any city code exists.
-  - Exit for the spike: the four base-ui surfaces and the R3F canvas work in the harness and inside the backoffice on both majors.
+- Spike first: a Lit wrapper hosting a React root, the afterglow theme adapted to `:host`, a base-ui dialog, popover, tooltip and command palette pinned inside the shadow root, and a 12-box R3F canvas with hover and click, running in the harness and in the backoffice on 17.6.2 and 18.1.1. If it fails, fall back to Lit before any city code exists. Done 2026-09-03; measured 179 kB + 340 kB gzipped.
+  - Exit for the spike: the four base-ui surfaces and the R3F canvas worked in the harness and inside the backoffice on both majors.
 - `SchemaGraphBuilder` complete for identity, behaviour, groups, properties, compositions, inheritance, allowed children, templates. Unit tests against hand-built `ContentType` instances.
 - `BlockEditorInspector` for Block List, Block Grid, RTE blocks, MNTP filter. Unit tests per editor.
 - `app/layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance.
@@ -462,7 +472,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - Compositions, Blocks, References layers with their edge styles.
 - Focus mode with camera flight and neighbourhood layout, refocus by double-click, Escape to return.
-- Workspace view on the Document Type editor, pre-focused, plus an "Open in Schema City" link.
+- A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link.
 - URL state and deep links.
 - Exit: "Where is this composition used?" and "What uses this Element Type?" are two clicks from the Document Type editor.
 
@@ -497,8 +507,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | --- | --- |
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
-| React, R3F, drei and base-ui on top of Three.js, about 150 kB gzipped | Loaded only when the workspace opens; the scene chunk is lazy. Measure at the spike and again at M1 exit. |
-| base-ui portals and focus inside a shadow root | Portal container inside our root, proven in the spike before any other UI is written. |
+| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Scene chunk loads only when the workspace opens. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 340 kB proves to matter. |
+| base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, checked by hand in the backoffice. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
 | Usage queries slow on large installs | One grouped query for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
 | Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements, and let the CI boot step on both majors be the detector. |
@@ -524,7 +534,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 1. Run the template, commit the untouched scaffold, then replace the example with `Constants.cs` and the graph controller. Done.
 2. Write `Models/` and `model/types.ts` together so the contract is fixed before any rendering. Done.
 3. Write `SchemaSeeder` and export `medium.json` from it.
-4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings.
+4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Next.
 5. Then buildings, then roads, then the inspector.
 
 ## 13. Resolved questions
