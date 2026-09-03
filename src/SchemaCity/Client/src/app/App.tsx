@@ -29,6 +29,7 @@ import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { Findings } from "./Findings";
 import { Inspector } from "./Inspector";
+import { TypeTable } from "./TypeTable";
 import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
 import { type Lens, LENS_LABEL, LENSES, lensScale, type Ramp } from "./scene/lens";
 import { parseUrl, type UrlState, urlToWrite, type View } from "./url";
@@ -409,7 +410,20 @@ export function App({
         <div className="relative flex-1">
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
-          {nodes.length === 0 ? (
+          {view === "list" ? (
+            // The inspector is an overlay, so the table is inset by its width while
+            // it is open rather than sliding under it.
+            <div className={`absolute inset-0 ${selectedNode ? "pr-80" : ""}`}>
+              <TypeTable
+                graph={graph}
+                onQuery={setQuery}
+                onSelect={setSelected}
+                query={query}
+                selected={selected}
+                usage={usage}
+              />
+            </div>
+          ) : nodes.length === 0 ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-8 text-center">
               <p className="font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
                 No Document Types yet
