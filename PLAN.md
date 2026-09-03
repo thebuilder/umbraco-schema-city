@@ -397,8 +397,8 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Usage badge | small numeric sprite above the roof when the Usage lens is on |
 | Selection | signal pink outline and label |
 | Road (`allowedChild`) | flat ribbon on the ground with animated chevrons in the direction of the edge |
-| Bridge (`composition` / `inherits`) | elevated quadratic arc at roof height, thicker for `inherits` |
-| Block link | thin dashed line dipping to ground level toward the element district |
+| Bridge (`composition` / `inherits`) | elevated quadratic arc, apex one arch above the taller roof. `inherits` is drawn as two arcs a hair apart, because WebGL ignores a line width above 1 |
+| Block link | thin solid line dipping to ground level toward the element district. Dashes are what tells a reference apart from it |
 | Reference | dotted line, hidden unless the References layer is on |
 | Folder | ground slab tint + label |
 
@@ -431,7 +431,7 @@ The ground has to read as a large seamless world the city sits in, not a patch i
 | Findings drawer | grouped by severity, filter by kind, each row links to its node. Counts shown as matched / total |
 | Inspector | header (name, alias, badges for Element, Root and Varies by culture, and "N properties (own · composed)"), then only the sections that have something in them: Compositions, Inherits, Allowed parents, Allowed children, Block hosts, Block targets grouped by property alias, References out grouped by property alias and references in, Templates with the default marked, then Floors as a collapsible tree of tabs and groups showing each property's editor, mandatory marker and "composed from X". A block target that resolves to no node reads "missing element type" in the signal colour. Every type name is a button that selects that type, and there is one "Open in editor" button for the selected type rather than one per name, because a hub lists 25 rows |
 | Labels | candidates are the hovered and selected nodes, the selected node's neighbours when there are at most 8, and every placed neighbour in focus mode. The scene then culls in screen space whenever the camera or the layout moves. Each candidate's box is estimated from its name, and boxes are kept in priority order (selected, hovered, then the rest) unless they land on one already kept, the building is under 6 px, or 40 labels are already up. A hidden name is one hover or one inspector row away |
-| URL | `?type=<alias>&layer=<layer>&lens=<lens>` so the workspace view and findings can deep link |
+| URL | `?type=<alias>&focus=1&layers=structure,blocks` so the workspace view and findings can deep link. The lens joins it at M3. Written with `history.replaceState` by the app itself, unless the host passes `initial` or `onStateChange` and mirrors the state into its own route, as the Document Type tab does |
 
 Accessibility: the canvas is `aria-hidden`; the inspector and a hidden type list are the accessible surface, with arrow keys moving selection and the scene following. A "list view" toggle that hides the canvas entirely is cheap and worth shipping in v1.
 
@@ -489,9 +489,9 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - Focus mode with camera flight and neighbourhood layout, refocus by double-click, inspector or palette, Escape to return. Done 2026-09-03 (pulled ahead of the layers because a hub selection is a road fan and a list without it).
 - Screen-space label culling. Done 2026-09-03; 17 labels, none overlapping, on the Home focus view.
-- Compositions, Blocks, References layers with their edge styles.
+- Compositions, Blocks, References layers with their edge styles. Done 2026-09-03; one merged line geometry per layer, and the block layer draws at 0.3 opacity because 302 distinct block links into 15 element types is a wall at full strength.
 - A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link. Done 2026-09-03; visual check in the backoffice pending a login.
-- URL state and deep links.
+- URL state and deep links. Done 2026-09-03; `app/url.ts`, 12 tests.
 - Exit: "Where is this composition used?" and "What uses this Element Type?" are two clicks from the Document Type editor.
 
 ### M3, Usage (medium)
@@ -506,7 +506,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Roof icons, property "windows" on floors, Explore perspective toggle, list view fallback.
 - World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom.
 - Empty state (no Document Types), error state (endpoint 403/500), loading skeleton.
-- Perf pass, only if the pathological fixture drops below 60 fps: merged edge geometry per layer, label budget.
+- Perf pass, only if the pathological fixture drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - README with screenshots, NuGet packaging with the `[17.0.0, 19.0.0)` range, Umbraco Marketplace metadata.
 - Exit: `SchemaCity 1.0.0` on NuGet.
 
@@ -543,7 +543,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layer | How |
 | --- | --- |
 | Graph builder, block inspector, usage aggregation | 13 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
-| `model/`, `app/layout/` | 60 vitest tests across 8 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
+| `model/`, `app/` | 82 vitest tests across 10 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
 | Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |

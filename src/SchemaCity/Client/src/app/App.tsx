@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +26,114 @@ import { neighbourhoods } from "../model/neighbourhood";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph } from "../model/types";
 import { Inspector } from "./Inspector";
+import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
+import { parseUrl, serialiseUrl, type UrlState } from "./url";
+
+const LAYER_LABEL: Record<Layer, string> = {
+  structure: "Structure",
+  compositions: "Compositions",
+  blocks: "Blocks",
+  references: "References",
+};
+
+/** One edge style, drawn the way the scene draws it. */
+function EdgeMark({
+  className,
+  d,
+  dashed = false,
+  width = 1.25,
+}: {
+  className: string;
+  d: string;
+  dashed?: boolean;
+  width?: number;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      height="12"
+      viewBox="0 0 26 12"
+      width="26"
+    >
+      <path
+        d={d}
+        stroke="currentColor"
+        strokeDasharray={dashed ? "2 3" : undefined}
+        strokeWidth={width}
+      />
+    </svg>
+  );
+}
+
+function LegendRow({ mark, children }: { mark: ReactNode; children: ReactNode }) {
+  return (
+    <li className="flex items-center gap-2.5">
+      <span className="flex w-7 shrink-0 justify-center">{mark}</span>
+      {children}
+    </li>
+  );
+}
+
+function LegendTitle({ children }: { children: ReactNode }) {
+  return (
+    <p className="font-bold text-2xs text-phosphor-bright uppercase tracking-terminal-lg">
+      {children}
+    </p>
+  );
+}
+
+const Tint = ({ className }: { className: string }) => (
+  <span className={`size-3 ${className}`} />
+);
+
+function Legend() {
+  return (
+    <div className="space-y-3.5">
+      <section>
+        <LegendTitle>Buildings</LegendTitle>
+        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
+          <LegendRow mark={<Tint className="bg-phosphor" />}>Own property group</LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor/45" />}>Composed group</LegendRow>
+          <LegendRow mark={<Tint className="bg-amber" />}>Element Type</LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor-dim" />}>Root plaza</LegendRow>
+          <LegendRow mark={<Tint className="bg-signal" />}>Selected</LegendRow>
+        </ul>
+        <p className="mt-2 text-muted-foreground text-xs">
+          One floor per property group, and a wider footprint for more own properties.
+        </p>
+      </section>
+
+      <section>
+        <LegendTitle>Layers</LegendTitle>
+        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
+          <LegendRow
+            mark={
+              <EdgeMark className="text-phosphor-dim" d="M1 6 H25 M13 3 L17 6 L13 9" />
+            }
+          >
+            Allowed child, in the arrow's direction
+          </LegendRow>
+          <LegendRow mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" />}>
+            Composition
+          </LegendRow>
+          <LegendRow
+            mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" width={3} />}
+          >
+            Inheritance
+          </LegendRow>
+          <LegendRow mark={<EdgeMark className="text-amber" d="M1 1 Q13 13 25 1" />}>
+            Block target, dipping to the Element district
+          </LegendRow>
+          <LegendRow mark={<EdgeMark className="text-violet" d="M1 6 H25" dashed />}>
+            Picker reference
+          </LegendRow>
+        </ul>
+      </section>
+    </div>
+  );
+}
 
 // three.js, fiber and drei are a third of the bundle, so they load with the scene
 // rather than with the workspace element.
@@ -33,12 +142,35 @@ const Scene = lazy(() => import("./Scene"));
 export function App({
   graph,
   onOpenType,
+  initial,
+  onStateChange,
 }: {
   graph: SchemaGraph;
   onOpenType?: (id: string) => void;
+  /**
+   * Where to start. Left out, the app reads its own query string. `type` is a node
+   * id or an alias, because the Document Type editor knows the key it is on and a
+   * link knows the alias.
+   */
+  initial?: { type?: string | null; focus?: boolean; layers?: Layer[] };
+  /** Given, the host owns the address bar and the app writes nothing. */
+  onStateChange?: (state: UrlState) => void;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [focus, setFocus] = useState<string | null>(null);
+  const [start] = useState(() => {
+    const state =
+      initial ?? parseUrl(window.location.search, graph.nodes.map((node) => node.alias));
+    const node =
+      graph.nodes.find((candidate) => candidate.id === state.type) ??
+      graph.nodes.find((candidate) => candidate.alias === state.type);
+    return {
+      id: node?.id ?? null,
+      focus: state.focus === true,
+      layers: state.layers ?? [...DEFAULT_LAYERS],
+    };
+  });
+  const [selected, setSelected] = useState<string | null>(start.id);
+  const [focus, setFocus] = useState<string | null>(start.focus ? start.id : null);
+  const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
@@ -76,6 +208,36 @@ export function App({
     [nodes],
   );
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
+  const aliasById = useMemo(
+    () => new Map(nodes.map((node) => [node.id, node.alias])),
+    [nodes],
+  );
+
+  // A host that placed the app somewhere, like the Relationships tab on the
+  // Document Type editor, owns that address: it hears about the state through the
+  // callback, and writing to the query string would put ours on Umbraco's route.
+  // Read once, because a wrapper re-rendering with a fresh object literal must not
+  // change who owns the URL, and kept in a ref so a new callback each render does
+  // not make this effect run again.
+  const [hostOwnsUrl] = useState(() => Boolean(initial || onStateChange));
+  const mirror = useRef(onStateChange);
+  mirror.current = onStateChange;
+
+  useEffect(() => {
+    // The type in the link is the one the view is about, which in focus mode is
+    // the focused node even when a click inside its neighbourhood selected
+    // another. That selection is the one thing here a link cannot carry back.
+    const at = focus ?? selected;
+    const state: UrlState = {
+      type: at ? aliasById.get(at) ?? null : null,
+      focus: focus !== null,
+      layers,
+    };
+    mirror.current?.(state);
+    if (!hostOwnsUrl) {
+      window.history.replaceState(null, "", window.location.pathname + serialiseUrl(state));
+    }
+  }, [selected, focus, layers, aliasById, hostOwnsUrl]);
   const hits = useMemo(() => searchNodes(nodes, query), [nodes, query]);
   const selectedNode = selected ? nodesById.get(selected) : undefined;
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
@@ -108,16 +270,28 @@ export function App({
           </h1>
           <Badge>{nodes.length} types</Badge>
 
+          <ToggleGroup
+            aria-label="Relationship layers"
+            className="ml-4"
+            multiple
+            onValueChange={(value) => setLayers(value as Layer[])}
+            size="sm"
+            value={layers}
+          >
+            {LAYERS.map((layer) => (
+              <ToggleGroupItem key={layer} value={layer}>
+                {LAYER_LABEL[layer]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+
           <div className="ml-auto flex items-center gap-2">
             <Popover>
               <PopoverTrigger render={<Button size="sm" variant="outline" />}>
                 Legend
               </PopoverTrigger>
-              <PopoverContent className="text-sm">
-                <p className="text-phosphor-bright">Building height</p>
-                <p className="text-muted-foreground">
-                  One floor per property, own and composed together.
-                </p>
+              <PopoverContent className="w-80 text-sm">
+                <Legend />
               </PopoverContent>
             </Popover>
 
@@ -146,6 +320,7 @@ export function App({
               <Scene
                 focus={focus}
                 graph={graph}
+                layers={layers}
                 onFocus={enterFocus}
                 onSelect={setSelected}
                 selected={selected}
