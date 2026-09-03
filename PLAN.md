@@ -43,7 +43,7 @@ These apply to every commit, every file and every generated sentence.
 
 3. **Layered layout via `@dagrejs/dagre`.** Small, synchronous, deterministic. ELK is about 1.4 MB and wants a Web Worker. If dagre looks bad on a real schema, swap the one file that calls it. No adapter interface until a second engine exists.
 
-4. **Findings (unused types, dead ends, unused compositions, complexity score) are computed client-side** in pure TypeScript from `graph` + `usage`. They are cheap, easy to test with fixtures, and it keeps the backend to data collection.
+4. **Findings (unused types, dead ends, duplicate aliases, complexity score) are computed client-side** in pure TypeScript from `graph` + `usage`. They are cheap, easy to test with fixtures, and it keeps the backend to data collection.
 
 5. **Deterministic input order.** Nodes and edges are sorted by alias before layout, so the same schema always produces the same city. This is the FSN "spatial memory" property.
 
@@ -55,7 +55,7 @@ These apply to every commit, every file and every generated sentence.
 
 9. **Settings tool only, gated by Umbraco's own permissions.** The menu item is conditioned on the Settings section and both endpoints require `SectionAccessSettings`, so administrators control access per user group through the normal Users area. No custom permission or editor-facing view in v1.
 
-10. **The seeded schema is the test bed.** No real project is required. The seeder plants known findings (orphans, unused compositions, dead ends, an unused element type) so tests and milestone exits assert against a deterministic expected set.
+10. **The seeded schema is the test bed.** No real project is required. The seeder plants known findings (orphans, dead ends, an unused element type, a broken block reference) so tests and milestone exits assert against a deterministic expected set.
 
 11. **React inside the Lit wrapper, with R3F and afterglow.** React 19 renders inside the Lit workspace element, the scene runs on React Three Fiber and drei, and the panels are shadcn components on base-ui from the afterglow registry, with Tailwind v4. The reason is the ecosystem around the scene. Event traffic was not the deciding factor, since a store handles that identically in Lit or React. R3F and drei give declarative meshes, camera controls and instanced picking, and shadcn gives the panel chrome, so there is less code we own. No state library until one is needed.
 
