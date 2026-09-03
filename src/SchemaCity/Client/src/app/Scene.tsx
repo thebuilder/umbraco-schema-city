@@ -28,7 +28,7 @@ import { neighboursOf } from "./scene/graph-links";
 import { iconColour, rasteriseIcon } from "./scene/icons";
 import { CHAR_PX, LABEL_CAP, LABEL_HEIGHT_PX, pickLabels } from "./scene/labels";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
-import { type Anchor, buildLinkGeometry, type Layer, type LinkRange } from "./scene/layers";
+import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
 import { buildRoadGeometry } from "./scene/roads";
 import {
   fogRange,
@@ -651,7 +651,7 @@ function RoofIcons({
  * every edge drawn there already belongs to the focused node.
  */
 function fadeColors(
-  ranges: LinkRange[],
+  ranges: readonly { edges: SchemaEdge[]; start: number; count: number }[],
   vertices: number,
   colour: THREE.Color,
   background: string,
@@ -664,8 +664,7 @@ function fadeColors(
     const lit =
       focus !== null ||
       selected === null ||
-      range.edge.from === selected ||
-      range.edge.to === selected;
+      range.edges.some((edge) => edge.from === selected || edge.to === selected);
     const shown = lit ? colour : faded;
     for (let i = range.start; i < range.start + range.count; i++) {
       array[i * 3] = shown.r;
@@ -729,6 +728,7 @@ function Links({
   layer,
   edges,
   anchors,
+  placementsById,
   colour,
   opacity,
   palette,
@@ -738,6 +738,7 @@ function Links({
   layer: Exclude<Layer, "structure">;
   edges: SchemaEdge[];
   anchors: Map<string, Anchor>;
+  placementsById: Map<string, Placement>;
   colour: string;
   opacity: number;
   palette: Palette;
@@ -745,8 +746,8 @@ function Links({
   focus: string | null;
 }) {
   const { positions, ranges } = useMemo(
-    () => buildLinkGeometry(layer, edges, anchors),
-    [layer, edges, anchors],
+    () => buildLinkGeometry(layer, edges, anchors, placementsById),
+    [layer, edges, anchors, placementsById],
   );
   const colors = useMemo(
     () =>
@@ -1739,6 +1740,7 @@ export default function Scene({
               <Links
                 anchors={anchors}
                 colour={palette[token]}
+                placementsById={placementsById}
                 edges={drawnEdges}
                 focus={focus}
                 key={layer}
