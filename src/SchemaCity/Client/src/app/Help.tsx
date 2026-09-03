@@ -32,6 +32,22 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     ],
   },
   {
+    title: "Flight",
+    rows: [
+      {
+        keys: ["W", "A", "S", "D"],
+        does: "Pan the view along the ground. In Explore, fly forward, left, back, right",
+      },
+      {
+        keys: ["↑", "←", "↓", "→"],
+        does: "Pan the view. In Explore, turn it: swing the view up, left, down, right",
+      },
+      { keys: ["R", "F"], does: "Rise and descend, in Explore" },
+      { keys: ["Shift"], does: "Hold alongside any of these to go twice as fast" },
+      { keys: ["Home"], does: "Reframe the city" },
+    ],
+  },
+  {
     title: "Keys",
     rows: [
       { keys: ["Enter"], does: "Focus the selected building" },
@@ -43,7 +59,6 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       },
       { keys: ["L"], does: "List view" },
       { keys: ["E"], does: "Explore camera" },
-      { keys: ["Home"], does: "Reframe the city" },
       { keys: ["?"], does: "Show this page" },
     ],
   },
