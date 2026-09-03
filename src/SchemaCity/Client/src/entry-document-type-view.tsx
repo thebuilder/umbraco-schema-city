@@ -8,19 +8,10 @@ import {
 } from "@umbraco-cms/backoffice/external/lit";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
-import { App as AppOnMain } from "./app/App.js";
+import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
 import { getGraph, openTypeInEditor } from "./api.js";
 import type { SchemaGraph } from "./model/types.js";
-
-// ponytail: App takes no initial selection yet. The URL-state work on another branch
-// gives it `initial: { type, focus }`, and this cast is what lets the tab pass it
-// before that lands. Delete the cast once App declares the prop itself.
-const App = AppOnMain as (
-  props: Parameters<typeof AppOnMain>[0] & {
-    initial?: { type: string; focus: boolean };
-  },
-) => ReturnType<typeof AppOnMain>;
 
 /**
  * The Relationships tab on the Document Type editor. Same React app as the workspace,

@@ -213,6 +213,16 @@ export function App({
     [nodes],
   );
 
+  // A host that placed the app somewhere, like the Relationships tab on the
+  // Document Type editor, owns that address: it hears about the state through the
+  // callback, and writing to the query string would put ours on Umbraco's route.
+  // Read once, because a wrapper re-rendering with a fresh object literal must not
+  // change who owns the URL, and kept in a ref so a new callback each render does
+  // not make this effect run again.
+  const [hostOwnsUrl] = useState(() => Boolean(initial || onStateChange));
+  const mirror = useRef(onStateChange);
+  mirror.current = onStateChange;
+
   useEffect(() => {
     // The type in the link is the one the view is about, which in focus mode is
     // the focused node even when a click inside its neighbourhood selected
@@ -223,9 +233,11 @@ export function App({
       focus: focus !== null,
       layers,
     };
-    if (onStateChange) onStateChange(state);
-    else window.history.replaceState(null, "", window.location.pathname + serialiseUrl(state));
-  }, [selected, focus, layers, aliasById, onStateChange]);
+    mirror.current?.(state);
+    if (!hostOwnsUrl) {
+      window.history.replaceState(null, "", window.location.pathname + serialiseUrl(state));
+    }
+  }, [selected, focus, layers, aliasById, hostOwnsUrl]);
   const hits = useMemo(() => searchNodes(nodes, query), [nodes, query]);
   const selectedNode = selected ? nodesById.get(selected) : undefined;
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
