@@ -1,5 +1,5 @@
 import { Html, OrbitControls } from "@react-three/drei";
-import { Canvas, type ThreeEvent, useThree } from "@react-three/fiber";
+import { Canvas, type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { SchemaGraph, SchemaNode } from "../model/types";
@@ -10,6 +10,7 @@ import {
   type FloorCell,
   type FloorCellKind,
   type PlazaCell,
+  smootherstep,
 } from "./scene/buildings";
 import { neighboursOf } from "./scene/graph-links";
 import { buildRoadGeometry } from "./scene/roads";
@@ -23,6 +24,8 @@ type Palette = {
   separator: string;
 };
 
+/** Seconds a building takes to rise, once its own `introDelay` has passed. */
+const INTRO_DURATION = 0.46;
 const PLAZA_HEIGHT = 0.05;
 const HOVER_BRIGHTEN = 1.4;
 /** How far a faded building's colour moves toward the void, approximating 20% opacity. */
@@ -47,6 +50,7 @@ function Buildings({
   selected,
   hovered,
   neighbours,
+  reducedMotion,
   palette,
   onSelect,
   onHover,
@@ -58,6 +62,7 @@ function Buildings({
   selected: string | null;
   hovered: string | null;
   neighbours: Set<string> | null;
+  reducedMotion: boolean;
   palette: Palette;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
@@ -69,10 +74,19 @@ function Buildings({
   const plazaRef = useRef<THREE.InstancedMesh>(null);
   const hitRef = useRef<THREE.InstancedMesh>(null);
   const scratch = useMemo(() => new THREE.Object3D(), []);
+  const introDone = useRef(reducedMotion);
 
   const meshRefs = useMemo(
     () => ({ own: ownRef, composed: composedRef, separator: separatorRef, element: elementRef }),
     [],
+  );
+  const introDelayById = useMemo(
+    () => new Map(placements.map((p) => [p.id, p.introDelay])),
+    [placements],
+  );
+  const introEnd = useMemo(
+    () => Math.max(0, ...placements.map((p) => p.introDelay)) + INTRO_DURATION,
+    [placements],
   );
 
   const colors = useMemo(() => {
@@ -90,18 +104,24 @@ function Buildings({
     };
   }, [palette]);
 
-  function applyCell(mesh: THREE.InstancedMesh, index: number, cell: FloorCell) {
-    scratch.position.set(cell.cx, cell.cy, cell.cz);
-    scratch.scale.set(cell.sx, cell.sy, cell.sz);
+  function applyCell(mesh: THREE.InstancedMesh, index: number, cell: FloorCell, progress: number) {
+    scratch.position.set(cell.cx, cell.cy * progress, cell.cz);
+    scratch.scale.set(cell.sx, Math.max(cell.sy * progress, 0.0001), cell.sz);
     scratch.updateMatrix();
     mesh.setMatrixAt(index, scratch.matrix);
   }
 
+  // Sets every mesh to its resting position (or, unless reduced motion is on,
+  // to the ground) before the first paint. The frame loop below takes over
+  // from there until every building has risen.
   useEffect(() => {
+    introDone.current = reducedMotion;
+    const startProgress = reducedMotion ? 1 : 0;
+
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
       const mesh = meshRefs[kind].current;
       if (!mesh) continue;
-      cellsByKind[kind].forEach((cell, i) => applyCell(mesh, i, cell));
+      cellsByKind[kind].forEach((cell, i) => applyCell(mesh, i, cell, startProgress));
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
     }
@@ -132,7 +152,23 @@ function Buildings({
       hit.computeBoundingSphere();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cellsByKind, plazas, placements, heights]);
+  }, [cellsByKind, plazas, placements, heights, reducedMotion]);
+
+  useFrame((state) => {
+    if (introDone.current) return;
+    const elapsed = state.clock.elapsedTime;
+
+    for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
+      const mesh = meshRefs[kind].current;
+      if (!mesh) continue;
+      cellsByKind[kind].forEach((cell, i) => {
+        const delay = introDelayById.get(cell.buildingId) ?? 0;
+        applyCell(mesh, i, cell, smootherstep((elapsed - delay) / INTRO_DURATION));
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    if (elapsed >= introEnd) introDone.current = true;
+  });
 
   useEffect(() => {
     const lit = (id: string) => neighbours === null || neighbours.has(id);
@@ -354,6 +390,10 @@ export default function Scene({
     return { cellsByKind: groupByKind(built.cells), heights: built.heights };
   }, [nodesById, placements]);
   const plazas = useMemo(() => buildPlazaCells(nodesById, placements), [nodesById, placements]);
+  const reducedMotion = useMemo(
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
 
   // The scene colours are the theme's own tokens, read once from an element inside
   // the shadow root, so the city and the chrome can never drift apart.
@@ -398,6 +438,7 @@ export default function Scene({
             palette={palette}
             placements={placements}
             plazas={plazas}
+            reducedMotion={reducedMotion}
             selected={selected}
           />
           <Roads
