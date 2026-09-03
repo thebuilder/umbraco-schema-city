@@ -30,7 +30,7 @@ import { Findings } from "./Findings";
 import { Inspector } from "./Inspector";
 import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
 import { type Lens, LENS_LABEL, LENSES, lensScale, type Ramp } from "./scene/lens";
-import { parseUrl, serialiseUrl, type UrlState } from "./url";
+import { parseUrl, type UrlState, urlToWrite } from "./url";
 
 const LAYER_LABEL: Record<Layer, string> = {
   structure: "Structure",
@@ -237,6 +237,9 @@ export function App({
   // change who owns the URL, and kept in a ref so a new callback each render does
   // not make this effect run again.
   const [hostOwnsUrl] = useState(() => Boolean(initial || onStateChange));
+  // The route the app was mounted under. Anything else in the address bar means the host
+  // has navigated, and writing then would land our query on someone else's route.
+  const [mountedAt] = useState(() => window.location.pathname);
   const mirror = useRef(onStateChange);
   mirror.current = onStateChange;
 
@@ -252,10 +255,10 @@ export function App({
       lens,
     };
     mirror.current?.(state);
-    if (!hostOwnsUrl) {
-      window.history.replaceState(null, "", window.location.pathname + serialiseUrl(state));
-    }
-  }, [selected, focus, layers, lens, aliasById, hostOwnsUrl]);
+    if (hostOwnsUrl) return;
+    const url = urlToWrite(state, mountedAt, window.location.pathname);
+    if (url !== null) window.history.replaceState(null, "", url);
+  }, [selected, focus, layers, lens, aliasById, hostOwnsUrl, mountedAt]);
   const hits = useMemo(() => searchNodes(nodes, query), [nodes, query]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
   const scale = useMemo(() => lensScale(graph, usage, lens), [graph, usage, lens]);
