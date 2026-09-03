@@ -15,6 +15,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -372,8 +379,8 @@ export function App({
           </Toggle>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* A disabled select swallows its own pointer events, and with them the
-                hover the tooltip needs, so the trigger is the label around it. */}
+            {/* A disabled trigger swallows its own pointer events, and with them
+                the hover the tooltip needs, so the tooltip wraps the label. */}
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -381,19 +388,31 @@ export function App({
                 }
               >
                 Lens
-                <select
-                  aria-label="Usage lens"
-                  className="h-8 border border-line bg-secondary px-2 font-mono text-2xs text-phosphor uppercase tracking-terminal disabled:pointer-events-none disabled:opacity-40"
+                <Select
                   disabled={!usage}
-                  onChange={(event) => setLens(event.target.value as Lens)}
+                  items={LENSES.map((name) => ({ label: LENS_LABEL[name], value: name }))}
+                  onValueChange={(value) => setLens(value as Lens)}
                   value={lens}
                 >
-                  {LENSES.map((name) => (
-                    <option key={name} value={name}>
-                      {LENS_LABEL[name]}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    aria-label="Usage lens"
+                    className="text-2xs uppercase tracking-terminal"
+                    size="sm"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LENSES.map((name) => (
+                      <SelectItem
+                        className="text-2xs uppercase tracking-terminal"
+                        key={name}
+                        value={name}
+                      >
+                        {LENS_LABEL[name]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </TooltipTrigger>
               {usage ? null : (
                 <TooltipContent>The usage endpoint did not answer, so the lens is off.</TooltipContent>
