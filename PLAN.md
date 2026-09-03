@@ -99,7 +99,7 @@ schema-city/
           components/ui/                afterglow primitives, copy-in via the shadcn CLI
         dev/
           index.html  main.ts        harness, loads fixtures without Umbraco
-          fixtures/*.json
+          fixtures/*.json            graph and usage fixtures; the medium ones are exported by the seeder
     SchemaCity.Site/                 throwaway Umbraco 17 site referencing SchemaCity
       Seed/SchemaSeeder.cs           dev-only: creates ~80 Document Types on first boot
   tests/
@@ -229,16 +229,16 @@ All of this is in-process and runs on the host site. No new tables.
 | Allowed children | `AllowedContentTypes` (`ContentTypeSort.Key`) |
 | Templates | `AllowedTemplates`, `DefaultTemplate` |
 | Block and picker targets | `IDataTypeService.GetAllAsync()`; inspect `EditorAlias` against `Constants.PropertyEditors.Aliases.BlockList`, `BlockGrid`, `RichText`, `MultiNodeTreePicker`; read `ConfigurationObject` (`BlockListConfiguration.Blocks[].ContentElementTypeKey` / `SettingsElementTypeKey`, `BlockGridConfiguration.Blocks[]`, `RichTextConfiguration.Blocks`, `SingleBlockConfiguration`, `MultiNodePickerConfiguration.Filter` as comma separated aliases). Nested block configuration can recurse, so the walk keeps a visited set of Data Type ids and one of content type keys. A configured Element Type key that resolves to nothing becomes a broken-block-reference finding |
-| Content counts | One SQL query, left join from `cmsContentType` to `umbracoContent` and `umbracoNode` filtered to the document object type, grouped by content type, with `SUM` over `umbracoDocument.published` and `umbracoNode.trashed`. Left join so a type with zero content still gets a row. One round trip for the whole install |
-| Root instances | nodes at level 1 grouped by content type (`IContentService.GetRootContent()` grouped, or the same query) |
-| Cultures | `umbracoDocumentCultureVariation` grouped by content type, only when any type varies by culture |
-| Instance references | `IRelationService` relations of type `Constants.Conventions.RelationTypes.RelatedDocumentAlias`, joined to both ends' content type and grouped |
-| Last edited | max version date per type from `umbracoContentVersion` |
+| Content counts | One SQL query for the whole install. It starts from `umbracoNode` filtered to the Document Type object type and left joins `umbracoContent`, the instance's own `umbracoNode` row and `umbracoDocument`, so a type with zero content still gets a row. Grouped by type it gives total, published, drafts, trashed and root instances. `cmsContentType` is not needed. The Document Type key is `umbracoNode.uniqueId` and `umbracoContent.contentTypeId` is that node id. `nodeObjectType` is compared as a Guid, not as text, because SQLite and SQL Server disagree on the text form |
+| Root instances | level 1 nodes with `trashed = 0`, grouped by type, in the same counts query. The recycle bin's children are level 1 too |
+| Cultures | `umbracoDocumentCultureVariation` joined to `umbracoLanguage`, `available = 1`, grouped by type and ISO code. Always run, because an empty culture variation table costs nothing to scan |
+| Instance references | SQL over `umbracoRelation` filtered to the `umbDocument` relation type, both ends resolved to their content type key and grouped. Not `IRelationService`. The referencing document is the relation's parent, so parent maps to `fromType` |
+| Last edited | `MAX(versionDate)` per type from `umbracoContentVersion`, kept as its own query because joining versions multiplies rows |
 
 Caching and invalidation:
 
 - The builder keeps the last `SchemaGraph` in a field and is registered as a singleton. Its two `INotificationHandler` registrations for `ContentTypeCacheRefresherNotification` and `DataTypeCacheRefresherNotification` are factory registrations that resolve that same singleton. Umbraco's `AddNotificationHandler` registers handlers as transient, which would clear a cache nobody reads. Those notifications fire on every server after any save, delete or move, so load balancing needs nothing extra.
-- `UsageCollector` caches for 60 seconds. `?refresh=true` bypasses. No lock around the cold path; the query is one round trip.
+- `UsageCollector` caches the report in a field for 60 seconds. `?refresh=true` bypasses. No lock around the cold path; the four queries are cheap.
 
 Authorization: `[Authorize(Policy = AuthorizationPolicies.SectionAccessSettings)]` on both controllers. The menu item is only registered under Settings, and the workspace view is inside the Settings section. Access is therefore whatever the administrator grants a user group for Settings; the package adds no permission of its own.
 
@@ -339,11 +339,11 @@ Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.
 
 ### API client
 
-One hand-written function per endpoint in `src/api.ts`, calling `umbHttpClient.get<{ 200: SchemaGraph }>({ security: [{ type: "http", scheme: "bearer" }], url })` and wrapped in `tryExecute` by the caller. The `security` entry is required; without it the backoffice client sends no token. The type parameter is the status map, not the payload, because the client unwraps `Record` types by value. No Swagger document and no generated client: Umbraco 18 replaced Swashbuckle's document generation with Microsoft.AspNetCore.OpenApi, the 17 extension types no longer exist, and a composer deriving from them stops the whole assembly loading at boot on 18.
+One hand-written function per endpoint in `src/api.ts`, `getGraph()` and `getUsage(refresh = false)`, each calling `umbHttpClient.get<{ 200: SchemaGraph }>({ security: [{ type: "http", scheme: "bearer" }], url })` and wrapped in `tryExecute` by the caller. The `security` entry is required; without it the backoffice client sends no token. The type parameter is the status map, not the payload, because the client unwraps `Record` types by value. No Swagger document and no generated client: Umbraco 18 replaced Swashbuckle's document generation with Microsoft.AspNetCore.OpenApi, the 17 extension types no longer exist, and a composer deriving from them stops the whole assembly loading at boot on 18.
 
 ### Dev harness
 
-`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. The harness root is `dev/`, which is why the Tailwind entry carries `@source "../";`. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
+`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. The harness root is `dev/`, which is why the Tailwind entry carries `@source "../";`. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types), `medium-usage.json` (the seeded site's usage report, exported next to the graph), `small-usage.json` (hand-written for the 12-node fixture). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
 
 ---
 
@@ -455,7 +455,7 @@ Labels are one DOM layer over the canvas positioned from projected anchors, with
 
 ### From flat diagnostics dashboards
 
-Existing table-based Umbraco diagnostics tools answer most of the same questions. Taken from them: the single grouped count query, the block configuration switch including `SingleBlockConfiguration`, composed-property detection by id set difference, the visited sets for nested block recursion, property-alias search, edit links from every type name, and findings with stable ids and severities. Not taken: Data Type nodes, configuration drift heuristics, template diagnostics, a chart toggle, and a lock around the cache.
+Existing table-based Umbraco diagnostics tools answer most of the same questions. Taken from them: the grouped count query, the block configuration switch including `SingleBlockConfiguration`, composed-property detection by id set difference, the visited sets for nested block recursion, property-alias search, edit links from every type name, and findings with stable ids and severities. Not taken: Data Type nodes, configuration drift heuristics, template diagnostics, a chart toggle, and a lock around the cache.
 
 Leave behind: `FsNode`, categories, directory areas, the route/history model, all viewers, Tauri.
 
@@ -496,7 +496,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ### M3, Usage (medium)
 
-- `UsageCollector` and `usage` endpoint with caching. Tests for the aggregation.
+- `UsageCollector` and `usage` endpoint with caching. Tests for the aggregation. Done 2026-09-03; four queries, 17 backend tests, and a deterministic `medium-usage.json` exported by the seeder.
 - Usage lens with five modes and legend, badges on roofs.
 - `findings.ts` with tests. Findings drawer listing unused types, unused element types, dead ends, unused compositions, duplicate property aliases, broken block references, types with no properties, types with no template, and complexity tiers, each linking to its node.
 - Exit: the findings drawer reports exactly the planted set on the seeded site, on both Umbraco majors.
@@ -531,7 +531,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
-| Usage queries slow on large installs | One grouped query for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
+| Usage queries slow on large installs | Four small queries for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
 | Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements, and let the CI boot step on both majors be the detector. |
 | Shadow DOM and WebGL canvas sizing | `ResizeObserver` on the host element, `devicePixelRatio` cap at 2. |
 | Untrusted names and aliases in the inspector | Rendered as text by React, never through `dangerouslySetInnerHTML`; the wrapper never builds HTML from names either. |
@@ -542,7 +542,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 | Layer | How |
 | --- | --- |
-| Graph builder, block inspector, usage aggregation | 13 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
+| Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
 | `model/`, `app/` | 82 vitest tests across 10 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
