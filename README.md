@@ -42,8 +42,8 @@ OpenAPI document. `Client/src/api.ts` calls the endpoint by hand instead.
 `.github/workflows/ci.yml` runs on push and pull request. It builds the client with Node 24,
 then builds and tests the solution twice, once against Umbraco 17.6.2 and once against 18.1.1.
 Each leg then boots the site and checks that the backoffice answers, that
-`/App_Plugins/SchemaCity/umbraco-package.json` is served, and that the graph endpoint refuses
-an anonymous caller with 401. Compiling is not enough on its own. Umbraco finds composers and
+`/App_Plugins/SchemaCity/umbraco-package.json` is served, and that the graph and usage
+endpoints both refuse an anonymous caller with 401. Compiling is not enough on its own. Umbraco finds composers and
 controllers by scanning types at boot, so a type that vanished between majors only shows up
 when the site runs.
 
