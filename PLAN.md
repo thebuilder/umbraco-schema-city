@@ -397,6 +397,7 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Roof icon | Umbraco icon rasterised to a sprite from the SVG the wrapper resolved. It draws only when the building is about 40 px wide on screen or more, filling about 70 percent of the roof in the node's icon colour, or phosphor when it has none, on a darkened roof cap. Below that width nothing draws, except on the selected and hovered buildings, which always show theirs. The inspector header shows the icon too. The harness has no registry, so it draws none unless given a hand-made map |
 | Root plaza | flat disc under `allowedAsRoot` buildings with a small flag |
 | Element Type form | low, wide, chamfered "warehouse" in amber, no roof cap, distinct material |
+| Property window | one small quad per property, walked around the walls of its group's floor: the floor's own colour turned up, and turned up further when the property is mandatory. Element Types have no floors, so they have no windows |
 | Usage badge | Usage count on the label layer above the selected node, whatever the lens |
 | Selection | signal pink outline and label |
 | Road (`allowedChild`) | flat ribbon on the ground with animated chevrons in the direction of the edge |
@@ -413,7 +414,7 @@ Same placements, different colours. The picker has six modes: None, Content coun
 
 The camera frames the city at a span of its longer side. At a true isometric angle a city `width` by `depth` covers `(width + depth) / sqrt(6)` of the framed height, so that span shows all of it with about a quarter of the height left for the buildings standing up in it.
 
-Built 2026-09-03, after fsn's scene. Background and fog share the void colour. One grid plane of `span * 13.2` units follows the orbit target every frame, with its lines drawn from world position and faded radially from `span * 1.2` out to `span * 6`. Its squares are 6 and 30 world units, the layout's own street width. The ground slab stays at the city bounds and carries a darker rim, so the city reads as a block of land in the void rather than a wash. The zoom clamp is derived from where the fade ends, so no edge can show at any zoom. The fog is set but dormant under the orthographic camera and will act when the Explore perspective camera arrives, so do not "fix" it by pulling the distances in. There is no star dome, because a dome has no parallax under an orthographic camera.
+Built 2026-09-03, after fsn's scene. Background and fog share the void colour. One grid plane of `span * 13.2` units follows the ground point at the centre of the screen every frame, from the camera's own centre ray, with its lines drawn from world position and faded radially from `span * 1.2` out to `span * 6`. Its squares are 6 and 30 world units, the layout's own street width. The ground slab stays at the city bounds and carries a darker rim, so the city reads as a block of land in the void rather than a wash. The zoom clamp is derived from where the fade ends, so no edge can show at any zoom. Fog is not dormant under the orthographic camera, which was the guess here before Explore was built: three measures it in view depth, which varies across an orthographic frame as well, so it was already fading ground past `span * 1.8`. It is the Explore camera that makes it read, because the ground there recedes to a horizon. Either way, do not "fix" the distances by pulling them in. There is no star dome, because a dome has no parallax under an orthographic camera.
 
 ---
 
@@ -435,7 +436,7 @@ Built 2026-09-03, after fsn's scene. Background and fog share the void colour. O
 | Findings drawer | Sheet from the toolbar with a count badge, kind chips with counts, matched / total, rows grouped by severity; a row selects its node and closes. |
 | Inspector | header (name, alias, badges for Element, Root and Varies by culture, and "N properties (own · composed)"), then only the sections that have something in them: Compositions, Inherits, Allowed parents, Allowed children, Block hosts, Block targets grouped by property alias, References out grouped by property alias and references in, Templates with the default marked, then Floors as a collapsible tree of tabs and groups showing each property's editor, mandatory marker and "composed from X". A block target that resolves to no node reads "missing element type" in the signal colour. Every type name is a button that selects that type, and there is one "Open in editor" button for the selected type rather than one per name, because a hub lists 25 rows |
 | Labels | candidates are the hovered and selected nodes, the selected node's neighbours when there are at most 8, and every placed neighbour in focus mode. The scene then culls in screen space whenever the camera or the layout moves. Each candidate's box is estimated from its name, and boxes are kept in priority order (selected, hovered, then the rest) unless they land on one already kept, the building is under 6 px, or 40 labels are already up. A hidden name is one hover or one inspector row away |
-| URL | `?type=<alias>&focus=1&layers=structure,blocks&lens=<name>` so the workspace view and findings can deep link. Written with `history.replaceState` by the app itself, unless the host passes `initial` or `onStateChange` and mirrors the state into its own route, as the Document Type tab does |
+| URL | `?type=<alias>&focus=1&layers=structure,blocks&lens=<name>&view=list` so the workspace view and findings can deep link. Written with `history.replaceState` by the app itself, unless the host passes `initial` or `onStateChange` and mirrors the state into its own route, as the Document Type tab does |
 
 Accessibility: the canvas is `aria-hidden`; the inspector and a hidden type list are the accessible surface, with arrow keys moving selection and the scene following. A "list view" toggle that hides the canvas entirely is cheap and worth shipping in v1.
 
@@ -512,11 +513,11 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. Done 2026-09-03; the slab stays city-sized by choice.
 - NuGet packaging with the client build wired into `dotnet pack`, README for the package, marketplace metadata. Done 2026-09-03; screenshots still missing.
-- Roof icons (size rule, in progress), property "windows" on floors, Explore perspective toggle, list view fallback (icon resolution in the wrappers done 2026-09-03; the scene side in progress).
+- Roof icons, property "windows" on floors, Explore perspective toggle, list view fallback. Done 2026-09-03; 15 icon meshes and 616 windows on the seeded schema, and the list view is `view=list` in the URL.
 - Districts follow folders. Layout done 2026-09-03 (140 tests, 300 nodes in 44 ms); slabs and labels in progress.
-- Search palette in fsn's shape, fixed height (in progress).
-- Camera reset on hover: found 2026-09-03, fix in progress.
-- Focus mode sinks the unrelated city to plates (in progress).
+- Search palette in fsn's shape, fixed height. Done 2026-09-03; it opens on all 78 types, and the Search button carries the shortcut instead of a tooltip.
+- Camera reset on hover: found and fixed 2026-09-03. The camera rig re-applied its framing on every run of an effect that the viewport measurement re-runs, so a resize, and any re-render that arrived with one, threw away the orbit. Only a change of bounds moves the camera now.
+- Focus mode sinks the unrelated city to plates. Done 2026-09-03; 0.1 units tall on the same 400 ms tween as the move, and no picking while flat. The focus layout's own spacing needed nothing: no neighbourhood in the seeded schema overlaps, Home's 42 included.
 - Empty state (no Document Types), error state (HTTP status), lens disabled with a reason when usage fails. Done 2026-09-03.
 - Seeder log noise: application URL set, UI culture pinned to en-US in the demo site (the en-DK warnings were this Mac's locale). Done 2026-09-03; 585 warnings to 19.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
