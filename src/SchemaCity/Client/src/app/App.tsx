@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -433,17 +434,31 @@ export function App({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Two ways to look at the same city, and one toggle each rather than a
-              picker, because either one is off most of the time. Turning List off
-              goes back to the isometric city, not to Explore. */}
-          <Toggle
-            onPressedChange={(on) => setView(on ? "explore" : "city")}
-            pressed={view === "explore"}
-            size="sm"
-            variant="outline"
-          >
-            Explore
-          </Toggle>
+          {/* The camera is always one of the two, so it is a segmented pair rather
+              than a lone Explore toggle: one toggle says what Explore is and never
+              what it is instead, which is a fixed isometric angle. List is its own
+              toggle still, because the table is not a third camera, and turning it
+              off goes back to whichever camera the pair is on.
+
+              Picking a camera from the list leaves the list, the way turning
+              Explore on used to. */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
+              Camera
+            </span>
+            <ToggleGroup
+              aria-label="Camera"
+              onValueChange={(value) =>
+                setView(value[0] === "free" ? "explore" : "city")
+              }
+              size="sm"
+              value={[view === "explore" ? "free" : "iso"]}
+              variant="outline"
+            >
+              <ToggleGroupItem value="iso">Iso</ToggleGroupItem>
+              <ToggleGroupItem value="free">Free</ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           <Toggle
             onPressedChange={(on) => setView(on ? "list" : "city")}
             pressed={view === "list"}
