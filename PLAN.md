@@ -223,8 +223,8 @@ All of this is in-process and runs on the host site. No new tables.
 | All Document Types | `IContentTypeService.GetAll()` |
 | Folders | `IContentTypeService.GetContainers(Array.Empty<int>())`, matched via `contentType.ParentId` / `Path` |
 | Identity, icon, element, root, variations, description | `IContentType` properties; icon string split on space for the colour suffix |
-| Own groups and properties | `PropertyGroups`, `NoGroupPropertyTypes` |
-| Composed properties and their origin | `CompositionPropertyTypes` minus own `PropertyTypes` by id gives the composed set. For origin, walk `ContentTypeComposition` once and map each composition's own property ids to that composition |
+| Own groups and properties | `PropertyGroups`, `NoGroupPropertyTypes`. Group nesting is encoded in the alias as `tabAlias/groupAlias`, decoded with `PropertyGroupExtensions.GetParentAlias` and `GetLocalAlias`. There is no parent field on `PropertyGroup` |
+| Composed properties and their origin | `CompositionPropertyTypes` minus own `PropertyTypes` by id gives the composed set. For origin, walk the whole composition chain breadth first, direct compositions first, deduplicated by key, mapping each composition's own property ids to that composition. One level misses properties composed through an inherited parent |
 | Inheritance | `ParentId` pointing at another content type rather than a container; emit `inherits` and keep the matching `composition` edge |
 | Allowed children | `AllowedContentTypes` (`ContentTypeSort.Key`) |
 | Templates | `AllowedTemplates`, `DefaultTemplate` |
@@ -461,8 +461,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - Spike first, done 2026-09-03: a Lit wrapper hosting a React root, the afterglow theme with tokens on `:host, :root`, a base-ui dialog, popover, tooltip and command palette pinned inside the shadow root, and a 12-box R3F canvas with hover and click, working in the harness and served on both majors. Measured 179 kB + 340 kB gzipped. Checked by hand in the backoffice after fixing a double-loaded entry chunk; all four surfaces and the canvas render correctly.
   - Exit for the spike: the four base-ui surfaces and the R3F canvas worked in the harness and inside the backoffice on both majors.
-- `SchemaGraphBuilder` complete for identity, behaviour, groups, properties, compositions, inheritance, allowed children, templates. Unit tests against hand-built `ContentType` instances.
-- `BlockEditorInspector` for Block List, Block Grid, RTE blocks, MNTP filter. Unit tests per editor.
+- `SchemaGraphBuilder` complete for identity, behaviour, groups, properties, compositions, inheritance, allowed children, templates. Unit tests against hand-built `ContentType` instances. Done 2026-09-03. 13 tests; the seeded fixture has 511 edges across all five kinds.
+- `BlockEditorInspector` for Block List, Block Grid, RTE blocks, MNTP filter. Unit tests per editor. Done 2026-09-03.
 - `app/layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance. Done 2026-09-03, 15 tests, about 30 ms for 300 nodes.
 - Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, drei `Html` labels, intro rise.
 - Inspector with all schema sections. Search palette.
@@ -522,7 +522,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 | Layer | How |
 | --- | --- |
-| Graph builder, block inspector, usage aggregation | xUnit with hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
+| Graph builder, block inspector, usage aggregation | xUnit, 13 tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
 | `model/`, `app/layout/` | vitest on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
