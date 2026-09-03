@@ -276,7 +276,33 @@ export function App({
     const url = urlToWrite(state, mountedAt, window.location.pathname);
     if (url !== null) window.history.replaceState(null, "", url);
   }, [selected, focus, layers, lens, view, aliasById, hostOwnsUrl, mountedAt]);
-  const hits = useMemo(() => searchNodes(nodes, query), [nodes, query]);
+  // The palette opens on the whole schema rather than on nothing, so it reads as a
+  // list of every type that a query narrows, not as a box that waits to be fed.
+  const byName = useMemo(
+    () => [...nodes].sort((a, b) => a.name.localeCompare(b.name)),
+    [nodes],
+  );
+  const hits = useMemo(
+    () =>
+      query.trim() === ""
+        ? byName.map((node) => ({ node, propertyAlias: null }))
+        : searchNodes(nodes, query, nodes.length),
+    [byName, nodes, query],
+  );
+  // The district each type would stand in, from the graph alone: the palette has no
+  // placements, and this is the same three-way split the layout makes. A type nothing
+  // can create and nothing points at is detached, which is the dim swatch.
+  const swatchOf = useMemo(() => {
+    const placeable = new Set(
+      (graph.edges ?? []).filter((edge) => edge.kind === "allowedChild").map((edge) => edge.to),
+    );
+    return (node: (typeof nodes)[number]) =>
+      node.isElement
+        ? "bg-amber"
+        : node.allowedAsRoot || placeable.has(node.id)
+          ? "bg-phosphor"
+          : "bg-phosphor-dim";
+  }, [graph.edges]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
   const scale = useMemo(() => lensScale(graph, usage, lens), [graph, usage, lens]);
   const selectedNode = selected ? nodesById.get(selected) : undefined;
@@ -385,16 +411,13 @@ export function App({
               </PopoverContent>
             </Popover>
 
-            <Tooltip>
-              <TooltipTrigger
-                render={<Button onClick={() => openPalette(true)} size="sm" />}
-              >
-                Search
-              </TooltipTrigger>
-              <TooltipContent>
-                Search every type <Kbd>⌘K</Kbd>
-              </TooltipContent>
-            </Tooltip>
+            {/* No tooltip on a control that opens a dialog: the tooltip's exit
+                animation plays over the dialog opening, which reads as the label
+                flying away. The shortcut goes in the button instead. */}
+            <Button onClick={() => openPalette(true)} size="sm">
+              Search
+              <Kbd>⌘K</Kbd>
+            </Button>
           </div>
         </div>
 
@@ -473,7 +496,13 @@ export function App({
           ) : null}
         </div>
 
-        <CommandDialog onOpenChange={openPalette} open={paletteOpen}>
+        {/* One height whatever the query matches, so the panel never jumps while
+            you type and the list scrolls inside it. */}
+        <CommandDialog
+          className="h-[60vh] min-h-80 sm:max-w-xl"
+          onOpenChange={openPalette}
+          open={paletteOpen}
+        >
           {/* Afterglow's CommandDialog is the dialog only, so the cmdk root is ours.
               Filtering is ours too: cmdk scores its own item labels, which would
               miss the property aliases the rows do not print. */}
@@ -481,22 +510,49 @@ export function App({
             <CommandInput
               onValueChange={setQuery}
               placeholder="Find a type or a property alias…"
+              trailing={<Kbd className="shrink-0">Esc</Kbd>}
               value={query}
             />
-            <CommandList>
-              {query.trim() === "" ? null : hits.length === 0 ? (
-                <CommandEmpty>No type matches.</CommandEmpty>
+            <div className="flex justify-end border-line border-b px-3 py-1 font-bold text-3xs text-phosphor-dim uppercase tracking-terminal">
+              {hits.length} of {nodes.length} types
+            </div>
+            <CommandList
+              /* cmdk puts a sizer div between the list and its rows, so the empty
+                 state can only fill the box if that div is a column too. */
+              className="max-h-none flex-1 [&_[cmdk-list-sizer]]:flex [&_[cmdk-list-sizer]]:h-full [&_[cmdk-list-sizer]]:flex-col"
+            >
+              {hits.length === 0 ? (
+                <CommandEmpty className="flex flex-1 items-center justify-center py-0">
+                  No type or property matches
+                </CommandEmpty>
               ) : (
                 hits.map((hit) => (
                   <CommandItem
+                    className="group"
                     key={hit.node.id}
                     onSelect={() => pick(hit.node.id)}
                     value={hit.node.id}
                   >
-                    {hit.node.name}
-                    <span className="ml-auto text-2xs text-phosphor-dim">
-                      {hit.propertyAlias ?? hit.node.alias}
+                    <span
+                      aria-hidden
+                      className={`size-2.5 shrink-0 ${swatchOf(hit.node)}`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs">{hit.node.name}</span>
+                      <span className="block truncate text-3xs text-phosphor-dim">
+                        {hit.node.alias}
+                      </span>
                     </span>
+                    <span className="shrink-0 text-2xs text-phosphor-dim">
+                      {hit.propertyAlias ??
+                        `${hit.node.ownPropertyCount + hit.node.composedPropertyCount} properties`}
+                    </span>
+                    <Kbd
+                      className="shrink-0 opacity-0 group-data-[selected=true]:opacity-100"
+                      glyph
+                    >
+                      ↵
+                    </Kbd>
                   </CommandItem>
                 ))
               )}

@@ -66,8 +66,12 @@ function CommandDialog({
 
 function CommandInput({
   className,
+  trailing,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & {
+  /** Anything to sit at the right end of the field, such as a key hint. */
+  trailing?: React.ReactNode;
+}) {
   return (
     <div
       className="flex h-11 items-center gap-2.5 border-line border-b px-3 transition duration-150 ease-terminal has-[:focus-visible]:border-line-strong has-[:focus-visible]:shadow-glow"
@@ -82,6 +86,7 @@ function CommandInput({
         data-slot="command-input"
         {...props}
       />
+      {trailing}
     </div>
   );
 }
