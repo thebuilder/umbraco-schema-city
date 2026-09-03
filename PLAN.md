@@ -397,8 +397,8 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Usage badge | small numeric sprite above the roof when the Usage lens is on |
 | Selection | signal pink outline and label |
 | Road (`allowedChild`) | flat ribbon on the ground with animated chevrons in the direction of the edge |
-| Bridge (`composition` / `inherits`) | elevated quadratic arc at roof height, thicker for `inherits` |
-| Block link | thin dashed line dipping to ground level toward the element district |
+| Bridge (`composition` / `inherits`) | elevated quadratic arc, apex one arch above the taller roof. `inherits` is drawn as two arcs a hair apart, because WebGL ignores a line width above 1 |
+| Block link | thin solid line dipping to ground level toward the element district. Dashes are what tells a reference apart from it |
 | Reference | dotted line, hidden unless the References layer is on |
 | Folder | ground slab tint + label |
 
