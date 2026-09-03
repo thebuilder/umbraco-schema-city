@@ -6,9 +6,9 @@ import {
   state,
 } from "@umbraco-cms/backoffice/external/lit";
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
-import { umbHttpClient } from "@umbraco-cms/backoffice/http-client";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { SchemaCityService, type SchemaNode } from "./api/index.js";
+import { getGraph } from "./api.js";
+import type { SchemaNode } from "./model/types.js";
 
 /** Lists what the graph endpoint returns. The city itself lands in M1. */
 @customElement("schema-city-dashboard")
@@ -25,10 +25,7 @@ export class SchemaCityDashboardElement extends UmbElementMixin(LitElement) {
   }
 
   async #load() {
-    const { data, error } = await tryExecute(
-      this,
-      SchemaCityService.graph({ client: umbHttpClient }),
-    );
+    const { data, error } = await tryExecute(this, getGraph());
 
     if (error) {
       this._failed = true;
