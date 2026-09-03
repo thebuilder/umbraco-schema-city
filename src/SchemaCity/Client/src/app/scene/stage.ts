@@ -7,7 +7,11 @@
 // world position rather than from the geometry, so one plane can be re-centred on the
 // camera every frame without the lines appearing to slide.
 
-/** One grid square is the 6-unit street the layout leaves between ranks. */
+/**
+ * One grid square is six world units. It read as the street the layout left between
+ * two ranks until that street grew to nine, and it is a ruler under the islands now
+ * rather than their street plan.
+ */
 const MINOR_SPACING = 6;
 const MAJOR_SPACING = 30;
 
