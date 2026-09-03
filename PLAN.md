@@ -544,7 +544,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Roads follow the streets. Done 2026-09-03; crossings on the seeded schema fell from 292 to 94, fan limit at 3 parents with a `+N parents` marker, chevrons on the last 4.2 units.
 - District names stamped on the islands. Done 2026-09-03; 0.8 opacity because 0.55 vanished into the slab at overview zoom; the stamps do not fade with selection.
 - Keyboard flight, W A S D and arrows, isometric pan and Explore flight (in progress).
-- Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03.
+- Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03, except that the wrapped row spilled out of the fixed-height bar in the backoffice; fix in progress.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` on NuGet.
 
