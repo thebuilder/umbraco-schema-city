@@ -4,8 +4,23 @@
     {
       "name": "site",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "src/SchemaCity.Site"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/SchemaCity.Site"
+      ],
       "port": 61801
+    },
+    {
+      "name": "harness",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "src/SchemaCity/Client"
+      ],
+      "port": 5173
     }
   ]
 }
