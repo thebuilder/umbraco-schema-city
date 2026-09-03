@@ -181,3 +181,32 @@ describe("smootherstep", () => {
     expect(smootherstep(2)).toBe(1);
   });
 });
+
+describe("focus mode's flat plates", () => {
+  it("presses a whole building down to a plate and back", () => {
+    const nodes = new Map([
+      ["a", node("a", { groups: [group(), group(), group()] })],
+    ]);
+
+    const standing = buildFloorCells(nodes, [placement("a")]);
+    expect(standing.heights.get("a")).toBeCloseTo(1.8);
+
+    const flat = buildFloorCells(nodes, [placement("a", { flatten: 1 })]);
+    expect(flat.heights.get("a")).toBeCloseTo(0.1);
+    // Three floors still, stacked inside the plate rather than dropped.
+    expect(flat.cells).toHaveLength(3);
+    expect(Math.max(...flat.cells.map((c) => c.cy + c.sy / 2))).toBeCloseTo(0.1);
+
+    // Half way through the tween it is half way down, near enough.
+    const half = buildFloorCells(nodes, [placement("a", { flatten: 0.5 })]);
+    expect(half.heights.get("a")).toBeCloseTo(0.95);
+  });
+
+  it("flattens an Element Type's warehouse too", () => {
+    const nodes = new Map([["a", node("a", { isElement: true })]]);
+
+    expect(buildFloorCells(nodes, [placement("a", { flatten: 1 })]).heights.get("a")).toBeCloseTo(
+      0.1,
+    );
+  });
+});

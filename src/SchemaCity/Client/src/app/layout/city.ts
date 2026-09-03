@@ -16,6 +16,12 @@ export type Placement = {
   position: { x: number; z: number };
   /** Height above the ground. Only the focus layout raises anything off it. */
   y?: number;
+  /**
+   * 0 is a building at its own height, 1 a flat plate. Focus mode presses everything
+   * outside the neighbourhood down to a plate so its layout has a map to stand on,
+   * and the scene tweens the value in between.
+   */
+  flatten?: number;
   footprint: number;
   height: number;
   floors: number;

@@ -51,6 +51,8 @@ const PLAZA_HEIGHT = 0.05;
 const HOVER_BRIGHTEN = 1.4;
 /** How far a faded building's colour moves toward the void, approximating 20% opacity. */
 const FADE_MIX = 0.8;
+/** The same, for a building focus mode has pressed flat: about 12% opacity. */
+const PLATE_MIX = 0.88;
 
 /**
  * Where one building lands on the lens's ramp. Amber to azure both ways, with
@@ -135,6 +137,10 @@ function Buildings({
     () => new Map(placements.map((p) => [p.id, p.introDelay])),
     [placements],
   );
+  const flatById = useMemo(
+    () => new Map(placements.map((p) => [p.id, p.flatten ?? 0])),
+    [placements],
+  );
   const introEnd = useMemo(
     () => Math.max(0, ...placements.map((p) => p.introDelay)) + INTRO_DURATION,
     [placements],
@@ -214,12 +220,19 @@ function Buildings({
     if (hit) {
       placements.forEach((placement, i) => {
         const height = heights.get(placement.id) ?? placement.height;
+        // A building pressed flat is out of the conversation, so it stops taking the
+        // pointer as well: a zero-sized box is one the raycaster cannot hit.
+        const pickable = (placement.flatten ?? 0) < 0.999;
         scratch.position.set(
           placement.position.x,
           (placement.y ?? 0) + height / 2,
           placement.position.z,
         );
-        scratch.scale.set(placement.footprint, height, placement.footprint);
+        scratch.scale.set(
+          pickable ? placement.footprint : 0,
+          pickable ? height : 0,
+          pickable ? placement.footprint : 0,
+        );
         scratch.updateMatrix();
         hit.setMatrixAt(i, scratch.matrix);
       });
@@ -259,6 +272,10 @@ function Buildings({
 
   useEffect(() => {
     const lit = (id: string) => neighbours === null || neighbours.has(id);
+    // A building pressed flat is further out of the way than a merely faded one, so
+    // the focus layout stands on a map rather than in a crowd.
+    const fadeOf = (id: string) =>
+      FADE_MIX + (PLATE_MIX - FADE_MIX) * (flatById.get(id) ?? 0);
     // A lens repaints the buildings it has a number for. The ones it says nothing
     // about are Element Types, which have no content of their own, and under a lens
     // they go phosphor-dim: amber is the zero end of the ramp, and an amber district
@@ -274,7 +291,7 @@ function Buildings({
           ? colors.signal
           : lensColour(buildingId) ?? unlit;
       const bright = buildingId === hovered ? base.clone().multiplyScalar(HOVER_BRIGHTEN) : base;
-      return lit(buildingId) ? bright : bright.clone().lerp(colors.fade, FADE_MIX);
+      return lit(buildingId) ? bright : bright.clone().lerp(colors.fade, fadeOf(buildingId));
     };
 
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
@@ -305,12 +322,15 @@ function Buildings({
       plazas.forEach((cell, i) => {
         const base = cell.buildingId === selected ? colors.signal : colors.plaza;
         const bright = cell.buildingId === hovered ? base.clone().multiplyScalar(HOVER_BRIGHTEN) : base;
-        plaza.setColorAt(i, lit(cell.buildingId) ? bright : bright.clone().lerp(colors.fade, FADE_MIX));
+        plaza.setColorAt(
+          i,
+          lit(cell.buildingId) ? bright : bright.clone().lerp(colors.fade, fadeOf(cell.buildingId)),
+        );
       });
       if (plaza.instanceColor) plaza.instanceColor.needsUpdate = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cellsByKind, windows, plazas, selected, hovered, neighbours, colors, scale]);
+  }, [cellsByKind, windows, plazas, selected, hovered, neighbours, colors, scale, flatById]);
 
   const pick = (event: ThreeEvent<MouseEvent | PointerEvent>) => placements[event.instanceId ?? -1];
 
@@ -1318,8 +1338,16 @@ export default function Scene({
   );
   const target = useMemo(() => {
     const neighbourhood = focus ? neighbourhoodById.get(focus) : undefined;
-    return focus && neighbourhood ? layoutFocus(graph, neighbourhood, focus, city) : city;
-  }, [focus, graph, neighbourhoodById, city]);
+    if (!focus || !neighbourhood) return city;
+    const laid = layoutFocus(graph, neighbourhood, focus, city);
+    const inFocus = focusNeighbours ?? new Set<string>();
+    // Everything the focused node has nothing to do with becomes ground: the
+    // neighbourhood is laid out over the city it came from, and a city still standing
+    // at full height under it reads as two layouts on top of each other.
+    return laid.map((placement) =>
+      inFocus.has(placement.id) ? placement : { ...placement, flatten: 1 },
+    );
+  }, [focus, focusNeighbours, graph, neighbourhoodById, city]);
 
   // The placements on screen right now. They are the city's or the focus layout's
   // everywhere except during the 400 ms between the two.
@@ -1345,7 +1373,9 @@ export default function Scene({
           ? target
           : target.map((to) => {
               const at = from.get(to.id);
-              if (!at || at === to) return to;
+              // Nothing to tween when the placement is the same object and neither
+              // end is flattened, which is most of the city on the way in.
+              if (!at || (at === to && (at.flatten ?? 0) === (to.flatten ?? 0))) return to;
               return {
                 ...to,
                 position: {
@@ -1353,6 +1383,7 @@ export default function Scene({
                   z: lerp(at.position.z, to.position.z, t),
                 },
                 y: lerp(at.y ?? 0, to.y ?? 0, t),
+                flatten: lerp(at.flatten ?? 0, to.flatten ?? 0, t),
               };
             });
       shown.current = mixed;

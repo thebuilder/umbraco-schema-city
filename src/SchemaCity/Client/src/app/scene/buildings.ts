@@ -50,6 +50,8 @@ const WINDOW_STANDOFF = 0.012;
 const SEPARATOR_HEIGHT = 0.06;
 const ELEMENT_HEIGHT = FLOOR_HEIGHT;
 const PLAZA_MARGIN = 0.6;
+/** What a building's whole mass comes to once focus mode has pressed it flat. */
+export const PLATE_HEIGHT = 0.1;
 
 // A node with no groups still gets one floor, coloured as its own.
 const UNGROUPED: PropertyGroup = {
@@ -135,6 +137,9 @@ export function buildFloorCells(
     if (!node) continue;
     const { x, z } = placement.position;
     const footprint = placement.footprint;
+    // Every floor of a flattened building is squashed by the same factor, so the
+    // stack keeps its proportions on the way down to a plate.
+    const flatten = placement.flatten ?? 0;
     // The focus layout stands compositions on a platform, so a building's floors
     // start at its own ground rather than at zero.
     const base = placement.y ?? 0;
@@ -142,23 +147,25 @@ export function buildFloorCells(
     if (node.isElement) {
       // Element Types are the warehouse form: low, wide, amber, no roof cap,
       // never stacked into floors.
+      const squash = squashOf(flatten, ELEMENT_HEIGHT);
       cells.push({
         buildingId: placement.id,
         kind: "element",
         cx: x,
-        cy: base + ELEMENT_HEIGHT / 2,
+        cy: base + (ELEMENT_HEIGHT / 2) * squash,
         cz: z,
         sx: footprint,
-        sy: ELEMENT_HEIGHT,
+        sy: ELEMENT_HEIGHT * squash,
         sz: footprint,
       });
-      heights.set(placement.id, ELEMENT_HEIGHT);
+      heights.set(placement.id, ELEMENT_HEIGHT * squash);
       continue;
     }
 
     // medium.json is exported before the backend fills in groups, same gap
     // city.ts already guards against for floor counts.
     const groups = node.groups?.length ? node.groups : [UNGROUPED];
+    const squash = squashOf(flatten, massOf(groups));
     let y = 0;
     groups.forEach((group, i) => {
       // A new tab is a physical break in the building, marked by a thin
@@ -168,10 +175,10 @@ export function buildFloorCells(
           buildingId: placement.id,
           kind: "separator",
           cx: x,
-          cy: base + y + SEPARATOR_HEIGHT / 2,
+          cy: base + (y + SEPARATOR_HEIGHT / 2) * squash,
           cz: z,
           sx: footprint,
-          sy: SEPARATOR_HEIGHT,
+          sy: SEPARATOR_HEIGHT * squash,
           sz: footprint,
         });
         y += SEPARATOR_HEIGHT;
@@ -180,19 +187,34 @@ export function buildFloorCells(
         buildingId: placement.id,
         kind: group.fromCompositionId ? "composed" : "own",
         cx: x,
-        cy: base + y + FLOOR_HEIGHT / 2,
+        cy: base + (y + FLOOR_HEIGHT / 2) * squash,
         cz: z,
         sx: footprint,
-        sy: FLOOR_HEIGHT,
+        sy: FLOOR_HEIGHT * squash,
         sz: footprint,
       });
-      pushWindows(windows, group, placement.id, footprint, x, base + y + FLOOR_HEIGHT / 2, z);
+      // A plate has no walls worth lighting, so its windows go with its height.
+      if (squash > 0.5) {
+        pushWindows(windows, group, placement.id, footprint, x, base + (y + FLOOR_HEIGHT / 2) * squash, z);
+      }
       y += FLOOR_HEIGHT;
     });
-    heights.set(placement.id, y);
+    heights.set(placement.id, y * squash);
   }
 
   return { cells, windows, heights };
+}
+
+/** The mass a stack of groups comes to, separators included. */
+function massOf(groups: PropertyGroup[]): number {
+  const tabs = groups.filter((group, i) => i > 0 && group.type === "Tab").length;
+  return groups.length * FLOOR_HEIGHT + tabs * SEPARATOR_HEIGHT;
+}
+
+/** How much of its height a building keeps: 1 at rest, `PLATE_HEIGHT` when flat. */
+function squashOf(flatten: number, height: number): number {
+  if (flatten <= 0 || height <= 0) return 1;
+  return 1 + (PLATE_HEIGHT / height - 1) * Math.min(flatten, 1);
 }
 
 /** A flat plaza disc under every root building that is not an Element Type. */
