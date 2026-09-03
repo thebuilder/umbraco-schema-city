@@ -353,13 +353,14 @@ One hand-written function per endpoint in `src/api.ts`, calling `umbHttpClient.g
    - **Structure district**: every non-element type reachable from an `allowedAsRoot` type along `allowedChild` edges, plus roots themselves.
    - **Detached district**: non-element types not reachable from any root (dead ends and pure compositions).
    - **Element district**: `isElement` types.
-2. Run dagre (rank direction top-to-bottom, `ranker: "network-simplex"`) on the structure district using only `allowedChild` edges. Roots get rank 0. Cycles are fine, dagre reverses back edges.
-3. Lay out the detached and element districts as packed grids, sorted by alias, with rows of at most 8. They sit south (element) and east (detached) of the structure district with a street between.
-4. Optional folder districts: when the schema uses folders, the structure ranking still governs position, but the ground slab under each node is tinted by folder and a folder label is drawn at the centroid. Folders do not move buildings; a folder that spans the map is a fact about the schema, not a layout bug.
-5. Map dagre `x, y` to three.js `x, z`, scaled so a building footprint is 2 units and a rank gap is 6 units.
-6. Output `Placement { node, position, footprint, height, floors, district, introDelay }`.
+2. Run dagre (rank direction top-to-bottom, `ranker: "network-simplex"`) on the structure district using only `allowedChild` edges. Roots get rank 0. Cycles are fine, dagre reverses back edges. Read back the rank and the left-to-right order inside it, and nothing else. Dagre's own `x` is unusable on a real schema: an allowed-child graph is shallow and wide, and every edge that skips a rank threads a dummy node through the ranks between it, so the seeded 78-type fixture ranked into a district 624 units wide and 66 deep, which frames as a diagonal line of buildings a pixel or two tall.
+3. Fold each rank into rows of at most 8 buildings, keeping dagre's order, each row centred on the district's axis. Rows inside one rank sit a footprint plus a gap apart, and the next rank starts after the last of them plus the rank gap. The same fixture then measures 40 by 87. Eight is the number of buildings that stay legible side by side once the camera frames the whole city, and it is the same limit the packed grids use.
+4. Lay out the detached and element districts as packed grids, sorted by alias, with rows of at most 8. They sit south (element) and east (detached) of the structure district with a street between.
+5. Optional folder districts: when the schema uses folders, the structure ranking still governs position, but the ground slab under each node is tinted by folder and a folder label is drawn at the centroid. Folders do not move buildings; a folder that spans the map is a fact about the schema, not a layout bug.
+6. Positions are world units throughout: a building footprint is 2 units, two buildings in a row sit one footprint apart, and a rank gap is 6 units.
+7. Output `Placement { node, position, footprint, height, floors, district, introDelay }`.
 
-Determinism: sort nodes and edges by alias before dagre. Dagre is deterministic for a given input order, so the layout needs no persistence and no hash.
+Determinism: sort nodes and edges by alias before dagre. Dagre is deterministic for a given input order, and two nodes that land on the same dagre `x` break the tie by alias, so the layout needs no persistence and no hash.
 
 ### Focus layout (`app/layout/focus.ts`)
 
@@ -398,6 +399,8 @@ Everything else stays in the city at reduced opacity. The scene tweens each buil
 Same placements, different colours. Modes: content count (sequential ramp), published share (diverging around 50%), cultures, incoming references, unused/dead (binary highlight). Legend in the toolbar. Colours come from the afterglow theme tokens: phosphor green on void, pink signal, amber, azure and violet. Own groups are phosphor, composed groups desaturated phosphor, element types amber, selection signal. Any diverging or sequential ramp uses amber and azure, never phosphor against signal, because green against pink is the worst pair for colour-vision deficiency. Dark only, by choice. The theme has no light mode.
 
 ### World stage
+
+The camera frames the city at a span of its longer side. At a true isometric angle a city `width` by `depth` covers `(width + depth) / sqrt(6)` of the framed height, so that span shows all of it with about a quarter of the height left for the buildings standing up in it.
 
 The ground has to read as a large seamless world the city sits in, not a patch it fills. The ground plane and the grid extend far beyond the city bounds, distance fog in the void colour fades the far ground into the sky, and the sky is flat void with a subtle gradient or none at all. At any zoom the controls allow, the camera never shows a grid edge. The approach is borrowed from fsn's scene, which sets background and fog to the same void colour and draws one large grid plane re-centred on the camera each frame with its lines faded out by distance. Scheduled for M4. In M1 the grid extends to twice the city bounds and no further.
 
