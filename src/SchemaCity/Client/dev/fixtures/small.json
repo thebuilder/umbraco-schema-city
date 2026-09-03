@@ -1,0 +1,745 @@
+{
+  "generatedAt": "2026-01-15T09:30:00.0000000+00:00",
+  "folders": [
+    { "id": "f0000000-0000-4000-8000-000000000001", "name": "Components", "parentId": null }
+  ],
+  "nodes": [
+    {
+      "id": "a0000000-0000-4000-8000-000000000001",
+      "alias": "home",
+      "name": "Home",
+      "icon": "icon-home",
+      "iconColor": "color-blue",
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": true,
+      "variesByCulture": true,
+      "variesBySegment": false,
+      "description": "The site root.",
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-000000000001",
+          "alias": "content",
+          "name": "Content",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "pageTitle",
+              "name": "Page title",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": true,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "heroImage",
+              "name": "Hero image",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000002",
+              "editorAlias": "Umbraco.MediaPicker3",
+              "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        },
+        {
+          "id": "g0000000-0000-4000-8000-000000000002",
+          "alias": "seo",
+          "name": "SEO",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+          "properties": [
+            {
+              "alias": "metaTitle",
+              "name": "Meta title",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+              "targets": []
+            },
+            {
+              "alias": "metaDescription",
+              "name": "Meta description",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000003",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 2,
+      "templates": [
+        {
+          "id": "70000000-0000-4000-8000-000000000001",
+          "alias": "home",
+          "name": "Home",
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000002",
+      "alias": "landingPage",
+      "name": "Landing page",
+      "icon": "icon-flag",
+      "iconColor": null,
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": true,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "A campaign entry point that sits outside the main tree.",
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-000000000003",
+          "alias": "content",
+          "name": "Content",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "pageTitle",
+              "name": "Page title",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "campaignCode",
+              "name": "Campaign code",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 0,
+      "templates": [
+        {
+          "id": "70000000-0000-4000-8000-000000000002",
+          "alias": "landingPage",
+          "name": "Landing page",
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000003",
+      "alias": "contentPage",
+      "name": "Content page",
+      "icon": "icon-document",
+      "iconColor": null,
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": true,
+      "variesBySegment": false,
+      "description": null,
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-000000000004",
+          "alias": "content",
+          "name": "Content",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "bodyText",
+              "name": "Body text",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000004",
+              "editorAlias": "Umbraco.RichText",
+              "editorUiAlias": "Umb.PropertyEditorUi.Tiptap",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "blocks",
+              "name": "Blocks",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000005",
+              "editorAlias": "Umbraco.BlockList",
+              "editorUiAlias": "Umb.PropertyEditorUi.BlockList",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                { "nodeId": "b0000000-0000-4000-8000-000000000001", "role": "content" },
+                { "nodeId": "b0000000-0000-4000-8000-000000000003", "role": "settings" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g0000000-0000-4000-8000-000000000005",
+          "alias": "seo",
+          "name": "SEO",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+          "properties": [
+            {
+              "alias": "metaTitle",
+              "name": "Meta title",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+              "targets": []
+            },
+            {
+              "alias": "metaDescription",
+              "name": "Meta description",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000003",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 2,
+      "templates": [
+        {
+          "id": "70000000-0000-4000-8000-000000000003",
+          "alias": "contentPage",
+          "name": "Content page",
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000004",
+      "alias": "articlePage",
+      "name": "Article page",
+      "icon": "icon-newspaper",
+      "iconColor": "color-green",
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": true,
+      "variesBySegment": true,
+      "description": "Inherits from Content page, so the same composition arrives twice over.",
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-000000000006",
+          "alias": "article",
+          "name": "Article",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "author",
+              "name": "Author",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000006",
+              "editorAlias": "Umbraco.MultiNodeTreePicker",
+              "editorUiAlias": "Umb.PropertyEditorUi.ContentPicker",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                { "nodeId": "a0000000-0000-4000-8000-000000000008", "role": "picker" }
+              ]
+            },
+            {
+              "alias": "quotes",
+              "name": "Quotes",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000007",
+              "editorAlias": "Umbraco.BlockGrid",
+              "editorUiAlias": "Umb.PropertyEditorUi.BlockGrid",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                { "nodeId": "b0000000-0000-4000-8000-000000000002", "role": "content" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g0000000-0000-4000-8000-000000000007",
+          "alias": "content",
+          "name": "Content",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "a0000000-0000-4000-8000-000000000003",
+          "properties": [
+            {
+              "alias": "bodyText",
+              "name": "Body text",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000004",
+              "editorAlias": "Umbraco.RichText",
+              "editorUiAlias": "Umb.PropertyEditorUi.Tiptap",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": "a0000000-0000-4000-8000-000000000003",
+              "targets": []
+            },
+            {
+              "alias": "blocks",
+              "name": "Blocks",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000005",
+              "editorAlias": "Umbraco.BlockList",
+              "editorUiAlias": "Umb.PropertyEditorUi.BlockList",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": "a0000000-0000-4000-8000-000000000003",
+              "targets": [
+                { "nodeId": "b0000000-0000-4000-8000-000000000001", "role": "content" },
+                { "nodeId": "b0000000-0000-4000-8000-000000000003", "role": "settings" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "g0000000-0000-4000-8000-000000000008",
+          "alias": "seo",
+          "name": "SEO",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+          "properties": [
+            {
+              "alias": "metaTitle",
+              "name": "Meta title",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+              "targets": []
+            },
+            {
+              "alias": "metaDescription",
+              "name": "Meta description",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000003",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": "a0000000-0000-4000-8000-000000000006",
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 4,
+      "templates": [
+        {
+          "id": "70000000-0000-4000-8000-000000000003",
+          "alias": "contentPage",
+          "name": "Content page",
+          "isDefault": false
+        },
+        {
+          "id": "70000000-0000-4000-8000-000000000004",
+          "alias": "articlePage",
+          "name": "Article page",
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000005",
+      "alias": "newsListing",
+      "name": "News listing",
+      "icon": "icon-list",
+      "iconColor": null,
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": true,
+      "variesBySegment": false,
+      "description": null,
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-000000000009",
+          "alias": "listing",
+          "name": "Listing",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "intro",
+              "name": "Intro",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000003",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 1,
+      "composedPropertyCount": 0,
+      "templates": [
+        {
+          "id": "70000000-0000-4000-8000-000000000005",
+          "alias": "newsListing",
+          "name": "News listing",
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000006",
+      "alias": "seoComposition",
+      "name": "SEO composition",
+      "icon": "icon-tags",
+      "iconColor": "color-purple",
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": true,
+      "variesBySegment": false,
+      "description": "Composed into three types and never used on its own.",
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-00000000000a",
+          "alias": "seo",
+          "name": "SEO",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "metaTitle",
+              "name": "Meta title",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "metaDescription",
+              "name": "Meta description",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000003",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000007",
+      "alias": "legacyWidget",
+      "name": "Legacy widget",
+      "icon": "icon-wrench",
+      "iconColor": null,
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "No properties, no template and nothing allows it. A dead end.",
+      "groups": [],
+      "ownPropertyCount": 0,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000008",
+      "alias": "person",
+      "name": "Person",
+      "icon": "icon-user",
+      "iconColor": null,
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": null,
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-00000000000b",
+          "alias": "person",
+          "name": "Person",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "fullName",
+              "name": "Full name",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "email",
+              "name": "Email",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.EmailAddress",
+              "editorUiAlias": "Umb.PropertyEditorUi.EmailAddress",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000009",
+      "alias": "tagPage",
+      "name": "Tag page",
+      "icon": "icon-hashtag",
+      "iconColor": null,
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": null,
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-00000000000c",
+          "alias": "content",
+          "name": "Content",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "tagName",
+              "name": "Tag name",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 1,
+      "composedPropertyCount": 0,
+      "templates": [
+        {
+          "id": "70000000-0000-4000-8000-000000000006",
+          "alias": "tagPage",
+          "name": "Tag page",
+          "isDefault": true
+        }
+      ]
+    },
+    {
+      "id": "b0000000-0000-4000-8000-000000000001",
+      "alias": "heroBlock",
+      "name": "Hero block",
+      "icon": "icon-picture",
+      "iconColor": "color-orange",
+      "folderId": "f0000000-0000-4000-8000-000000000001",
+      "isElement": true,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": null,
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-00000000000d",
+          "alias": "content",
+          "name": "Content",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "headline",
+              "name": "Headline",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "image",
+              "name": "Image",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000002",
+              "editorAlias": "Umbraco.MediaPicker3",
+              "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "b0000000-0000-4000-8000-000000000002",
+      "alias": "quoteBlock",
+      "name": "Quote block",
+      "icon": "icon-quote",
+      "iconColor": null,
+      "folderId": "f0000000-0000-4000-8000-000000000001",
+      "isElement": true,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": null,
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-00000000000e",
+          "alias": "content",
+          "name": "Content",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "quote",
+              "name": "Quote",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000003",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "attribution",
+              "name": "Attribution",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "b0000000-0000-4000-8000-000000000003",
+      "alias": "ctaSettings",
+      "name": "CTA settings",
+      "icon": "icon-settings",
+      "iconColor": null,
+      "folderId": "f0000000-0000-4000-8000-000000000001",
+      "isElement": true,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "Only ever used as the settings half of a block.",
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-00000000000f",
+          "alias": "settings",
+          "name": "Settings",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "backgroundColor",
+              "name": "Background colour",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000008",
+              "editorAlias": "Umbraco.ColorPicker",
+              "editorUiAlias": "Umb.PropertyEditorUi.ColorPicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 1,
+      "composedPropertyCount": 0,
+      "templates": []
+    }
+  ],
+  "edges": [
+    { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000001", "to": "a0000000-0000-4000-8000-000000000003" },
+    { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000001", "to": "a0000000-0000-4000-8000-000000000005" },
+    { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000001", "to": "a0000000-0000-4000-8000-000000000009" },
+    { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000002", "to": "a0000000-0000-4000-8000-000000000003" },
+    { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000003", "to": "a0000000-0000-4000-8000-000000000003" },
+    { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000005", "to": "a0000000-0000-4000-8000-000000000004" },
+    { "kind": "composition", "from": "a0000000-0000-4000-8000-000000000001", "to": "a0000000-0000-4000-8000-000000000006" },
+    { "kind": "composition", "from": "a0000000-0000-4000-8000-000000000003", "to": "a0000000-0000-4000-8000-000000000006" },
+    { "kind": "composition", "from": "a0000000-0000-4000-8000-000000000004", "to": "a0000000-0000-4000-8000-000000000006" },
+    { "kind": "composition", "from": "a0000000-0000-4000-8000-000000000004", "to": "a0000000-0000-4000-8000-000000000003" },
+    { "kind": "inherits", "from": "a0000000-0000-4000-8000-000000000004", "to": "a0000000-0000-4000-8000-000000000003" },
+    { "kind": "block", "from": "a0000000-0000-4000-8000-000000000003", "to": "b0000000-0000-4000-8000-000000000001", "propertyAlias": "blocks", "role": "content" },
+    { "kind": "block", "from": "a0000000-0000-4000-8000-000000000003", "to": "b0000000-0000-4000-8000-000000000003", "propertyAlias": "blocks", "role": "settings" },
+    { "kind": "block", "from": "a0000000-0000-4000-8000-000000000004", "to": "b0000000-0000-4000-8000-000000000002", "propertyAlias": "quotes", "role": "content" },
+    { "kind": "reference", "from": "a0000000-0000-4000-8000-000000000004", "to": "a0000000-0000-4000-8000-000000000008", "propertyAlias": "author" }
+  ]
+}
