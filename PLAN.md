@@ -490,7 +490,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Focus mode with camera flight and neighbourhood layout, refocus by double-click, inspector or palette, Escape to return. Done 2026-09-03 (pulled ahead of the layers because a hub selection is a road fan and a list without it).
 - Screen-space label culling. Done 2026-09-03; 17 labels, none overlapping, on the Home focus view.
 - Compositions, Blocks, References layers with their edge styles. Done 2026-09-03; one merged line geometry per layer, and the block layer draws at 0.3 opacity because 302 distinct block links into 15 element types is a wall at full strength.
-- A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link. Done 2026-09-03; visual check in the backoffice pending a login.
+- A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link. Done 2026-09-03; checked in the backoffice 2026-09-03: opens focused on the edited type with the full toolbar and inspector.
+- "Open in editor" link: found broken in the backoffice 2026-09-03 (the app's URL writer rewrote the route after navigation); fix in progress.
 - URL state and deep links. Done 2026-09-03; `app/url.ts`, 12 tests.
 - Exit: "Where is this composition used?" and "What uses this Element Type?" are two clicks from the Document Type editor.
 
@@ -501,7 +502,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Both wrappers fetch the usage report after the graph without blocking the first render; a failed usage call leaves the lens disabled. Done 2026-09-03.
 - `findings.ts` with tests. Findings drawer listing unused types, unused element types, structural dead ends, duplicate property aliases, broken block references, types with no properties, types with no template, pure mixins and the top complexity tier, each linking to its node. Done 2026-09-03; every planted alias reported; 122 vitest tests.
 - Tidy-up done 2026-09-03: dead end absorbs unused composition, no-template notes only for placeable types on schemas that use templates, element types neutral under a lens; the seeded schema reports 115 findings with usage, every planted alias once.
-- Exit: met 2026-09-03. The findings drawer reports every planted alias once on the seeded site, on both Umbraco majors, plus the 47 genuinely unused seeded types.
+- Exit: met 2026-09-03. The findings drawer reports every planted alias once on the seeded site, on both Umbraco majors, plus the 47 genuinely unused seeded types. Checked in the backoffice 2026-09-03: usage loads, the lens is enabled, the drawer shows 115.
 
 ### M4, Polish and release (medium)
 
@@ -531,6 +532,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
 | Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.4 kB for `api.js`, 44 kB of app and 170 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
 | The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
+| The app's own URL writing fights the backoffice router | Write URL state only while the location is still the workspace route the app mounted under, and never after navigating away; use the backoffice's own navigation for the editor link. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
 | Usage queries slow on large installs | Four small queries for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
@@ -559,7 +561,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens, pending a login. Then M4: world stage, packaging, states (in progress), then roof icons, property windows, Explore camera, list view. Next.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Fix the editor link (in progress). Then M4: world stage, packaging, states (in progress), then roof icons, property windows, Explore camera, list view. Next.
 
 ## 13. Resolved questions
 
