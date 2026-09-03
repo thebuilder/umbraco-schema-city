@@ -544,7 +544,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Roads follow the streets. Done 2026-09-03; crossings on the seeded schema fell from 292 to 94, fan limit at 3 parents with a `+N parents` marker, chevrons on the last 4.2 units.
 - District names stamped on the islands. Done 2026-09-03; 0.8 opacity because 0.55 vanished into the slab at overview zoom; the stamps do not fade with selection.
 - Keyboard flight, W A S D and arrows, isometric pan and Explore flight (in progress).
-- Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03, except that the wrapped row spilled out of the fixed-height bar in the backoffice; fix in progress.
+- Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03. The wrapped row spilling over the canvas was paint order (the absolutely positioned scene painted over the in-flow toolbar) plus a Toggle that could shrink under its label; fixed the same day with a stacking layer and `shrink-0`, measured from 1400 to 600 px.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` on NuGet.
 
@@ -569,6 +569,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
 | The app's own URL writing fights the backoffice router | Write URL state only while the location is still the workspace route the app mounted under, and never after navigating away; use the backoffice's own navigation for the editor link. Done 2026-09-03. |
 | Hover re-renders reset the camera | The framing effect moves the camera only for new bounds (`framingAction` in `scene/stage.ts`); verified by hand and by test. Done 2026-09-03. |
+| The toolbar and the absolutely positioned canvas fight for paint order | Toolbar and legend rows sit in their own layer (`relative z-10`) with a background, `shrink-0`, and the canvas takes the remaining height with `min-h-0`; measured across widths rather than given a breakpoint. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
 | Usage queries slow on large installs | Four small queries for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
@@ -597,7 +598,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. In progress: keyboard flight, the toolbar wrap fix. Next: screenshots for the README and the marketplace, the pathological fixture, a final verification on both majors.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. In progress: keyboard flight and the stamp orientation. Next: screenshots for the README and the marketplace, the pathological fixture, a final verification on both majors.
 
 ## 13. Resolved questions
 
