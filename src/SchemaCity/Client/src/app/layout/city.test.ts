@@ -6,6 +6,7 @@ import {
   cityBounds,
   cityDistricts,
   layoutCity,
+  STREET,
   type District,
   type Placement,
 } from "./city";
@@ -194,9 +195,10 @@ describe("cityDistricts", () => {
     );
   });
 
-  it("leaves a street of at least six units between any two districts", () => {
-    expect(crowded(cityDistricts(medium).districts, 6)).toEqual([]);
-    expect(crowded(cityDistricts(folderless).districts, 6)).toEqual([]);
+  it("leaves a street of at least eight units between any two districts", () => {
+    expect(STREET).toBeGreaterThanOrEqual(8);
+    expect(crowded(cityDistricts(medium).districts, STREET)).toEqual([]);
+    expect(crowded(cityDistricts(folderless).districts, STREET)).toEqual([]);
   });
 
   it("keeps every building inside the bounds its district reports", () => {
@@ -464,6 +466,41 @@ describe("layoutCity", () => {
     expect(wide.height).toBeCloseTo(1.2);
     expect(capped.footprint).toBe(5);
     expect(capped.floors).toBe(1);
+  });
+
+  it("leaves one and a half footprints between two buildings in a row", () => {
+    const placements = layoutCity(
+      graphOf(
+        [node("root", { allowedAsRoot: true }), node("a"), node("b")],
+        [road("root", "a"), road("root", "b")],
+      ),
+    );
+    const [a, b] = placements
+      .filter((p) => p.id !== "root")
+      .sort((one, other) => one.position.x - other.position.x) as [Placement, Placement];
+
+    expect(b.position.x - a.position.x - (a.footprint + b.footprint) / 2).toBeCloseTo(3);
+  });
+
+  it("leaves a street between a district's ranked block and its packed grid", () => {
+    const placements = layoutCity(
+      graphOf(
+        [
+          node("root", { allowedAsRoot: true, folderId: "f" }),
+          node("child", { folderId: "f" }),
+          node("loner", { folderId: "f" }),
+        ],
+        [road("root", "child")],
+        [{ id: "f", name: "F", parentId: null }],
+      ),
+    );
+    const at = (id: string) => placements.find((p) => p.id === id) as Placement;
+    const gap =
+      at("loner").position.z -
+      at("child").position.z -
+      (at("loner").footprint + at("child").footprint) / 2;
+
+    expect(gap).toBeGreaterThanOrEqual(STREET);
   });
 
   it("never overlaps two footprints", () => {

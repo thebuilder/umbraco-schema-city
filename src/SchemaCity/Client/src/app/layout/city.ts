@@ -64,8 +64,17 @@ export type CityBounds = {
 
 /** A building is 2 units square before its own properties widen it. */
 const FOOTPRINT = 2;
-/** Gap between two dagre ranks, and the street between two districts. */
-const RANK_GAP = 6;
+/**
+ * Ground between two buildings in the same row, row or grid. One and a half
+ * footprints, up from one, because at one the blocks read as a single plate.
+ */
+const GAP = FOOTPRINT * 1.5;
+/**
+ * The street between two dagre ranks, between a district's ranked block and its
+ * packed grid, and between two districts. It grew with the gap inside a block, so a
+ * street still reads as wider than the ground between two neighbours.
+ */
+export const STREET = 9;
 const FLOOR_HEIGHT = 0.6;
 /** Buildings in one row, everywhere. A wider rank folds onto more rows. */
 export const ROW_LIMIT = 8;
@@ -265,7 +274,7 @@ function layoutDistrict(
     group.id,
     kind,
     ranked.length > 0 ? box.minX : 0,
-    ranked.length > 0 ? box.maxZ + RANK_GAP : 0,
+    ranked.length > 0 ? box.maxZ + STREET : 0,
     // The grid keeps rippling where the ranks stopped, so a district lights up once.
     new Set(ranked.map((placement) => placement.introDelay)).size,
   );
@@ -283,7 +292,7 @@ function layoutDistrict(
  *
  * Compositions north, the structure districts across the middle ordered largest first,
  * elements south, and everything with no structure in it, Unfiled included, east of the
- * lot. A street of six units separates any two of them.
+ * lot. A street of nine units separates any two of them.
  */
 function arrange(laid: Laid[]): District[] {
   const bandOf = (district: Laid) =>
@@ -329,20 +338,20 @@ function arrange(laid: Laid[]): District[] {
     let depth = 0;
     for (const district of row) {
       const size = moveTo(district, x, z);
-      x += size.width + RANK_GAP;
+      x += size.width + STREET;
       depth = Math.max(depth, size.depth);
     }
-    z += depth + RANK_GAP;
+    z += depth + STREET;
   }
 
   // East of every row, so a wide row can never grow into this column.
   const eastX =
     districts.length > 0
-      ? districts.reduce((max, district) => Math.max(max, district.maxX), 0) + RANK_GAP
+      ? districts.reduce((max, district) => Math.max(max, district.maxX), 0) + STREET
       : 0;
   let eastZ = 0;
   for (const district of laid.filter((d) => bandOf(d) === "east").sort(bySize)) {
-    eastZ += moveTo(district, eastX, eastZ).depth + RANK_GAP;
+    eastZ += moveTo(district, eastX, eastZ).depth + STREET;
   }
   return districts;
 }
@@ -448,24 +457,24 @@ function layoutRanks(
         compare(a.alias, b.alias),
     );
     // One depth for the whole rank, so a row of narrow buildings cannot slide under the
-    // row behind it. Rows sit one footprint plus a gap apart inside the rank's band.
+    // row behind it. Rows sit one building plus a gap apart inside the rank's band.
     const depth = Math.max(...members.map(footprintOf));
     const rows = Math.ceil(members.length / ROW_LIMIT);
     for (let i = 0; i < members.length; i += ROW_LIMIT) {
       const row = members.slice(i, i + ROW_LIMIT);
       const width =
         row.reduce((sum, node) => sum + footprintOf(node), 0) +
-        FOOTPRINT * (row.length - 1);
-      const rowZ = z + (i / ROW_LIMIT) * (depth + FOOTPRINT) + depth / 2;
+        GAP * (row.length - 1);
+      const rowZ = z + (i / ROW_LIMIT) * (depth + GAP) + depth / 2;
       let x = -width / 2;
       for (const node of row) {
         const centre = x + footprintOf(node) / 2;
         placements.push(place(node, centre, rowZ, district, kind, step));
         placedX.set(node.id, centre);
-        x += footprintOf(node) + FOOTPRINT;
+        x += footprintOf(node) + GAP;
       }
     }
-    z += rows * depth + (rows - 1) * FOOTPRINT + RANK_GAP;
+    z += rows * depth + (rows - 1) * GAP + STREET;
   }
   return placements;
 }
@@ -481,7 +490,7 @@ function layoutGrid(
   if (nodes.length === 0) return [];
 
   // One pitch for the whole grid, so squares of different widths still cannot touch.
-  const pitch = Math.max(...nodes.map(footprintOf)) + FOOTPRINT;
+  const pitch = Math.max(...nodes.map(footprintOf)) + GAP;
   return nodes.map((node, i) => {
     const row = Math.floor(i / ROW_LIMIT);
     const column = i % ROW_LIMIT;
