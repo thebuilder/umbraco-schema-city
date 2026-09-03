@@ -327,6 +327,8 @@ The theme is edited in place. The token block selector is `:host, :root`. The `.
 
 The portal container is a context in `portal.ts` holding a ref to an empty div that `App` renders last. The copied `dialog`, `popover` and `tooltip` primitives are patched to pass that div as `container`, because the registry's wrappers do not forward it. Without it base-ui escapes to `document.body` and loses the stylesheet. Every portalled primitive copied in from the registry later needs the same one-line patch. `CommandDialog` from the registry is the dialog shell only, so `App` supplies its own `<Command>` root.
 
+drei's `Html` labels carry a z-index near 2^24, so the scene sits in its own stacking context (`z-0`) and the panels drawn beside the canvas (`z-10`) stay above it. Every future overlay has to sit outside the scene's stacking context too.
+
 The scene reads `--phosphor`, `--signal` and `--phosphor-dim` from computed style on a div inside the shadow root, so there is no separate palette file.
 
 ### Vite
@@ -410,7 +412,7 @@ The ground has to read as a large seamless world the city sits in, not a patch i
 
 | Action | Effect |
 | --- | --- |
-| Hover | outline + tooltip (name, alias, counts) |
+| Hover | outline + tooltip (name, alias, counts), label |
 | Click | select: unrelated nodes and edges fade to 20%, inspector opens |
 | Double-click / Enter | focus mode: camera flight, neighbourhood layout |
 | Double-click a neighbour in focus mode | refocus on it, camera flight |
@@ -418,10 +420,11 @@ The ground has to read as a large seamless world the city sits in, not a patch i
 | Drag | orbit at a fixed isometric polar angle in ortho mode, free orbit in Explore |
 | Right-drag / two-finger | pan |
 | Wheel | zoom (ortho zoom, not dolly) |
-| `Cmd/Ctrl + K` or `/` | search palette, fuzzy on type name, alias and property alias, so "heroImage" finds every type that has that field. Enter selects and flies |
+| `Cmd/Ctrl + K` | search palette, substring match on type name, alias and every property alias (own and composed), type hits ranked above property hits. Enter selects; in focus mode it refocuses |
 | Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer, and the command palette, which is cmdk through afterglow's `command` component |
 | Findings drawer | grouped by severity, filter by kind, each row links to its node. Counts shown as matched / total |
-| Inspector | header (icon, name, alias, badges), Compositions, Allowed parents, Allowed children, Templates, Usage, then floors as a collapsible tree; every type name is a link that selects it. Every type name also has an edit link that opens the real Document Type editor |
+| Inspector | header (name, alias, badges for Element, Root and Varies by culture, and "N properties (own · composed)"), then only the sections that have something in them: Compositions, Inherits, Allowed parents, Allowed children, Block hosts, Block targets grouped by property alias, References out grouped by property alias and references in, Templates with the default marked, then Floors as a collapsible tree of tabs and groups showing each property's editor, mandatory marker and "composed from X". A block target that resolves to no node reads "missing element type" in the signal colour. Every type name is a button that selects that type, and there is one "Open in editor" button for the selected type rather than one per name, because a hub lists 25 rows |
+| Labels | hovered and selected nodes always; the selected node's neighbours only when there are at most 8; nothing else. In focus mode every placed neighbour is labelled |
 | URL | `?type=<alias>&layer=<layer>&lens=<lens>` so the workspace view and findings can deep link |
 
 Accessibility: the canvas is `aria-hidden`; the inspector and a hidden type list are the accessible surface, with arrow keys moving selection and the scene following. A "list view" toggle that hides the canvas entirely is cheap and worth shipping in v1.
@@ -473,11 +476,12 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - `BlockEditorInspector` for Block List, Block Grid, RTE blocks, MNTP filter. Unit tests per editor. Done 2026-09-03.
 - `app/layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance. Done 2026-09-03, 15 tests, about 30 ms for 300 nodes.
 - Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, drei `Html` labels, intro rise.
-- Inspector with all schema sections. Search palette.
+- Inspector with all schema sections. Search palette. Done 2026-09-03; 42 tests.
 - Exit: usable on the seeded schema and `pathological.json`; 300 types at 60 fps on an M-series laptop.
 
 ### M2, Layers and focus (medium)
 
+- Focus mode first (pulled forward): a hub selection is a road fan and a list until the neighbourhood is laid out around it.
 - Compositions, Blocks, References layers with their edge styles.
 - Focus mode with camera flight and neighbourhood layout, refocus by double-click, Escape to return.
 - A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link.
@@ -515,6 +519,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Risk | Mitigation |
 | --- | --- |
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
+| Hub types (40+ neighbours) make selection views unreadable | Label cap, focus mode with a neighbourhood layout, and only the focused node's edges drawn. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
 | Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Scene chunk loads only when the workspace opens. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 340 kB proves to matter. |
 | The manifest entry loaded twice by the backoffice's cache-busting query | The entry chunk exports nothing; shared code and vendors live in their own chunks; the element registration is guarded. |
@@ -545,7 +550,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 2. Write `Models/` and `model/types.ts` together so the contract is fixed before any rendering. Done.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
-5. Then buildings, then roads, then the inspector. Next.
+5. Then buildings, then roads, then the inspector. Done.
+6. Focus mode with the camera flight, then the edge layers. Next.
 
 ## 13. Resolved questions
 
