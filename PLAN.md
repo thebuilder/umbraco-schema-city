@@ -335,7 +335,7 @@ The scene reads `--phosphor`, `--signal` and `--phosphor-dim` from computed styl
 
 Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. React, R3F, drei, base-ui, Three.js and dagre are bundled.
 
-Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the four chunks measure `workspace.js` 1.1 kB, `app.js` 32 kB, `vendor.js` 165 kB and `Scene.js` 341 kB.
+Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the four chunks measure `workspace.js` 1.1 kB, `app.js` 36 kB, `vendor.js` 165 kB and `Scene.js` 347 kB.
 
 ### API client
 
@@ -356,7 +356,7 @@ One hand-written function per endpoint in `src/api.ts`, calling `umbHttpClient.g
    - **Detached district**: non-element types not reachable from any root (dead ends and pure compositions).
    - **Element district**: `isElement` types.
 2. Run dagre (rank direction top-to-bottom, `ranker: "network-simplex"`) on the structure district using only `allowedChild` edges. Roots get rank 0. Cycles are fine, dagre reverses back edges. Read back the rank and the left-to-right order inside it, and nothing else. Dagre's own `x` is unusable on a real schema: an allowed-child graph is shallow and wide, and every edge that skips a rank threads a dummy node through the ranks between it, so the seeded 78-type fixture ranked into a district 624 units wide and 66 deep, which frames as a diagonal line of buildings a pixel or two tall.
-3. Fold each rank into rows of at most 8 buildings, keeping dagre's order, each row centred on the district's axis. Rows inside one rank sit a footprint plus a gap apart, and the next rank starts after the last of them plus the rank gap. The same fixture then measures 40 by 87. Eight is the number of buildings that stay legible side by side once the camera frames the whole city, and it is the same limit the packed grids use.
+3. Fold each rank into rows of at most 8 buildings, each row centred on the district's axis. The order within a rank follows the leftmost already-placed parent from any earlier rank, not only the rank above, which also handles edges that skip a rank. Dagre's order breaks ties. Rows inside one rank sit a footprint plus a gap apart, and the next rank starts after the last of them plus the rank gap. The same fixture then measures 40 by 87. Eight is the number of buildings that stay legible side by side once the camera frames the whole city, and it is the same limit the packed grids use.
 4. Lay out the detached and element districts as packed grids, sorted by alias, with rows of at most 8. They sit south (element) and east (detached) of the structure district with a street between.
 5. Optional folder districts: when the schema uses folders, the structure ranking still governs position, but the ground slab under each node is tinted by folder and a folder label is drawn at the centroid. Folders do not move buildings; a folder that spans the map is a fact about the schema, not a layout bug.
 6. Positions are world units throughout: a building footprint is 2 units, two buildings in a row sit one footprint apart, and a rank gap is 6 units.
@@ -366,15 +366,21 @@ Determinism: sort nodes and edges by alias before dagre. Dagre is deterministic 
 
 ### Focus layout (`app/layout/focus.ts`)
 
-Given a focused node id, produce placements for the focused node and its neighbourhood:
+`layoutFocus(graph, neighbourhood, focusId, cityPlacements)` places the focused node and its neighbours. It takes the graph as well, because the neighbourhood model has no list of the types that compose the focused one.
 
 - focused node at the origin
-- allowed parents in an arc to the north, allowed children to the south
-- compositions on a raised platform to the north-west, types that compose it to the north-east
-- block targets (element types) to the south-west, block hosts to the south-east
-- reference targets and sources on the flanks, faded
+- allowed parents in arc rings of at most 8 to the north. An unbounded arc swings into the corner groups
+- allowed children in rows of 8 to the south
+- compositions and the inherited parent on a raised platform to the north-west. `Placement` gained an optional `y` for it
+- types that compose it to the north-east
+- block targets to the south-west, block hosts to the south-east
+- reference targets east, reference sources west
 
-Everything else stays in the city at reduced opacity. The scene tweens each building from its city placement to its focus placement and back (400 ms, smootherstep from fsn).
+Only the focused node's edges draw: roads for `allowedChild`, raised azure lines for `composition` and `inherits`, dipped amber lines for `block`, dotted violet lines for `reference`. Everything that is not a neighbour fades.
+
+Entry is a double-click, Enter on the selected node, or the inspector's Focus button. The camera flies in over 700 ms and any pointer down on the controls interrupts it. Each neighbour tweens from its city placement to its focus placement over 400 ms with smootherstep, and reduced motion skips the tweens. Double-click a neighbour, or pick one in the inspector or the palette, to refocus. The first Escape leaves focus and keeps the selection, the second clears it.
+
+Ceiling: more than about 30 parents plus compositions at once pushes the outer arc into the north-west grid. Nothing in the seeded schema is close.
 
 ### Encoding
 
@@ -414,9 +420,9 @@ The ground has to read as a large seamless world the city sits in, not a patch i
 | --- | --- |
 | Hover | outline + tooltip (name, alias, counts), label |
 | Click | select: unrelated nodes and edges fade to 20%, inspector opens |
-| Double-click / Enter | focus mode: camera flight, neighbourhood layout |
+| Double-click / Enter | focus mode: 700 ms camera flight, neighbourhood layout, only the focused node's edges drawn |
 | Double-click a neighbour in focus mode | refocus on it, camera flight |
-| Escape / Backspace | leave focus mode, then clear selection |
+| Escape | leave focus mode and keep the selection. Escape again clears the selection |
 | Drag | orbit at a fixed isometric polar angle in ortho mode, free orbit in Explore |
 | Right-drag / two-finger | pan |
 | Wheel | zoom (ortho zoom, not dolly) |
@@ -424,7 +430,7 @@ The ground has to read as a large seamless world the city sits in, not a patch i
 | Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer, and the command palette, which is cmdk through afterglow's `command` component |
 | Findings drawer | grouped by severity, filter by kind, each row links to its node. Counts shown as matched / total |
 | Inspector | header (name, alias, badges for Element, Root and Varies by culture, and "N properties (own · composed)"), then only the sections that have something in them: Compositions, Inherits, Allowed parents, Allowed children, Block hosts, Block targets grouped by property alias, References out grouped by property alias and references in, Templates with the default marked, then Floors as a collapsible tree of tabs and groups showing each property's editor, mandatory marker and "composed from X". A block target that resolves to no node reads "missing element type" in the signal colour. Every type name is a button that selects that type, and there is one "Open in editor" button for the selected type rather than one per name, because a hub lists 25 rows |
-| Labels | hovered and selected nodes always; the selected node's neighbours only when there are at most 8; nothing else. In focus mode every placed neighbour is labelled |
+| Labels | hovered and selected nodes always; the selected node's neighbours only when there are at most 8; nothing else. In focus mode every placed neighbour is labelled. Screen-space culling so labels never overlap is the next step |
 | URL | `?type=<alias>&layer=<layer>&lens=<lens>` so the workspace view and findings can deep link |
 
 Accessibility: the canvas is `aria-hidden`; the inspector and a hidden type list are the accessible surface, with arrow keys moving selection and the scene following. A "list view" toggle that hides the canvas entirely is cheap and worth shipping in v1.
@@ -481,9 +487,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ### M2, Layers and focus (medium)
 
-- Focus mode first (pulled forward): a hub selection is a road fan and a list until the neighbourhood is laid out around it.
+- Focus mode with camera flight and neighbourhood layout, refocus by double-click, inspector or palette, Escape to return. Done 2026-09-03 (pulled ahead of the layers because a hub selection is a road fan and a list without it).
 - Compositions, Blocks, References layers with their edge styles.
-- Focus mode with camera flight and neighbourhood layout, refocus by double-click, Escape to return.
 - A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link.
 - URL state and deep links.
 - Exit: "Where is this composition used?" and "What uses this Element Type?" are two clicks from the Document Type editor.
@@ -521,7 +526,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
 | Hub types (40+ neighbours) make selection views unreadable | Label cap, focus mode with a neighbourhood layout, and only the focused node's edges drawn. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
-| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Scene chunk loads only when the workspace opens. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 340 kB proves to matter. |
+| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.1 kB for the entry plus 36 kB of app and 165 kB of vendor, and the 347 kB scene chunk loads only when the workspace opens. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 347 kB proves to matter. |
 | The manifest entry loaded twice by the backoffice's cache-busting query | The entry chunk exports nothing; shared code and vendors live in their own chunks; the element registration is guarded. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
@@ -536,8 +541,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 | Layer | How |
 | --- | --- |
-| Graph builder, block inspector, usage aggregation | xUnit, 13 tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
-| `model/`, `app/layout/` | vitest on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
+| Graph builder, block inspector, usage aggregation | 13 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
+| `model/`, `app/layout/` | 51 vitest tests across 7 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
 | Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |
@@ -551,7 +556,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. Focus mode with the camera flight, then the edge layers. Next.
+6. Focus mode with the camera flight. Done. Then screen-space label culling, then the edge layers. Next.
 
 ## 13. Resolved questions
 
