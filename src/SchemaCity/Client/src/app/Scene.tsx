@@ -3,7 +3,7 @@ import { Canvas, type ThreeEvent, useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { neighbourhoods } from "../model/neighbourhood";
-import type { SchemaEdge, SchemaGraph, SchemaNode } from "../model/types";
+import type { SchemaEdge, SchemaGraph, SchemaNode, UsageReport } from "../model/types";
 import { cityBounds, layoutCity, type CityBounds, type Placement } from "./layout/city";
 import { layoutFocus } from "./layout/focus";
 import {
@@ -15,7 +15,8 @@ import {
   smootherstep,
 } from "./scene/buildings";
 import { neighboursOf } from "./scene/graph-links";
-import { CHAR_PX, LABEL_CAP, pickLabels } from "./scene/labels";
+import { CHAR_PX, LABEL_CAP, LABEL_HEIGHT_PX, pickLabels } from "./scene/labels";
+import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { type Anchor, buildLinkGeometry, type Layer, type LinkRange } from "./scene/layers";
 import { buildRoadGeometry } from "./scene/roads";
 
@@ -36,6 +37,25 @@ const PLAZA_HEIGHT = 0.05;
 const HOVER_BRIGHTEN = 1.4;
 /** How far a faded building's colour moves toward the void, approximating 20% opacity. */
 const FADE_MIX = 0.8;
+
+/**
+ * Where one building lands on the lens's ramp. Amber to azure both ways, with
+ * phosphor-dim as the diverging middle and the unused lens's quiet end, because
+ * phosphor against signal is the pair colour-vision deficiency ruins.
+ */
+function rampColour(
+  ramp: Ramp,
+  t: number,
+  colors: { amber: THREE.Color; azure: THREE.Color; dim: THREE.Color; signal: THREE.Color },
+): THREE.Color {
+  if (ramp === "binary") return t >= 0.5 ? colors.signal.clone() : colors.dim.clone();
+  if (ramp === "diverging") {
+    return t < 0.5
+      ? colors.amber.clone().lerp(colors.dim, t * 2)
+      : colors.dim.clone().lerp(colors.azure, (t - 0.5) * 2);
+  }
+  return colors.amber.clone().lerp(colors.azure, t);
+}
 
 function groupByKind(cells: FloorCell[]): Record<FloorCellKind, FloorCell[]> {
   const byKind: Record<FloorCellKind, FloorCell[]> = {
@@ -58,6 +78,7 @@ function Buildings({
   neighbours,
   reducedMotion,
   palette,
+  scale,
   onSelect,
   onFocus,
   onHover,
@@ -71,6 +92,8 @@ function Buildings({
   neighbours: Set<string> | null;
   reducedMotion: boolean;
   palette: Palette;
+  /** The lens colouring, or null when no lens is on. */
+  scale: LensScale | null;
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
   onHover: (id: string | null) => void;
@@ -109,6 +132,9 @@ function Buildings({
       plaza: dim,
       signal: new THREE.Color(palette.signal),
       fade: new THREE.Color(palette.background),
+      amber: new THREE.Color(palette.amber),
+      azure: new THREE.Color(palette.azure),
+      dim,
     };
   }, [palette]);
 
@@ -185,8 +211,17 @@ function Buildings({
 
   useEffect(() => {
     const lit = (id: string) => neighbours === null || neighbours.has(id);
+    // A lens repaints the buildings it has a number for. The ones it says nothing
+    // about, Element Types under every content lens, keep the colour they had.
+    const lensColour = (buildingId: string) => {
+      const t = scale?.t.get(buildingId);
+      return t === undefined || !scale ? null : rampColour(scale.ramp, t, colors);
+    };
     const colourFor = (kind: FloorCellKind, buildingId: string) => {
-      const base = buildingId === selected ? colors.signal : colors[kind];
+      const base =
+        buildingId === selected
+          ? colors.signal
+          : lensColour(buildingId) ?? colors[kind];
       const bright = buildingId === hovered ? base.clone().multiplyScalar(HOVER_BRIGHTEN) : base;
       return lit(buildingId) ? bright : bright.clone().lerp(colors.fade, FADE_MIX);
     };
@@ -208,7 +243,7 @@ function Buildings({
       if (plaza.instanceColor) plaza.instanceColor.needsUpdate = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cellsByKind, plazas, selected, hovered, neighbours, colors]);
+  }, [cellsByKind, plazas, selected, hovered, neighbours, colors, scale]);
 
   const pick = (event: ThreeEvent<MouseEvent | PointerEvent>) => placements[event.instanceId ?? -1];
 
@@ -447,6 +482,7 @@ function Labels({
   hovered,
   neighbours,
   focusNeighbours,
+  badge,
 }: {
   nodesById: Map<string, SchemaNode>;
   placementsById: Map<string, Placement>;
@@ -455,6 +491,8 @@ function Labels({
   hovered: string | null;
   neighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
+  /** The selected building's usage line, drawn as a second label over its name. */
+  badge: string | null;
 }) {
   const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
   const gl = useThree((state) => state.gl);
@@ -491,23 +529,42 @@ function Labels({
       x: number;
       y: number;
       z: number;
+      /** Pixels to raise the box by after projection, so it clears the name below it. */
+      lift: number;
     }[] = [];
     for (const id of ids) {
       const node = nodesById.get(id);
       const placement = placementsById.get(id);
       if (!node || !placement) continue;
+      const anchorY = (placement.y ?? 0) + (heights.get(id) ?? placement.height) + LABEL_LIFT;
       built.push({
         id,
         text: node.name,
         rank: id === selected ? 0 : id === hovered ? 1 : 2,
         footprint: placement.footprint,
         x: placement.position.x,
-        y: (placement.y ?? 0) + (heights.get(id) ?? placement.height) + LABEL_LIFT,
+        y: anchorY,
         z: placement.position.z,
+        lift: 0,
       });
+      // The usage badge is one more label on the same layer, sitting exactly one
+      // box above the name. Lifting it in pixels rather than world units keeps the
+      // two apart at any zoom, which a fixed height over the roof would not.
+      if (id === selected && badge) {
+        built.push({
+          id: `${id}:usage`,
+          text: badge,
+          rank: 0,
+          footprint: placement.footprint,
+          x: placement.position.x,
+          y: anchorY,
+          z: placement.position.z,
+          lift: LABEL_HEIGHT_PX + 4,
+        });
+      }
     }
     return built;
-  }, [hovered, selected, neighbours, focusNeighbours, nodesById, placementsById, heights]);
+  }, [hovered, selected, neighbours, focusNeighbours, nodesById, placementsById, heights, badge]);
 
   useEffect(() => {
     dirty.current = true;
@@ -567,7 +624,7 @@ function Labels({
           rank: candidate.rank,
           pinned: candidate.rank < 2,
           x: (anchor.x * 0.5 + 0.5) * size.width,
-          y: (0.5 - anchor.y * 0.5) * size.height,
+          y: (0.5 - anchor.y * 0.5) * size.height - candidate.lift,
           // ponytail: an orthographic camera's zoom is exactly its pixels per
           // world unit. The Explore toggle's perspective camera will have to
           // project a second point instead.
@@ -730,6 +787,8 @@ const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
 export default function Scene({
   graph,
+  usage,
+  scale,
   selected,
   focus,
   layers,
@@ -737,6 +796,9 @@ export default function Scene({
   onFocus,
 }: {
   graph: SchemaGraph;
+  usage?: UsageReport;
+  /** The lens colouring App computed. Absent or null means no lens is on. */
+  scale?: LensScale | null;
   selected: string | null;
   focus: string | null;
   layers: readonly Layer[];
@@ -897,6 +959,7 @@ export default function Scene({
             placements={placements}
             plazas={plazas}
             reducedMotion={reducedMotion}
+            scale={scale ?? null}
             selected={selected}
           />
           {active.has("structure") ? (
@@ -924,6 +987,7 @@ export default function Scene({
             ) : null,
           )}
           <Labels
+            badge={selected ? usageBadge(usage, selected) : null}
             focusNeighbours={focusNeighbours}
             heights={heights}
             hovered={hovered}
