@@ -23,6 +23,21 @@
       "conditions": [
         { "alias": "Umb.Condition.SectionAlias", "match": "Umb.Section.Settings" }
       ]
+    },
+    {
+      "type": "workspaceView",
+      "alias": "SchemaCity.DocumentTypeView",
+      "name": "Schema City Relationships View",
+      "element": "/App_Plugins/SchemaCity/document-type-view.js",
+      "weight": 50,
+      "meta": {
+        "label": "Relationships",
+        "pathname": "relationships",
+        "icon": "icon-map-alt"
+      },
+      "conditions": [
+        { "alias": "Umb.Condition.WorkspaceAlias", "match": "Umb.Workspace.DocumentType" }
+      ]
     }
   ]
 }

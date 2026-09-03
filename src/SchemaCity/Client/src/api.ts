@@ -1,3 +1,4 @@
+import { UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN } from "@umbraco-cms/backoffice/document-type";
 import { umbHttpClient } from "@umbraco-cms/backoffice/http-client";
 import type { SchemaGraph } from "./model/types.js";
 
@@ -12,3 +13,19 @@ export const getGraph = () =>
     security: [{ type: "http", scheme: "bearer" }],
     url: "/umbraco/management/api/v1/schema-city/graph",
   });
+
+/**
+ * Both wrappers hand this to the app as `onOpenType`. The path pattern is Umbraco's own,
+ * so a route change in 18 or 19 arrives with the package. It is relative to the backoffice
+ * base URI, and router-slot patches history.pushState to announce the navigation, so the
+ * editor opens without a page load.
+ */
+export const openTypeInEditor = (unique: string) =>
+  history.pushState(
+    null,
+    "",
+    new URL(
+      UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN.generateAbsolute({ unique }),
+      document.baseURI,
+    ),
+  );

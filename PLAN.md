@@ -327,7 +327,7 @@ The theme is edited in place. The token block selector is `:host, :root`. The `.
 
 The portal container is a context in `portal.ts` holding a ref to an empty div that `App` renders last. The copied `dialog`, `popover` and `tooltip` primitives are patched to pass that div as `container`, because the registry's wrappers do not forward it. Without it base-ui escapes to `document.body` and loses the stylesheet. Every portalled primitive copied in from the registry later needs the same one-line patch. `CommandDialog` from the registry is the dialog shell only, so `App` supplies its own `<Command>` root.
 
-drei's `Html` labels carry a z-index near 2^24, so the scene sits in its own stacking context (`z-0`) and the panels drawn beside the canvas (`z-10`) stay above it. Every future overlay has to sit outside the scene's stacking context too.
+The label layer is a DOM layer over the canvas, positioned by the scene, and it sits inside the scene's stacking context (`z-0`), so the panels drawn beside the canvas (`z-10`) still win. Every future overlay has to sit outside the scene's stacking context too.
 
 The scene reads `--phosphor`, `--signal` and `--phosphor-dim` from computed style on a div inside the shadow root, so there is no separate palette file.
 
@@ -335,7 +335,7 @@ The scene reads `--phosphor`, `--signal` and `--phosphor-dim` from computed styl
 
 Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. React, R3F, drei, base-ui, Three.js and dagre are bundled.
 
-Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the four chunks measure `workspace.js` 1.1 kB, `app.js` 36 kB, `vendor.js` 165 kB and `Scene.js` 347 kB.
+Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the four chunks measure `workspace.js` 1.1 kB, `app.js` 37 kB, `vendor.js` 165 kB and `Scene.js` 345 kB.
 
 ### API client
 
@@ -430,7 +430,7 @@ The ground has to read as a large seamless world the city sits in, not a patch i
 | Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer, and the command palette, which is cmdk through afterglow's `command` component |
 | Findings drawer | grouped by severity, filter by kind, each row links to its node. Counts shown as matched / total |
 | Inspector | header (name, alias, badges for Element, Root and Varies by culture, and "N properties (own · composed)"), then only the sections that have something in them: Compositions, Inherits, Allowed parents, Allowed children, Block hosts, Block targets grouped by property alias, References out grouped by property alias and references in, Templates with the default marked, then Floors as a collapsible tree of tabs and groups showing each property's editor, mandatory marker and "composed from X". A block target that resolves to no node reads "missing element type" in the signal colour. Every type name is a button that selects that type, and there is one "Open in editor" button for the selected type rather than one per name, because a hub lists 25 rows |
-| Labels | hovered and selected nodes always; the selected node's neighbours only when there are at most 8; nothing else. In focus mode every placed neighbour is labelled. Screen-space culling so labels never overlap is the next step |
+| Labels | candidates are the hovered and selected nodes, the selected node's neighbours when there are at most 8, and every placed neighbour in focus mode. The scene then culls in screen space whenever the camera or the layout moves. Each candidate's box is estimated from its name, and boxes are kept in priority order (selected, hovered, then the rest) unless they land on one already kept, the building is under 6 px, or 40 labels are already up. A hidden name is one hover or one inspector row away |
 | URL | `?type=<alias>&layer=<layer>&lens=<lens>` so the workspace view and findings can deep link |
 
 Accessibility: the canvas is `aria-hidden`; the inspector and a hidden type list are the accessible surface, with arrow keys moving selection and the scene following. A "list view" toggle that hides the canvas entirely is cheap and worth shipping in v1.
@@ -451,7 +451,7 @@ fsn is pnpm + Turborepo, Vite, three.js 0.179, Biome lint-only, vitest. Its `pac
 | World stage: sky, fog, ground extent | `scene.ts` | Fog colour equals the background so the ground dissolves instead of ending; grid and ground scale with the district; borrowed at M4 |
 | Conventions | `CLAUDE.md` | why-comments, colocated behaviour tests, no snapshot tests |
 
-Three of fsn's mechanisms are not ported: drei's `Html` component replaces the sprite labels, R3F does instanced picking without the per-instance pick maps, and base-ui's dialog and popover cover light dismiss.
+Labels are one DOM layer over the canvas positioned from projected anchors, with screen-space culling in `app/scene/labels.ts`; R3F handles instanced picking; base-ui handles light dismiss.
 
 ### From flat diagnostics dashboards
 
@@ -481,13 +481,14 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - `SchemaGraphBuilder` complete for identity, behaviour, groups, properties, compositions, inheritance, allowed children, templates. Unit tests against hand-built `ContentType` instances. Done 2026-09-03. 13 tests; the seeded fixture has 511 edges across all five kinds.
 - `BlockEditorInspector` for Block List, Block Grid, RTE blocks, MNTP filter. Unit tests per editor. Done 2026-09-03.
 - `app/layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance. Done 2026-09-03, 15 tests, about 30 ms for 300 nodes.
-- Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, drei `Html` labels, intro rise.
+- Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, a DOM label layer with screen-space culling, intro rise.
 - Inspector with all schema sections. Search palette. Done 2026-09-03; 42 tests.
 - Exit: usable on the seeded schema and `pathological.json`; 300 types at 60 fps on an M-series laptop.
 
 ### M2, Layers and focus (medium)
 
 - Focus mode with camera flight and neighbourhood layout, refocus by double-click, inspector or palette, Escape to return. Done 2026-09-03 (pulled ahead of the layers because a hub selection is a road fan and a list without it).
+- Screen-space label culling. Done 2026-09-03; 17 labels, none overlapping, on the Home focus view.
 - Compositions, Blocks, References layers with their edge styles.
 - A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link.
 - URL state and deep links.
@@ -542,7 +543,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layer | How |
 | --- | --- |
 | Graph builder, block inspector, usage aggregation | 13 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
-| `model/`, `app/layout/` | 51 vitest tests across 7 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
+| `model/`, `app/layout/` | 60 vitest tests across 8 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
 | Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |
@@ -556,7 +557,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. Focus mode with the camera flight. Done. Then screen-space label culling, then the edge layers. Next.
+6. Focus mode with the camera flight. Done. Screen-space label culling. Done. Then the edge layers, URL state and the Document Type editor wrapper. Next.
 
 ## 13. Resolved questions
 
