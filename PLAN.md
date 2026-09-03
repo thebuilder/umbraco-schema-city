@@ -414,7 +414,7 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Bridge (`composition` / `inherits`) | elevated quadratic arc, apex one arch above the taller roof. `inherits` is drawn as two arcs a hair apart, because WebGL ignores a line width above 1 |
 | Block link | thin solid line off the roof, down to the streets, along them to the target element type and up to its roof. Dashes are what tells a reference apart from it |
 | Reference | the same street route, dashed and a little higher, hidden unless the References layer is on |
-| District | One padded island per district: slab and rim, colour shifted by kind (compositions lighter, elements warmer), the name at the north corner; a nested folder is a lighter rectangle under its members |
+| District | One padded island per district: slab and rim, colour shifted by kind (compositions lighter, elements warmer), the name stamped flat on the slab at the north-west corner like silkscreen on a board, uppercase mono, phosphor-dim, about 3 units tall; a nested folder is a lighter rectangle under its members |
 
 ### Usage lens
 
@@ -442,12 +442,13 @@ Built 2026-09-03, after fsn's scene. Background and fog share the void colour. O
 | Wheel | zoom (ortho zoom, not dolly) |
 | `Cmd/Ctrl + K` | search palette, substring match on type name, alias and every property alias (own and composed), type hits ranked above property hits. Enter selects; in focus mode it refocuses. The palette opens listing every type, fixed height, with a counter, swatches, alias, a property-count or matched-alias hint, an Escape hint and an Enter glyph, as fsn's does |
 | `1` `2` `3` `4`, `L`, `E`, `Home`, `?` | Toggle the four layers in toolbar order; list view; Explore camera; reframe the city with a 400 ms flight (leaves focus first); the control reference. Single keys are ignored while the palette or a dialog is open, while a text field has focus, or with a modifier other than Shift; the target is read off `composedPath` |
-| Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer and a Help button, and the command palette, which is cmdk through afterglow's `command` component. The Search and Help buttons show their shortcut as a Kbd and have no tooltip, because a tooltip's exit animation played over the opening dialog |
+| `W` `A` `S` `D`, arrows, `R` `F`, `Shift` | Isometric: pan along the ground. Explore: fly forward, left, back, right; the arrows turn; R and F rise and descend; Shift is faster. Listed under a FLIGHT group in the control reference. |
+| Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer and a Help button, and the command palette, which is cmdk through afterglow's `command` component. The Search and Help buttons show their shortcut as a Kbd and have no tooltip, because a tooltip's exit animation played over the opening dialog. The four layer toggles become one Layers menu with checkbox items (`1`-`4` still work), Help is an icon button, and the toolbar wraps below about 900 px |
 | Lens | Picker with six modes; disabled until usage loads; `lens=<name>` in the URL |
 | Findings drawer | Sheet from the toolbar with a count badge, kind chips with counts, matched / total, rows grouped by severity; a row selects its node and closes. |
 | Control reference | a dialog opened by `?` or the Help button: an ESC chip, three groups (mouse, keys, objects), a Kbd column and one line of prose per row, in fsn's `man controls` shape |
 | Inspector | header (name, alias, badges for Element, Root and Varies by culture, and "N properties (own · composed)"), then only the sections that have something in them: Compositions, Inherits, Allowed parents, Allowed children, Block hosts, Block targets grouped by property alias, References out grouped by property alias and references in, Templates with the default marked, then Floors as a collapsible tree of tabs and groups showing each property's editor, mandatory marker and "composed from X". A block target that resolves to no node reads "missing element type" in the signal colour. Every type name is a button that selects that type, and there is one "Open in editor" button for the selected type rather than one per name, because a hub lists 25 rows |
-| Labels | candidates are the hovered and selected nodes, the selected node's neighbours when there are at most 8, and every placed neighbour in focus mode. The scene then culls in screen space whenever the camera or the layout moves. Each candidate's box is estimated from its name, and boxes are kept in priority order (selected, hovered, then the rest) unless they land on one already kept, the building is under 6 px, or 40 labels are already up. A hidden name is one hover or one inspector row away. District names are candidates too, ranked below every building name, culled under 80 px of island |
+| Labels | candidates are the hovered and selected nodes, the selected node's neighbours when there are at most 8, and every placed neighbour in focus mode. The scene then culls in screen space whenever the camera or the layout moves. Each candidate's box is estimated from its name, and boxes are kept in priority order (selected, hovered, then the rest) unless they land on one already kept, the building is under 6 px, or 40 labels are already up. A hidden name is one hover or one inspector row away. District names are not DOM labels; they are stamped on the islands. |
 | URL | `?type=<alias>&focus=1&layers=structure,blocks&lens=<name>&view=list` so the workspace view and findings can deep link. Written with `history.replaceState` by the app itself, unless the host passes `initial` or `onStateChange` and mirrors the state into its own route, as the Document Type tab does |
 
 Accessibility: the canvas is `aria-hidden`; the inspector and a hidden type list are the accessible surface, with arrow keys moving selection and the scene following. A "list view" toggle that hides the canvas entirely is cheap and worth shipping in v1.
@@ -540,6 +541,9 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Empty state (no Document Types), error state (HTTP status), lens disabled with a reason when usage fails. Done 2026-09-03.
 - Seeder log noise: application URL set, UI culture pinned to en-US in the demo site (the en-DK warnings were this Mac's locale). Done 2026-09-03; 585 warnings to 19.
 - Roads follow the streets. Done 2026-09-03; crossings on the seeded schema fell from 292 to 94, fan limit at 3 parents with a `+N parents` marker, chevrons on the last 4.2 units.
+- District names stamped on the islands (in progress).
+- Keyboard flight, W A S D and arrows, isometric pan and Explore flight (in progress).
+- Toolbar polish: filter input border highlight and own clear button, Layers menu, Help icon, no type badge, wrapping toolbar (in progress).
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` on NuGet.
 
@@ -592,7 +596,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Next: screenshots for the README and the marketplace, the pathological fixture, a final verification on both majors.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. In progress: stamped district names, keyboard flight, and the toolbar polish. Next: screenshots for the README and the marketplace, the pathological fixture, a final verification on both majors.
 
 ## 13. Resolved questions
 
