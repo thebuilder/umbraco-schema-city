@@ -152,17 +152,22 @@ export function cityDistricts(graph: SchemaGraph): {
   return { placements: laid.flatMap((district) => district.placements), districts };
 }
 
-/** The placements alone, which is all the scene needs until it draws the slabs. */
+/** The placements alone, for a caller with no use for the district boxes. */
 export function layoutCity(graph: SchemaGraph): Placement[] {
   return cityDistricts(graph).placements;
 }
 
-/** The box the camera has to frame, including each building's own footprint. */
-export function cityBounds(placements: Placement[]): CityBounds {
+/**
+ * The box the camera has to frame, including each building's own footprint and `pad`
+ * units of ground around the lot. The islands are the districts padded by the same
+ * number, and the outermost district touches the outermost building, so padding the
+ * whole box is the same box as the union of the padded islands.
+ */
+export function cityBounds(placements: Placement[], pad = 0): CityBounds {
   const box = boxOf(placements);
   return {
-    width: box.maxX - box.minX,
-    depth: box.maxZ - box.minZ,
+    width: box.maxX - box.minX + pad * 2,
+    depth: box.maxZ - box.minZ + pad * 2,
     centre: { x: (box.minX + box.maxX) / 2, z: (box.minZ + box.maxZ) / 2 },
   };
 }

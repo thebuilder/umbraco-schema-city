@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { neighbourhoods } from "../model/neighbourhood";
 import type { SchemaEdge, SchemaGraph, SchemaNode, UsageReport } from "../model/types";
-import { cityBounds, layoutCity, type CityBounds, type Placement } from "./layout/city";
+import {
+  cityBounds,
+  cityDistricts,
+  type CityBounds,
+  type District,
+  type DistrictKind,
+  type Placement,
+} from "./layout/city";
 import { layoutFocus } from "./layout/focus";
 import {
   buildFloorCells,
@@ -984,25 +991,56 @@ function Labels({
   return null;
 }
 
-/** Thickness of the slab of land the city stands on, whose top face is y = 0. */
+/** Thickness of the slab of land an island is, whose top face is y = 0. */
 const SLAB_HEIGHT = 0.4;
 const RIM_HEIGHT = 0.18;
-/** How far the rim stands out past the slab, and the slab past the city. */
+/** How far the rim stands out past the slab. */
 const RIM_OVERHANG = 0.9;
-const SLAB_MARGIN = 2.5;
+/** Ground between a district's outermost building and the edge of its island. */
+const ISLAND_PAD = 3;
+/** Ground around a nested folder's members that its tint covers. */
+const FOLDER_PAD = 1;
+/** How far the tint under a nested folder stands proud of the island. */
+const FOLDER_TINT_HEIGHT = 0.02;
 /** The grid sits under the rim, so the two can never z-fight. */
 const GRID_Y = -(SLAB_HEIGHT + RIM_HEIGHT + 0.05);
 
+/** Mixed into a slab to lighten it, in the renderer's working space. */
+const WHITE = new THREE.Color(1, 1, 1);
+
+/**
+ * The land under a district. Structure is the same panel colour the chrome uses,
+ * compositions and mixed are a touch lighter and elements a touch warmer, so the
+ * islands read as different places without turning into four colours.
+ */
+function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
+  const land = new THREE.Color(palette.land);
+  if (kind === "structure") return land;
+  if (kind === "elements") return land.lerp(new THREE.Color(palette.amber), 0.09);
+  return land.lerp(WHITE, 0.06);
+}
+
 /**
  * The world stage, borrowed from fsn: a void-coloured background and fog, one grid
- * plane that follows the camera so the ground never runs out, and the slab of land the
- * city stands on. `span` is the city's own, not the focus layout's, so entering focus
- * does not rescale the world; `bounds` is whatever layout is on screen, so the slab
- * moves with it.
+ * plane that follows the camera so the ground never runs out, and an island of land
+ * per district. `span` is the city's own, not the focus layout's, so entering focus
+ * does not rescale the world, and the islands come from the city layout as well, so
+ * the focused neighbourhood stands on whatever island it lands over.
  *
- * Three draw calls, and nothing here animates.
+ * Two draw calls per district plus one per nested folder, and nothing here animates.
  */
-function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; palette: Palette }) {
+function Stage({
+  districts,
+  folders,
+  span,
+  palette,
+}: {
+  districts: District[];
+  /** The ground a nested folder's members cover, for the tint on the island. */
+  folders: (CityBounds & { id: string })[];
+  span: number;
+  palette: Palette;
+}) {
   const camera = useThree((state) => state.camera);
   const grid = useRef<THREE.Mesh>(null);
   const ray = useMemo(() => new THREE.Raycaster(), []);
@@ -1011,6 +1049,14 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
   const centre = useMemo(() => new THREE.Vector3(), []);
   const { fadeNear, fadeFar, plane } = stageMetrics(span);
   const fog = fogRange(span);
+  const rimColour = useMemo(
+    () => new THREE.Color(palette.land).lerp(new THREE.Color(palette.background), 0.6),
+    [palette],
+  );
+  const folderColour = useMemo(
+    () => new THREE.Color(palette.land).lerp(WHITE, 0.14),
+    [palette],
+  );
 
   const uniforms = useMemo(
     () => ({
@@ -1042,7 +1088,6 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
     uniforms.uCentre.value.set(centre.x, centre.z);
   });
 
-  const rim = SLAB_MARGIN + RIM_OVERHANG;
   return (
     <>
       <color args={[palette.background]} attach="background" />
@@ -1060,24 +1105,42 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
           vertexShader={GRID_VERTEX_SHADER}
         />
       </mesh>
-      {/* ponytail: one rectangle around everything placed. In focus mode that is the
-          city and the focus layout at once, so the land reads as a larger rectangle
-          rather than as ground that follows the layout. Two slabs, or a slab per
-          district, would fix it; the grid under it is the same either way. */}
-      <mesh position={[bounds.centre.x, -SLAB_HEIGHT / 2, bounds.centre.z]}>
-        <boxGeometry
-          args={[bounds.width + SLAB_MARGIN * 2, SLAB_HEIGHT, bounds.depth + SLAB_MARGIN * 2]}
-        />
-        <meshStandardMaterial color={palette.land} metalness={0} roughness={1} />
-      </mesh>
-      <mesh position={[bounds.centre.x, -SLAB_HEIGHT - RIM_HEIGHT / 2, bounds.centre.z]}>
-        <boxGeometry args={[bounds.width + rim * 2, RIM_HEIGHT, bounds.depth + rim * 2]} />
-        <meshStandardMaterial
-          color={new THREE.Color(palette.land).lerp(new THREE.Color(palette.background), 0.6)}
-          metalness={0}
-          roughness={1}
-        />
-      </mesh>
+      {districts.map((district) => {
+        const width = district.maxX - district.minX + ISLAND_PAD * 2;
+        const depth = district.maxZ - district.minZ + ISLAND_PAD * 2;
+        const rim = RIM_OVERHANG * 2;
+        return (
+          <group key={district.id} position={[district.centre.x, 0, district.centre.z]}>
+            <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
+              <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
+              <meshStandardMaterial
+                color={slabColour(district.kind, palette)}
+                metalness={0}
+                roughness={1}
+              />
+            </mesh>
+            <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
+              <boxGeometry args={[width + rim, RIM_HEIGHT, depth + rim]} />
+              <meshStandardMaterial color={rimColour} metalness={0} roughness={1} />
+            </mesh>
+          </group>
+        );
+      })}
+      {/* A nested folder is a lighter rectangle on the island its members stand on,
+          which is what says where one block of a district ends and the next starts. */}
+      {folders.map((folder) => (
+        <mesh
+          key={folder.id}
+          position={[
+            folder.centre.x,
+            FOLDER_TINT_HEIGHT / 2 - SLAB_HEIGHT / 2,
+            folder.centre.z,
+          ]}
+        >
+          <boxGeometry args={[folder.width, SLAB_HEIGHT + FOLDER_TINT_HEIGHT, folder.depth]} />
+          <meshStandardMaterial color={folderColour} metalness={0} roughness={1} />
+        </mesh>
+      ))}
     </>
   );
 }
@@ -1383,7 +1446,19 @@ export default function Scene({
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     [],
   );
-  const city = useMemo(() => layoutCity(graph), [graph]);
+  const city = useMemo(() => cityDistricts(graph), [graph]);
+  // The ground a nested folder's members cover, which tints that patch of its island.
+  // The city layout, not what is on screen, so the islands hold still through a focus.
+  const folderTints = useMemo(() => {
+    const members = new Map<string, Placement[]>();
+    for (const placement of city.placements) {
+      if (!placement.folder) continue;
+      const held = members.get(placement.folder);
+      if (held) held.push(placement);
+      else members.set(placement.folder, [placement]);
+    }
+    return [...members].map(([id, held]) => ({ id, ...cityBounds(held, FOLDER_PAD) }));
+  }, [city]);
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
   const focusNeighbours = useMemo(
     () => (focus ? neighboursOf(graph, focus) : null),
@@ -1391,8 +1466,8 @@ export default function Scene({
   );
   const target = useMemo(() => {
     const neighbourhood = focus ? neighbourhoodById.get(focus) : undefined;
-    if (!focus || !neighbourhood) return city;
-    const laid = layoutFocus(graph, neighbourhood, focus, city);
+    if (!focus || !neighbourhood) return city.placements;
+    const laid = layoutFocus(graph, neighbourhood, focus, city.placements);
     const inFocus = focusNeighbours ?? new Set<string>();
     // Everything the focused node has nothing to do with becomes ground: the
     // neighbourhood is laid out over the city it came from, and a city still standing
@@ -1446,13 +1521,11 @@ export default function Scene({
     return () => cancelAnimationFrame(frame);
   }, [target, reducedMotion]);
 
-  const ground = useMemo(() => cityBounds(city), [city]);
+  // Every island, with the ground each one carries around its buildings.
+  const ground = useMemo(() => cityBounds(city.placements, ISLAND_PAD), [city]);
   // The stage is scaled by the city's own span, whatever the focus layout does, so
   // entering focus never rescales the world around it.
   const span = citySpan(ground);
-  // The slab of land follows what is on screen instead, which during a focus tween is
-  // the buildings mid-flight, so it is never out from under them.
-  const land = useMemo(() => cityBounds(placements), [placements]);
   // The camera frames the focus layout instead, which is the focused node and
   // everything moved around it, not the whole city behind them.
   const bounds = useMemo(
@@ -1531,7 +1604,12 @@ export default function Scene({
         <Canvas orthographic>
           <ambientLight intensity={1.2} />
           <directionalLight intensity={2.4} position={[8, 16, 6]} />
-          <Stage bounds={land} palette={palette} span={span} />
+          <Stage
+            districts={city.districts}
+            folders={folderTints}
+            palette={palette}
+            span={span}
+          />
           <Buildings
             cellsByKind={cellsByKind}
             heights={heights}
