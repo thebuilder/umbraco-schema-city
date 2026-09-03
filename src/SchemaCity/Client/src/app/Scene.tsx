@@ -1265,7 +1265,14 @@ function Stage({
       ))}
       {/* The district's name printed flat on its island, in the margin along the north
           edge. It writes no depth, so the buildings, the roads and every link stand
-          over it. */}
+          over it.
+
+          ponytail: the print holds its strength through a selection and through focus
+          mode, where the buildings around it fade. Fading it too means telling the
+          stage which islands are lit, which is a prop and a set the stage has no other
+          use for. ponytail: a nested folder's tint is opaque and stands a hundredth of
+          a unit higher, so it would cover a name that reached under it. No folder in
+          either fixture reaches into the margin the name is printed in. */}
       {districts.map((district) => {
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
         const stamp = districtStamp(
