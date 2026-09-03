@@ -7,6 +7,8 @@ import {
   cityBounds,
   cityDistricts,
   layoutCity,
+  ROW_LIMIT,
+  SPARSE_RANK,
   STREET,
   type District,
   type Placement,
@@ -83,6 +85,67 @@ function overlaps(placements: Placement[]) {
       const gapZ = Math.abs(a.position.z - b.position.z) - (a.footprint + b.footprint) / 2;
       // A shared edge is not an overlap, so only a negative gap on both axes counts.
       if (gapX < -1e-9 && gapZ < -1e-9) found.push(`${a.id} over ${b.id}`);
+    }
+  }
+  return found;
+}
+
+/**
+ * The ranked block of each district, as its ranks in the order dagre gave them. A
+ * rank is a district plus an intro delay, which is the only place the rank number
+ * survives into the output; the packed grid is left out, because it is a street
+ * below the block by design rather than a rank that failed to merge.
+ */
+function rankedBlocks(graph: SchemaGraph): Map<string, Placement[][]> {
+  const placements = layoutCity(graph);
+  const byId = new Map(placements.map((p) => [p.id, p]));
+  const linked = new Set<string>();
+  for (const edge of graph.edges ?? []) {
+    if (edge.kind !== "allowedChild" || edge.from === edge.to) continue;
+    if (byId.get(edge.from)?.district !== byId.get(edge.to)?.district) continue;
+    if (!byId.has(edge.from)) continue;
+    linked.add(edge.from).add(edge.to);
+  }
+
+  const blocks = new Map<string, Map<number, Placement[]>>();
+  for (const placement of placements) {
+    if (!linked.has(placement.id)) continue;
+    const ranks = blocks.get(placement.district) ?? new Map<number, Placement[]>();
+    blocks.set(placement.district, ranks);
+    ranks.set(placement.introDelay, [
+      ...(ranks.get(placement.introDelay) ?? []),
+      placement,
+    ]);
+  }
+  return new Map(
+    [...blocks].map(([id, ranks]) => [
+      id,
+      [...ranks].sort((a, b) => a[0] - b[0]).map(([, members]) => members),
+    ]),
+  );
+}
+
+/**
+ * Sparse ranks that could have shared the band above them and did not. A rank of at
+ * most `SPARSE_RANK` buildings merges into the open band while the band still fits a
+ * row, so anything this finds is a band spent on ground no building stands on.
+ *
+ * Cycles are the one case that legitimately blocks a merge, and none of the fixtures
+ * runs a back edge between two sparse ranks, so anything here is a real gap.
+ */
+function strandedRanks(graph: SchemaGraph): string[] {
+  const found: string[] = [];
+  for (const [district, ranks] of rankedBlocks(graph)) {
+    let held = 0;
+    let band = Number.NaN;
+    for (const rank of ranks) {
+      const z = (rank[0] as Placement).position.z;
+      const sparse = rank.length <= SPARSE_RANK;
+      if (sparse && held > 0 && held + rank.length <= ROW_LIMIT && z !== band) {
+        found.push(`${district} rank at ${z} left out of the band at ${band}`);
+      }
+      held = sparse ? (z === band ? held : 0) + rank.length : 0;
+      band = z;
     }
   }
   return found;
@@ -381,16 +444,67 @@ describe("layoutCity", () => {
     expect(overlaps(placements)).toEqual([]);
   });
 
-  it("folds the medium fixture's Pages district squarer than three to one", () => {
-    const pages = cityDistricts(medium).districts.find(
-      (d) => d.name === "Pages",
-    ) as District;
-    const width = pages.maxX - pages.minX;
-    const depth = pages.maxZ - pages.minZ;
+  it("never lays a district out wider than a row of eight", () => {
+    // Unfolded, the medium fixture ranks its pages into a district 624 units across,
+    // which frames as a diagonal line of buildings a couple of pixels tall. The row
+    // limit is what bounds that, and a merged band is the widest a row ever gets,
+    // because it holds a street between one rank's members and the next rank's.
+    for (const graph of [small, medium, pathological]) {
+      const { placements, districts } = cityDistricts(graph);
+      for (const district of districts) {
+        const mine = placements.filter((p) => p.district === district.id);
+        const widest = Math.max(...mine.map((p) => p.footprint));
+        expect(district.maxX - district.minX).toBeLessThanOrEqual(
+          ROW_LIMIT * widest + (ROW_LIMIT - 1) * STREET,
+        );
+      }
+    }
+  });
 
-    // Unfolded, this fixture ranks its pages into a district 624 by 66, which frames
-    // as a diagonal line of buildings a couple of pixels tall.
-    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(3);
+  it("stands consecutive sparse ranks side by side instead of giving each a band", () => {
+    // A rank of one or two buildings costs a whole band plus the street under it, so
+    // a twelve-deep chain of single types stretched the pathological fixture's Pages
+    // folder to 61 by 229 units at eight percent fill.
+    for (const graph of [small, medium, pathological]) {
+      expect(strandedRanks(graph)).toEqual([]);
+    }
+  });
+
+  it("keeps the rank a cycle runs back into out of the band", () => {
+    // Dagre reverses the ring's back edge to rank it. Folding those three ranks side
+    // by side would run that road right to left while the rest ran left to right.
+    const three = [node("ringA", { allowedAsRoot: true }), node("ringB"), node("ringC")];
+    const chain = [road("ringA", "ringB"), road("ringB", "ringC")];
+    const at = (placements: Placement[], id: string) =>
+      placements.find((p) => p.id === id) as Placement;
+
+    const open = layoutCity(graphOf(three, chain));
+    expect(new Set(open.map((p) => p.position.z)).size).toBe(1);
+
+    const ring = layoutCity(graphOf(three, [...chain, road("ringC", "ringA")]));
+    expect(at(ring, "ringC").position.z).toBeGreaterThan(at(ring, "ringA").position.z);
+  });
+
+  it("puts a chain of single types in one row, a street apart", () => {
+    const chain = ["root", ...Array.from({ length: 6 }, (_, i) => `link${i}`)];
+    const placements = layoutCity(
+      graphOf(
+        [node("root", { allowedAsRoot: true }), ...chain.slice(1).map((alias) => node(alias))],
+        chain.slice(1).map((alias, i) => road(chain[i] as string, alias)),
+      ),
+    ).sort((a, b) => a.position.x - b.position.x);
+
+    // Seven ranks of one building, in one band, in the order the chain runs.
+    expect(new Set(placements.map((p) => p.position.z)).size).toBe(1);
+    expect(placements.map((p) => p.id)).toEqual(chain);
+    for (let i = 1; i < placements.length; i++) {
+      const near = placements[i - 1] as Placement;
+      const far = placements[i] as Placement;
+      expect(
+        far.position.x - near.position.x - (near.footprint + far.footprint) / 2,
+      ).toBeCloseTo(STREET);
+    }
+    expect(overlaps(placements)).toEqual([]);
   });
 
   it("folds the same way twice", () => {
@@ -573,6 +687,15 @@ describe("layoutCity", () => {
     expect(overlaps(placements)).toEqual([]);
     expect(crowded(districts, STREET)).toEqual([]);
     expect(elapsed).toBeLessThan(200);
-    console.log(`pathological: 300 nodes laid out in ${elapsed.toFixed(1)} ms`);
+
+    // The Pages folder holds the twelve-deep chain of single types. Before those
+    // ranks shared a band it came out 61 by 229, framed at eight percent fill.
+    const pages = districts.find((d) => d.name === "Pages") as District;
+    const width = pages.maxX - pages.minX;
+    const depth = pages.maxZ - pages.minZ;
+    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(2);
+    console.log(
+      `pathological: 300 nodes laid out in ${elapsed.toFixed(1)} ms, Pages ${width.toFixed(0)} by ${depth.toFixed(0)}`,
+    );
   });
 });

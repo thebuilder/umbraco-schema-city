@@ -78,6 +78,12 @@ export const STREET = 9;
 const FLOOR_HEIGHT = 0.6;
 /** Buildings in one row, everywhere. A wider rank folds onto more rows. */
 export const ROW_LIMIT = 8;
+/**
+ * The most buildings a rank can hold and still share its band with the rank below.
+ * Two is where a rank stops paying for the street under it: a fuller rank reads as a
+ * generation of its own, and merging those would widen districts that fold fine.
+ */
+export const SPARSE_RANK = 2;
 const INTRO_STAGGER = 0.06;
 const EMPTY_BOX = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
 /** Types the schema files nowhere, and types nothing places when there are no folders. */
@@ -436,7 +442,6 @@ function layoutRanks(
     else ranks.set(at(node.id).y, [node]);
   }
 
-  const placements: Placement[] = [];
   // Where each already-placed building sits, so the next rank can line up under it.
   const placedX = new Map<string, number>();
   // A node whose parents are all further up, or absent, sorts to the right of every
@@ -450,38 +455,122 @@ function layoutRanks(
     return leftmost;
   };
 
-  let z = 0;
-  for (const [step, y] of [...ranks.keys()].sort((a, b) => a - b).entries()) {
-    // Ordering a rank by the column its parents landed in is what keeps the roads
-    // into a folded rank from crossing each other. Dagre's own order breaks the tie,
-    // which is what rank 0 and any node with no placed parent sort on.
-    const members = (ranks.get(y) as SchemaNode[]).sort(
+  // Ordering a rank by the column its parents landed in is what keeps the roads
+  // into a folded rank from crossing each other. Dagre's own order breaks the tie,
+  // which is what rank 0 and any node with no placed parent sort on. A rank inside a
+  // merged band still sorts after the rank to its left, so it sees those columns.
+  const ordered = (members: SchemaNode[]) =>
+    [...members].sort(
       (a, b) =>
         parentColumn(a.id) - parentColumn(b.id) ||
         at(a.id).x - at(b.id).x ||
         compare(a.alias, b.alias),
     );
-    // One depth for the whole rank, so a row of narrow buildings cannot slide under the
-    // row behind it. Rows sit one building plus a gap apart inside the rank's band.
+
+  const placements: Placement[] = [];
+  let z = 0;
+  let step = 0;
+  for (const band of bandRanks(
+    [...ranks.keys()].sort((a, b) => a - b).map((y) => ranks.get(y) as SchemaNode[]),
+    roads,
+  )) {
+    const members = band.flat();
+    // One depth for the whole band, so a row of narrow buildings cannot slide under
+    // the row behind it.
     const depth = Math.max(...members.map(footprintOf));
-    const rows = Math.ceil(members.length / ROW_LIMIT);
-    for (let i = 0; i < members.length; i += ROW_LIMIT) {
-      const row = members.slice(i, i + ROW_LIMIT);
-      const width =
-        row.reduce((sum, node) => sum + footprintOf(node), 0) +
-        GAP * (row.length - 1);
-      const rowZ = z + (i / ROW_LIMIT) * (depth + GAP) + depth / 2;
-      let x = -width / 2;
-      for (const node of row) {
+
+    if (band.length === 1 && members.length > ROW_LIMIT) {
+      // A rank too wide for one row folds onto more, a building plus a gap apart.
+      const rows = Math.ceil(members.length / ROW_LIMIT);
+      const sorted = ordered(members);
+      for (let i = 0; i < sorted.length; i += ROW_LIMIT) {
+        const row = sorted.slice(i, i + ROW_LIMIT);
+        const width =
+          row.reduce((sum, node) => sum + footprintOf(node), 0) + GAP * (row.length - 1);
+        const rowZ = z + (i / ROW_LIMIT) * (depth + GAP) + depth / 2;
+        let x = -width / 2;
+        for (const node of row) {
+          const centre = x + footprintOf(node) / 2;
+          placements.push(place(node, centre, rowZ, district, kind, step));
+          placedX.set(node.id, centre);
+          x += footprintOf(node) + GAP;
+        }
+      }
+      z += rows * depth + (rows - 1) * GAP + STREET;
+      step += 1;
+      continue;
+    }
+
+    // One row for the whole band: a gap between two buildings of one rank, a street
+    // between the last of one rank and the first of the next, so the generations
+    // still read apart. The road between them dips into the street below the band.
+    const width =
+      members.reduce((sum, node) => sum + footprintOf(node), 0) +
+      GAP * (members.length - band.length) +
+      STREET * (band.length - 1);
+    const rowZ = z + depth / 2;
+    let x = -width / 2;
+    for (const rank of band) {
+      for (const node of ordered(rank)) {
         const centre = x + footprintOf(node) / 2;
         placements.push(place(node, centre, rowZ, district, kind, step));
         placedX.set(node.id, centre);
         x += footprintOf(node) + GAP;
       }
+      x += STREET - GAP;
+      step += 1;
     }
-    z += rows * depth + (rows - 1) * GAP + STREET;
+    z += depth + STREET;
   }
   return placements;
+}
+
+/**
+ * Which ranks share a band.
+ *
+ * A rank of one or two buildings still cost a whole band and the nine-unit street
+ * under it, so the pathological fixture's twelve-deep chain of single types ranked
+ * its Pages folder into 61 by 229 units at eight percent fill, and the camera framed
+ * mostly empty ground to show it. Consecutive sparse ranks now stand side by side in
+ * one band instead, which turns that chain into a row along one street: 85 by 147.
+ *
+ * Only sparse ranks merge, and only while the band still fits a row of eight. A rank
+ * that fills a row already reads as a generation, and merging those would widen every
+ * district that was not the problem and put more roads on each street.
+ *
+ * A band never merges past a back edge. Dagre reverses cycles to rank them, so a ring
+ * whose ranks were folded side by side would run one of its roads right to left while
+ * the rest ran left to right, and the band would stop reading as one generation
+ * feeding the next.
+ */
+function bandRanks(order: SchemaNode[][], roads: SchemaEdge[]): SchemaNode[][][] {
+  const rankOf = new Map<string, number>();
+  order.forEach((rank, i) => {
+    for (const node of rank) rankOf.set(node.id, i);
+  });
+  // The rank span of every edge that runs back up the ranking, low end first.
+  const backwards: [number, number][] = [];
+  for (const road of roads) {
+    const from = rankOf.get(road.from);
+    const to = rankOf.get(road.to);
+    if (from !== undefined && to !== undefined && from > to) backwards.push([to, from]);
+  }
+
+  const bands: SchemaNode[][][] = [];
+  order.forEach((rank, i) => {
+    const open = bands[bands.length - 1];
+    const size = open ? open.reduce((sum, held) => sum + held.length, 0) : 0;
+    const first = i - (open?.length ?? 0);
+    const fits =
+      open !== undefined &&
+      rank.length <= SPARSE_RANK &&
+      (open[open.length - 1] as SchemaNode[]).length <= SPARSE_RANK &&
+      size + rank.length <= ROW_LIMIT &&
+      !backwards.some(([to, from]) => to >= first && from <= i);
+    if (fits) (open as SchemaNode[][]).push(rank);
+    else bands.push([rank]);
+  });
+  return bands;
 }
 
 function layoutGrid(
