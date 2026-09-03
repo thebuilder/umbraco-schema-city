@@ -14,16 +14,16 @@ node_modules/
 src/SchemaCity/wwwroot/App_Plugins/SchemaCity/
 
 # Umbraco runtime
-umbraco/Data/
-umbraco/Logs/
-umbraco/models/
-umbraco/mediacache/
-wwwroot/media/
+**/umbraco/Data/
+**/umbraco/Logs/
+**/umbraco/models/
+**/umbraco/mediacache/
+**/wwwroot/media/
 appsettings.Local.json
 
 # Written into the site project by the Umbraco build
-appsettings-schema*.json
-umbraco-package-schema.json
+**/appsettings-schema*.json
+**/umbraco-package-schema.json
 
 # macOS
 .DS_Store

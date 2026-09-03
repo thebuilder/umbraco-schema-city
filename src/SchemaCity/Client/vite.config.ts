@@ -3,11 +3,12 @@ import { defineConfig } from "vite";
 export default defineConfig({
   build: {
     lib: {
-      entry: "src/bundle.manifests.ts", // Bundle registers one or more manifests
+      entry: "src/entry-dashboard.ts",
       formats: ["es"],
-      fileName: "schema-city",
+      fileName: "dashboard",
     },
-    outDir: "../wwwroot/App_Plugins/SchemaCity", // your web component will be saved in this location
+    // Served by the host site as static web assets of this Razor Class Library.
+    outDir: "../wwwroot/App_Plugins/SchemaCity",
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {

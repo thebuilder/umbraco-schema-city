@@ -1,14 +1,17 @@
 {
-  "id": "SchemaCity",
-  "name": "SchemaCity",
-  "version": "0.0.0",
-  "allowTelemetry": true,
+  "name": "Schema City",
+  "version": "0.1.0",
   "extensions": [
     {
-      "name": "Schema City Bundle",
-      "alias": "SchemaCity.Bundle",
-      "type": "bundle",
-      "js": "/App_Plugins/SchemaCity/schema-city.js"
+      "type": "dashboard",
+      "alias": "SchemaCity.Dashboard",
+      "name": "Schema City Dashboard",
+      "element": "/App_Plugins/SchemaCity/dashboard.js",
+      "weight": -10,
+      "meta": { "label": "Schema City", "pathname": "schema-city" },
+      "conditions": [
+        { "alias": "Umb.Condition.SectionAlias", "match": "Umb.Section.Settings" }
+      ]
     }
   ]
 }
