@@ -1,0 +1,33 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        umbraco: [17.6.2, 18.1.1]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/SchemaCity/Client/package-lock.json
+
+      - run: npm ci
+        working-directory: src/SchemaCity/Client
+
+      - run: npm run build
+        working-directory: src/SchemaCity/Client
+
+      - run: dotnet build SchemaCity.sln -c Release -p:UmbracoVersion=${{ matrix.umbraco }}
+
+      - run: dotnet test SchemaCity.sln -c Release --no-build
