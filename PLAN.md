@@ -355,14 +355,14 @@ Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.
 
 ### Layout (`app/layout/city.ts`)
 
-1. Partition nodes into districts:
-   - **Structure district**: every non-element type reachable from an `allowedAsRoot` type along `allowedChild` edges, plus roots themselves.
-   - **Detached district**: non-element types not reachable from any root (dead ends and pure compositions).
-   - **Element district**: `isElement` types.
-2. Run dagre (rank direction top-to-bottom, `ranker: "network-simplex"`) on the structure district using only `allowedChild` edges. Roots get rank 0. Cycles are fine, dagre reverses back edges. Read back the rank and the left-to-right order inside it, and nothing else. Dagre's own `x` is unusable on a real schema: an allowed-child graph is shallow and wide, and every edge that skips a rank threads a dummy node through the ranks between it, so the seeded 78-type fixture ranked into a district 624 units wide and 66 deep, which frames as a diagonal line of buildings a pixel or two tall.
-3. Fold each rank into rows of at most 8 buildings, each row centred on the district's axis. The order within a rank follows the leftmost already-placed parent from any earlier rank, not only the rank above, which also handles edges that skip a rank. Dagre's order breaks ties. Rows inside one rank sit a footprint plus a gap apart, and the next rank starts after the last of them plus the rank gap. The same fixture then measures 40 by 87. Eight is the number of buildings that stay legible side by side once the camera frames the whole city, and it is the same limit the packed grids use.
-4. Lay out the detached and element districts as packed grids, sorted by alias, with rows of at most 8. They sit south (element) and east (detached) of the structure district with a street between.
-5. Optional folder districts: when the schema uses folders, the structure ranking still governs position, but the ground slab under each node is tinted by folder and a folder label is drawn at the centroid. Folders do not move buildings; a folder that spans the map is a fact about the schema, not a layout bug.
+1. Districts follow the schema's folders. One district per top-level Document Type folder, named after it, plus **Unfiled** for types outside any folder.
+   - With no folders, derive the districts by role and name them: **Pages** (reachable from a root along `allowedChild` edges, plus the roots), **Compositions** (composed by something, never placed), **Elements** (`isElement` types) and **Unplaced** (the rest). Pages is the fallback name only, because not every schema is pages.
+   - Each district carries a kind, one of structure, compositions, elements or mixed, which the colour rules read.
+   - One structure district was a single pile. Folder blocks cut it into clusters, and the labels say what each block is.
+2. Inside each district, run dagre (rank direction top-to-bottom, `ranker: "network-simplex"`) over the members joined by `allowedChild` edges. Roots get rank 0. Cycles are fine, dagre reverses back edges. Read back the rank and the left-to-right order inside it, and nothing else. Dagre's own `x` is unusable on a real schema: an allowed-child graph is shallow and wide, and every edge that skips a rank threads a dummy node through the ranks between it, so the seeded 78-type fixture ranked into a district 624 units wide and 66 deep, which frames as a diagonal line of buildings a pixel or two tall.
+3. Fold each rank into rows of at most 8 buildings, each row centred on the district's axis. The order within a rank follows the leftmost already-placed parent from any earlier rank, not only the rank above, which also handles edges that skip a rank. Dagre's order breaks ties. Rows inside one rank sit a footprint plus a gap apart, and the next rank starts after the last of them plus the rank gap. The same fixture then measures 40 by 87. Eight is the number of buildings that stay legible side by side once the camera frames the whole city, and it is the same limit the packed grids use. Members that no `allowedChild` edge joins pack into a grid below the ranked block, sorted by alias, at most 8 per row.
+4. Place the districts by kind. Structure districts sit in the middle row, largest first. Compositions go north, so their bridges rise. Elements go south, so block links dip. Unfiled and unplaced sit east. Streets of at least 6 units run between districts.
+5. Nested folders stay inside their top-level district for now, tinting the slab under their members rather than getting a district of their own.
 6. Positions are world units throughout: a building footprint is 2 units, two buildings in a row sit one footprint apart, and a rank gap is 6 units.
 7. Output `Placement { node, position, footprint, height, floors, district, introDelay }`.
 
@@ -380,7 +380,7 @@ Determinism: sort nodes and edges by alias before dagre. Dagre is deterministic 
 - block targets to the south-west, block hosts to the south-east
 - reference targets east, reference sources west
 
-Only the focused node's edges draw: roads for `allowedChild`, raised azure lines for `composition` and `inherits`, dipped amber lines for `block`, dotted violet lines for `reference`. Everything that is not a neighbour fades.
+Only the focused node's edges draw: roads for `allowedChild`, raised azure lines for `composition` and `inherits`, dipped amber lines for `block`, dotted violet lines for `reference`. Everything that is not a neighbour sinks to a flat plate 0.1 units high at about 0.12 opacity, with no label, no road and no picking, so the neighbourhood stands on a flat map that still shows where it is. Leaving focus restores the buildings with the same 400 ms tween. The focus layout is centred on the focused node's city position, so without this its rows landed on top of faded buildings and read as overlap.
 
 Entry is a double-click, Enter on the selected node, or the inspector's Focus button. The camera flies in over 700 ms and any pointer down on the controls interrupts it. Each neighbour tweens from its city placement to its focus placement over 400 ms with smootherstep, and reduced motion skips the tweens. Double-click a neighbour, or pick one in the inspector or the palette, to refocus. The first Escape leaves focus and keeps the selection, the second clears it.
 
@@ -395,7 +395,7 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Floor tint | own group: phosphor; composed group: desaturated phosphor with a diagonal hatch in the shader |
 | Footprint | `2 + 0.25 * clamp(ownPropertyCount, 0, 12)` units square, so it never dominates |
 | Roof cap colour | `iconColor` from the contract if present, else neutral (the backend splits the colour suffix; the client never parses it) |
-| Roof icon | Umbraco icon rasterised to a sprite from the SVG the wrapper resolved; the harness has no registry, so it draws none unless given a hand-made map |
+| Roof icon | Umbraco icon rasterised to a sprite from the SVG the wrapper resolved. It draws only when the building is about 40 px wide on screen or more, filling about 70 percent of the roof in the node's icon colour, or phosphor when it has none, on a darkened roof cap. Below that width nothing draws, except on the selected and hovered buildings, which always show theirs. The inspector header shows the icon too. The harness has no registry, so it draws none unless given a hand-made map |
 | Root plaza | flat disc under `allowedAsRoot` buildings with a small flag |
 | Element Type form | low, wide, chamfered "warehouse" in amber, no roof cap, distinct material |
 | Usage badge | Usage count on the label layer above the selected node, whatever the lens |
@@ -404,7 +404,7 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Bridge (`composition` / `inherits`) | elevated quadratic arc, apex one arch above the taller roof. `inherits` is drawn as two arcs a hair apart, because WebGL ignores a line width above 1 |
 | Block link | thin solid line dipping to ground level toward the element district. Dashes are what tells a reference apart from it |
 | Reference | dotted line, hidden unless the References layer is on |
-| Folder | ground slab tint + label |
+| District | Ground slab with a rim and a name label per district; nested folders tint the slab |
 
 ### Usage lens
 
@@ -424,13 +424,13 @@ Built 2026-09-03, after fsn's scene. Background and fog share the void colour. O
 | --- | --- |
 | Hover | outline + tooltip (name, alias, counts), label |
 | Click | select: unrelated nodes and edges fade to 20%, inspector opens |
-| Double-click / Enter | focus mode: 700 ms camera flight, neighbourhood layout, only the focused node's edges drawn |
+| Double-click / Enter | focus mode: 700 ms camera flight, neighbourhood layout, only the focused node's edges drawn, unrelated buildings sink to faint plates |
 | Double-click a neighbour in focus mode | refocus on it, camera flight |
 | Escape | leave focus mode and keep the selection. Escape again clears the selection |
-| Drag | orbit at a fixed isometric polar angle in ortho mode, free orbit in Explore. Pan stays in the ground plane, which the grid relies on |
+| Drag | orbit at a fixed isometric polar angle in ortho mode, free orbit in Explore. Pan stays in the ground plane, which the grid relies on. Hover, selection and lens changes never move the camera; only focus mode's flight and the Explore toggle do |
 | Right-drag / two-finger | pan |
 | Wheel | zoom (ortho zoom, not dolly) |
-| `Cmd/Ctrl + K` | search palette, substring match on type name, alias and every property alias (own and composed), type hits ranked above property hits. Enter selects; in focus mode it refocuses |
+| `Cmd/Ctrl + K` | search palette, substring match on type name, alias and every property alias (own and composed), type hits ranked above property hits. Enter selects; in focus mode it refocuses. The palette opens listing every type, fixed height, with a counter, swatches, alias, a property-count or matched-alias hint, an Escape hint and an Enter glyph, as fsn's does |
 | Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer, and the command palette, which is cmdk through afterglow's `command` component |
 | Lens | Picker with six modes; disabled until usage loads; `lens=<name>` in the URL |
 | Findings drawer | Sheet from the toolbar with a count badge, kind chips with counts, matched / total, rows grouped by severity; a row selects its node and closes. |
@@ -513,7 +513,11 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. Done 2026-09-03; the slab stays city-sized by choice.
 - NuGet packaging with the client build wired into `dotnet pack`, README for the package, marketplace metadata. Done 2026-09-03; screenshots still missing.
-- Roof icons, property "windows" on floors, Explore perspective toggle, list view fallback (icon resolution in the wrappers done 2026-09-03; the scene side in progress).
+- Roof icons (size rule, in progress), property "windows" on floors, Explore perspective toggle, list view fallback (icon resolution in the wrappers done 2026-09-03; the scene side in progress).
+- Districts follow folders, with slabs and labels (in progress).
+- Search palette in fsn's shape, fixed height (in progress).
+- Camera reset on hover: found 2026-09-03, fix in progress.
+- Focus mode sinks the unrelated city to plates (in progress).
 - Empty state (no Document Types), error state (HTTP status), lens disabled with a reason when usage fails. Done 2026-09-03.
 - Seeder log noise: application URL set, UI culture pinned to en-US in the demo site (the en-DK warnings were this Mac's locale). Done 2026-09-03; 585 warnings to 19.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
@@ -539,6 +543,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.7 kB for `api.js`, 44 kB of app and 170 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
 | The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
 | The app's own URL writing fights the backoffice router | Write URL state only while the location is still the workspace route the app mounted under, and never after navigating away; use the backoffice's own navigation for the editor link. Done 2026-09-03. |
+| Hover re-renders reset the camera | The controls and the framing effect must not depend on hover or selection state; verified by hand: orbit, hover, the view holds. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
 | Usage queries slow on large installs | Four small queries for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
@@ -567,7 +572,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Then roof icons, property windows, Explore camera, list view. Next.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Then roof icons, property windows, Explore camera, list view, districts by folder, the fsn-style palette and the hover camera fix (all in progress). Next.
 
 ## 13. Resolved questions
 
