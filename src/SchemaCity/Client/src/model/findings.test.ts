@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import mediumUsageFixture from "../../dev/fixtures/medium-usage.json";
 import mediumFixture from "../../dev/fixtures/medium.json";
 import smallFixture from "../../dev/fixtures/small.json";
 import { type FindingKind, findFindings } from "./findings";
@@ -12,6 +13,7 @@ import type {
 
 const small = smallFixture as unknown as SchemaGraph;
 const medium = mediumFixture as unknown as SchemaGraph;
+const mediumUsage = mediumUsageFixture as unknown as UsageReport;
 
 function node(alias: string, extra: Partial<SchemaNode> = {}): SchemaNode {
   return {
@@ -295,6 +297,19 @@ describe("findFindings on the seeded medium.json", () => {
     expect(findFindings(medium, usage)).toContainEqual(
       expect.objectContaining({ kind, nodeId: id }),
     );
+  });
+
+  it("reports the seeded site's own usage report the same way", () => {
+    const legacy = medium.nodes.find(
+      (candidate) => candidate.alias === "unusedArticleLegacy",
+    )?.id;
+    const article = medium.nodes.find((candidate) => candidate.alias === "article")?.id;
+    const unused = findFindings(medium, mediumUsage)
+      .filter((finding) => finding.kind === "unusedType")
+      .map((finding) => finding.nodeId);
+    expect(unused).toContain(legacy);
+    // article has 162 items in that report, so it is never the unused one.
+    expect(unused).not.toContain(article);
   });
 
   it("reports the graph-only rules with no usage report at all", () => {

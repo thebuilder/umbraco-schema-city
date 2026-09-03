@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
+import mediumUsageFixture from "../../../dev/fixtures/medium-usage.json";
+import mediumFixture from "../../../dev/fixtures/medium.json";
 import type { SchemaGraph, SchemaNode, TypeUsage, UsageReport } from "../../model/types";
 import { lensScale, usageBadge } from "./lens";
+
+const medium = mediumFixture as unknown as SchemaGraph;
+const mediumUsage = mediumUsageFixture as unknown as UsageReport;
+const idOf = (alias: string) =>
+  medium.nodes.find((node) => node.alias === alias)?.id as string;
 
 const node = (alias: string, isElement = false): SchemaNode => ({
   id: alias,
@@ -107,6 +114,23 @@ describe("lensScale", () => {
     const flat = lensScale({ ...graph, nodes: [node("home")] }, usage, "count");
     expect(flat?.t.get("home")).toBe(0);
     expect([flat?.minLabel, flat?.maxLabel]).toEqual(["100", "100"]);
+  });
+});
+
+describe("the lenses on the seeded site's usage report", () => {
+  it("puts article, with 162 items, at the bright end of the content count", () => {
+    const scale = lensScale(medium, mediumUsage, "count");
+    expect(scale?.t.get(idOf("article"))).toBe(1);
+    expect(scale?.maxLabel).toBe("162");
+  });
+
+  it("lights only the two types that vary by culture", () => {
+    const scale = lensScale(medium, mediumUsage, "cultures");
+    const lit = [...(scale?.t ?? [])]
+      .filter(([, t]) => t === 1)
+      .map(([id]) => medium.nodes.find((node) => node.id === id)?.alias)
+      .sort();
+    expect(lit).toEqual(["blogPost", "campaignPage"]);
   });
 });
 
