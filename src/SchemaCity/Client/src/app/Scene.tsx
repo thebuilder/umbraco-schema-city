@@ -15,6 +15,7 @@ import {
   smootherstep,
 } from "./scene/buildings";
 import { neighboursOf } from "./scene/graph-links";
+import { iconColour, rasteriseIcon } from "./scene/icons";
 import { CHAR_PX, LABEL_CAP, LABEL_HEIGHT_PX, pickLabels } from "./scene/labels";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { type Anchor, buildLinkGeometry, type Layer, type LinkRange } from "./scene/layers";
@@ -24,6 +25,7 @@ import {
   framingAction,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
+  pixelsPerUnit,
   stageMetrics,
   zoomRange,
 } from "./scene/stage";
@@ -315,6 +317,168 @@ function Buildings({
           <meshBasicMaterial opacity={0} transparent />
         </instancedMesh>
       )}
+    </>
+  );
+}
+
+/** Fraction of the footprint one roof icon covers. */
+const ICON_FOOTPRINT = 0.72;
+/** An icon smaller than this on screen is a smudge, so it is not drawn at all. */
+const ICON_MIN_PX = 12;
+
+/** One rasterised icon, and the buildings that wear it. */
+type IconGroup = { key: string; texture: THREE.Texture; ids: string[] };
+
+/**
+ * The icons, rasterised once per name and colour and kept until the graph changes.
+ * The map is empty until they have decoded, which is a frame or two after the city
+ * paints, and a type whose icon the host did not hand over is simply not in it.
+ */
+function useIconGroups(
+  icons: Record<string, string> | undefined,
+  nodesById: Map<string, SchemaNode>,
+  phosphor: string,
+): IconGroup[] {
+  const wanted = useMemo(() => {
+    const byKey = new Map<string, { svg: string; colour: string; ids: string[] }>();
+    // The palette arrives one render in, and rasterising against a colour that is
+    // not the theme's yet would do every icon twice.
+    if (!icons || !phosphor) return byKey;
+    // Sorted, so the draw order of the icon meshes is the same city to city.
+    for (const node of [...nodesById.values()].sort((a, b) => a.alias.localeCompare(b.alias))) {
+      const svg = icons[node.icon];
+      if (!svg) continue;
+      const colour = iconColour(node.iconColor, phosphor);
+      const key = `${node.icon}|${colour}`;
+      const group = byKey.get(key) ?? { svg, colour, ids: [] };
+      group.ids.push(node.id);
+      byKey.set(key, group);
+    }
+    return byKey;
+  }, [icons, nodesById, phosphor]);
+
+  const [groups, setGroups] = useState<IconGroup[]>([]);
+
+  useEffect(() => {
+    let live = true;
+    const made: IconGroup[] = [];
+    Promise.all(
+      [...wanted].map(async ([key, { svg, colour, ids }]) => {
+        // An icon the browser cannot draw is one the city goes without.
+        const canvas = await rasteriseIcon(key, svg, colour).catch(() => null);
+        if (!canvas) return;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        made.push({ key, texture, ids });
+      }),
+    ).then(() => live && setGroups(made));
+
+    return () => {
+      live = false;
+      for (const group of made) group.texture.dispose();
+    };
+  }, [wanted]);
+
+  return groups;
+}
+
+/**
+ * The Umbraco icon of each type, standing over its roof as a camera-facing sprite.
+ * One instanced mesh per icon and colour, which the seeded schema makes 15 of, and
+ * the whole set is rewritten every frame: 78 quaternion copies is nothing next to
+ * the buildings under them, and it keeps the sprites facing the Explore camera as
+ * it moves.
+ *
+ * An icon whose building is under `ICON_MIN_PX` across is scaled away rather than
+ * drawn, the same measure the label layer culls names by.
+ */
+function RoofIcons({
+  groups,
+  placementsById,
+  heights,
+  neighbours,
+  palette,
+}: {
+  groups: IconGroup[];
+  placementsById: Map<string, Placement>;
+  heights: Map<string, number>;
+  neighbours: Set<string> | null;
+  palette: Palette;
+}) {
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
+  const meshes = useRef(new Map<string, THREE.InstancedMesh>());
+  const scratch = useMemo(() => new THREE.Object3D(), []);
+  const anchor = useMemo(() => new THREE.Vector3(), []);
+
+  useEffect(() => {
+    const lit = new THREE.Color(1, 1, 1);
+    const faded = new THREE.Color(palette.background).lerp(lit, 0.22);
+    for (const group of groups) {
+      const mesh = meshes.current.get(group.key);
+      if (!mesh) continue;
+      group.ids.forEach((id, index) =>
+        mesh.setColorAt(index, neighbours === null || neighbours.has(id) ? lit : faded),
+      );
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+  }, [groups, neighbours, palette]);
+
+  useFrame(() => {
+    for (const group of groups) {
+      const mesh = meshes.current.get(group.key);
+      if (!mesh) continue;
+      group.ids.forEach((id, index) => {
+        const placement = placementsById.get(id);
+        const side = (placement?.footprint ?? 0) * ICON_FOOTPRINT;
+        if (placement) {
+          anchor.set(
+            placement.position.x,
+            (placement.y ?? 0) + (heights.get(id) ?? placement.height) + side / 2,
+            placement.position.z,
+          );
+        }
+        const px = placement
+          ? placement.footprint *
+            pixelsPerUnit(
+              camera as THREE.OrthographicCamera & { fov?: number },
+              size.height,
+              camera.position.distanceTo(anchor),
+            )
+          : 0;
+        scratch.position.copy(anchor);
+        scratch.quaternion.copy(camera.quaternion);
+        scratch.scale.setScalar(px < ICON_MIN_PX ? 0 : side);
+        scratch.updateMatrix();
+        mesh.setMatrixAt(index, scratch.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  });
+
+  return (
+    <>
+      {groups.map((group) => (
+        <instancedMesh
+          args={[undefined, undefined, group.ids.length]}
+          frustumCulled={false}
+          key={group.key}
+          ref={(mesh) => {
+            if (mesh) meshes.current.set(group.key, mesh);
+            else meshes.current.delete(group.key);
+          }}
+          renderOrder={1}
+        >
+          <planeGeometry />
+          <meshBasicMaterial
+            alphaTest={0.08}
+            depthWrite={false}
+            map={group.texture}
+            side={THREE.DoubleSide}
+            transparent
+          />
+        </instancedMesh>
+      ))}
     </>
   );
 }
@@ -919,11 +1083,14 @@ export default function Scene({
   selected,
   focus,
   layers,
+  icons,
   onSelect,
   onFocus,
 }: {
   graph: SchemaGraph;
   usage?: UsageReport;
+  /** Umbraco icon name to SVG, for the roofs. The harness usually passes none. */
+  icons?: Record<string, string>;
   /** The lens colouring App computed. Absent or null means no lens is on. */
   scale?: LensScale | null;
   selected: string | null;
@@ -1022,6 +1189,7 @@ export default function Scene({
     return { cellsByKind: groupByKind(built.cells), heights: built.heights };
   }, [nodesById, placements]);
   const plazas = useMemo(() => buildPlazaCells(nodesById, placements), [nodesById, placements]);
+  const iconGroups = useIconGroups(icons, nodesById, palette?.phosphor ?? "");
 
   // In focus mode the city's other edges are noise around a layout that is about
   // one node, so only the edges that touch it are built at all. Structure is on
@@ -1088,6 +1256,15 @@ export default function Scene({
             scale={scale ?? null}
             selected={selected}
           />
+          {iconGroups.length > 0 ? (
+            <RoofIcons
+              groups={iconGroups}
+              heights={heights}
+              neighbours={neighbours}
+              palette={palette}
+              placementsById={placementsById}
+            />
+          ) : null}
           {active.has("structure") ? (
             <Roads
               edges={drawnEdges}

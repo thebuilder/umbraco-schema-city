@@ -1,5 +1,12 @@
 import { expect, test } from "vitest";
-import { fogRange, framingAction, groundReach, stageMetrics, zoomRange } from "./stage";
+import {
+  fogRange,
+  framingAction,
+  groundReach,
+  pixelsPerUnit,
+  stageMetrics,
+  zoomRange,
+} from "./stage";
 
 /** Wide, square and tall, because the zoom range depends on the viewport's shape. */
 const VIEWPORTS = [
@@ -50,4 +57,20 @@ test("only a new framing moves the camera", () => {
   expect(framingAction({ bounds, controls }, { bounds, controls })).toBe("none");
   expect(framingAction({ bounds, controls: null }, { bounds, controls })).toBe("snap");
   expect(framingAction({ bounds, controls }, { bounds: other, controls })).toBe("fly");
+});
+
+test("a world unit measures the same on screen through either camera", () => {
+  const size = { width: 1600, height: 900 };
+  const span = 87;
+  const zoom = framingZoom(span, size);
+  // The perspective camera the Explore toggle stands up frames the same world height
+  // the orthographic one was showing, so at the point it is aimed at the two agree.
+  const worldHeight = size.height / zoom;
+  const fov = 45;
+  const distance = worldHeight / (2 * Math.tan(((fov * Math.PI) / 180) / 2));
+
+  expect(pixelsPerUnit({ isOrthographicCamera: true, zoom }, size.height, 999)).toBe(zoom);
+  expect(pixelsPerUnit({ zoom: 1, fov }, size.height, distance)).toBeCloseTo(zoom);
+  // Twice as far away is half the size.
+  expect(pixelsPerUnit({ zoom: 1, fov }, size.height, distance * 2)).toBeCloseTo(zoom / 2);
 });

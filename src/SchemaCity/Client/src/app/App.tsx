@@ -154,6 +154,7 @@ const Scene = lazy(() => import("./Scene"));
 export function App({
   graph,
   usage,
+  icons,
   onOpenType,
   initial,
   onStateChange,
@@ -161,6 +162,11 @@ export function App({
   graph: SchemaGraph;
   /** The usage report, once it has arrived. The city never waits for it. */
   usage?: UsageReport;
+  /**
+   * Umbraco icon name to SVG string, for the roofs. The wrappers resolve these from
+   * the backoffice icon registry; a name that is missing draws no icon.
+   */
+  icons?: Record<string, string>;
   onOpenType?: (id: string) => void;
   /**
    * Where to start. Left out, the app reads its own query string. `type` is a node
@@ -392,6 +398,7 @@ export function App({
                 <Scene
                   focus={focus}
                   graph={graph}
+                  icons={icons}
                   layers={layers}
                   onFocus={enterFocus}
                   onSelect={setSelected}

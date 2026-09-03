@@ -69,6 +69,24 @@ export function fogRange(span: number): { near: number; far: number } {
 }
 
 /**
+ * How many CSS pixels one world unit covers, for either camera.
+ *
+ * An orthographic camera's `zoom` is exactly that number, whatever is being looked
+ * at. A perspective camera's answer depends on how far away the thing is, so the
+ * Explore mode has to pass the distance to the point it is asking about. Everything
+ * that culls by on-screen size goes through here rather than reading `zoom`.
+ */
+export function pixelsPerUnit(
+  camera: { isOrthographicCamera?: boolean; zoom: number; fov?: number },
+  viewportHeight: number,
+  distance: number,
+): number {
+  if (camera.isOrthographicCamera) return camera.zoom;
+  const halfFov = (((camera.fov ?? 50) * Math.PI) / 180) / 2;
+  return viewportHeight / (2 * Math.max(distance, 1e-6) * Math.tan(halfFov));
+}
+
+/**
  * What the camera rig should do when its framing effect runs again.
  *
  * The effect's inputs include the viewport, and the viewport is measured again on
