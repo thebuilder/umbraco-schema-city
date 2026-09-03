@@ -31,3 +31,24 @@ jobs:
       - run: dotnet build SchemaCity.sln -c Release -p:UmbracoVersion=${{ matrix.umbraco }}
 
       - run: dotnet test SchemaCity.sln -c Release --no-build
+
+      # Compiling against both majors is not enough. Umbraco discovers composers and controllers
+      # by scanning types at boot, so a missing base type only shows up when the site runs.
+      - name: boot the site and check it serves
+        working-directory: src/SchemaCity.Site
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:61801
+        run: |
+          dotnet run --no-build --no-launch-profile -c Release -p:UmbracoVersion=${{ matrix.umbraco }} &
+          code() { curl -so /dev/null -w '%{http_code}' "http://localhost:61801$1"; }
+          # /umbraco answers during the unattended install, but App_Plugins is only served once
+          # Umbraco reaches the Run level, so wait on the manifest rather than on the backoffice.
+          for _ in $(seq 60); do
+            [ "$(code /App_Plugins/SchemaCity/umbraco-package.json)" = 200 ] && break
+            sleep 2
+          done
+          test "$(code /App_Plugins/SchemaCity/umbraco-package.json)" = 200
+          test "$(code /umbraco)" = 200
+          test "$(code /umbraco/management/api/v1/schema-city/graph)" = 401
+          pkill -f SchemaCity.Site
