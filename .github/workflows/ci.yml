@@ -33,6 +33,19 @@ jobs:
 
       - run: dotnet test SchemaCity.sln -c Release --no-build
 
+      # One package covers both majors, so packing once is enough. --no-build reuses the Release
+      # output above, static web assets included.
+      - name: pack and check the package
+        if: matrix.umbraco == '17.6.2'
+        run: |
+          dotnet pack src/SchemaCity/SchemaCity.csproj -c Release --no-build -o pack -p:SkipClientBuild=true
+          nupkg=$(echo pack/*.nupkg)
+          test -f "$nupkg"
+          list=$(unzip -l "$nupkg")
+          grep -q staticwebassets/App_Plugins/SchemaCity/workspace.js <<<"$list"
+          test -z "$(grep '\.map' <<<"$list")"
+          test "$(wc -c < "$nupkg")" -lt 1048576
+
       # Compiling against both majors is not enough. Umbraco discovers composers and controllers
       # by scanning types at boot, so a missing base type only shows up when the site runs.
       - name: boot the site and check it serves
