@@ -514,7 +514,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ### M4, Polish and release (medium)
 
-- World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. Done 2026-09-03; the slab stays city-sized by choice.
+- World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. Done 2026-09-03; the single city slab later became one island per district.
 - NuGet packaging with the client build wired into `dotnet pack`, README for the package, marketplace metadata. Done 2026-09-03; screenshots still missing.
 - Roof icons on the roof caps. Done 2026-09-03; one instanced quad mesh per icon-and-colour pair from a cached canvas texture, 15 meshes on the seeded schema, drawn flat over a darker cap from about 40 px of footprint width and always on the selected and hovered buildings.
 - Property "windows" on floors. Done 2026-09-03; one instanced quad per property walked around the floor's four walls, 616 on the seeded schema, each one its floor's colour turned up and brighter again when the property is mandatory.
