@@ -51,7 +51,11 @@ export function App({
         return;
       }
       // The palette owns the keyboard while it is open, including its own Escape.
-      if (paletteOpen) return;
+      // Picking a row closes it inside the same keystroke, and React has swapped
+      // this listener for one that reads the palette as closed by the time the
+      // event reaches the document, so the Enter that chose a type would focus it
+      // too. cmdk calls preventDefault on the key it consumed, which is the tell.
+      if (paletteOpen || event.defaultPrevented) return;
       if (event.key === "Enter" && selected) setFocus(selected);
       // Escape leaves focus first and clears the selection second, so the way out
       // of focus mode never also loses the node you were reading.
