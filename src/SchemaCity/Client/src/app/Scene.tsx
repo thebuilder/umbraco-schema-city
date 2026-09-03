@@ -2,8 +2,10 @@ import { Html, OrbitControls } from "@react-three/drei";
 import { Canvas, type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import type { SchemaGraph, SchemaNode } from "../model/types";
+import { neighbourhoods } from "../model/neighbourhood";
+import type { SchemaEdge, SchemaGraph, SchemaNode } from "../model/types";
 import { cityBounds, layoutCity, type CityBounds, type Placement } from "./layout/city";
+import { layoutFocus } from "./layout/focus";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -20,6 +22,8 @@ type Palette = {
   dim: string;
   signal: string;
   amber: string;
+  azure: string;
+  violet: string;
   background: string;
   separator: string;
 };
@@ -53,6 +57,7 @@ function Buildings({
   reducedMotion,
   palette,
   onSelect,
+  onFocus,
   onHover,
 }: {
   cellsByKind: Record<FloorCellKind, FloorCell[]>;
@@ -65,6 +70,7 @@ function Buildings({
   reducedMotion: boolean;
   palette: Palette;
   onSelect: (id: string | null) => void;
+  onFocus: (id: string) => void;
   onHover: (id: string | null) => void;
 }) {
   const ownRef = useRef<THREE.InstancedMesh>(null);
@@ -113,10 +119,11 @@ function Buildings({
 
   // Sets every mesh to its resting position (or, unless reduced motion is on,
   // to the ground) before the first paint. The frame loop below takes over
-  // from there until every building has risen.
+  // from there until every building has risen. It runs again on every frame of
+  // a focus tween, which is why it reads the intro's progress rather than
+  // resetting it; resetting would replay the rise every time a building moves.
   useEffect(() => {
-    introDone.current = reducedMotion;
-    const startProgress = reducedMotion ? 1 : 0;
+    const startProgress = introDone.current ? 1 : 0;
 
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
       const mesh = meshRefs[kind].current;
@@ -129,7 +136,7 @@ function Buildings({
     const plaza = plazaRef.current;
     if (plaza) {
       plazas.forEach((cell, i) => {
-        scratch.position.set(cell.cx, PLAZA_HEIGHT / 2, cell.cz);
+        scratch.position.set(cell.cx, cell.cy + PLAZA_HEIGHT / 2, cell.cz);
         // cylinderGeometry's default radius is 1, so scale by the radius directly.
         scratch.scale.set(cell.radius, PLAZA_HEIGHT, cell.radius);
         scratch.updateMatrix();
@@ -143,7 +150,11 @@ function Buildings({
     if (hit) {
       placements.forEach((placement, i) => {
         const height = heights.get(placement.id) ?? placement.height;
-        scratch.position.set(placement.position.x, height / 2, placement.position.z);
+        scratch.position.set(
+          placement.position.x,
+          (placement.y ?? 0) + height / 2,
+          placement.position.z,
+        );
         scratch.scale.set(placement.footprint, height, placement.footprint);
         scratch.updateMatrix();
         hit.setMatrixAt(i, scratch.matrix);
@@ -239,6 +250,11 @@ function Buildings({
             const placement = pick(event);
             if (placement) onSelect(placement.id);
           }}
+          onDoubleClick={(event) => {
+            event.stopPropagation();
+            const placement = pick(event);
+            if (placement) onFocus(placement.id);
+          }}
           onPointerMove={(event) => {
             event.stopPropagation();
             onHover(pick(event)?.id ?? null);
@@ -258,16 +274,24 @@ function Roads({
   placementsById,
   edges,
   selected,
+  focus,
   palette,
 }: {
   placementsById: Map<string, Placement>;
   edges: SchemaGraph["edges"];
   selected: string | null;
+  focus: string | null;
   palette: Palette;
 }) {
+  // In focus mode the city's other roads are noise around a layout that is about
+  // one node, so only the roads that touch it get built at all.
+  const drawn = useMemo(
+    () => (focus ? (edges ?? []).filter((edge) => touches(edge, focus)) : (edges ?? [])),
+    [edges, focus],
+  );
   const { positions, ranges } = useMemo(
-    () => buildRoadGeometry(placementsById, edges ?? []),
-    [placementsById, edges],
+    () => buildRoadGeometry(placementsById, drawn),
+    [placementsById, drawn],
   );
 
   const colors = useMemo(() => {
@@ -275,7 +299,11 @@ function Roads({
     const faded = dim.clone().lerp(new THREE.Color(palette.background), FADE_MIX);
     const array = new Float32Array(positions.length);
     for (const range of ranges) {
-      const lit = selected === null || range.edge.from === selected || range.edge.to === selected;
+      const lit =
+        focus !== null ||
+        selected === null ||
+        range.edge.from === selected ||
+        range.edge.to === selected;
       const colour = lit ? dim : faded;
       for (let i = range.start; i < range.start + range.count; i++) {
         array[i * 3] = colour.r;
@@ -284,7 +312,7 @@ function Roads({
       }
     }
     return array;
-  }, [positions, ranges, selected, palette]);
+  }, [positions, ranges, selected, focus, palette]);
 
   if (positions.length === 0) return null;
 
@@ -299,6 +327,115 @@ function Roads({
   );
 }
 
+const touches = (edge: SchemaEdge, id: string) => edge.from === id || edge.to === id;
+
+/** How high a composition link arches over the two buildings it joins. */
+const LINK_ARCH = 3;
+/** How close to the ground a block link dips on its way to the element district. */
+const LINK_DIP = 0.25;
+const DASH_ON = 0.55;
+const DASH_OFF = 0.4;
+
+/**
+ * The compositions, blocks and references of the focused node, as straight lines
+ * bent over one midpoint. Compositions and inheritance arch above the roofs, block
+ * links dip to the ground, and references are dotted. The city draws none of these;
+ * they are what makes the inspector's lists visible in focus mode.
+ */
+function FocusLinks({
+  focus,
+  edges,
+  placementsById,
+  heights,
+  palette,
+}: {
+  focus: string;
+  edges: SchemaGraph["edges"];
+  placementsById: Map<string, Placement>;
+  heights: Map<string, number>;
+  palette: Palette;
+}) {
+  const lines = useMemo(() => {
+    const built: Record<"composition" | "block" | "reference", number[]> = {
+      composition: [],
+      block: [],
+      reference: [],
+    };
+    const roofOf = (id: string) => {
+      const placement = placementsById.get(id);
+      if (!placement) return null;
+      const height = heights.get(id) ?? placement.height;
+      return new THREE.Vector3(
+        placement.position.x,
+        (placement.y ?? 0) + height * 0.8,
+        placement.position.z,
+      );
+    };
+
+    const origin = roofOf(focus);
+    if (!origin) return built;
+
+    for (const edge of edges ?? []) {
+      // Inheritance is the thicker composition in the plan; one arch covers both
+      // until a real ribbon geometry replaces these lines.
+      const kind = edge.kind === "inherits" ? "composition" : edge.kind;
+      if (kind !== "composition" && kind !== "block" && kind !== "reference") continue;
+      if (!touches(edge, focus)) continue;
+      const other = roofOf(edge.from === focus ? edge.to : edge.from);
+      if (!other) continue;
+
+      const mid = origin.clone().add(other).multiplyScalar(0.5);
+      if (kind === "composition") mid.y = Math.max(origin.y, other.y) + LINK_ARCH;
+      if (kind === "block") mid.y = LINK_DIP;
+      const out = built[kind];
+      if (kind === "reference") {
+        pushDashes(out, origin, mid);
+        pushDashes(out, mid, other);
+      } else {
+        out.push(origin.x, origin.y, origin.z, mid.x, mid.y, mid.z);
+        out.push(mid.x, mid.y, mid.z, other.x, other.y, other.z);
+      }
+    }
+    return built;
+  }, [focus, edges, placementsById, heights]);
+
+  const styles = [
+    { kind: "composition", colour: palette.azure },
+    { kind: "block", colour: palette.amber },
+    { kind: "reference", colour: palette.violet },
+  ] as const;
+
+  return (
+    <>
+      {styles.map(({ kind, colour }) =>
+        lines[kind].length === 0 ? null : (
+          <lineSegments frustumCulled={false} key={kind}>
+            <bufferGeometry>
+              <bufferAttribute
+                args={[new Float32Array(lines[kind]), 3]}
+                attach="attributes-position"
+              />
+            </bufferGeometry>
+            <lineBasicMaterial color={colour} />
+          </lineSegments>
+        ),
+      )}
+    </>
+  );
+}
+
+// ponytail: dashes are cut into the geometry rather than drawn with
+// LineDashedMaterial, which would need computeLineDistances on a geometry React
+// has not attached yet. A dozen reference links is nothing to rebuild.
+function pushDashes(out: number[], from: THREE.Vector3, to: THREE.Vector3) {
+  const span = from.distanceTo(to);
+  for (let at = 0; at < span; at += DASH_ON + DASH_OFF) {
+    const a = from.clone().lerp(to, at / span);
+    const b = from.clone().lerp(to, Math.min(1, (at + DASH_ON) / span));
+    out.push(a.x, a.y, a.z, b.x, b.y, b.z);
+  }
+}
+
 /** How many neighbours of the selected node still get a label each. */
 const MAX_NEIGHBOUR_LABELS = 8;
 
@@ -309,6 +446,7 @@ function Labels({
   selected,
   hovered,
   neighbours,
+  focusNeighbours,
 }: {
   nodesById: Map<string, SchemaNode>;
   placementsById: Map<string, Placement>;
@@ -316,11 +454,18 @@ function Labels({
   selected: string | null;
   hovered: string | null;
   neighbours: Set<string> | null;
+  focusNeighbours: Set<string> | null;
 }) {
   const ids = useMemo(() => {
     const set = new Set<string>();
     // A faded building gets no label, not even under the cursor.
     if (hovered && (neighbours === null || neighbours.has(hovered))) set.add(hovered);
+    // The focus layout spreads the whole neighbourhood over its own compass, so
+    // there every building has room for its name, however many there are.
+    if (focusNeighbours) {
+      for (const id of focusNeighbours) set.add(id);
+      return set;
+    }
     if (selected) {
       set.add(selected);
       const direct = [...(neighbours ?? [])].filter((id) => id !== selected);
@@ -330,7 +475,7 @@ function Labels({
       if (direct.length <= MAX_NEIGHBOUR_LABELS) for (const id of direct) set.add(id);
     }
     return set;
-  }, [hovered, selected, neighbours]);
+  }, [hovered, selected, neighbours, focusNeighbours]);
 
   return (
     <>
@@ -342,7 +487,11 @@ function Labels({
         return (
           <Html
             key={id}
-            position={[placement.position.x, height + 0.35, placement.position.z]}
+            position={[
+              placement.position.x,
+              (placement.y ?? 0) + height + 0.35,
+              placement.position.z,
+            ]}
             style={{ pointerEvents: "none" }}
             center
           >
@@ -374,63 +523,222 @@ function citySpan(bounds: CityBounds): number {
   return Math.max(bounds.width, bounds.depth, 4);
 }
 
-/** Fits the ortho camera to the city bounds, at a true isometric angle. */
-function CameraFrame({ bounds }: { bounds: CityBounds }) {
-  const { camera, size } = useThree();
+type View = {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  zoom: number;
+  span: number;
+};
 
-  useEffect(() => {
-    const ortho = camera as THREE.OrthographicCamera;
-    const span = citySpan(bounds);
-    const direction = new THREE.Vector3(1, 1, 1).normalize();
-    ortho.position.set(
+/** Milliseconds the camera takes to reach a new framing. */
+const FLIGHT_MS = 700;
+
+/** fsn's easing for the establishing shot. */
+const easeInOutCubic = (t: number) =>
+  t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+
+/** Where the ortho camera stands to frame `bounds` at a true isometric angle. */
+function viewOf(bounds: CityBounds, size: { width: number; height: number }): View {
+  const span = citySpan(bounds);
+  const direction = new THREE.Vector3(1, 1, 1).normalize();
+  return {
+    position: new THREE.Vector3(
       bounds.centre.x + direction.x * span,
       direction.y * span,
       bounds.centre.z + direction.z * span,
-    );
-    ortho.lookAt(bounds.centre.x, 0, bounds.centre.z);
-    ortho.zoom = Math.min(size.width, size.height) / span;
-    // The camera sits `span` units from its target, so a fixed clip range (the
-    // spike's original 500) clips the whole city once a real schema's bounds
-    // grow past that. Scale it with the city instead.
-    ortho.near = -span * 2;
-    ortho.far = span * 3;
-    ortho.updateProjectionMatrix();
-  }, [bounds, camera, size]);
+    ),
+    target: new THREE.Vector3(bounds.centre.x, 0, bounds.centre.z),
+    zoom: Math.min(size.width, size.height) / span,
+    span,
+  };
+}
+
+/**
+ * Frames the city, and flies to a new framing when focus changes it. The flight is
+ * an establishing shot in fsn's sense: any pointer down on the canvas ends it where
+ * it is, because a camera that keeps moving after you grab it is a camera fighting
+ * you. A resize is not a new framing, so it snaps.
+ */
+function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotion: boolean }) {
+  const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
+  const controls = useThree((state) => state.controls) as {
+    target: THREE.Vector3;
+    update: () => void;
+  } | null;
+  const gl = useThree((state) => state.gl);
+  const size = useThree((state) => state.size);
+  const flight = useRef<{ from: View; to: View; started: number } | null>(null);
+  const framed = useRef<CityBounds | null>(null);
+
+  const view = useMemo(() => viewOf(bounds, size), [bounds, size]);
+
+  useEffect(() => {
+    const cancel = () => {
+      flight.current = null;
+    };
+    gl.domElement.addEventListener("pointerdown", cancel);
+    return () => gl.domElement.removeEventListener("pointerdown", cancel);
+  }, [gl]);
+
+  useEffect(() => {
+    const apply = (to: View) => {
+      camera.position.copy(to.position);
+      camera.zoom = to.zoom;
+      // The camera sits `span` units from its target, so a fixed clip range (the
+      // spike's original 500) clips the whole city once a real schema's bounds
+      // grow past that. Scale it with the city instead.
+      camera.near = -to.span * 2;
+      camera.far = to.span * 3;
+      camera.updateProjectionMatrix();
+      if (controls) {
+        controls.target.copy(to.target);
+        controls.update();
+      } else camera.lookAt(to.target);
+    };
+
+    const changed = framed.current !== null && framed.current !== bounds;
+    framed.current = bounds;
+    if (!changed || reducedMotion) {
+      apply(view);
+      return;
+    }
+    flight.current = {
+      from: {
+        position: camera.position.clone(),
+        target: controls ? controls.target.clone() : new THREE.Vector3(),
+        zoom: camera.zoom,
+        span: -camera.near / 2,
+      },
+      to: view,
+      started: performance.now(),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, bounds, controls, reducedMotion]);
+
+  useFrame(() => {
+    const moving = flight.current;
+    if (!moving) return;
+    const t = easeInOutCubic(Math.min(1, (performance.now() - moving.started) / FLIGHT_MS));
+    const span = moving.from.span + (moving.to.span - moving.from.span) * t;
+
+    camera.position.lerpVectors(moving.from.position, moving.to.position, t);
+    camera.zoom = moving.from.zoom + (moving.to.zoom - moving.from.zoom) * t;
+    camera.near = -span * 2;
+    camera.far = span * 3;
+    camera.updateProjectionMatrix();
+    if (controls) {
+      controls.target.lerpVectors(moving.from.target, moving.to.target, t);
+      controls.update();
+    }
+    if (t >= 1) flight.current = null;
+  });
 
   return null;
 }
 
+/** Milliseconds a building takes to move between its city spot and its focus spot. */
+const TWEEN_MS = 400;
+
+const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
+
 export default function Scene({
   graph,
   selected,
+  focus,
   onSelect,
+  onFocus,
 }: {
   graph: SchemaGraph;
   selected: string | null;
+  focus: string | null;
   onSelect: (id: string | null) => void;
+  onFocus: (id: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const placements = useMemo(() => layoutCity(graph), [graph]);
-  const bounds = useMemo(() => cityBounds(placements), [placements]);
-  const span = useMemo(() => citySpan(bounds), [bounds]);
+  const reducedMotion = useMemo(
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [],
+  );
+  const city = useMemo(() => layoutCity(graph), [graph]);
+  const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
+  const focusNeighbours = useMemo(
+    () => (focus ? neighboursOf(graph, focus) : null),
+    [graph, focus],
+  );
+  const target = useMemo(() => {
+    const neighbourhood = focus ? neighbourhoodById.get(focus) : undefined;
+    return focus && neighbourhood ? layoutFocus(graph, neighbourhood, focus, city) : city;
+  }, [focus, graph, neighbourhoodById, city]);
+
+  // The placements on screen right now. They are the city's or the focus layout's
+  // everywhere except during the 400 ms between the two.
+  const [placements, setPlacements] = useState(target);
+  const shown = useRef(target);
+
+  useEffect(() => {
+    if (shown.current === target) return;
+    if (reducedMotion) {
+      shown.current = target;
+      setPlacements(target);
+      return;
+    }
+
+    // Tweening from what is on screen, not from the city, is what lets a second
+    // focus interrupt the first halfway and carry on from there.
+    const from = new Map(shown.current.map((placement) => [placement.id, placement]));
+    const started = performance.now();
+    let frame = requestAnimationFrame(function step() {
+      const t = smootherstep((performance.now() - started) / TWEEN_MS);
+      const mixed =
+        t >= 1
+          ? target
+          : target.map((to) => {
+              const at = from.get(to.id);
+              if (!at || at === to) return to;
+              return {
+                ...to,
+                position: {
+                  x: lerp(at.position.x, to.position.x, t),
+                  z: lerp(at.position.z, to.position.z, t),
+                },
+                y: lerp(at.y ?? 0, to.y ?? 0, t),
+              };
+            });
+      shown.current = mixed;
+      setPlacements(mixed);
+      if (t < 1) frame = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [target, reducedMotion]);
+
+  // The camera frames the focus layout, which is the focused node and everything
+  // the focus layout moved, not the whole city behind it.
+  const bounds = useMemo(
+    () =>
+      focus && focusNeighbours
+        ? cityBounds(target.filter((placement) => focusNeighbours.has(placement.id)))
+        : cityBounds(city),
+    [focus, focusNeighbours, target, city],
+  );
+  const span = useMemo(() => citySpan(cityBounds(city)), [city]);
+  const groundCentre = useMemo(() => cityBounds(city).centre, [city]);
   const nodesById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph]);
   const placementsById = useMemo(() => new Map(placements.map((p) => [p.id, p])), [placements]);
-  const neighbours = useMemo(
+  const selectionNeighbours = useMemo(
     () => (selected ? neighboursOf(graph, selected) : null),
     [graph, selected],
   );
+  // In focus mode the lit set is the focused node's, so clicking through the
+  // neighbourhood does not dim the layout you are standing in.
+  const neighbours = focusNeighbours ?? selectionNeighbours;
   const { cellsByKind, heights } = useMemo(() => {
     const built = buildFloorCells(nodesById, placements);
     return { cellsByKind: groupByKind(built.cells), heights: built.heights };
   }, [nodesById, placements]);
   const plazas = useMemo(() => buildPlazaCells(nodesById, placements), [nodesById, placements]);
-  const reducedMotion = useMemo(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    [],
-  );
 
   // The scene colours are the theme's own tokens, read once from an element inside
   // the shadow root, so the city and the chrome can never drift apart.
@@ -439,21 +747,15 @@ export default function Scene({
     const token = (name: string) => style.getPropertyValue(name).trim();
     setPalette({
       amber: token("--amber"),
+      azure: token("--azure"),
       background: token("--background"),
       dim: token("--phosphor-dim"),
       phosphor: token("--phosphor"),
       separator: token("--panel-sunken"),
       signal: token("--signal"),
+      violet: token("--violet"),
     });
   }, []);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onSelect(null);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onSelect]);
 
   return (
     <div className="absolute inset-0" ref={host}>
@@ -464,14 +766,15 @@ export default function Scene({
           {/* ponytail: a flat, fixed-size grid stands in for real ground. A proper
               stage (sky, fog, seamless terrain, as fsn does) is a later pass. */}
           <gridHelper
-            args={[span * 2, 20, palette.dim, palette.dim]}
-            position={[bounds.centre.x, 0, bounds.centre.z]}
+            args={[span * 3, 30, palette.dim, palette.dim]}
+            position={[groundCentre.x, 0, groundCentre.z]}
           />
           <Buildings
             cellsByKind={cellsByKind}
             heights={heights}
             hovered={hovered}
             neighbours={neighbours}
+            onFocus={onFocus}
             onHover={setHovered}
             onSelect={onSelect}
             palette={palette}
@@ -482,11 +785,22 @@ export default function Scene({
           />
           <Roads
             edges={graph.edges}
+            focus={focus}
             palette={palette}
             placementsById={placementsById}
             selected={selected}
           />
+          {focus ? (
+            <FocusLinks
+              edges={graph.edges}
+              focus={focus}
+              heights={heights}
+              palette={palette}
+              placementsById={placementsById}
+            />
+          ) : null}
           <Labels
+            focusNeighbours={focusNeighbours}
             heights={heights}
             hovered={hovered}
             neighbours={neighbours}
@@ -494,12 +808,11 @@ export default function Scene({
             placementsById={placementsById}
             selected={selected}
           />
-          <CameraFrame bounds={bounds} />
+          <CameraRig bounds={bounds} reducedMotion={reducedMotion} />
           <OrbitControls
             makeDefault
             maxPolarAngle={ISO_POLAR_ANGLE}
             minPolarAngle={ISO_POLAR_ANGLE}
-            target={[bounds.centre.x, 0, bounds.centre.z]}
           />
         </Canvas>
       ) : null}

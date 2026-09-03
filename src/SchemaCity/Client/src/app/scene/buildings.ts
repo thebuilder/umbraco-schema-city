@@ -18,7 +18,14 @@ export type FloorCell = {
   sz: number;
 };
 
-export type PlazaCell = { buildingId: string; cx: number; cz: number; radius: number };
+export type PlazaCell = {
+  buildingId: string;
+  cx: number;
+  /** The ground the building stands on, which the focus layout can raise. */
+  cy: number;
+  cz: number;
+  radius: number;
+};
 
 export const FLOOR_HEIGHT = 0.6;
 const SEPARATOR_HEIGHT = 0.06;
@@ -58,6 +65,9 @@ export function buildFloorCells(
     if (!node) continue;
     const { x, z } = placement.position;
     const footprint = placement.footprint;
+    // The focus layout stands compositions on a platform, so a building's floors
+    // start at its own ground rather than at zero.
+    const base = placement.y ?? 0;
 
     if (node.isElement) {
       // Element Types are the warehouse form: low, wide, amber, no roof cap,
@@ -66,7 +76,7 @@ export function buildFloorCells(
         buildingId: placement.id,
         kind: "element",
         cx: x,
-        cy: ELEMENT_HEIGHT / 2,
+        cy: base + ELEMENT_HEIGHT / 2,
         cz: z,
         sx: footprint,
         sy: ELEMENT_HEIGHT,
@@ -88,7 +98,7 @@ export function buildFloorCells(
           buildingId: placement.id,
           kind: "separator",
           cx: x,
-          cy: y + SEPARATOR_HEIGHT / 2,
+          cy: base + y + SEPARATOR_HEIGHT / 2,
           cz: z,
           sx: footprint,
           sy: SEPARATOR_HEIGHT,
@@ -100,7 +110,7 @@ export function buildFloorCells(
         buildingId: placement.id,
         kind: group.fromCompositionId ? "composed" : "own",
         cx: x,
-        cy: y + FLOOR_HEIGHT / 2,
+        cy: base + y + FLOOR_HEIGHT / 2,
         cz: z,
         sx: footprint,
         sy: FLOOR_HEIGHT,
@@ -126,6 +136,7 @@ export function buildPlazaCells(
     plazas.push({
       buildingId: placement.id,
       cx: placement.position.x,
+      cy: placement.y ?? 0,
       cz: placement.position.z,
       radius: placement.footprint / 2 + PLAZA_MARGIN,
     });

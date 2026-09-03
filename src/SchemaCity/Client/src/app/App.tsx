@@ -38,22 +38,33 @@ export function App({
   onOpenType?: (id: string) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey))
+      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
         return;
-      event.preventDefault();
-      setPaletteOpen((open) => !open);
+      }
+      // The palette owns the keyboard while it is open, including its own Escape.
+      if (paletteOpen) return;
+      if (event.key === "Enter" && selected) setFocus(selected);
+      // Escape leaves focus first and clears the selection second, so the way out
+      // of focus mode never also loses the node you were reading.
+      if (event.key === "Escape") {
+        if (focus) setFocus(null);
+        else setSelected(null);
+      }
     };
     // Keyboard events cross the shadow boundary, so one document listener covers
     // both the backoffice and the harness.
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [paletteOpen, selected, focus]);
 
   const nodes = graph.nodes;
   const nodesById = useMemo(
@@ -74,6 +85,12 @@ export function App({
     setSelected(id);
     openPalette(false);
   };
+
+  const enterFocus = (id: string) => {
+    setSelected(id);
+    setFocus(id);
+  };
+
 
   return (
     <PortalContainer value={portal}>
@@ -120,7 +137,13 @@ export function App({
                 <p className="p-4 text-phosphor-dim text-sm">Loading the scene…</p>
               }
             >
-              <Scene graph={graph} onSelect={setSelected} selected={selected} />
+              <Scene
+                focus={focus}
+                graph={graph}
+                onFocus={enterFocus}
+                onSelect={setSelected}
+                selected={selected}
+              />
             </Suspense>
           </div>
 
