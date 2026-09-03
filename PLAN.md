@@ -342,7 +342,7 @@ One hand-written function per endpoint in `src/api.ts`, `getGraph()` and `getUsa
 
 ### Dev harness
 
-`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. The harness root is `dev/`, which is why the Tailwind entry carries `@source "../";`. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types), `medium-usage.json` (the seeded site's usage report, exported next to the graph), `small-usage.json` (hand-written for the 12-node fixture). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
+`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. The harness root is `dev/`, which is why the Tailwind entry carries `@source "../";`. Fixtures: `small.json` (12 types), `medium.json` (78 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types), `medium-usage.json` (the seeded site's usage report, exported next to the graph), `small-usage.json` (hand-written for the 12-node fixture). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
 
 ---
 
