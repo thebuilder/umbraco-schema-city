@@ -357,6 +357,7 @@ function Links({
   edges,
   anchors,
   colour,
+  opacity,
   palette,
   selected,
   focus,
@@ -365,6 +366,7 @@ function Links({
   edges: SchemaEdge[];
   anchors: Map<string, Anchor>;
   colour: string;
+  opacity: number;
   palette: Palette;
   selected: string | null;
   focus: string | null;
@@ -394,19 +396,30 @@ function Links({
         <bufferAttribute args={[positions, 3]} attach="attributes-position" />
         <bufferAttribute args={[colors, 3]} attach="attributes-color" />
       </bufferGeometry>
-      <lineBasicMaterial vertexColors />
+      <lineBasicMaterial opacity={opacity} transparent vertexColors />
     </lineSegments>
   );
 }
 
 const touches = (edge: SchemaEdge, id: string) => edge.from === id || edge.to === id;
 
-/** The three layers drawn as lines, and the theme token each one is coloured with. */
+/**
+ * The three layers drawn as lines: the theme token each is coloured with, and how
+ * solid it draws. The seeded schema has 62 composition arcs and 38 references,
+ * which read as lines, against 302 block links into a district of 15 element
+ * types. At full strength that many amber lines are a wall rather than a layer,
+ * so the block layer draws faint and the fan reads as a haze over the district it
+ * lands on. Which property makes which link is the inspector's job.
+ */
 const LINK_LAYERS = [
-  { layer: "compositions", token: "azure" },
-  { layer: "blocks", token: "amber" },
-  { layer: "references", token: "violet" },
-] as const satisfies readonly { layer: Exclude<Layer, "structure">; token: keyof Palette }[];
+  { layer: "compositions", token: "azure", opacity: 0.85 },
+  { layer: "blocks", token: "amber", opacity: 0.3 },
+  { layer: "references", token: "violet", opacity: 0.85 },
+] as const satisfies readonly {
+  layer: Exclude<Layer, "structure">;
+  token: keyof Palette;
+  opacity: number;
+}[];
 
 
 /** How many neighbours of the selected node still get a label each. */
@@ -895,7 +908,7 @@ export default function Scene({
               selected={selected}
             />
           ) : null}
-          {LINK_LAYERS.map(({ layer, token }) =>
+          {LINK_LAYERS.map(({ layer, token, opacity }) =>
             active.has(layer) ? (
               <Links
                 anchors={anchors}
@@ -904,6 +917,7 @@ export default function Scene({
                 focus={focus}
                 key={layer}
                 layer={layer}
+                opacity={opacity}
                 palette={palette}
                 selected={selected}
               />
