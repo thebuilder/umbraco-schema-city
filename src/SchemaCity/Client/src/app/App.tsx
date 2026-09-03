@@ -395,9 +395,14 @@ export function App({
             fitting, which is 848 px with the lens picker reading None and earlier
             once a longer lens name widens it. The backoffice is narrower than the
             harness, and a media query would have to guess by how much. ml-auto still
-            holds the right group against the right edge on whichever row it lands. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-line border-b px-4 py-2.5">
-          <h1 className="font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
+            holds the right group against the right edge on whichever row it lands.
+
+            shrink-0 so the column below can never trade the second row away, and
+            relative z-10 with a background of its own because the scene under it is
+            a positioned layer: a positioned box paints over a plain sibling's text
+            whatever the source order, so the toolbar has to be on a layer too. */}
+        <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-line border-b bg-background px-4 py-2.5">
+          <h1 className="shrink-0 font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
             Schema City
           </h1>
 
@@ -454,7 +459,7 @@ export function App({
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <label className="flex items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
+                  <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
                 }
               >
                 Lens
@@ -513,7 +518,7 @@ export function App({
         </div>
 
         {scale ? (
-          <div className="flex items-center gap-2 border-line border-b px-4 py-1.5 text-2xs text-phosphor-dim">
+          <div className="relative z-10 flex shrink-0 items-center gap-2 border-line border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
             <span className="font-bold uppercase tracking-terminal">{LENS_LABEL[lens]}</span>
             <span>{scale.minLabel}</span>
             <span aria-hidden className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`} />
@@ -521,7 +526,7 @@ export function App({
           </div>
         ) : null}
 
-        <div className="relative flex-1">
+        <div className="relative min-h-0 flex-1">
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
           {view === "list" ? (
