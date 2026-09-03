@@ -6,11 +6,16 @@ import {
   unsafeCSS,
 } from "@umbraco-cms/backoffice/external/lit";
 import { UmbApiError, tryExecute } from "@umbraco-cms/backoffice/resources";
+import type { ComponentProps, FC } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
-import { getGraph, getUsage, openTypeInEditor } from "./api.js";
+import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
+
+// ponytail: App does not declare `icons` yet. When that prop lands, delete this line and
+// render <App> directly again. The value passed is already the shape the prop will take.
+const IconApp = App as FC<ComponentProps<typeof App> & { icons?: Record<string, string> }>;
 
 /**
  * The one file that knows about Umbraco. It fetches the graph, hands it to the React
@@ -21,6 +26,7 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
   #root?: Root;
   #graph?: SchemaGraph;
   #usage?: UsageReport;
+  #icons?: Record<string, string>;
   #failed?: string;
 
   override connectedCallback() {
@@ -52,6 +58,10 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
     this.#draw();
     if (!this.#graph) return;
 
+    // The roofs are worth waiting a beat for, the city is not, so the icons resolve
+    // alongside usage rather than in front of the first paint. Resolved once and kept.
+    if (!this.#icons) void this.#loadIcons(this.#graph);
+
     // Usage is the slow half, and the city is worth looking at without it, so it
     // starts only once the graph has drawn. A failure leaves `usage` undefined,
     // which is what disables the lens picker, and says so once.
@@ -64,12 +74,22 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
     this.#draw();
   }
 
+  async #loadIcons(graph: SchemaGraph) {
+    this.#icons = await resolveIcons(this, graph.nodes.map((node) => node.icon));
+    this.#draw();
+  }
+
   #draw() {
     if (!this.#root) return;
 
     this.#root.render(
       this.#graph ? (
-        <App graph={this.#graph} onOpenType={openTypeInEditor} usage={this.#usage} />
+        <IconApp
+          graph={this.#graph}
+          icons={this.#icons}
+          onOpenType={openTypeInEditor}
+          usage={this.#usage}
+        />
       ) : (
         <p className="p-4 font-mono text-sm text-phosphor-dim">
           {this.#failed ?? "Loading…"}
