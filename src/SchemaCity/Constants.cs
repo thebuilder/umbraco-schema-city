@@ -3,8 +3,8 @@ namespace SchemaCity;
 public static class Constants
 {
     /// <summary>
-    /// Name of the Swagger document and the value <c>[MapToApi]</c> matches on, so the
-    /// controllers land in /umbraco/swagger/schema-city/swagger.json and nowhere else.
+    /// The value <c>[MapToApi]</c> matches on, which keeps these controllers out of Umbraco's
+    /// own Management API OpenAPI document. Schema City registers no document of its own.
     /// </summary>
     public const string ApiName = "schema-city";
 

@@ -25,14 +25,6 @@
     <PackageReference Include="Umbraco.Cms.Api.Management" Version="[17.0.0, 19.0.0)" />
     <PackageReference Include="Umbraco.Cms.Web.Common" Version="[17.0.0, 19.0.0)" />
     <PackageReference Include="Umbraco.Cms.Web.Website" Version="[17.0.0, 19.0.0)" />
-
-    <!--
-      Swashbuckle comes in transitively from the Umbraco packages, but the composer uses
-      SwaggerGenOptions and OpenApiInfo directly. Without a direct reference NuGet can resolve a
-      different Swashbuckle here than in the host site, and the two Microsoft.OpenApi versions then
-      clash at runtime so the schema-city Swagger document never appears.
-    -->
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
   </ItemGroup>
 
   <ItemGroup>
