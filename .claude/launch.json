@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "site",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/SchemaCity.Site"],
+      "port": 61801
+    }
+  ]
+}
