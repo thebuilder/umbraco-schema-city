@@ -490,7 +490,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Focus mode with camera flight and neighbourhood layout, refocus by double-click, inspector or palette, Escape to return. Done 2026-09-03 (pulled ahead of the layers because a hub selection is a road fan and a list without it).
 - Screen-space label culling. Done 2026-09-03; 17 labels, none overlapping, on the Home focus view.
 - Compositions, Blocks, References layers with their edge styles. Done 2026-09-03; one merged line geometry per layer, and the block layer draws at 0.3 opacity because 302 distinct block links into 15 element types is a wall at full strength.
-- A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link. Done 2026-09-03; checked in the backoffice 2026-09-03: opens focused on the edited type with the full toolbar and inspector.
+- A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link. Done 2026-09-03; checked in the backoffice the same day: opens focused on the edited type with the full toolbar and inspector.
 - "Open in editor" link: found broken in the backoffice 2026-09-03 (the app's URL writer rewrote the route after navigation); fix in progress.
 - URL state and deep links. Done 2026-09-03; `app/url.ts`, 12 tests.
 - Exit: "Where is this composition used?" and "What uses this Element Type?" are two clicks from the Document Type editor.
