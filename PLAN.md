@@ -339,7 +339,7 @@ Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.
 
 ### Packaging
 
-`dotnet pack src/SchemaCity/SchemaCity.csproj -c Release` from a clean clone produces `SchemaCity.1.0.0.nupkg`. It carries the built client as static web assets under `staticwebassets/App_Plugins/SchemaCity/`, which a host serves at `/App_Plugins/SchemaCity/` because `StaticWebAssetBasePath` is `/`, plus the README, the MIT licence, the author and the four Umbraco dependencies at `[17.0.0, 19.0.0)`. A `BuildClient` MSBuild target runs `npm ci` (only when `node_modules` is missing) and `npm run build`, with `BeforeTargets="ResolveProjectStaticWebAssets"`, and only when `wwwroot/App_Plugins/SchemaCity/workspace.js` is missing. The target then adds `wwwroot/**` back as `Content` itself, because the SDK globs `Content` at evaluation time, before Vite has written anything. `-p:SkipClientBuild=true` skips the target, and CI passes it after running its own npm build. The package measured 9.5 MB with 6.9 MB of `.js.map` in it, so the packaged build is being changed to ship no source maps.
+`dotnet pack src/SchemaCity/SchemaCity.csproj -c Release` from a clean clone produces `SchemaCity.1.0.0.nupkg`. It carries the built client as static web assets under `staticwebassets/App_Plugins/SchemaCity/`, which a host serves at `/App_Plugins/SchemaCity/` because `StaticWebAssetBasePath` is `/`, plus the README, the MIT licence, the author and the four Umbraco dependencies at `[17.0.0, 19.0.0)`. A `BuildClient` MSBuild target runs `npm ci` (only when `node_modules` is missing) and `npm run build`, with `BeforeTargets="ResolveProjectStaticWebAssets"`, and only when `wwwroot/App_Plugins/SchemaCity/workspace.js` is missing. The target then adds `wwwroot/**` back as `Content` itself, because the SDK globs `Content` at evaluation time, before Vite has written anything. `-p:SkipClientBuild=true` skips the target, and CI passes it after running its own npm build. The package measured 9.5 MB with 6.9 MB of `.js.map` in it, so the packaged build is being changed to ship no source maps. CI packs on the 17.6.2 leg and asserts the nupkg carries `workspace.js`, ships no `.map` files and is under 1 MB; it measures 599 KB.
 
 ### API client
 
@@ -496,7 +496,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Screen-space label culling. Done 2026-09-03; 17 labels, none overlapping, on the Home focus view.
 - Compositions, Blocks, References layers with their edge styles. Done 2026-09-03; one merged line geometry per layer, and the block layer draws at 0.3 opacity because 302 distinct block links into 15 element types is a wall at full strength.
 - A second Lit wrapper on the Document Type editor mounts the same `App` with `focus` set from the workspace context, plus an "Open in Schema City" link. Done 2026-09-03; checked in the backoffice the same day: opens focused on the edited type with the full toolbar and inspector.
-- "Open in editor" link: found broken in the backoffice 2026-09-03 (the app's URL writer rewrote the route after navigation); fix in progress.
+- "Open in editor" link: found broken in the backoffice 2026-09-03 (the backoffice router cancels an in-flight navigation on any `replaceState`, and the app's URL writer fired exactly then); fixed the same day by writing URL state only while the location is still the route the app mounted under. Rechecked in the backoffice: Article's editor opens.
 - URL state and deep links. Done 2026-09-03; `app/url.ts`, 12 tests.
 - Exit: "Where is this composition used?" and "What uses this Element Type?" are two clicks from the Document Type editor.
 
@@ -538,7 +538,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
 | Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.4 kB for `api.js`, 44 kB of app and 170 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
 | The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
-| The app's own URL writing fights the backoffice router | Write URL state only while the location is still the workspace route the app mounted under, and never after navigating away; use the backoffice's own navigation for the editor link. |
+| The app's own URL writing fights the backoffice router | Write URL state only while the location is still the workspace route the app mounted under, and never after navigating away; use the backoffice's own navigation for the editor link. Done 2026-09-03. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
 | Usage queries slow on large installs | Four small queries for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
@@ -555,7 +555,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
 | `model/`, `app/` | 125 vitest tests across 13 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
-| End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 at the M3 merge, green on both majors |
+| End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 at the M3 merge, green on both majors. CI also packs and checks the nupkg |
 | Performance | The seeded schema in the dev harness with the browser's own frame profiler; a pathological fixture (cycles, 40 element types, orphans) is still to be written |
 
 ---
@@ -567,7 +567,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Fix the editor link (in progress). Then M4: packaging and states. Done. World stage. Done. Then roof icons, property windows, Explore camera, list view. Next.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Then roof icons, property windows, Explore camera, list view. Next.
 
 ## 13. Resolved questions
 
