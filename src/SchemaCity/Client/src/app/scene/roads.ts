@@ -41,6 +41,12 @@ const ROAD_WIDTH = 0.3;
 const ROAD_Y = 0.015;
 const CHEVRON_Y = 0.02;
 const CHEVRON_SPACING = 1.4;
+/**
+ * How much of the run before a child carries chevrons. A rank-skipping road descends
+ * the whole district in one run, and chevroning all of it reads as a dashed line
+ * rather than as an arrow into the building at the end.
+ */
+const CHEVRON_RUN = 4.2;
 const CHEVRON_LENGTH = 0.4;
 const CHEVRON_HALF_WIDTH = 0.16;
 const LOOP_GAP = 0.5;
@@ -370,9 +376,13 @@ function pushSegment(positions: number[], segment: RoadSegment) {
   const toEnd = Math.hypot(segment.into.x - segment.x1, segment.into.z - segment.z1);
   const toStart = Math.hypot(segment.into.x - segment.x0, segment.into.z - segment.z0);
   const flip = toStart < toEnd ? -1 : 1;
-  const steps = Math.max(1, Math.floor(length / CHEVRON_SPACING));
+  const run = Math.min(length, CHEVRON_RUN);
+  const steps = Math.max(1, Math.floor(run / CHEVRON_SPACING));
   for (let i = 1; i <= steps; i++) {
-    const t = i / (steps + 1);
+    // Measured back from the end the child is at, so the arrows always sit against
+    // the building however long the rest of the run is.
+    const back = (i / (steps + 1)) * run;
+    const t = flip > 0 ? (length - back) / length : back / length;
     pushChevron(
       positions,
       segment.x0 + dx * t,
