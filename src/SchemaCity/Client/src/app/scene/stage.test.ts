@@ -5,6 +5,7 @@ import {
   framingAction,
   groundReach,
   pixelsPerUnit,
+  STAMP_BAND,
   STAMP_CAP,
   stageMetrics,
   zoomRange,
@@ -98,7 +99,7 @@ function stampExtent(
   };
 }
 
-test("a district's name prints inside the north-west corner of its island", () => {
+test("a district's name prints in the band along the north edge of its island", () => {
   // "PAGES" tracked out, rasterised: about seven cap heights wide.
   const island = { minX: -20, maxX: 40, minZ: -10, maxZ: 30 };
   const stamp = districtStamp(island, 7, ISO_VIEW);
@@ -108,9 +109,32 @@ test("a district's name prints inside the north-west corner of its island", () =
   // has to be that much taller in the world to read as STAMP_CAP on screen.
   expect(stamp.height * Math.sin(ISO_VIEW.elevation)).toBeCloseTo(STAMP_CAP);
   expect(stamp.width / stamp.height).toBeCloseTo(7);
-  // Half an inset in from the island's own west and north edges, whatever the turn.
+  // Half an inset in from the island's own west edge, whatever the turn.
   expect(stamp.x - extent.x).toBeCloseTo(island.minX + 0.5);
-  expect(stamp.z - extent.z).toBeCloseTo(island.minZ + 0.5);
+  // And half an inset clear of where the first row starts, which is the band in.
+  expect(stamp.z + extent.z).toBeCloseTo(island.minZ + STAMP_BAND - 0.5);
+});
+
+test("no camera angle prints a name over the row the band holds clear", () => {
+  // The first row of buildings starts a band in from the island's north edge, and
+  // nothing the controls allow may push a letter onto it: the overview is pinned to
+  // the isometric elevation and Explore orbits freely down to the horizon.
+  const island = { minX: -20, maxX: 40, minZ: -10, maxZ: 30 };
+  const rowStartsAt = island.minZ + STAMP_BAND;
+
+  for (const azimuth of [0, 0.4, Math.PI / 2, 2.5, -1.9, Math.PI]) {
+    for (const elevation of [ISO_VIEW.elevation, 0.9, 1.4, 0.3, 0.01]) {
+      const view = {
+        forward: { x: Math.sin(azimuth), z: Math.cos(azimuth) },
+        elevation,
+      };
+      const stamp = districtStamp(island, 7, view);
+      expect(stamp.z + stampExtent(stamp, view).z).toBeLessThanOrEqual(rowStartsAt);
+      // And the name never loses its cap height to a shallow view: the correction
+      // stops at the isometric elevation instead of running away.
+      expect(stamp.height).toBeLessThanOrEqual(STAMP_BAND);
+    }
+  }
 });
 
 test("the name turns to face the camera and reads horizontally", () => {
@@ -142,9 +166,14 @@ test("a name too big for its island shrinks instead of hanging over the void", (
   expect(stamp.width / stamp.height).toBeCloseTo(7);
 });
 
-test("a grazing view never blows the name up past half the island", () => {
+test("a grazing view never blows the name up past the band it stands in", () => {
   const island = { minX: 0, maxX: 60, minZ: 0, maxZ: 40 };
   const flat = districtStamp(island, 7, { forward: { x: 0, z: -1 }, elevation: 0.02 });
+  const iso = districtStamp(island, 7, ISO_VIEW);
 
-  expect(flat.height).toBeLessThanOrEqual((40 - 1) / 2);
+  // The correction stops at the overview's own elevation, so tilting toward the
+  // horizon in Explore shrinks the name with the ground rather than stretching it to
+  // five cap heights over the district it names.
+  expect(flat.height).toBeCloseTo(iso.height);
+  expect(flat.height).toBeLessThan(STAMP_BAND);
 });

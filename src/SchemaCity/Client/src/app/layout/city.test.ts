@@ -3,9 +3,11 @@ import mediumFixture from "../../../dev/fixtures/medium.json";
 import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import smallFixture from "../../../dev/fixtures/small.json";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
+import { STAMP_BAND } from "../scene/stage";
 import {
   cityBounds,
   cityDistricts,
+  ISLAND_PAD,
   layoutCity,
   ROW_LIMIT,
   SPARSE_RANK,
@@ -264,6 +266,21 @@ describe("cityDistricts", () => {
     expect(STREET).toBeGreaterThanOrEqual(8);
     expect(crowded(cityDistricts(medium).districts, STREET)).toEqual([]);
     expect(crowded(cityDistricts(folderless).districts, STREET)).toEqual([]);
+  });
+
+  it("holds a band clear along each island's north edge for the name", () => {
+    // The name is printed on the ground and writes no depth, so a row standing in
+    // the band would draw over the letters.
+    for (const graph of [small, medium, pathological]) {
+      const { placements, districts } = cityDistricts(graph);
+      const byId = new Map(districts.map((d) => [d.id, d]));
+      for (const p of placements) {
+        const island = (byId.get(p.district) as District).minZ - ISLAND_PAD;
+        expect(p.position.z - p.footprint / 2).toBeGreaterThanOrEqual(
+          island + STAMP_BAND - 1e-9,
+        );
+      }
+    }
   });
 
   it("keeps every building inside the bounds its district reports", () => {

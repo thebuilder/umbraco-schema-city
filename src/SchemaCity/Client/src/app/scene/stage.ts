@@ -116,18 +116,38 @@ export function framingAction<B, C>(
 export const STAMP_CAP = 3;
 
 /**
- * Ground between the island's north and west edges and the name printed on it. The
- * padding around a district is 3 units, so a 3 unit cap set in from the corner runs
- * about half a unit past the padding, onto ground the outermost building's own row
- * leaves empty either side of it.
+ * A true isometric view looks down at 35.26 degrees, whose sine is this. It is the
+ * only elevation the overview's orbit controls allow, so it is also the shallowest
+ * view the stamp ever has to stand a full cap height in.
+ */
+const ISO_SINE = 1 / Math.sqrt(3);
+
+/**
+ * Ground between the island's west edge and the name printed on it, and between the
+ * name and the first row of buildings south of it.
  */
 const STAMP_INSET = 0.5;
 
 /**
  * The shallowest angle the stamp corrects for. Past it the correction runs away, and
- * a name stretched to five times its cap covers the district it names.
+ * a name stretched to five times its cap covers the district it names. The overview
+ * camera is pinned to the isometric elevation, so this only ever bites in Explore,
+ * where tilting toward the horizon now shrinks the name along with the ground it is
+ * printed on rather than growing it into the district. It was 0.2, which let the
+ * name reach five cap heights and needed a fifteen-unit margin to stand in.
  */
-const STAMP_MIN_SINE = 0.2;
+const STAMP_MIN_SINE = ISO_SINE;
+
+/** Ground between the name and the first row of buildings. */
+const STAMP_GAP = 1;
+
+/**
+ * The ground an island keeps clear along its north edge for the name, from the edge
+ * to the first building's north face. The name stands at most `STAMP_CAP` divided by
+ * the shallowest sine any camera reaches, so this holds it at every allowed angle,
+ * and the layout leaves it empty rather than the scene printing over a row.
+ */
+export const STAMP_BAND = STAMP_CAP / STAMP_MIN_SINE + STAMP_GAP;
 
 /**
  * Where a district's name lies on its island, how big the quad is and which way it
@@ -147,6 +167,23 @@ const STAMP_MIN_SINE = 0.2;
  * unit cap reads as three units. `spin` is the angle to turn the flat quad by, around
  * the world's vertical.
  *
+ * `band` is the ground the layout holds empty along the island's north edge, and the
+ * stamp hangs off the south edge of it: its own southern edge sits an inset north of
+ * where the first row starts, at every camera angle, so no building can print over a
+ * letter. Tucking the quad into the north-west corner instead put it a half-width
+ * south of the edge, and the first rows ate the middle of every long name.
+ *
+ * ponytail: turned to the camera, the quad's ground footprint is a strip at 45
+ * degrees to the island under the isometric view, so it covers about 0.71 of its own
+ * width and height in z: 29 units for a five-letter name against a band of six. The
+ * band holds the edge that matters, the southern one, and the rest of the strip runs
+ * north over the street. On a city whose districts sit a street apart that can reach
+ * the island behind, where a tall building could still cover a letter. Containing the
+ * whole strip means either a thirty-unit margin north of every district or a name
+ * under one cap height on screen, so neither is worth it; printing the name along the
+ * island's edge instead contains it exactly, at the price of the 30 degree diagonal
+ * the turn exists to avoid.
+ *
  * A stamp that will not fit in the margin at its turned size shrinks until it does,
  * which is what a district of two types would otherwise hang over the void.
  */
@@ -154,6 +191,7 @@ export function districtStamp(
   island: { minX: number; maxX: number; minZ: number; maxZ: number },
   aspect: number,
   view: { forward: { x: number; z: number }; elevation: number },
+  band = STAMP_BAND,
   cap = STAMP_CAP,
 ): { x: number; z: number; width: number; height: number; spin: number } {
   const across = island.maxX - island.minX - STAMP_INSET * 2;
@@ -188,7 +226,7 @@ export function districtStamp(
   }
   return {
     x: island.minX + STAMP_INSET + halfX,
-    z: island.minZ + STAMP_INSET + halfZ,
+    z: island.minZ + band - STAMP_INSET - halfZ,
     width,
     height,
     spin,

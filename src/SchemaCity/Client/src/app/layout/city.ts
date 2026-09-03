@@ -13,6 +13,7 @@ import type {
   SchemaGraph,
   SchemaNode,
 } from "../../model/types";
+import { STAMP_BAND } from "../scene/stage";
 
 /** What a district mostly holds. The scene colours and labels from this. */
 export type DistrictKind = "structure" | "compositions" | "elements" | "mixed";
@@ -75,6 +76,18 @@ const GAP = FOOTPRINT * 1.5;
  * street still reads as wider than the ground between two neighbours.
  */
 export const STREET = 9;
+/**
+ * Ground between a district's outermost building and the edge of its island. The
+ * scene draws the slab from it, and the layout needs it here to know how much of the
+ * name's band the padding already covers.
+ */
+export const ISLAND_PAD = 3;
+/**
+ * Ground a district holds empty north of its first row, on top of the island's own
+ * padding, so its name has somewhere to stand. The name is printed on the ground and
+ * writes no depth, so without this the first row drew over it and ate the letters.
+ */
+const STAMP_MARGIN = Math.max(0, STAMP_BAND - ISLAND_PAD);
 const FLOOR_HEIGHT = 0.6;
 /** Buildings in one row, everywhere. A wider rank folds onto more rows. */
 export const ROW_LIMIT = 8;
@@ -320,14 +333,17 @@ function arrange(laid: Laid[]): District[] {
     b.members.length - a.members.length || compare(a.name, b.name);
 
   const districts: District[] = [];
+  // The district's box starts at (x, z) and its buildings a stamp margin south of
+  // that, so the ground the name stands on is inside the district rather than in the
+  // street, and two islands stay a street apart however deep the margin grows.
   const moveTo = (district: Laid, x: number, z: number) => {
     const box = boxOf(district.placements);
     for (const placement of district.placements) {
       placement.position.x += x - box.minX;
-      placement.position.z += z - box.minZ;
+      placement.position.z += z + STAMP_MARGIN - box.minZ;
     }
     const width = box.maxX - box.minX;
-    const depth = box.maxZ - box.minZ;
+    const depth = box.maxZ - box.minZ + STAMP_MARGIN;
     districts.push({
       id: district.id,
       name: district.name,

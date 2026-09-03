@@ -7,6 +7,7 @@ import type { SchemaEdge, SchemaGraph, SchemaNode, UsageReport } from "../model/
 import {
   cityBounds,
   cityDistricts,
+  ISLAND_PAD,
   type CityBounds,
   type District,
   type DistrictKind,
@@ -1043,8 +1044,6 @@ const SLAB_HEIGHT = 0.4;
 const RIM_HEIGHT = 0.18;
 /** How far the rim stands out past the slab. */
 const RIM_OVERHANG = 0.9;
-/** Ground between a district's outermost building and the edge of its island. */
-const ISLAND_PAD = 3;
 /** Ground around a nested folder's members that its tint covers. */
 const FOLDER_PAD = 1;
 /** How far the tint under a nested folder stands proud of the island. */
