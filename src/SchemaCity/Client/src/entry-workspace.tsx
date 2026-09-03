@@ -9,7 +9,7 @@ import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
-import { getGraph } from "./api.js";
+import { getGraph, openTypeInEditor } from "./api.js";
 import type { SchemaGraph } from "./model/types.js";
 
 /**
@@ -51,7 +51,7 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
 
     this.#root.render(
       this.#graph ? (
-        <App graph={this.#graph} onOpenType={openType} />
+        <App graph={this.#graph} onOpenType={openTypeInEditor} />
       ) : (
         <p className="p-4 font-mono text-sm text-phosphor-dim">
           {this.#failed ? "The graph endpoint did not answer." : "Loading…"}
@@ -77,9 +77,6 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
     `,
   ];
 }
-
-/** ponytail: M2 turns this into a link to the Document Type editor. */
-const openType = (id: string) => console.log("schema-city: open type", id);
 
 // Belt and braces: the fixed double-fetch in vite.config.ts stops two module instances
 // from existing, but if a host ever serves this chunk twice anyway, a second define()

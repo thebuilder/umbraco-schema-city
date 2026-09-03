@@ -1,9 +1,10 @@
 # Schema City
 
 An Umbraco backoffice extension that draws the content model as a map you can walk around.
-This is milestone M0: a Schema City entry in the Settings sidebar, under Advanced, that opens a
-workspace listing the Document Types it gets from one endpoint. The city itself comes later.
-`PLAN.md` has the whole plan.
+The Schema City entry in the Settings sidebar, under Advanced, opens the whole city. The
+Relationships tab on a Document Type editor opens the same map on the type being edited.
+Selecting a building opens an inspector, and its Open in editor button goes to that type's
+editor. `PLAN.md` has the whole plan.
 
 Umbraco 17 and 18 are supported from one package, dependency range `[17.0.0, 19.0.0)`.
 

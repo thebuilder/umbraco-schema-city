@@ -31,7 +31,10 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: { workspace: "src/entry-workspace.tsx" },
+      entry: {
+        workspace: "src/entry-workspace.tsx",
+        "document-type-view": "src/entry-document-type-view.tsx",
+      },
       formats: ["es"],
     },
     // Served by the host site as static web assets of this Razor Class Library.
