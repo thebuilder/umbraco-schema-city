@@ -9,37 +9,32 @@
   <PropertyGroup>
     <PackageId>SchemaCity</PackageId>
     <Product>SchemaCity</Product>
-    <Title>SchemaCity</Title>
+    <Title>Schema City</Title>
+    <Authors>Daniel Schmidt</Authors>
+    <Description>Renders the Umbraco content model as an isometric city in the backoffice.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
-
-
-  <!-- Per-project - with versions -->
+  <!-- One package for Umbraco 17 and 18. NuGet resolves the lowest version in the range here and
+       the host site's own reference decides what actually loads. -->
   <ItemGroup>
-    <PackageReference Include="Umbraco.Cms.Api.Common" Version="17.6.2" />
-    <PackageReference Include="Umbraco.Cms.Api.Management" Version="17.6.2" />
+    <PackageReference Include="Umbraco.Cms.Api.Common" Version="[17.0.0, 19.0.0)" />
+    <PackageReference Include="Umbraco.Cms.Api.Management" Version="[17.0.0, 19.0.0)" />
+    <PackageReference Include="Umbraco.Cms.Web.Common" Version="[17.0.0, 19.0.0)" />
+    <PackageReference Include="Umbraco.Cms.Web.Website" Version="[17.0.0, 19.0.0)" />
 
     <!--
-      Swashbuckle is available transitively from the Umbraco packages above, but we take a direct
-      dependency here because extension code directly uses types from Swashbuckle (SwaggerGenOptions)
-      and Microsoft.OpenApi (OpenApiInfo). Without a direct reference, this project's Swashbuckle
-      version is determined solely by NuGet's transitive resolution, which can resolve to a different
-      version than the host site project (e.g. a newer patch). When that happens, the different
-      Microsoft.OpenApi versions (a transitive dependency of Swashbuckle) can conflict at runtime,
-      causing custom Swagger documents registered by the extension to fail to appear.
-      Most other transitive dependencies don't have this problem because extension code doesn't
-      use their types directly - only Swashbuckle/OpenApi types are referenced in the composer.
+      Swashbuckle comes in transitively from the Umbraco packages, but the composer uses
+      SwaggerGenOptions and OpenApiInfo directly. Without a direct reference NuGet can resolve a
+      different Swashbuckle here than in the host site, and the two Microsoft.OpenApi versions then
+      clash at runtime so the schema-city Swagger document never appears.
     -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
-    <PackageReference Include="Umbraco.Cms.Web.Common" Version="17.6.2" />
-    <PackageReference Include="Umbraco.Cms.Web.Website" Version="17.6.2" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Don't include the client folder as part of packaging nuget build -->
+    <!-- The client sources are build input, not package content. -->
     <Content Remove="Client\**" />
-
-    <!-- However make the Umbraco-package.json included for dotnet pack or nuget package and visible to the solution -->
     <None Include="Client\public\umbraco-package.json" Pack="false" />
   </ItemGroup>
 
