@@ -56,6 +56,25 @@ describe("buildRoadGeometry", () => {
     }
   });
 
+  it("aims chevrons at a child sitting north-east of its parent", () => {
+    // Folding a wide rank onto extra rows puts some children above and beside their
+    // parent instead of straight below it, so the ribbon runs in any direction.
+    const folded = new Map([
+      ["parent", placement("parent", 0, 0)],
+      ["child", placement("child", 7, -9)],
+    ]);
+    const { positions } = buildRoadGeometry(folded, [road("parent", "child")]);
+    const at = (v: number) => ({ x: positions[v * 3] as number, z: positions[v * 3 + 2] as number });
+
+    // Six ribbon vertices, then one triangle per chevron, tip first.
+    expect(positions.length / 3).toBeGreaterThan(6);
+    for (let v = 6; v < positions.length / 3; v += 3) {
+      const [tip, backA, backB] = [at(v), at(v + 1), at(v + 2)];
+      expect(tip.x).toBeGreaterThan(Math.max(backA.x, backB.x));
+      expect(tip.z).toBeLessThan(Math.min(backA.z, backB.z));
+    }
+  });
+
   it("draws a self-loop as a ring instead of a ribbon", () => {
     const { positions, ranges } = buildRoadGeometry(placements, [road("a", "a")]);
     expect(ranges).toHaveLength(1);

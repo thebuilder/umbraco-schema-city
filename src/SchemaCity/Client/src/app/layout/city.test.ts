@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import mediumFixture from "../../../dev/fixtures/medium.json";
 import smallFixture from "../../../dev/fixtures/small.json";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
 import { cityBounds, layoutCity, type Placement } from "./city";
 
 const small = smallFixture as unknown as SchemaGraph;
+const medium = mediumFixture as unknown as SchemaGraph;
 
 function node(alias: string, extra: Partial<SchemaNode> = {}): SchemaNode {
   return {
@@ -117,6 +119,49 @@ describe("layoutCity", () => {
 
     expect(structure.length).toBe(6);
     expect(rows.size).toBeGreaterThan(1);
+  });
+
+  it("folds a rank of 30 onto four rows of at most eight", () => {
+    const children = Array.from({ length: 30 }, (_, i) => `child${String(i).padStart(2, "0")}`);
+    const placements = layoutCity(
+      graphOf(
+        [node("root", { allowedAsRoot: true }), ...children.map((alias) => node(alias))],
+        children.map((alias) => road("root", alias)),
+      ),
+    );
+
+    const rows = new Map<number, number>();
+    for (const p of placements) {
+      if (p.id === "root") continue;
+      rows.set(p.position.z, (rows.get(p.position.z) ?? 0) + 1);
+    }
+
+    expect([...rows.values()].sort((a, b) => b - a)).toEqual([8, 8, 8, 6]);
+    expect(overlaps(placements)).toEqual([]);
+  });
+
+  it("gives every building in the medium fixture its own spot", () => {
+    const placements = layoutCity(medium);
+    const spots = placements.map((p) => `${p.position.x},${p.position.z}`);
+
+    expect(new Set(spots).size).toBe(placements.length);
+    expect(overlaps(placements)).toEqual([]);
+  });
+
+  it("folds the medium fixture's structure district squarer than three to one", () => {
+    const structure = layoutCity(medium).filter((p) => p.district === "structure");
+    const { width, depth } = cityBounds(structure);
+
+    // Unfolded, this fixture ranks 55 types into a district 624 by 66, which frames
+    // as a diagonal line of buildings a couple of pixels tall.
+    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(3);
+  });
+
+  it("folds the same way twice", () => {
+    expect(layoutCity(medium)).toEqual(layoutCity(medium));
+    expect(layoutCity(graphOf([...medium.nodes].reverse(), [...medium.edges].reverse()))).toEqual(
+      layoutCity(medium),
+    );
   });
 
   it("ripples the intro outward from the roots", () => {
