@@ -299,6 +299,9 @@ function Roads({
   );
 }
 
+/** How many neighbours of the selected node still get a label each. */
+const MAX_NEIGHBOUR_LABELS = 8;
+
 function Labels({
   nodesById,
   placementsById,
@@ -316,10 +319,15 @@ function Labels({
 }) {
   const ids = useMemo(() => {
     const set = new Set<string>();
-    if (hovered) set.add(hovered);
+    // A faded building gets no label, not even under the cursor.
+    if (hovered && (neighbours === null || neighbours.has(hovered))) set.add(hovered);
     if (selected) {
       set.add(selected);
-      for (const id of neighbours ?? []) set.add(id);
+      const direct = [...(neighbours ?? [])].filter((id) => id !== selected);
+      // Home has 42 neighbours in the seeded schema, and 42 labels land on top of
+      // each other in a district a few hundred pixels wide. Past this many the
+      // scene shows none and the inspector's lists are where you read them.
+      if (direct.length <= MAX_NEIGHBOUR_LABELS) for (const id of direct) set.add(id);
     }
     return set;
   }, [hovered, selected, neighbours]);
