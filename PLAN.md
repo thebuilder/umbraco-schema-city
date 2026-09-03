@@ -74,7 +74,6 @@ schema-city/
       Composers/
         SchemaCityComposer.cs        DI + Swagger doc registration
       Api/
-        SchemaCityControllerBase.cs  [MapToApi], [VersionedApiBackOfficeRoute("schema-city")]
         GraphController.cs           GET graph
         UsageController.cs           GET usage
       Graph/
@@ -110,7 +109,7 @@ Scaffold command (verified against the v17 docs):
 dotnet new umbraco-extension -n SchemaCity -ex
 ```
 
-The `-ex` example gives the controller, Swagger composer and dashboard to replace. Keep its `openapi-ts` wiring and the `umbHttpClient` binding.
+The `-ex` example gives the controller, Swagger composer and dashboard to replace. Keep its `openapi-ts` wiring and the `umbHttpClient` binding. There is no controller base class until a second controller exists; `GraphController` carries the route and API attributes itself.
 
 Naming: NuGet id `SchemaCity`, namespace `SchemaCity`, route `schema-city`, custom element prefix `schema-city-`, extension alias prefix `SchemaCity.`.
 
@@ -235,7 +234,7 @@ All of this is in-process and runs on the host site. No new tables.
 
 Caching and invalidation:
 
-- The builder keeps the last `SchemaGraph` in a field. One `INotificationHandler` for `ContentTypeCacheRefresherNotification` and `DataTypeCacheRefresherNotification` clears it. Those fire on every server after any save, delete or move, so load balancing needs nothing extra.
+- The builder keeps the last `SchemaGraph` in a field and is registered as a singleton. Its two `INotificationHandler` registrations for `ContentTypeCacheRefresherNotification` and `DataTypeCacheRefresherNotification` are factory registrations that resolve that same singleton. Umbraco's `AddNotificationHandler` registers handlers as transient, which would clear a cache nobody reads. Those notifications fire on every server after any save, delete or move, so load balancing needs nothing extra.
 - `UsageCollector` caches for 60 seconds. `?refresh=true` bypasses. No lock around the cold path; the query is one round trip.
 
 Authorization: `[Authorize(Policy = AuthorizationPolicies.SectionAccessSettings)]` on both controllers. The dashboard is only registered under Settings, and the workspace view is inside the Settings section. Access is therefore whatever the administrator grants a user group for Settings; the package adds no permission of its own.
@@ -293,11 +292,11 @@ The workspace view consumes `UMB_DOCUMENT_TYPE_WORKSPACE_CONTEXT` (from `@umbrac
 
 ### Vite
 
-Library mode, ES output, two entries (`dashboard`, `workspace`), `rollupOptions.external: [/^@umbraco-cms\//]`, `base: "/App_Plugins/SchemaCity/"`. Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the dashboard element, so opening Settings never pays for three.js, only opening the dashboard does. If the template's `openapi-ts` wiring costs more than it saves, a 40-line fetch helper that calls `umbHttpClient` is the fallback; GodMode ships that way.
+Library mode, ES output, two entries (`dashboard`, `workspace`), `rollupOptions.external: [/^@umbraco-cms\//]`, `base: "/App_Plugins/SchemaCity/"` (needed from M1, when the three.js chunk is split out). Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the dashboard element, so opening Settings never pays for three.js, only opening the dashboard does. If the template's `openapi-ts` wiring costs more than it saves, a 40-line fetch helper that calls `umbHttpClient` is the fallback; GodMode ships that way.
 
 ### API client
 
-`@hey-api/openapi-ts` against the `schema-city` Swagger document, output to `src/api/`, called as `tryExecute(this, getGraph({ client: umbHttpClient }))` from `@umbraco-cms/backoffice/resources` and `@umbraco-cms/backoffice/http-client`.
+`@hey-api/openapi-ts` against the `schema-city` Swagger document, output to `src/api/`. The template generates the SDK as a class named after the Swagger group, so the call is `tryExecute(this, SchemaCityService.graph({ client: umbHttpClient }))` with imports from `@umbraco-cms/backoffice/resources` and `@umbraco-cms/backoffice/http-client`.
 
 ### Dev harness
 
@@ -415,6 +414,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - CI matrix: the site project builds and boots on Umbraco 17 and 18.
 - Dev harness with a hand-written `small.json`.
 - CI: `dotnet build`, `dotnet test`, `npm run build`, `vitest`, on both Umbraco majors.
+- Done 2026-09-03 on Umbraco 17.6.2, with 18.1.1 as the second CI target.
 - Exit: the Settings dashboard shows "Schema City, 80 types" from the real endpoint.
 
 ### M1, The city (large)
@@ -487,8 +487,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ## 12. First tasks
 
-1. Run the template, commit the untouched scaffold, then replace the example with `Constants.cs`, the two controllers and the Swagger doc.
-2. Write `Models/` and `model/types.ts` together so the contract is fixed before any rendering.
+1. Run the template, commit the untouched scaffold, then replace the example with `Constants.cs`, the graph controller and the Swagger doc. Done.
+2. Write `Models/` and `model/types.ts` together so the contract is fixed before any rendering. Done.
 3. Write `SchemaSeeder` and export `medium.json` from it.
 4. Build `layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings.
 5. Then buildings, then roads, then the inspector.
