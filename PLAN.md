@@ -343,7 +343,7 @@ One hand-written function per endpoint in `src/api.ts`, `getGraph()` and `getUsa
 
 ### Dev harness
 
-`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. The harness root is `dev/`, which is why the Tailwind entry carries `@source "../";`. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
+`Client/dev/index.html` renders the same React `App` with a fixture graph; there is no HTTP layer to fake. The harness root is `dev/`, which is why the Tailwind entry carries `@source "../";`. Fixtures: `small.json` (12 types), `medium.json` (80 types, folders, compositions, blocks), `pathological.json` (cycles, self-allowed folders, 40 element types, orphan types), `medium-usage.json` (the seeded site's usage report, exported next to the graph), `small-usage.json` (hand-written for the 12-node fixture). Exported from the seeded test site with a one-line script so fixtures stay honest. `medium.json` is rewritten by the seeded site on every Development boot, so it is always the endpoint's real shape.
 
 ---
 
@@ -455,7 +455,7 @@ Labels are one DOM layer over the canvas positioned from projected anchors, with
 
 ### From flat diagnostics dashboards
 
-Existing table-based Umbraco diagnostics tools answer most of the same questions. Taken from them: the single grouped count query, the block configuration switch including `SingleBlockConfiguration`, composed-property detection by id set difference, the visited sets for nested block recursion, property-alias search, edit links from every type name, and findings with stable ids and severities. Not taken: Data Type nodes, configuration drift heuristics, template diagnostics, a chart toggle, and a lock around the cache.
+Existing table-based Umbraco diagnostics tools answer most of the same questions. Taken from them: the grouped count query, the block configuration switch including `SingleBlockConfiguration`, composed-property detection by id set difference, the visited sets for nested block recursion, property-alias search, edit links from every type name, and findings with stable ids and severities. Not taken: Data Type nodes, configuration drift heuristics, template diagnostics, a chart toggle, and a lock around the cache.
 
 Leave behind: `FsNode`, categories, directory areas, the route/history model, all viewers, Tauri.
 
@@ -531,7 +531,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
-| Usage queries slow on large installs | One grouped query for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
+| Usage queries slow on large installs | Four small queries for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
 | Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements, and let the CI boot step on both majors be the detector. |
 | Shadow DOM and WebGL canvas sizing | `ResizeObserver` on the host element, `devicePixelRatio` cap at 2. |
 | Untrusted names and aliases in the inspector | Rendered as text by React, never through `dangerouslySetInnerHTML`; the wrapper never builds HTML from names either. |
