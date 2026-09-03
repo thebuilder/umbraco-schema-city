@@ -436,9 +436,9 @@ The free camera's field of view is 40 degrees; 45 stretched the city. It is aime
 | --- | --- |
 | Hover | outline + tooltip (name, alias, counts), label |
 | Click | select a building: unrelated nodes and edges fade to 20%, inspector opens. Clicking bare ground clears the selection (done 2026-09-03) |
-| Double-click / Enter | focus mode: 700 ms camera flight, neighbourhood layout, only the focused node's edges drawn, unrelated buildings sink to faint plates, the camera frames the neighbourhood in the uncovered part of the canvas (queued) |
+| Double-click / Enter | focus mode: 700 ms camera flight, neighbourhood layout, only the focused node's edges drawn, unrelated buildings sink to faint plates, the camera frames the neighbourhood in the uncovered part of the canvas (in progress) |
 | Double-click a neighbour in focus mode | refocus on it, camera flight |
-| Escape | leave focus mode and keep the selection. Escape again clears the selection. Closing the inspector or clicking bare ground leaves focus and clears the selection in one step (queued) |
+| Escape | leave focus mode and keep the selection. Escape again clears the selection. Closing the inspector or clicking bare ground leaves focus and clears the selection in one step (in progress) |
 | Drag | Iso orbits around the centre at a fixed angle; Free orbits freely. Pan stays in the ground plane, which the grid relies on. Hover, selection and lens changes never move the camera; only focus mode's flight and the camera switch do |
 | Right-drag / two-finger | pan |
 | Wheel | zoom (ortho zoom, not dolly) |
