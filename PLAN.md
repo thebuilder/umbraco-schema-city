@@ -201,8 +201,14 @@ Findings are derived in `model/findings.ts`:
 | Unused element type | element, no incoming `block` edge |
 | Unused composition | a type that exists only to be composed (no root, no incoming `allowedChild`, no instances) with zero incoming `composition` edges |
 | Structural dead end | not `allowedAsRoot`, no incoming `allowedChild`, not element |
-| Orphan composition target | composed but never a child, never root, never a block (a pure mixin, informational) |
+| Duplicate property alias | two compositions, or a composition and the type's own properties, contribute the same property alias. This is the composition bug that breaks editing |
+| Broken block reference | a block editor configuration names an Element Type key that no longer exists. The block inspector emits this instead of silently dropping the edge |
+| No properties | zero own and zero composed properties |
+| No template | not element, zero allowed templates. Informational tier |
+| Pure mixin | composed but never a child, never root, never a block (a pure mixin, informational) |
 | Complexity | `own + composed properties + 2*compositions + block targets`, bucketed into 5 tiers for the lens |
+
+Every finding carries a stable id (kind plus node id), a severity (problem or note) and the node it points at, so the drawer can filter and link.
 
 ---
 
@@ -216,12 +222,12 @@ All of this is in-process and runs on the host site. No new tables.
 | Folders | `IContentTypeService.GetContainers(Array.Empty<int>())`, matched via `contentType.ParentId` / `Path` |
 | Identity, icon, element, root, variations, description | `IContentType` properties; icon string split on space for the colour suffix |
 | Own groups and properties | `PropertyGroups`, `NoGroupPropertyTypes` |
-| Composed properties and their origin | `ContentTypeComposition` (direct), walk recursively; a property is "from X" when X's own `PropertyTypes` contains its alias |
+| Composed properties and their origin | `CompositionPropertyTypes` minus own `PropertyTypes` by id gives the composed set. For origin, walk `ContentTypeComposition` once and map each composition's own property ids to that composition |
 | Inheritance | `ParentId` pointing at another content type rather than a container; emit `inherits` and keep the matching `composition` edge |
 | Allowed children | `AllowedContentTypes` (`ContentTypeSort.Key`) |
 | Templates | `AllowedTemplates`, `DefaultTemplate` |
-| Block and picker targets | `IDataTypeService.GetAllAsync()`; inspect `EditorAlias` against `Constants.PropertyEditors.Aliases.BlockList`, `BlockGrid`, `RichText`, `MultiNodeTreePicker`; read `ConfigurationObject` (`BlockListConfiguration.Blocks[].ContentElementTypeKey` / `SettingsElementTypeKey`, `BlockGridConfiguration.Blocks[]`, `RichTextConfiguration.Blocks`, `MultiNodePickerConfiguration.Filter` as comma separated aliases) |
-| Content counts | `IContentService.Count(alias)` and `CountPublished(alias)`. Two queries per type. Measure on the seeded site before replacing them with one grouped query |
+| Block and picker targets | `IDataTypeService.GetAllAsync()`; inspect `EditorAlias` against `Constants.PropertyEditors.Aliases.BlockList`, `BlockGrid`, `RichText`, `MultiNodeTreePicker`; read `ConfigurationObject` (`BlockListConfiguration.Blocks[].ContentElementTypeKey` / `SettingsElementTypeKey`, `BlockGridConfiguration.Blocks[]`, `RichTextConfiguration.Blocks`, `SingleBlockConfiguration`, `MultiNodePickerConfiguration.Filter` as comma separated aliases). Nested block configuration can recurse, so the walk keeps a visited set of Data Type ids and one of content type keys. A configured Element Type key that resolves to nothing becomes a broken-block-reference finding |
+| Content counts | One SQL query, left join from `cmsContentType` to `umbracoContent` and `umbracoNode` filtered to the document object type, grouped by content type, with `SUM` over `umbracoDocument.published` and `umbracoNode.trashed`. Left join so a type with zero content still gets a row. One round trip for the whole install |
 | Root instances | nodes at level 1 grouped by content type (`IContentService.GetRootContent()` grouped, or the same query) |
 | Cultures | `umbracoDocumentCultureVariation` grouped by content type, only when any type varies by culture |
 | Instance references | `IRelationService` relations of type `Constants.Conventions.RelationTypes.RelatedDocumentAlias`, joined to both ends' content type and grouped |
@@ -230,7 +236,7 @@ All of this is in-process and runs on the host site. No new tables.
 Caching and invalidation:
 
 - The builder keeps the last `SchemaGraph` in a field. One `INotificationHandler` for `ContentTypeCacheRefresherNotification` and `DataTypeCacheRefresherNotification` clears it. Those fire on every server after any save, delete or move, so load balancing needs nothing extra.
-- `UsageCollector` caches for 60 seconds; `?refresh=true` bypasses.
+- `UsageCollector` caches for 60 seconds. `?refresh=true` bypasses. No lock around the cold path; the query is one round trip.
 
 Authorization: `[Authorize(Policy = AuthorizationPolicies.SectionAccessSettings)]` on both controllers. The dashboard is only registered under Settings, and the workspace view is inside the Settings section. Access is therefore whatever the administrator grants a user group for Settings; the package adds no permission of its own.
 
@@ -287,7 +293,7 @@ The workspace view consumes `UMB_DOCUMENT_TYPE_WORKSPACE_CONTEXT` (from `@umbrac
 
 ### Vite
 
-Library mode, ES output, two entries (`dashboard`, `workspace`), `rollupOptions.external: [/^@umbraco-cms\//]`, `base: "/App_Plugins/SchemaCity/"`. Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the dashboard element, so opening Settings never pays for three.js, only opening the dashboard does.
+Library mode, ES output, two entries (`dashboard`, `workspace`), `rollupOptions.external: [/^@umbraco-cms\//]`, `base: "/App_Plugins/SchemaCity/"`. Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the dashboard element, so opening Settings never pays for three.js, only opening the dashboard does. If the template's `openapi-ts` wiring costs more than it saves, a 40-line fetch helper that calls `umbHttpClient` is the fallback; GodMode ships that way.
 
 ### API client
 
@@ -364,9 +370,10 @@ Same placements, different colours. Modes: content count (sequential ramp), publ
 | Drag | orbit at a fixed isometric polar angle in ortho mode, free orbit in Explore |
 | Right-drag / two-finger | pan |
 | Wheel | zoom (ortho zoom, not dolly) |
-| `Cmd/Ctrl + K` or `/` | search palette, fuzzy on name and alias, Enter selects and flies |
+| `Cmd/Ctrl + K` or `/` | search palette, fuzzy on type name, alias and property alias, so "heroImage" finds every type that has that field. Enter selects and flies |
 | Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer |
-| Inspector | header (icon, name, alias, badges), Compositions, Allowed parents, Allowed children, Templates, Usage, then floors as a collapsible tree; every type name is a link that selects it |
+| Findings drawer | grouped by severity, filter by kind, each row links to its node. Counts shown as matched / total |
+| Inspector | header (icon, name, alias, badges), Compositions, Allowed parents, Allowed children, Templates, Usage, then floors as a collapsible tree; every type name is a link that selects it. Every type name also has an edit link that opens the real Document Type editor |
 | URL | `?type=<alias>&layer=<layer>&lens=<lens>` so the workspace view and findings can deep link |
 
 Accessibility: the canvas is `aria-hidden`; the inspector and a hidden type list are the accessible surface, with arrow keys moving selection and the scene following. A "list view" toggle that hides the canvas entirely is cheap and worth shipping in v1.
@@ -388,6 +395,10 @@ fsn is pnpm + Turborepo, Vite, three.js 0.179, Biome lint-only, vitest. Its `pac
 | Light dismiss helper | `light-dismiss.ts` | search palette |
 | `textContent`-only DOM helper | `viewers/dom.ts` | inspector rendering, names are untrusted |
 | Conventions | `CLAUDE.md` | why-comments, colocated behaviour tests, no snapshot tests |
+
+### From Umbraco.GodMode
+
+Umbraco.GodMode (DanDiplo) answers most of the same questions as flat tables. Taken from its code: the single grouped count query, the block configuration switch including `SingleBlockConfiguration`, composed-property detection by id set difference, the visited sets for nested block recursion, property-alias search, edit links from every type name, and findings with stable ids and severities. Not taken: Data Type nodes, configuration drift heuristics, template diagnostics, a chart toggle, and a lock around the cache.
 
 Leave behind: `FsNode`, categories, directory areas, the route/history model, all viewers, Tauri.
 
@@ -427,7 +438,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 - `UsageCollector` and `usage` endpoint with caching. Tests for the aggregation.
 - Usage lens with five modes and legend, badges on roofs.
-- `findings.ts` with tests; Findings drawer listing unused types, unused element types, dead ends, unused compositions, complexity tiers; each finding links to the node.
+- `findings.ts` with tests. Findings drawer listing unused types, unused element types, dead ends, unused compositions, duplicate property aliases, broken block references, types with no properties, types with no template, and complexity tiers, each linking to its node.
 - Exit: the findings drawer reports exactly the planted set on the seeded site, on both Umbraco majors.
 
 ### M4, Polish and release (medium)
@@ -455,7 +466,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
 | Three.js bundle size in the backoffice | Separate chunk, loaded only when the dashboard opens. |
-| Usage queries slow on large installs | Service API first, 60 s cache, `refresh` on demand. The city never waits for usage. |
+| Usage queries slow on large installs | One grouped query for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
 | Backoffice API surface changes between 17, 18 and 19 | Only three imports are Umbraco-specific (`tryExecute`, `umbHttpClient`, the workspace context token). Keep them in one `ui/umbraco.ts` file. The CI matrix catches breakage on the day it ships. |
 | Shadow DOM and WebGL canvas sizing | `ResizeObserver` on the host element, `devicePixelRatio` cap at 2. |
 | Untrusted names and aliases in the inspector | `textContent` only, never `innerHTML`, same as fsn. |
