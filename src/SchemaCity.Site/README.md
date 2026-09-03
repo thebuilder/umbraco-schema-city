@@ -10,18 +10,21 @@ dotnet run --project src/SchemaCity.Site
 ```
 
 It listens on https://localhost:44341 and http://localhost:61801. The first boot installs itself
-unattended into a SQLite file at `umbraco/Data/Umbraco.sqlite.db`. Delete that file to start over.
+unattended into a SQLite file at `umbraco/Data/Umbraco.sqlite.db`, in any environment, because the
+unattended install settings and the connection string live in `appsettings.json` rather than the
+Development overrides. Delete that file to start over.
 
-## Dev credentials
+## Demo credentials
 
-These are for this local site only. They are in `appsettings.Development.json` in plain text,
-which is how Umbraco's unattended install works. Never reuse them anywhere.
+These are for this throwaway site only. They are in `appsettings.json` in plain text, which is how
+Umbraco's unattended install works. Never reuse them anywhere.
 
 - Email: admin@example.com
-- Password: ScXlyQOiHBASNYe3V3!7
+- Password: SchemaCity1234!
 
 `Umbraco:CMS:Imaging:HMACSecretKey` in `appsettings.Development.json` is a fixed dev-only value, so
-a Development boot stops generating one and rewriting `appsettings.json`.
+a Development boot stops generating one and rewriting `appsettings.json`. A first boot in another
+environment still writes a generated key into `appsettings.json`; revert that file afterwards.
 
 ## Seed data
 
