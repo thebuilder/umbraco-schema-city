@@ -16,6 +16,7 @@ import {
 } from "./scene/buildings";
 import { neighboursOf } from "./scene/graph-links";
 import { CHAR_PX, LABEL_CAP, pickLabels } from "./scene/labels";
+import { type Anchor, buildLinkGeometry, type Layer, type LinkRange } from "./scene/layers";
 import { buildRoadGeometry } from "./scene/roads";
 
 type Palette = {
@@ -271,6 +272,38 @@ function Buildings({
   );
 }
 
+/**
+ * One colour per vertex, so selecting a node fades every edge it does not touch
+ * without the geometry being rebuilt. In focus mode nothing is faded, because
+ * every edge drawn there already belongs to the focused node.
+ */
+function fadeColors(
+  ranges: LinkRange[],
+  vertices: number,
+  colour: THREE.Color,
+  background: string,
+  selected: string | null,
+  focus: string | null,
+): Float32Array {
+  const faded = colour.clone().lerp(new THREE.Color(background), FADE_MIX);
+  const array = new Float32Array(vertices);
+  for (const range of ranges) {
+    const lit =
+      focus !== null ||
+      selected === null ||
+      range.edge.from === selected ||
+      range.edge.to === selected;
+    const shown = lit ? colour : faded;
+    for (let i = range.start; i < range.start + range.count; i++) {
+      array[i * 3] = shown.r;
+      array[i * 3 + 1] = shown.g;
+      array[i * 3 + 2] = shown.b;
+    }
+  }
+  return array;
+}
+
+/** The Structure layer: every allowedChild edge as a ribbon on the ground. */
 function Roads({
   placementsById,
   edges,
@@ -279,41 +312,27 @@ function Roads({
   palette,
 }: {
   placementsById: Map<string, Placement>;
-  edges: SchemaGraph["edges"];
+  edges: SchemaEdge[];
   selected: string | null;
   focus: string | null;
   palette: Palette;
 }) {
-  // In focus mode the city's other roads are noise around a layout that is about
-  // one node, so only the roads that touch it get built at all.
-  const drawn = useMemo(
-    () => (focus ? (edges ?? []).filter((edge) => touches(edge, focus)) : (edges ?? [])),
-    [edges, focus],
-  );
   const { positions, ranges } = useMemo(
-    () => buildRoadGeometry(placementsById, drawn),
-    [placementsById, drawn],
+    () => buildRoadGeometry(placementsById, edges),
+    [placementsById, edges],
   );
-
-  const colors = useMemo(() => {
-    const dim = new THREE.Color(palette.dim);
-    const faded = dim.clone().lerp(new THREE.Color(palette.background), FADE_MIX);
-    const array = new Float32Array(positions.length);
-    for (const range of ranges) {
-      const lit =
-        focus !== null ||
-        selected === null ||
-        range.edge.from === selected ||
-        range.edge.to === selected;
-      const colour = lit ? dim : faded;
-      for (let i = range.start; i < range.start + range.count; i++) {
-        array[i * 3] = colour.r;
-        array[i * 3 + 1] = colour.g;
-        array[i * 3 + 2] = colour.b;
-      }
-    }
-    return array;
-  }, [positions, ranges, selected, focus, palette]);
+  const colors = useMemo(
+    () =>
+      fadeColors(
+        ranges,
+        positions.length,
+        new THREE.Color(palette.dim),
+        palette.background,
+        selected,
+        focus,
+      ),
+    [positions, ranges, selected, focus, palette],
+  );
 
   if (positions.length === 0) return null;
 
@@ -328,114 +347,67 @@ function Roads({
   );
 }
 
-const touches = (edge: SchemaEdge, id: string) => edge.from === id || edge.to === id;
-
-/** How high a composition link arches over the two buildings it joins. */
-const LINK_ARCH = 3;
-/** How close to the ground a block link dips on its way to the element district. */
-const LINK_DIP = 0.25;
-const DASH_ON = 0.55;
-const DASH_OFF = 0.4;
-
 /**
- * The compositions, blocks and references of the focused node, as straight lines
- * bent over one midpoint. Compositions and inheritance arch above the roofs, block
- * links dip to the ground, and references are dotted. The city draws none of these;
- * they are what makes the inspector's lists visible in focus mode.
+ * One of the three link layers, merged into a single line geometry. The geometry is
+ * rebuilt when the graph, the layout or the layer set changes, and never for a
+ * selection: that only rewrites the colour attribute.
  */
-function FocusLinks({
-  focus,
+function Links({
+  layer,
   edges,
-  placementsById,
-  heights,
+  anchors,
+  colour,
   palette,
+  selected,
+  focus,
 }: {
-  focus: string;
-  edges: SchemaGraph["edges"];
-  placementsById: Map<string, Placement>;
-  heights: Map<string, number>;
+  layer: Exclude<Layer, "structure">;
+  edges: SchemaEdge[];
+  anchors: Map<string, Anchor>;
+  colour: string;
   palette: Palette;
+  selected: string | null;
+  focus: string | null;
 }) {
-  const lines = useMemo(() => {
-    const built: Record<"composition" | "block" | "reference", number[]> = {
-      composition: [],
-      block: [],
-      reference: [],
-    };
-    const roofOf = (id: string) => {
-      const placement = placementsById.get(id);
-      if (!placement) return null;
-      const height = heights.get(id) ?? placement.height;
-      return new THREE.Vector3(
-        placement.position.x,
-        (placement.y ?? 0) + height * 0.8,
-        placement.position.z,
-      );
-    };
+  const { positions, ranges } = useMemo(
+    () => buildLinkGeometry(layer, edges, anchors),
+    [layer, edges, anchors],
+  );
+  const colors = useMemo(
+    () =>
+      fadeColors(
+        ranges,
+        positions.length,
+        new THREE.Color(colour),
+        palette.background,
+        selected,
+        focus,
+      ),
+    [positions, ranges, colour, palette, selected, focus],
+  );
 
-    const origin = roofOf(focus);
-    if (!origin) return built;
-
-    for (const edge of edges ?? []) {
-      // Inheritance is the thicker composition in the plan; one arch covers both
-      // until a real ribbon geometry replaces these lines.
-      const kind = edge.kind === "inherits" ? "composition" : edge.kind;
-      if (kind !== "composition" && kind !== "block" && kind !== "reference") continue;
-      if (!touches(edge, focus)) continue;
-      const other = roofOf(edge.from === focus ? edge.to : edge.from);
-      if (!other) continue;
-
-      const mid = origin.clone().add(other).multiplyScalar(0.5);
-      if (kind === "composition") mid.y = Math.max(origin.y, other.y) + LINK_ARCH;
-      if (kind === "block") mid.y = LINK_DIP;
-      const out = built[kind];
-      if (kind === "reference") {
-        pushDashes(out, origin, mid);
-        pushDashes(out, mid, other);
-      } else {
-        out.push(origin.x, origin.y, origin.z, mid.x, mid.y, mid.z);
-        out.push(mid.x, mid.y, mid.z, other.x, other.y, other.z);
-      }
-    }
-    return built;
-  }, [focus, edges, placementsById, heights]);
-
-  const styles = [
-    { kind: "composition", colour: palette.azure },
-    { kind: "block", colour: palette.amber },
-    { kind: "reference", colour: palette.violet },
-  ] as const;
+  if (positions.length === 0) return null;
 
   return (
-    <>
-      {styles.map(({ kind, colour }) =>
-        lines[kind].length === 0 ? null : (
-          <lineSegments frustumCulled={false} key={kind}>
-            <bufferGeometry>
-              <bufferAttribute
-                args={[new Float32Array(lines[kind]), 3]}
-                attach="attributes-position"
-              />
-            </bufferGeometry>
-            <lineBasicMaterial color={colour} />
-          </lineSegments>
-        ),
-      )}
-    </>
+    <lineSegments frustumCulled={false}>
+      <bufferGeometry>
+        <bufferAttribute args={[positions, 3]} attach="attributes-position" />
+        <bufferAttribute args={[colors, 3]} attach="attributes-color" />
+      </bufferGeometry>
+      <lineBasicMaterial vertexColors />
+    </lineSegments>
   );
 }
 
-// ponytail: dashes are cut into the geometry rather than drawn with
-// LineDashedMaterial, which would need computeLineDistances on a geometry React
-// has not attached yet. A dozen reference links is nothing to rebuild.
-function pushDashes(out: number[], from: THREE.Vector3, to: THREE.Vector3) {
-  const span = from.distanceTo(to);
-  for (let at = 0; at < span; at += DASH_ON + DASH_OFF) {
-    const a = from.clone().lerp(to, at / span);
-    const b = from.clone().lerp(to, Math.min(1, (at + DASH_ON) / span));
-    out.push(a.x, a.y, a.z, b.x, b.y, b.z);
-  }
-}
+const touches = (edge: SchemaEdge, id: string) => edge.from === id || edge.to === id;
+
+/** The three layers drawn as lines, and the theme token each one is coloured with. */
+const LINK_LAYERS = [
+  { layer: "compositions", token: "azure" },
+  { layer: "blocks", token: "amber" },
+  { layer: "references", token: "violet" },
+] as const satisfies readonly { layer: Exclude<Layer, "structure">; token: keyof Palette }[];
+
 
 /** How many neighbours of the selected node still get a label each. */
 const MAX_NEIGHBOUR_LABELS = 8;
@@ -747,12 +719,14 @@ export default function Scene({
   graph,
   selected,
   focus,
+  layers,
   onSelect,
   onFocus,
 }: {
   graph: SchemaGraph;
   selected: string | null;
   focus: string | null;
+  layers: readonly Layer[];
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
 }) {
@@ -844,6 +818,31 @@ export default function Scene({
   }, [nodesById, placements]);
   const plazas = useMemo(() => buildPlazaCells(nodesById, placements), [nodesById, placements]);
 
+  // In focus mode the city's other edges are noise around a layout that is about
+  // one node, so only the edges that touch it are built at all. Structure is on
+  // there whatever the toolbar says, because a hub without its roads is a list.
+  const drawnEdges = useMemo(
+    () => (focus ? (graph.edges ?? []).filter((edge) => touches(edge, focus)) : graph.edges ?? []),
+    [graph.edges, focus],
+  );
+  const active = useMemo(
+    () => new Set<Layer>(focus ? [...layers, "structure"] : layers),
+    [layers, focus],
+  );
+  // A link leaves from the roof of the building it belongs to, so it stays visible
+  // over a tall neighbour and moves with the focus tween.
+  const anchors = useMemo(() => {
+    const map = new Map<string, Anchor>();
+    for (const placement of placements) {
+      map.set(placement.id, {
+        x: placement.position.x,
+        y: (placement.y ?? 0) + (heights.get(placement.id) ?? placement.height) * 0.8,
+        z: placement.position.z,
+      });
+    }
+    return map;
+  }, [placements, heights]);
+
   // The scene colours are the theme's own tokens, read once from an element inside
   // the shadow root, so the city and the chrome can never drift apart.
   useEffect(() => {
@@ -887,22 +886,29 @@ export default function Scene({
             reducedMotion={reducedMotion}
             selected={selected}
           />
-          <Roads
-            edges={graph.edges}
-            focus={focus}
-            palette={palette}
-            placementsById={placementsById}
-            selected={selected}
-          />
-          {focus ? (
-            <FocusLinks
-              edges={graph.edges}
+          {active.has("structure") ? (
+            <Roads
+              edges={drawnEdges}
               focus={focus}
-              heights={heights}
               palette={palette}
               placementsById={placementsById}
+              selected={selected}
             />
           ) : null}
+          {LINK_LAYERS.map(({ layer, token }) =>
+            active.has(layer) ? (
+              <Links
+                anchors={anchors}
+                colour={palette[token]}
+                edges={drawnEdges}
+                focus={focus}
+                key={layer}
+                layer={layer}
+                palette={palette}
+                selected={selected}
+              />
+            ) : null,
+          )}
           <Labels
             focusNeighbours={focusNeighbours}
             heights={heights}

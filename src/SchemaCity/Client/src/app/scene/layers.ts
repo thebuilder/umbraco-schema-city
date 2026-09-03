@@ -1,0 +1,155 @@
+// The relationship layers: which edge kind each one draws, and one merged line
+// geometry per layer so the scene spends a single draw call on all of them.
+// Pure: no three.js, no React, no DOM.
+import type { EdgeKind, SchemaEdge } from "../../model/types";
+
+export type Layer = "structure" | "compositions" | "blocks" | "references";
+
+/** Toolbar order, and the order a layer list is written to the URL in. */
+export const LAYERS: readonly Layer[] = [
+  "structure",
+  "compositions",
+  "blocks",
+  "references",
+];
+
+/** Structure alone. The other three are noise until you ask for them. */
+export const DEFAULT_LAYERS: readonly Layer[] = ["structure"];
+
+export const LAYER_OF: Record<EdgeKind, Layer> = {
+  allowedChild: "structure",
+  block: "blocks",
+  composition: "compositions",
+  inherits: "compositions",
+  reference: "references",
+};
+
+/** Where a link attaches to a building: its roof, in world units. */
+export type Anchor = { x: number; y: number; z: number };
+
+export type LinkRange = { edge: SchemaEdge; start: number; count: number };
+
+/** How high a composition arc rises over the taller of the two roofs it joins. */
+const ARCH = 3;
+/** How close to the ground a block link dips on its way to the element district. */
+const DIP = 0.25;
+/** Samples along one curve. Ten reads as a curve and costs twenty vertices. */
+const SEGMENTS = 10;
+const DASH_ON = 0.55;
+const DASH_OFF = 0.4;
+// ponytail: WebGL ignores a line width above 1 on every desktop driver, so the
+// thicker inheritance arc is two arcs a hair apart instead. drei's Line2 would give
+// real width, at the cost of a fat triangle geometry per layer.
+const THICK_OFFSET = 0.09;
+
+/**
+ * One flat xyz line-segment list for every edge in `layer`, plus the vertex range
+ * each edge occupies so the scene can fade one edge without rebuilding anything.
+ *
+ * Compositions arch over the roofs, blocks dip to the ground on their way to the
+ * element district, and references are dotted straight lines.
+ */
+export function buildLinkGeometry(
+  layer: Exclude<Layer, "structure">,
+  edges: SchemaEdge[],
+  anchors: Map<string, Anchor>,
+): { positions: Float32Array; ranges: LinkRange[] } {
+  const positions: number[] = [];
+  const ranges: LinkRange[] = [];
+  const drawn = new Set<string>();
+  // An inherited parent arrives as both an inherits and a composition edge. The
+  // thicker arc is the one worth drawing, so the composition twin is dropped
+  // whichever order the two came in.
+  const inherited =
+    layer === "compositions"
+      ? new Set(
+          edges
+            .filter((edge) => edge.kind === "inherits")
+            .map((edge) => `${edge.from}|${edge.to}`),
+        )
+      : null;
+
+  for (const edge of edges) {
+    if (LAYER_OF[edge.kind] !== layer) continue;
+    if (edge.kind === "composition" && inherited?.has(`${edge.from}|${edge.to}`)) continue;
+    // Two block properties on one type pointing at the same Element Type are one
+    // line, not two drawn on top of each other. That is 38 of the seeded schema's
+    // 340 block edges, and the inspector is where the property aliases are read.
+    const pair = `${edge.from}|${edge.to}`;
+    if (drawn.has(pair) || edge.from === edge.to) continue;
+    const from = anchors.get(edge.from);
+    const to = anchors.get(edge.to);
+    if (!from || !to) continue;
+    drawn.add(pair);
+
+    const start = positions.length / 3;
+    if (layer === "references") {
+      pushDashes(positions, from, to);
+    } else {
+      // A quadratic curve only travels half way to its control point, so the
+      // control is put twice as far out as the height the curve should reach.
+      const apex = (height: number) => 2 * height - (from.y + to.y) / 2;
+      const control = {
+        x: (from.x + to.x) / 2,
+        y: layer === "compositions" ? apex(Math.max(from.y, to.y) + ARCH) : apex(DIP),
+        z: (from.z + to.z) / 2,
+      };
+      for (const offset of edge.kind === "inherits" ? [-THICK_OFFSET, THICK_OFFSET] : [0]) {
+        pushCurve(positions, from, control, to, offset);
+      }
+    }
+    ranges.push({ edge, start, count: positions.length / 3 - start });
+  }
+
+  return { positions: new Float32Array(positions), ranges };
+}
+
+/** A quadratic curve as `SEGMENTS` joined segments, shifted sideways by `offset`. */
+function pushCurve(
+  out: number[],
+  from: Anchor,
+  control: Anchor,
+  to: Anchor,
+  offset: number,
+) {
+  const span = Math.hypot(to.x - from.x, to.z - from.z) || 1;
+  const offsetX = (-(to.z - from.z) / span) * offset;
+  const offsetZ = ((to.x - from.x) / span) * offset;
+
+  let px = from.x + offsetX;
+  let py = from.y;
+  let pz = from.z + offsetZ;
+  for (let step = 1; step <= SEGMENTS; step++) {
+    const t = step / SEGMENTS;
+    const u = 1 - t;
+    const qx =
+      u * u * (from.x + offsetX) + 2 * u * t * (control.x + offsetX) + t * t * (to.x + offsetX);
+    const qy = u * u * from.y + 2 * u * t * control.y + t * t * to.y;
+    const qz =
+      u * u * (from.z + offsetZ) + 2 * u * t * (control.z + offsetZ) + t * t * (to.z + offsetZ);
+    out.push(px, py, pz, qx, qy, qz);
+    px = qx;
+    py = qy;
+    pz = qz;
+  }
+}
+
+// ponytail: dashes are cut into the geometry rather than drawn with
+// LineDashedMaterial, which would need computeLineDistances on a geometry React has
+// not attached yet. The seeded schema has 38 reference links to cut.
+function pushDashes(out: number[], from: Anchor, to: Anchor) {
+  const span = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+  if (span < 1e-6) return;
+  for (let at = 0; at < span; at += DASH_ON + DASH_OFF) {
+    const start = at / span;
+    const end = Math.min(1, (at + DASH_ON) / span);
+    out.push(
+      from.x + (to.x - from.x) * start,
+      from.y + (to.y - from.y) * start,
+      from.z + (to.z - from.z) * start,
+      from.x + (to.x - from.x) * end,
+      from.y + (to.y - from.y) * end,
+      from.z + (to.z - from.z) * end,
+    );
+  }
+}

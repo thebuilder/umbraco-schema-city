@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +26,14 @@ import { neighbourhoods } from "../model/neighbourhood";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph } from "../model/types";
 import { Inspector } from "./Inspector";
+import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
+
+const LAYER_LABEL: Record<Layer, string> = {
+  structure: "Structure",
+  compositions: "Compositions",
+  blocks: "Blocks",
+  references: "References",
+};
 
 // three.js, fiber and drei are a third of the bundle, so they load with the scene
 // rather than with the workspace element.
@@ -39,6 +48,7 @@ export function App({
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
+  const [layers, setLayers] = useState<Layer[]>([...DEFAULT_LAYERS]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
@@ -108,6 +118,21 @@ export function App({
           </h1>
           <Badge>{nodes.length} types</Badge>
 
+          <ToggleGroup
+            aria-label="Relationship layers"
+            className="ml-4"
+            multiple
+            onValueChange={(value) => setLayers(value as Layer[])}
+            size="sm"
+            value={layers}
+          >
+            {LAYERS.map((layer) => (
+              <ToggleGroupItem key={layer} value={layer}>
+                {LAYER_LABEL[layer]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+
           <div className="ml-auto flex items-center gap-2">
             <Popover>
               <PopoverTrigger render={<Button size="sm" variant="outline" />}>
@@ -146,6 +171,7 @@ export function App({
               <Scene
                 focus={focus}
                 graph={graph}
+                layers={layers}
                 onFocus={enterFocus}
                 onSelect={setSelected}
                 selected={selected}
