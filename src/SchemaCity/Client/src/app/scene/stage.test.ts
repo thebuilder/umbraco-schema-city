@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { FLOOR_HEIGHT } from "./buildings";
 import {
   districtStamp,
   fogRange,
@@ -95,8 +96,19 @@ test("a district's name prints in the band along the north edge of its island", 
   expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(island.minZ + STAMP_BAND);
 });
 
-test("the band is a cap height with an inset above it and below it", () => {
-  expect(STAMP_BAND).toBeCloseTo(STAMP_CAP + 1);
+test("the band clears a first row of four floors at the isometric angle", () => {
+  const floors = 4 * FLOOR_HEIGHT;
+  // An inset, the letters, and the ground a four-floor roof leans over on the
+  // island's diagonal. About 7.9 units.
+  expect(STAMP_BAND).toBeCloseTo(0.5 + STAMP_CAP + Math.SQRT2 * floors);
+
+  // What that buys: a building standing one row south of the band hides the ground
+  // sqrt(2) times its height north of it, and the letters end before that reaches.
+  const island = { minX: 0, maxX: 60, minZ: 0, maxZ: 40 };
+  const stamp = districtStamp(island, 7);
+  const roof = island.minZ + STAMP_BAND;
+
+  expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(roof - Math.SQRT2 * floors);
 });
 
 test("a name too wide for its island shrinks instead of hanging over the void", () => {

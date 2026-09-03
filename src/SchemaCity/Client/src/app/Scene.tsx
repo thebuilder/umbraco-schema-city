@@ -1070,7 +1070,7 @@ const WHITE = "#ffffff";
 
 /**
  * Font size a district's name is rasterised at. Its cap height comes out around 72 px,
- * and the stamp is at most 3 world units tall, so the print carries about 24 px of
+ * and the stamp is at most 4 world units tall, so the print carries about 18 px of
  * texture per world unit. The ground needs 2 to stay crisp at the framing zoom, and
  * the rest is what Explore leans on when the camera comes down to street level.
  */
@@ -1087,7 +1087,7 @@ const STAMP_TRACKING = "0.32em";
  * How solid the print reads against the island under it. Phosphor-dim at 0.8 comes
  * out around #3f6b60 over the panel colour, which is still darker than any building
  * and half the strength of a road. Lower than this and the letters go, because the
- * whole city framed shrinks a 100 px raster to a 17 px cap and the mipmap averages a
+ * whole city framed shrinks a 100 px raster to a 22 px cap and the mipmap averages a
  * thin stroke into the slab.
  */
 const STAMP_OPACITY = 0.8;
