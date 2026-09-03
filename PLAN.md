@@ -258,7 +258,7 @@ GET /umbraco/management/api/v1/schema-city/usage?refresh=false
 - `src/app/` is the React application and imports nothing from `@umbraco-cms/backoffice`. It takes the graph and usage objects and a `focus` id as props, and calls back through props (`onOpenType`).
 - The two wrapper elements, the home workspace and the Document Type editor view, are the only Umbraco-aware code. They fetch, read the workspace context, resolve icons, and turn `onOpenType` into an editor link.
 - The harness renders the same `App` from fixtures and a query string.
-- `model/` stays pure: no DOM, no three.js, no React. Vitest-tested with fixture JSON. The layout functions (dagre to placements, focus layout) live under `app/` beside the scene and are pure in the same way.
+- `model/` stays pure: no DOM, no three.js, no React. Vitest-tested with fixture JSON. The layout functions (dagre to placements, focus layout) live in `app/layout/` and are pure in the same way.
 - `components/ui/` holds the copied-in afterglow primitives. They are edited in place; there is no upstream to update from.
 
 ### Extension manifests (`public/umbraco-package.json`)
@@ -337,7 +337,7 @@ One hand-written function per endpoint in `src/api.ts`, calling `umbHttpClient.g
 
 ## 6. Visual and layout specification
 
-### Layout (`layout/city.ts`)
+### Layout (`app/layout/city.ts`)
 
 1. Partition nodes into districts:
    - **Structure district**: every non-element type reachable from an `allowedAsRoot` type along `allowedChild` edges, plus roots themselves.
@@ -351,7 +351,7 @@ One hand-written function per endpoint in `src/api.ts`, calling `umbHttpClient.g
 
 Determinism: sort nodes and edges by alias before dagre. Dagre is deterministic for a given input order, so the layout needs no persistence and no hash.
 
-### Focus layout (`layout/focus.ts`)
+### Focus layout (`app/layout/focus.ts`)
 
 Given a focused node id, produce placements for the focused node and its neighbourhood:
 
@@ -453,7 +453,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
   - Exit for the spike: the four base-ui surfaces and the R3F canvas work in the harness and inside the backoffice on both majors.
 - `SchemaGraphBuilder` complete for identity, behaviour, groups, properties, compositions, inheritance, allowed children, templates. Unit tests against hand-built `ContentType` instances.
 - `BlockEditorInspector` for Block List, Block Grid, RTE blocks, MNTP filter. Unit tests per editor.
-- `layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance.
+- `app/layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance.
 - Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, drei `Html` labels, intro rise.
 - Inspector with all schema sections. Search palette.
 - Exit: usable on the seeded schema and `pathological.json`; 300 types at 60 fps on an M-series laptop.
@@ -503,7 +503,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Usage queries slow on large installs | One grouped query for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
 | Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements, and let the CI boot step on both majors be the detector. |
 | Shadow DOM and WebGL canvas sizing | `ResizeObserver` on the host element, `devicePixelRatio` cap at 2. |
-| Untrusted names and aliases in the inspector | `textContent` only, never `innerHTML`, same as fsn. |
+| Untrusted names and aliases in the inspector | Rendered as text by React, never through `dangerouslySetInnerHTML`; the wrapper never builds HTML from names either. |
 
 ---
 
@@ -512,7 +512,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layer | How |
 | --- | --- |
 | Graph builder, block inspector, usage aggregation | xUnit with hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
-| `model/`, `layout/` | vitest on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 50 ms, findings rules |
+| `model/`, `app/layout/` | vitest on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 50 ms, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
 | Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |
@@ -524,7 +524,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 1. Run the template, commit the untouched scaffold, then replace the example with `Constants.cs` and the graph controller. Done.
 2. Write `Models/` and `model/types.ts` together so the contract is fixed before any rendering. Done.
 3. Write `SchemaSeeder` and export `medium.json` from it.
-4. Build `layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings.
+4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings.
 5. Then buildings, then roads, then the inspector.
 
 ## 13. Resolved questions
