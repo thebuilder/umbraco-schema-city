@@ -27,6 +27,7 @@ import { searchNodes } from "../model/search";
 import type { SchemaGraph } from "../model/types";
 import { Inspector } from "./Inspector";
 import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
+import { parseUrl, serialiseUrl, type UrlState } from "./url";
 
 const LAYER_LABEL: Record<Layer, string> = {
   structure: "Structure",
@@ -141,13 +142,35 @@ const Scene = lazy(() => import("./Scene"));
 export function App({
   graph,
   onOpenType,
+  initial,
+  onStateChange,
 }: {
   graph: SchemaGraph;
   onOpenType?: (id: string) => void;
+  /**
+   * Where to start. Left out, the app reads its own query string. `type` is a node
+   * id or an alias, because the Document Type editor knows the key it is on and a
+   * link knows the alias.
+   */
+  initial?: { type?: string | null; focus?: boolean; layers?: Layer[] };
+  /** Given, the host owns the address bar and the app writes nothing. */
+  onStateChange?: (state: UrlState) => void;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [focus, setFocus] = useState<string | null>(null);
-  const [layers, setLayers] = useState<Layer[]>([...DEFAULT_LAYERS]);
+  const [start] = useState(() => {
+    const state =
+      initial ?? parseUrl(window.location.search, graph.nodes.map((node) => node.alias));
+    const node =
+      graph.nodes.find((candidate) => candidate.id === state.type) ??
+      graph.nodes.find((candidate) => candidate.alias === state.type);
+    return {
+      id: node?.id ?? null,
+      focus: state.focus === true,
+      layers: state.layers ?? [...DEFAULT_LAYERS],
+    };
+  });
+  const [selected, setSelected] = useState<string | null>(start.id);
+  const [focus, setFocus] = useState<string | null>(start.focus ? start.id : null);
+  const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
@@ -185,6 +208,24 @@ export function App({
     [nodes],
   );
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
+  const aliasById = useMemo(
+    () => new Map(nodes.map((node) => [node.id, node.alias])),
+    [nodes],
+  );
+
+  useEffect(() => {
+    // The type in the link is the one the view is about, which in focus mode is
+    // the focused node even when a click inside its neighbourhood selected
+    // another. That selection is the one thing here a link cannot carry back.
+    const at = focus ?? selected;
+    const state: UrlState = {
+      type: at ? aliasById.get(at) ?? null : null,
+      focus: focus !== null,
+      layers,
+    };
+    if (onStateChange) onStateChange(state);
+    else window.history.replaceState(null, "", window.location.pathname + serialiseUrl(state));
+  }, [selected, focus, layers, aliasById, onStateChange]);
   const hits = useMemo(() => searchNodes(nodes, query), [nodes, query]);
   const selectedNode = selected ? nodesById.get(selected) : undefined;
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
