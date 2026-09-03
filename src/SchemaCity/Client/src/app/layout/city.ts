@@ -77,6 +77,13 @@ const GAP = FOOTPRINT * 1.5;
  */
 export const STREET = 9;
 /**
+ * The void between two islands, which is twice a street. At one street the islands
+ * read as one plate with seams in it: the padding around each district's buildings
+ * meets its neighbour's and the grid under them never shows. The roads between
+ * districts route over the wider void the same way.
+ */
+export const DISTRICT_GAP = STREET * 2;
+/**
  * Ground between a district's outermost building and the edge of its island. The
  * scene draws the slab from it, and the layout needs it here to know how much of the
  * name's band the padding already covers.
@@ -324,7 +331,7 @@ function layoutDistrict(
  *
  * Compositions north, the structure districts across the middle ordered largest first,
  * elements south, and everything with no structure in it, Unfiled included, east of the
- * lot. A street of nine units separates any two of them.
+ * lot. A void of two streets separates any two of them.
  */
 function arrange(laid: Laid[]): District[] {
   const bandOf = (district: Laid) =>
@@ -343,7 +350,7 @@ function arrange(laid: Laid[]): District[] {
   const districts: District[] = [];
   // The district's box starts at (x, z) and its buildings a stamp margin south of
   // that, so the ground the name stands on is inside the district rather than in the
-  // street, and two islands stay a street apart however deep the margin grows.
+  // street, and two islands stay a void apart however deep the margin grows.
   const moveTo = (district: Laid, x: number, z: number) => {
     const box = boxOf(district.placements);
     for (const placement of district.placements) {
@@ -373,20 +380,20 @@ function arrange(laid: Laid[]): District[] {
     let depth = 0;
     for (const district of row) {
       const size = moveTo(district, x, z);
-      x += size.width + STREET;
+      x += size.width + DISTRICT_GAP;
       depth = Math.max(depth, size.depth);
     }
-    z += depth + STREET;
+    z += depth + DISTRICT_GAP;
   }
 
   // East of every row, so a wide row can never grow into this column.
   const eastX =
     districts.length > 0
-      ? districts.reduce((max, district) => Math.max(max, district.maxX), 0) + STREET
+      ? districts.reduce((max, district) => Math.max(max, district.maxX), 0) + DISTRICT_GAP
       : 0;
   let eastZ = 0;
   for (const district of laid.filter((d) => bandOf(d) === "east").sort(bySize)) {
-    eastZ += moveTo(district, eastX, eastZ).depth + STREET;
+    eastZ += moveTo(district, eastX, eastZ).depth + DISTRICT_GAP;
   }
   return districts;
 }

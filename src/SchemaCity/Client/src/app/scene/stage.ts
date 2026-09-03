@@ -116,120 +116,56 @@ export function framingAction<B, C>(
 export const STAMP_CAP = 3;
 
 /**
- * A true isometric view looks down at 35.26 degrees, whose sine is this. It is the
- * only elevation the overview's orbit controls allow, so it is also the shallowest
- * view the stamp ever has to stand a full cap height in.
- */
-const ISO_SINE = 1 / Math.sqrt(3);
-
-/**
- * Ground between the island's west edge and the name printed on it, and between the
- * name and the first row of buildings south of it.
+ * Ground between the name and the three island edges it sits near: the west edge it
+ * is aligned to, the north edge above it, and the first row of buildings below it.
  */
 const STAMP_INSET = 0.5;
 
 /**
- * The shallowest angle the stamp corrects for. Past it the correction runs away, and
- * a name stretched to five times its cap covers the district it names. The overview
- * camera is pinned to the isometric elevation, so this only ever bites in Explore,
- * where tilting toward the horizon now shrinks the name along with the ground it is
- * printed on rather than growing it into the district. It was 0.2, which let the
- * name reach five cap heights and needed a fifteen-unit margin to stand in.
+ * The ground an island keeps clear along its north edge for the name: a cap height
+ * with an inset above it and another below. The name lies flat and never turns, so
+ * this band holds the whole of it at every camera angle and the layout leaves it
+ * empty rather than the scene printing over a row.
  */
-const STAMP_MIN_SINE = ISO_SINE;
-
-/** Ground between the name and the first row of buildings. */
-const STAMP_GAP = 1;
+export const STAMP_BAND = STAMP_CAP + STAMP_INSET * 2;
 
 /**
- * The ground an island keeps clear along its north edge for the name, from the edge
- * to the first building's north face. The name stands at most `STAMP_CAP` divided by
- * the shallowest sine any camera reaches, so this holds it at every allowed angle,
- * and the layout leaves it empty rather than the scene printing over a row.
- */
-export const STAMP_BAND = STAMP_CAP / STAMP_MIN_SINE + STAMP_GAP;
-
-/**
- * Where a district's name lies on its island, how big the quad is and which way it
- * faces, in world units. `island` is the district's box with its padding already
- * added, `aspect` is the rasterised name's width over its cap height, and `view` is
- * the camera's ground direction with how high above the ground it stands.
+ * Where a district's name lies on its island and how big it is, in world units.
+ * `island` is the district's box with its padding already added, and `aspect` is the
+ * rasterised name's width over its cap height.
  *
- * The name still prints in the north-west margin the layout leaves, but it is turned
- * to face the camera rather than lying along the island's north edge. Printed along
- * the edge it came out of the isometric projection as a cramped 30 degree diagonal,
- * near enough vertical for a long name. Turned, its baseline is square to the view
- * and it reads horizontally at every azimuth, so the correction is a yaw about its
- * own vertical axis rather than a billboard: it stays printed on the ground.
+ * The name is a fixed part of the city rather than a label: it lies flat along the
+ * island's north edge, tucked into the north-west corner of the band the layout
+ * holds clear, and it does not turn, grow or move with the camera. The isometric
+ * projection makes a 30 degree diagonal of a line running east, so that is how the
+ * name reads, and it stays where it was put while the city is orbited.
  *
- * The height is divided by the sine of the elevation, because ground lying that far
- * from square to the view loses exactly that much of its depth on screen, so a three
- * unit cap reads as three units. `spin` is the angle to turn the flat quad by, around
- * the world's vertical.
+ * Lying square to the island is what contains it: its footprint is its own width and
+ * height, so the band holds all of it and no building can ever stand over a letter.
+ * Turning it to face the camera read horizontally at every azimuth but swept a strip
+ * at 45 degrees to the island that ran north over the street, where a building on
+ * the island behind covered the end of a long name.
  *
- * `band` is the ground the layout holds empty along the island's north edge, and the
- * stamp hangs off the south edge of it: its own southern edge sits an inset north of
- * where the first row starts, at every camera angle, so no building can print over a
- * letter. Tucking the quad into the north-west corner instead put it a half-width
- * south of the edge, and the first rows ate the middle of every long name.
- *
- * ponytail: turned to the camera, the quad's ground footprint is a strip at 45
- * degrees to the island under the isometric view, so it covers about 0.71 of its own
- * width and height in z: 29 units for a five-letter name against a band of six. The
- * band holds the edge that matters, the southern one, and the rest of the strip runs
- * north over the street. On a city whose districts sit a street apart that can reach
- * the island behind, where a tall building could still cover a letter. Containing the
- * whole strip means either a thirty-unit margin north of every district or a name
- * under one cap height on screen, so neither is worth it; printing the name along the
- * island's edge instead contains it exactly, at the price of the 30 degree diagonal
- * the turn exists to avoid.
- *
- * A stamp that will not fit in the margin at its turned size shrinks until it does,
- * which is what a district of two types would otherwise hang over the void.
+ * A name wider than its island shrinks until it fits, which is what a district of two
+ * types would otherwise hang over the void.
  */
 export function districtStamp(
   island: { minX: number; maxX: number; minZ: number; maxZ: number },
   aspect: number,
-  view: { forward: { x: number; z: number }; elevation: number },
-  band = STAMP_BAND,
   cap = STAMP_CAP,
-): { x: number; z: number; width: number; height: number; spin: number } {
+): { x: number; z: number; width: number; height: number } {
   const across = island.maxX - island.minX - STAMP_INSET * 2;
-  const down = island.maxZ - island.minZ - STAMP_INSET * 2;
-  const shorter = Math.min(across, down);
-  let height = Math.min(
-    cap / Math.max(Math.sin(view.elevation), STAMP_MIN_SINE),
-    shorter / 2,
-  );
+  let height = cap;
   let width = height * aspect;
-
-  // The baseline runs along the screen's right, a quarter turn from the view
-  // direction on the ground, and the name's own up runs away from the camera. The
-  // quad is laid flat by a quarter turn about x, so this is the spin it takes first,
-  // in its own plane.
-  const spin = Math.atan2(-view.forward.x, -view.forward.z);
-  const right = { x: -view.forward.z, z: view.forward.x };
-  // Half the ground the turned quad covers along each axis, so the corner it is
-  // tucked into holds it whichever way it is facing.
-  // ponytail: an axis-aligned box around a turned quad, so a name at 45 degrees to
-  // the island shrinks a little more than it strictly has to. Fitting the quad's own
-  // corners against the rectangle is a clip test per corner and buys back a few
-  // percent of cap height on the two smallest districts.
-  let halfX = (Math.abs(right.x) * width + Math.abs(view.forward.x) * height) / 2;
-  let halfZ = (Math.abs(right.z) * width + Math.abs(view.forward.z) * height) / 2;
-  const fit = Math.min(1, across / (2 * halfX), down / (2 * halfZ));
-  if (fit < 1) {
-    width *= fit;
-    height *= fit;
-    halfX *= fit;
-    halfZ *= fit;
-  }
+  // Cap height and width shrink together, so the letters keep their shape.
+  const fit = Math.min(1, across / width);
+  width *= fit;
+  height *= fit;
   return {
-    x: island.minX + STAMP_INSET + halfX,
-    z: island.minZ + band - STAMP_INSET - halfZ,
+    x: island.minX + STAMP_INSET + width / 2,
+    z: island.minZ + STAMP_INSET + height / 2,
     width,
     height,
-    spin,
   };
 }
 

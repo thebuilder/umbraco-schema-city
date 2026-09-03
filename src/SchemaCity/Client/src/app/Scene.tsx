@@ -460,11 +460,13 @@ const ICON_FOOTPRINT = 0.7;
 const CAP_FOOTPRINT = 0.88;
 /**
  * A building narrower than this on screen gets no icon. Most of a schema shares two
- * or three icons, so a city of 12 px smudges reads as noise rather than as identity;
- * at 40 px an icon is legible and only a handful of buildings are that big at once.
- * The inspector header carries the same icon at any zoom.
+ * or three icons, so a city of 12 px smudges reads as noise rather than as identity.
+ * It was 40 px, from when an icon was extruded and needed the size to read as a
+ * shape; flat on the roof it holds together at 24, which is most of a district at
+ * the framing zoom rather than a handful of buildings. The inspector header carries
+ * the same icon at any zoom.
  */
-const ICON_MIN_PX = 40;
+const ICON_MIN_PX = 24;
 
 /** One rasterised icon, the buildings that wear it, and where its caps start. */
 type IconGroup = { key: string; texture: THREE.Texture; ids: string[]; offset: number };
@@ -1179,8 +1181,6 @@ function Stage({
 }) {
   const camera = useThree((state) => state.camera);
   const grid = useRef<THREE.Mesh>(null);
-  const stampMeshes = useRef<(THREE.Mesh | null)[]>([]);
-  const viewDirection = useMemo(() => new THREE.Vector3(), []);
   const ray = useMemo(() => new THREE.Raycaster(), []);
   const ground = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const screenCentre = useMemo(() => new THREE.Vector2(0, 0), []);
@@ -1208,50 +1208,27 @@ function Stage({
     [palette, fadeNear, fadeFar],
   );
 
-  // One rasterised name per district, with the island it prints on. The quad it goes
-  // on is placed and sized every frame instead, because both follow the camera.
+  // One rasterised name per district, with the quad it prints on. The name is fixed
+  // to its island, so this is worked out once rather than followed every frame.
   const stampsOf = useMemo(
     () =>
       districts.map((district) => {
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
-        return {
-          id: district.id,
-          texture,
-          aspect: texture.image.width / texture.image.height,
-          island: {
+        const stamp = districtStamp(
+          {
             minX: district.minX - ISLAND_PAD,
             maxX: district.maxX + ISLAND_PAD,
             minZ: district.minZ - ISLAND_PAD,
             maxZ: district.maxZ + ISLAND_PAD,
           },
-        };
+          texture.image.width / texture.image.height,
+        );
+        return { id: district.id, texture, stamp };
       }),
     [districts, palette.mono],
   );
 
   useFrame(() => {
-    // Each name turns about its own vertical to face the camera and grows by the
-    // foreshortening, so it reads as printed on the ground and still reads at all.
-    camera.getWorldDirection(viewDirection);
-    const along = Math.hypot(viewDirection.x, viewDirection.z);
-    const view = {
-      forward:
-        along < 1e-6
-          ? { x: 0, z: -1 }
-          : { x: viewDirection.x / along, z: viewDirection.z / along },
-      elevation: Math.atan2(-viewDirection.y, along),
-    };
-    stampsOf.forEach((printed, index) => {
-      const mesh = stampMeshes.current[index];
-      if (!mesh) return;
-      const stamp = districtStamp(printed.island, printed.aspect, view);
-      mesh.position.set(stamp.x, STAMP_Y, stamp.z);
-      // The spin is applied in the quad's own plane, before the quarter turn that
-      // lays it flat, which makes it a yaw about the world's vertical.
-      mesh.rotation.set(-Math.PI / 2, 0, stamp.spin);
-      mesh.scale.set(stamp.width, stamp.height, 1);
-    });
-
     // The ground point at the centre of the screen, from the camera's own centre
     // ray. The orbit target would do under the isometric camera, whose panning holds
     // it on y = 0, but the Explore camera can look anywhere.
@@ -1329,28 +1306,22 @@ function Stage({
           use for. ponytail: a nested folder's tint is opaque and stands a hundredth of
           a unit higher, so it would cover a name that reached under it. No folder in
           either fixture reaches into the margin the name is printed in. */}
-      {stampsOf.map((stamp, index) => {
-        return (
-          <mesh
-            key={stamp.id}
-            ref={(mesh) => {
-              stampMeshes.current[index] = mesh;
-            }}
-            rotation={[-Math.PI / 2, 0, 0]}
-          >
-            {/* A unit quad, scaled every frame: the size follows the camera now, and
-                rebuilding a geometry per frame per district would not. */}
-            <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial
-              color={palette.dim}
-              depthWrite={false}
-              map={stamp.texture}
-              opacity={STAMP_OPACITY}
-              transparent
-            />
-          </mesh>
-        );
-      })}
+      {stampsOf.map(({ id, stamp, texture }) => (
+        <mesh
+          key={id}
+          position={[stamp.x, STAMP_Y, stamp.z]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[stamp.width, stamp.height]} />
+          <meshBasicMaterial
+            color={palette.dim}
+            depthWrite={false}
+            map={texture}
+            opacity={STAMP_OPACITY}
+            transparent
+          />
+        </mesh>
+      ))}
     </>
   );
 }
@@ -1740,7 +1711,14 @@ function PoseTracker({ pose }: { pose: React.RefObject<Pose | null> }) {
   return null;
 }
 
-const EXPLORE_FOV = 45;
+/**
+ * The Explore camera's field of view. At 45 the near corners of the city stretched:
+ * a building at the edge of the frame leaned away from one at the centre far enough
+ * to read as a different shape. 40 is a longer lens, so the stand-off grows and the
+ * perspective flattens, and the city still fills the same screen height because that
+ * distance is worked out from this angle.
+ */
+const EXPLORE_FOV = 40;
 
 /**
  * The Explore camera. It starts at the isometric camera's own direction and target,
@@ -1758,6 +1736,7 @@ function ExploreCamera({
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
+  const invalidate = useThree((state) => state.invalidate);
   const controls = useThree((state) => state.controls) as {
     target: THREE.Vector3;
     update: () => void;
@@ -1767,8 +1746,10 @@ function ExploreCamera({
   useEffect(() => {
     const perspective = camera as THREE.PerspectiveCamera;
     // drei swaps the default camera one render after this component mounts, so the
-    // first run of this effect is still the orthographic one.
-    if (!perspective.isPerspectiveCamera || !controls) return;
+    // first run of this effect is still the orthographic one. A viewport of nothing
+    // is the canvas before it has been measured, which a link straight into Explore
+    // arrives at: framing against it puts the camera a NaN away from the city.
+    if (!perspective.isPerspectiveCamera || size.width === 0 || size.height === 0) return;
     // A link straight into Explore has no isometric camera to copy, so the framing
     // that one would have taken is worked out here instead.
     const framing = viewOf(bounds, size);
@@ -1781,14 +1762,22 @@ function ExploreCamera({
       const distance = from.worldHeight / (2 * Math.tan((EXPLORE_FOV * Math.PI) / 360));
       const direction = from.position.clone().sub(from.target).normalize();
       perspective.position.copy(from.target).addScaledVector(direction, distance);
+      // The controls are what aim the camera, on their first update, and they are
+      // rebuilt for the new camera a render after this one. Until then the camera
+      // keeps the rotation it was made with and looks down -z from above the city,
+      // at nothing, which is the black frame the switch used to open on.
+      perspective.lookAt(from.target);
+      perspective.updateProjectionMatrix();
       placed.current = true;
+      invalidate();
     }
+    if (!controls) return;
     // New controls come with the target at the origin, so it is copied over every
     // time they are rebuilt, not only on the first one.
     controls.target.copy(from.target);
     controls.update();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, controls, pose]);
+  }, [camera, controls, invalidate, pose, size]);
 
   return <PerspectiveCamera far={span * 40} fov={EXPLORE_FOV} makeDefault near={0.5} />;
 }
