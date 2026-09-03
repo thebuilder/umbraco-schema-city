@@ -76,7 +76,9 @@ export function buildFloorCells(
       continue;
     }
 
-    const groups = node.groups.length > 0 ? node.groups : [UNGROUPED];
+    // medium.json is exported before the backend fills in groups, same gap
+    // city.ts already guards against for floor counts.
+    const groups = node.groups?.length ? node.groups : [UNGROUPED];
     let y = 0;
     groups.forEach((group, i) => {
       // A new tab is a physical break in the building, marked by a thin
