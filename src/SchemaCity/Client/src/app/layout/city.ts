@@ -192,6 +192,10 @@ function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
     // row behind it. Rows sit one footprint plus a gap apart inside the rank's band.
     const depth = Math.max(...members.map(footprintOf));
     const rows = Math.ceil(members.length / ROW_LIMIT);
+    // ponytail: a row keeps dagre's order and nothing else, so a road to a child on
+    // the second or third row of a rank crosses the rows in front of it. Ordering each
+    // rank by the column its parent landed in would fix that, and is worth the work
+    // once roads on a real schema read as a tangle.
     for (let i = 0; i < members.length; i += ROW_LIMIT) {
       const row = members.slice(i, i + ROW_LIMIT);
       const width =
