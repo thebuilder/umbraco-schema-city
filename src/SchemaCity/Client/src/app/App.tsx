@@ -1,5 +1,4 @@
 import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -9,6 +8,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
 import {
   Popover,
@@ -23,7 +29,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -48,6 +53,13 @@ const LAYER_LABEL: Record<Layer, string> = {
   blocks: "Blocks",
   references: "References",
 };
+
+/**
+ * `layers` with one layer switched. Rebuilt from LAYERS rather than pushed onto, so
+ * the URL writes its layers in toolbar order however they were switched on.
+ */
+const withLayer = (on: Layer[], layer: Layer): Layer[] =>
+  LAYERS.filter((name) => (name === layer ? !on.includes(name) : on.includes(name)));
 
 /** One edge style, drawn the way the scene draws it. */
 function EdgeMark({
@@ -262,13 +274,7 @@ export function App({
       const digit = Number(event.key);
       if (digit >= 1 && digit <= 4) {
         const layer = LAYERS[digit - 1];
-        // Rebuilt from LAYERS rather than pushed onto, so the URL writes its layers
-        // in toolbar order however they were switched on.
-        setLayers((on) =>
-          LAYERS.filter((name) =>
-            name === layer ? !on.includes(name) : on.includes(name),
-          ),
-        );
+        setLayers((on) => withLayer(on, layer));
         return;
       }
       // Turning either view off goes back to the city, the way the toolbar's two
@@ -385,26 +391,42 @@ export function App({
   return (
     <PortalContainer value={portal}>
       <div className="flex h-full flex-col bg-background font-mono text-foreground">
-        <div className="flex items-center gap-3 border-line border-b px-4 py-2.5">
+        {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
+            fitting, which is 848 px with the lens picker reading None and earlier
+            once a longer lens name widens it. The backoffice is narrower than the
+            harness, and a media query would have to guess by how much. ml-auto still
+            holds the right group against the right edge on whichever row it lands. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-line border-b px-4 py-2.5">
           <h1 className="font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
             Schema City
           </h1>
-          <Badge>{nodes.length} types</Badge>
 
-          <ToggleGroup
-            aria-label="Relationship layers"
-            className="ml-4"
-            multiple
-            onValueChange={(value) => setLayers(value as Layer[])}
-            size="sm"
-            value={layers}
-          >
-            {LAYERS.map((layer) => (
-              <ToggleGroupItem key={layer} value={layer}>
-                {LAYER_LABEL[layer]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          {/* One button rather than four, because the backoffice is narrower than
+              the harness and four of them ran off the edge. The count is on the
+              label so the toolbar still says how much of the city is drawn.
+              ponytail: base-ui's Menu is 6.9 kB gzipped of vendor that nothing else
+              here uses. Four checkbox rows in the Popover already in the bundle
+              would be free, at the cost of writing the roving focus and the
+              typeahead this gets for nothing. Swap it if the bundle gets tight. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<Button size="sm" variant="outline" />}
+            >
+              Layers {layers.length}/{LAYERS.length}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {LAYERS.map((layer, index) => (
+                <DropdownMenuCheckboxItem
+                  checked={layers.includes(layer)}
+                  key={layer}
+                  onCheckedChange={() => setLayers((on) => withLayer(on, layer))}
+                >
+                  {LAYER_LABEL[layer]}
+                  <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Two ways to look at the same city, and one toggle each rather than a
               picker, because either one is off most of the time. Turning List off
@@ -426,7 +448,7 @@ export function App({
             List
           </Toggle>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* A disabled trigger swallows its own pointer events, and with them
                 the hover the tooltip needs, so the tooltip wraps the label. */}
             <Tooltip>

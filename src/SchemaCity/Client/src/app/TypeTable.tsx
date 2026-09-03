@@ -2,6 +2,7 @@
 // reading of the city, so it is plain semantic markup with no canvas anywhere near
 // it, and the same search that feeds the palette filters it.
 import { useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 
@@ -116,13 +117,28 @@ export function TypeTable({
       <div className="flex items-center gap-3 border-line border-b px-4 py-2">
         <label className="flex items-center gap-2 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
           Filter
-          <input
-            className="h-8 w-64 border border-line bg-secondary px-2 font-mono text-phosphor text-xs normal-case tracking-normal outline-none focus-visible:border-phosphor"
-            onChange={(event) => onQuery(event.target.value)}
-            placeholder="Type name, alias or property alias"
-            type="search"
-            value={query}
-          />
+          {/* type="text" and our own clear button, because a search field draws the
+              browser's blue X, which is unreadable on this background. The button is
+              interactive content, so clicking it does not also activate the label. */}
+          <span className="relative">
+            <Input
+              className="h-8 w-64 bg-secondary px-2 pr-7 text-xs normal-case tracking-normal focus-visible:border-phosphor"
+              onChange={(event) => onQuery(event.target.value)}
+              placeholder="Type name, alias or property alias"
+              type="text"
+              value={query}
+            />
+            {query === "" ? null : (
+              <button
+                aria-label="Clear the filter"
+                className="-translate-y-1/2 absolute top-1/2 right-1 cursor-pointer px-1 text-base text-phosphor-dim leading-none hover:text-phosphor-bright"
+                onClick={() => onQuery("")}
+                type="button"
+              >
+                ×
+              </button>
+            )}
+          </span>
         </label>
         <p className="text-muted-foreground text-2xs">
           {shown.length} of {rows.length} types
