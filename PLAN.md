@@ -414,7 +414,7 @@ Same placements, different colours. The picker has six modes: None, Content coun
 
 The camera frames the city at a span of its longer side. At a true isometric angle a city `width` by `depth` covers `(width + depth) / sqrt(6)` of the framed height, so that span shows all of it with about a quarter of the height left for the buildings standing up in it.
 
-The ground has to read as a large seamless world the city sits in, not a patch it fills. The ground plane and the grid extend far beyond the city bounds, distance fog in the void colour fades the far ground into the sky, and the sky is flat void with a subtle gradient or none at all. At any zoom the controls allow, the camera never shows a grid edge. The approach is borrowed from fsn's scene, which sets background and fog to the same void colour and draws one large grid plane re-centred on the camera each frame with its lines faded out by distance. Scheduled for M4. In M1 the grid extends to twice the city bounds and no further.
+Built 2026-09-03, after fsn's scene. Background and fog share the void colour. One grid plane of `span * 13.2` units follows the orbit target every frame, with its lines drawn from world position and faded radially from `span * 1.2` out to `span * 6`. Its squares are 6 and 30 world units, the layout's own street width. The ground slab stays at the city bounds and carries a darker rim, so the city reads as a block of land in the void rather than a wash. The zoom clamp is derived from where the fade ends, so no edge can show at any zoom. The fog is set but dormant under the orthographic camera and will act when the Explore perspective camera arrives, so do not "fix" it by pulling the distances in. There is no star dome, because a dome has no parallax under an orthographic camera.
 
 ---
 
@@ -427,7 +427,7 @@ The ground has to read as a large seamless world the city sits in, not a patch i
 | Double-click / Enter | focus mode: 700 ms camera flight, neighbourhood layout, only the focused node's edges drawn |
 | Double-click a neighbour in focus mode | refocus on it, camera flight |
 | Escape | leave focus mode and keep the selection. Escape again clears the selection |
-| Drag | orbit at a fixed isometric polar angle in ortho mode, free orbit in Explore |
+| Drag | orbit at a fixed isometric polar angle in ortho mode, free orbit in Explore. Pan stays in the ground plane, which the grid relies on |
 | Right-drag / two-finger | pan |
 | Wheel | zoom (ortho zoom, not dolly) |
 | `Cmd/Ctrl + K` | search palette, substring match on type name, alias and every property alias (own and composed), type hits ranked above property hits. Enter selects; in focus mode it refocuses |
@@ -453,7 +453,7 @@ fsn is pnpm + Turborepo, Vite, three.js 0.179, Biome lint-only, vitest. Its `pac
 | Activation dimming (1 = lit, 0 = background) | `DirectoryArea.activation` | becomes the selection fade |
 | Staggered intro rise | `introDelay`, `INTRO_STAGGER` | ripple outward from roots |
 | Names rendered as text, never as HTML | `viewers/dom.ts` | React does this by default; never `dangerouslySetInnerHTML`, because names and aliases are untrusted |
-| World stage: sky, fog, ground extent | `scene.ts` | Fog colour equals the background so the ground dissolves instead of ending; grid and ground scale with the district; borrowed at M4 |
+| World stage: sky, fog, ground extent | `scene.ts` | Fog colour equals the background so the ground dissolves instead of ending; grid and ground scale with the district; borrowed 2026-09-03 |
 | Conventions | `CLAUDE.md` | why-comments, colocated behaviour tests, no snapshot tests |
 
 Labels are one DOM layer over the canvas positioned from projected anchors, with screen-space culling in `app/scene/labels.ts`; R3F handles instanced picking; base-ui handles light dismiss.
@@ -488,7 +488,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - `app/layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance. Done 2026-09-03, 15 tests, about 30 ms for 300 nodes.
 - Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, a DOM label layer with screen-space culling, intro rise.
 - Inspector with all schema sections. Search palette. Done 2026-09-03; 42 tests.
-- Exit: usable on the seeded schema and `pathological.json`; 300 types at 60 fps on an M-series laptop.
+- Exit: usable on the seeded schema (the pathological fixture is still to be written); 300 types at 60 fps on an M-series laptop.
 
 ### M2, Layers and focus (medium)
 
@@ -511,12 +511,12 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 
 ### M4, Polish and release (medium)
 
-- World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. (in progress)
+- World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. Done 2026-09-03; the slab stays city-sized by choice.
 - NuGet packaging with the client build wired into `dotnet pack`, README for the package, marketplace metadata. Done 2026-09-03; screenshots still missing.
 - Roof icons, property "windows" on floors, Explore perspective toggle, list view fallback.
 - Empty state (no Document Types), error state (HTTP status), lens disabled with a reason when usage fails. Done 2026-09-03.
 - Seeder log noise: application URL set, UI culture pinned to en-US in the demo site (the en-DK warnings were this Mac's locale). Done 2026-09-03; 585 warnings to 19.
-- Perf pass, only if the pathological fixture drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
+- Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` on NuGet.
 
 ### Later, explicitly not v1
@@ -553,10 +553,10 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layer | How |
 | --- | --- |
 | Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
-| `model/`, `app/` | 122 vitest tests across 12 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
+| `model/`, `app/` | 125 vitest tests across 13 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 at the M3 merge, green on both majors |
-| Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |
+| Performance | The seeded schema in the dev harness with the browser's own frame profiler; a pathological fixture (cycles, 40 element types, orphans) is still to be written |
 
 ---
 
@@ -567,7 +567,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Fix the editor link (in progress). Then M4: packaging and states. Done. World stage (in progress), then roof icons, property windows, Explore camera, list view. Next.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Fix the editor link (in progress). Then M4: packaging and states. Done. World stage. Done. Then roof icons, property windows, Explore camera, list view. Next.
 
 ## 13. Resolved questions
 
