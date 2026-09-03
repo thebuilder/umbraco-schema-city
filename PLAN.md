@@ -397,6 +397,10 @@ Everything else stays in the city at reduced opacity. The scene tweens each buil
 
 Same placements, different colours. Modes: content count (sequential ramp), published share (diverging around 50%), cultures, incoming references, unused/dead (binary highlight). Legend in the toolbar. Colours come from the afterglow theme tokens: phosphor green on void, pink signal, amber, azure and violet. Own groups are phosphor, composed groups desaturated phosphor, element types amber, selection signal. Any diverging or sequential ramp uses amber and azure, never phosphor against signal, because green against pink is the worst pair for colour-vision deficiency. Dark only, by choice. The theme has no light mode.
 
+### World stage
+
+The ground has to read as a large seamless world the city sits in, not a patch it fills. The ground plane and the grid extend far beyond the city bounds, distance fog in the void colour fades the far ground into the sky, and the sky is flat void with a subtle gradient or none at all. At any zoom the controls allow, the camera never shows a grid edge. The approach is borrowed from fsn's scene, which sets background and fog to the same void colour and draws one large grid plane re-centred on the camera each frame with its lines faded out by distance. Scheduled for M4. In M1 the grid extends to twice the city bounds and no further.
+
 ---
 
 ## 7. Interaction specification
@@ -432,6 +436,7 @@ fsn is pnpm + Turborepo, Vite, three.js 0.179, Biome lint-only, vitest. Its `pac
 | Activation dimming (1 = lit, 0 = background) | `DirectoryArea.activation` | becomes the selection fade |
 | Staggered intro rise | `introDelay`, `INTRO_STAGGER` | ripple outward from roots |
 | Names rendered as text, never as HTML | `viewers/dom.ts` | React does this by default; never `dangerouslySetInnerHTML`, because names and aliases are untrusted |
+| World stage: sky, fog, ground extent | `scene.ts` | Fog colour equals the background so the ground dissolves instead of ending; grid and ground scale with the district; borrowed at M4 |
 | Conventions | `CLAUDE.md` | why-comments, colocated behaviour tests, no snapshot tests |
 
 Three of fsn's mechanisms are not ported: drei's `Html` component replaces the sprite labels, R3F does instanced picking without the per-instance pick maps, and base-ui's dialog and popover cover light dismiss.
@@ -486,6 +491,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 ### M4, Polish and release (medium)
 
 - Roof icons, property "windows" on floors, Explore perspective toggle, list view fallback.
+- World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom.
 - Empty state (no Document Types), error state (endpoint 403/500), loading skeleton.
 - Perf pass, only if the pathological fixture drops below 60 fps: merged edge geometry per layer, label budget.
 - README with screenshots, NuGet packaging with the `[17.0.0, 19.0.0)` range, Umbraco Marketplace metadata.
