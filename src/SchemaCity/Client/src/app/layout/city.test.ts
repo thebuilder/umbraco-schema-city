@@ -11,6 +11,7 @@ import {
   layoutCity,
   ROW_LIMIT,
   SPARSE_RANK,
+  DISTRICT_GAP,
   STREET,
   type District,
   type Placement,
@@ -262,10 +263,10 @@ describe("cityDistricts", () => {
     );
   });
 
-  it("leaves a street of at least eight units between any two districts", () => {
-    expect(STREET).toBeGreaterThanOrEqual(8);
-    expect(crowded(cityDistricts(medium).districts, STREET)).toEqual([]);
-    expect(crowded(cityDistricts(folderless).districts, STREET)).toEqual([]);
+  it("leaves a void of two streets between any two districts", () => {
+    expect(DISTRICT_GAP).toBe(STREET * 2);
+    expect(crowded(cityDistricts(medium).districts, DISTRICT_GAP)).toEqual([]);
+    expect(crowded(cityDistricts(folderless).districts, DISTRICT_GAP)).toEqual([]);
   });
 
   it("holds a band clear along each island's north edge for the name", () => {
@@ -702,7 +703,7 @@ describe("layoutCity", () => {
     expect(placements).toHaveLength(300);
     expect(new Set(placements.map((p) => p.id)).size).toBe(300);
     expect(overlaps(placements)).toEqual([]);
-    expect(crowded(districts, STREET)).toEqual([]);
+    expect(crowded(districts, DISTRICT_GAP)).toEqual([]);
     expect(elapsed).toBeLessThan(200);
 
     // The Pages folder holds the twelve-deep chain of single types. Before those
