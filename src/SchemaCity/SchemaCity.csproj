@@ -4,6 +4,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+    <!-- NuGet audits the range floor, 17.0.0, but the host site picks the Umbraco version that
+         actually runs, so the floor's transitive advisories are not what this package ships. -->
+    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>
