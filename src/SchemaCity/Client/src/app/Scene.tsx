@@ -460,11 +460,13 @@ const ICON_FOOTPRINT = 0.7;
 const CAP_FOOTPRINT = 0.88;
 /**
  * A building narrower than this on screen gets no icon. Most of a schema shares two
- * or three icons, so a city of 12 px smudges reads as noise rather than as identity;
- * at 40 px an icon is legible and only a handful of buildings are that big at once.
- * The inspector header carries the same icon at any zoom.
+ * or three icons, so a city of 12 px smudges reads as noise rather than as identity.
+ * It was 40 px, from when an icon was extruded and needed the size to read as a
+ * shape; flat on the roof it holds together at 24, which is most of a district at
+ * the framing zoom rather than a handful of buildings. The inspector header carries
+ * the same icon at any zoom.
  */
-const ICON_MIN_PX = 40;
+const ICON_MIN_PX = 24;
 
 /** One rasterised icon, the buildings that wear it, and where its caps start. */
 type IconGroup = { key: string; texture: THREE.Texture; ids: string[]; offset: number };
