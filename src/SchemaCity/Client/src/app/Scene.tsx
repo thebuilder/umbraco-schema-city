@@ -1259,25 +1259,32 @@ function Controls({ span, explore }: { span: number; explore: boolean }) {
 type Pose = { position: THREE.Vector3; target: THREE.Vector3; worldHeight: number };
 
 /**
- * Remembers the camera pose every frame, so the Explore camera can be stood up
- * exactly where the isometric one was looking from. `worldHeight` is how much world
- * the viewport covers at the target, which is what the two cameras have to agree on
- * for the switch not to jump.
+ * Remembers the isometric camera's pose every frame, so the Explore camera can be
+ * stood up exactly where it was looking from. `worldHeight` is how much world the
+ * viewport covers at the target, which is what the two cameras have to agree on for
+ * the switch not to jump. It runs only while the isometric camera is the one on, and
+ * a session that opens straight into Explore leaves it null.
  */
-function PoseTracker({ pose }: { pose: React.RefObject<Pose> }) {
+function PoseTracker({ pose }: { pose: React.RefObject<Pose | null> }) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as { target: THREE.Vector3 } | null;
   const size = useThree((state) => state.size);
 
   useFrame(() => {
-    pose.current.position.copy(camera.position);
-    if (controls) pose.current.target.copy(controls.target);
+    const at = pose.current ?? {
+      position: new THREE.Vector3(),
+      target: new THREE.Vector3(),
+      worldHeight: 1,
+    };
+    at.position.copy(camera.position);
+    if (controls) at.target.copy(controls.target);
     const perUnit = pixelsPerUnit(
       camera as THREE.OrthographicCamera & { fov?: number },
       size.height,
-      camera.position.distanceTo(pose.current.target),
+      camera.position.distanceTo(at.target),
     );
-    pose.current.worldHeight = size.height / perUnit;
+    at.worldHeight = size.height / perUnit;
+    pose.current = at;
   });
 
   return null;
@@ -1290,8 +1297,17 @@ const EXPLORE_FOV = 45;
  * far enough back that the viewport covers the same world height, so turning Explore
  * on changes the projection and nothing else.
  */
-function ExploreCamera({ pose, span }: { pose: React.RefObject<Pose>; span: number }) {
+function ExploreCamera({
+  bounds,
+  pose,
+  span,
+}: {
+  bounds: CityBounds;
+  pose: React.RefObject<Pose | null>;
+  span: number;
+}) {
   const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
   const controls = useThree((state) => state.controls) as {
     target: THREE.Vector3;
     update: () => void;
@@ -1303,16 +1319,25 @@ function ExploreCamera({ pose, span }: { pose: React.RefObject<Pose>; span: numb
     // drei swaps the default camera one render after this component mounts, so the
     // first run of this effect is still the orthographic one.
     if (!perspective.isPerspectiveCamera || !controls) return;
+    // A link straight into Explore has no isometric camera to copy, so the framing
+    // that one would have taken is worked out here instead.
+    const framing = viewOf(bounds, size);
+    const from = pose.current ?? {
+      position: framing.position,
+      target: framing.target,
+      worldHeight: size.height / framing.zoom,
+    };
     if (!placed.current) {
-      const distance = pose.current.worldHeight / (2 * Math.tan((EXPLORE_FOV * Math.PI) / 360));
-      const direction = pose.current.position.clone().sub(pose.current.target).normalize();
-      perspective.position.copy(pose.current.target).addScaledVector(direction, distance);
+      const distance = from.worldHeight / (2 * Math.tan((EXPLORE_FOV * Math.PI) / 360));
+      const direction = from.position.clone().sub(from.target).normalize();
+      perspective.position.copy(from.target).addScaledVector(direction, distance);
       placed.current = true;
     }
     // New controls come with the target at the origin, so it is copied over every
     // time they are rebuilt, not only on the first one.
-    controls.target.copy(pose.current.target);
+    controls.target.copy(from.target);
     controls.update();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, controls, pose]);
 
   return <PerspectiveCamera far={span * 40} fov={EXPLORE_FOV} makeDefault near={0.5} />;
@@ -1353,11 +1378,7 @@ export default function Scene({
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const pose = useRef<Pose>({
-    position: new THREE.Vector3(),
-    target: new THREE.Vector3(),
-    worldHeight: 1,
-  });
+  const pose = useRef<Pose | null>(null);
   const reducedMotion = useMemo(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     [],
@@ -1573,12 +1594,14 @@ export default function Scene({
             selected={selected}
           />
           {explore ? (
-            <ExploreCamera pose={pose} span={span} />
+            <ExploreCamera bounds={bounds} pose={pose} span={span} />
           ) : (
-            <CameraRig bounds={bounds} reducedMotion={reducedMotion} />
+            <>
+              <CameraRig bounds={bounds} reducedMotion={reducedMotion} />
+              <PoseTracker pose={pose} />
+            </>
           )}
           <Controls explore={explore === true} span={span} />
-          <PoseTracker pose={pose} />
         </Canvas>
       ) : null}
     </div>
