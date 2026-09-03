@@ -19,3 +19,6 @@ which is how Umbraco's unattended install works. Never reuse them anywhere.
 
 - Email: admin@example.com
 - Password: ScXlyQOiHBASNYe3V3!7
+
+On first boot Umbraco writes an image processing HMAC key into `appsettings.json`. It is
+regenerated whenever it is missing, so leave it out of commits.
