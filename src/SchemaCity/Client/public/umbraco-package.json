@@ -1,0 +1,14 @@
+{
+  "id": "SchemaCity",
+  "name": "SchemaCity",
+  "version": "0.0.0",
+  "allowTelemetry": true,
+  "extensions": [
+    {
+      "name": "Schema City Bundle",
+      "alias": "SchemaCity.Bundle",
+      "type": "bundle",
+      "js": "/App_Plugins/SchemaCity/schema-city.js"
+    }
+  ]
+}
