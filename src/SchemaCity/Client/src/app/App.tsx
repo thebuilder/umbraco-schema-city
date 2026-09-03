@@ -35,9 +35,6 @@ import type { SchemaGraph } from "../model/types";
 // rather than with the workspace element.
 const Scene = lazy(() => import("./Scene"));
 
-/** The spike puts twelve buildings on the ground. The real layout arrives in M1. */
-const BUILDINGS = 12;
-
 export function App({
   graph,
   onOpenType,
@@ -63,7 +60,6 @@ export function App({
   }, []);
 
   const nodes = graph.nodes;
-  const shown = nodes.slice(0, BUILDINGS);
   const selectedNode = nodes.find((node) => node.id === selected);
 
   return (
@@ -125,7 +121,7 @@ export function App({
               <p className="p-4 text-phosphor-dim text-sm">Loading the scene…</p>
             }
           >
-            <Scene nodes={shown} onSelect={setSelected} selected={selected} />
+            <Scene graph={graph} onSelect={setSelected} selected={selected} />
           </Suspense>
 
           {selectedNode ? (
