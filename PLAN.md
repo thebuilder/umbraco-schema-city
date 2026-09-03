@@ -199,18 +199,17 @@ Findings are derived in `model/findings.ts`:
 
 | Finding | Rule |
 | --- | --- |
-| Unused type | not element, `total === 0` |
+| Unused type | not element, zero instances. Needs usage |
 | Unused element type | element, no incoming `block` edge |
-| Unused composition | a type that exists only to be composed (no root, no incoming `allowedChild`, no instances) with zero incoming `composition` edges |
-| Structural dead end | not `allowedAsRoot`, no incoming `allowedChild`, not element |
+| Structural dead end | not `allowedAsRoot`, no incoming `allowedChild`, not element, and nothing composes it. This absorbs the unused-composition kind, which is dropped |
 | Duplicate property alias | two compositions, or a composition and the type's own properties, contribute the same property alias. This is the composition bug that breaks editing |
-| Broken block reference | a block editor configuration names an Element Type key that no longer exists. The block inspector emits this instead of silently dropping the edge |
+| Broken block reference | a block target that resolves to no node. The block inspector emits this instead of silently dropping the edge |
 | No properties | zero own and zero composed properties |
-| No template | not element, zero allowed templates. Informational tier |
-| Pure mixin | composed but never a child, never root, never a block (a pure mixin, informational) |
-| Complexity | `own + composed properties + 2*compositions + block targets`, bucketed into 5 tiers for the lens |
+| No template | not element, placeable, zero allowed templates, and only when at least one type in the schema has a template. Note |
+| Pure mixin | composed by something, never root, never a child, never a block target. Note |
+| Complexity | `own + composed properties + 2*compositions + block targets`, in tiers cut relative to the schema's busiest type. Only the top tier is reported. Note |
 
-Every finding carries a stable id (kind plus node id), a severity (problem or note) and the node it points at, so the drawer can filter and link.
+Every finding carries a stable id (`kind:nodeId`), a severity (problem or note) and the node it points at, so the drawer can filter and link. Problems sort before notes. The rules that read usage are skipped when usage is absent.
 
 ---
 
@@ -335,7 +334,7 @@ The scene reads `--phosphor`, `--signal` and `--phosphor-dim` from computed styl
 
 Library mode, ES output, `rollupOptions.external: [/^@umbraco/]`. Two entries, `workspace` and `document-type-view`, sharing `vendor.js` and `app.js`. `api.ts` sits outside `src/app/` and is shared by both, so it becomes its own small `api.js` chunk. No Vite React plugin; esbuild compiles JSX with `jsx: "react-jsx"`. The Tailwind plugin builds the one CSS entry. React, R3F, drei, base-ui, Three.js and dagre are bundled.
 
-Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the six chunks measure `workspace.js` 1.0 kB, `document-type-view.js` 1.2 kB, `api.js` 0.4 kB, `app.js` 39 kB, `vendor.js` 170 kB and `Scene.js` 345 kB.
+Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.NODE_ENV": '"production"' }` is required. Without it React throws "process is not defined" in the browser. Flat chunk names need `preserveEntrySignatures: "allow-extension"`, or Rollup emits a facade entry. No `base` is needed. The built entry imports `./Scene.js` relatively and it served 200 on both majors. The scene is a separate chunk behind `React.lazy(() => import("./Scene"))`, so the workspace paints its chrome before Three.js arrives, and opening Settings never pays for either. The dev script is `vite dev dev -c vite.config.ts`, because Vite looks for the config in the root it is given. Pinned at the spike: react 19.2.8, @base-ui/react 1.7.0, tailwindcss 4.3.3, three 0.185.1, @react-three/fiber 9.7.0, @react-three/drei 10.7.8, cmdk 1.1.1. Umbraco loads the manifest's `element` URL with a cache-busting query, so a lazy chunk that imports shared code back from the entry without that query gets a second module instance; `manualChunks` keeps the entry down to the wrapper alone, sorts a package into `vendor` when anything outside the lazy scene subtree needs it eagerly (a reachability check on module info, not a package name list, because fiber and drei pull in a dozen unnamed transitive packages), sorts the rest of the app code into `app`, and has `Scene.js` import `./vendor.js` and `./app.js` directly instead of the entry. Gzipped, the six chunks measure `workspace.js` 1.0 kB, `document-type-view.js` 1.2 kB, `api.js` 0.4 kB, `app.js` 44 kB, `vendor.js` 170 kB and `Scene.js` 345 kB.
 
 ### API client
 
@@ -394,7 +393,7 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Roof icon | Umbraco icon rasterised to a sprite (M4) |
 | Root plaza | flat disc under `allowedAsRoot` buildings with a small flag |
 | Element Type form | low, wide, chamfered "warehouse" in amber, no roof cap, distinct material |
-| Usage badge | small numeric sprite above the roof when the Usage lens is on |
+| Usage badge | Usage count on the label layer above the selected node, whatever the lens |
 | Selection | signal pink outline and label |
 | Road (`allowedChild`) | flat ribbon on the ground with animated chevrons in the direction of the edge |
 | Bridge (`composition` / `inherits`) | elevated quadratic arc, apex one arch above the taller roof. `inherits` is drawn as two arcs a hair apart, because WebGL ignores a line width above 1 |
@@ -404,7 +403,7 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 
 ### Usage lens
 
-Same placements, different colours. Modes: content count (sequential ramp), published share (diverging around 50%), cultures, incoming references, unused/dead (binary highlight). Legend in the toolbar. Colours come from the afterglow theme tokens: phosphor green on void, pink signal, amber, azure and violet. Own groups are phosphor, composed groups desaturated phosphor, element types amber, selection signal. Any diverging or sequential ramp uses amber and azure, never phosphor against signal, because green against pink is the worst pair for colour-vision deficiency. Dark only, by choice. The theme has no light mode.
+Same placements, different colours. The picker has six modes: None, Content count, Published share, Cultures, Incoming references and Unused. Sequential ramps run amber to azure, never phosphor against signal, because green against pink is the worst pair for colour-vision deficiency. Published share diverges around 50 percent. Unused is a signal highlight on non-element types with zero instances. Element types render neutral (`phosphor-dim`) under every lens, and root plazas are not recoloured. A legend row under the toolbar shows the minimum, the colour bar and the maximum. The selected node carries a usage badge ("162 · 152 published") on the label layer whatever the lens, and the picker is disabled with a tooltip until usage loads. The inspector has a Usage section with total, published, drafts, trashed, roots, cultures and last edited. Dark only, by choice. The theme has no light mode.
 
 ### World stage
 
@@ -428,10 +427,11 @@ The ground has to read as a large seamless world the city sits in, not a patch i
 | Wheel | zoom (ortho zoom, not dolly) |
 | `Cmd/Ctrl + K` | search palette, substring match on type name, alias and every property alias (own and composed), type hits ranked above property hits. Enter selects; in focus mode it refocuses |
 | Toolbar | layer toggles `Structure · Compositions · Blocks · References`, lens picker `Usage`, `Explore` camera toggle, `Findings` drawer, and the command palette, which is cmdk through afterglow's `command` component |
-| Findings drawer | grouped by severity, filter by kind, each row links to its node. Counts shown as matched / total |
+| Lens | Picker with six modes; disabled until usage loads; `lens=<name>` in the URL |
+| Findings drawer | Sheet from the toolbar with a count badge, kind chips with counts, matched / total, rows grouped by severity; a row selects its node and closes. |
 | Inspector | header (name, alias, badges for Element, Root and Varies by culture, and "N properties (own · composed)"), then only the sections that have something in them: Compositions, Inherits, Allowed parents, Allowed children, Block hosts, Block targets grouped by property alias, References out grouped by property alias and references in, Templates with the default marked, then Floors as a collapsible tree of tabs and groups showing each property's editor, mandatory marker and "composed from X". A block target that resolves to no node reads "missing element type" in the signal colour. Every type name is a button that selects that type, and there is one "Open in editor" button for the selected type rather than one per name, because a hub lists 25 rows |
 | Labels | candidates are the hovered and selected nodes, the selected node's neighbours when there are at most 8, and every placed neighbour in focus mode. The scene then culls in screen space whenever the camera or the layout moves. Each candidate's box is estimated from its name, and boxes are kept in priority order (selected, hovered, then the rest) unless they land on one already kept, the building is under 6 px, or 40 labels are already up. A hidden name is one hover or one inspector row away |
-| URL | `?type=<alias>&focus=1&layers=structure,blocks` so the workspace view and findings can deep link. The lens joins it at M3. Written with `history.replaceState` by the app itself, unless the host passes `initial` or `onStateChange` and mirrors the state into its own route, as the Document Type tab does |
+| URL | `?type=<alias>&focus=1&layers=structure,blocks&lens=<name>` so the workspace view and findings can deep link. Written with `history.replaceState` by the app itself, unless the host passes `initial` or `onStateChange` and mirrors the state into its own route, as the Document Type tab does |
 
 Accessibility: the canvas is `aria-hidden`; the inspector and a hidden type list are the accessible surface, with arrow keys moving selection and the scene following. A "list view" toggle that hides the canvas entirely is cheap and worth shipping in v1.
 
@@ -468,7 +468,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 ### M0, Scaffold (small)
 
 - `dotnet new umbraco-extension -n SchemaCity -ex`, solution, test site, xUnit project.
-- `SchemaSeeder` creates ~80 Document Types with folders, compositions, inheritance, Block List / Grid / RTE blocks, MNTP filters, roots, a cycle, orphans and element types, plus a few hundred content items so usage counts are non-trivial. It plants a known set of findings, listed in one test in `SchemaCity.Tests`. Runs once in Development only.
+- `SchemaSeeder` creates ~80 Document Types with folders, compositions, inheritance, Block List / Grid / RTE blocks, MNTP filters, roots, a cycle, orphans and element types, plus a few hundred content items so usage counts are non-trivial. It plants a known set of findings, listed in one test in `SchemaCity.Tests`. Runs once in Development only. The seeder writes no property values, so the seeded site has no instance references and the incoming-references lens is flat there.
 - Dev harness with a hand-written `small.json`.
 - CI: `npm ci`, `npm run build`, `dotnet build`, `dotnet test`, then boot the site and check the manifest, the backoffice and a 401 from the graph endpoint, on Umbraco 17.6.2 and 18.1.1.
 - Done 2026-09-03 on Umbraco 17.6.2, with 18.1.1 as the second CI target.
@@ -497,8 +497,8 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 ### M3, Usage (medium)
 
 - `UsageCollector` and `usage` endpoint with caching. Tests for the aggregation. Done 2026-09-03; four queries, 17 backend tests, and a deterministic `medium-usage.json` exported by the seeder.
-- Usage lens with five modes and legend, badges on roofs.
-- `findings.ts` with tests. Findings drawer listing unused types, unused element types, dead ends, unused compositions, duplicate property aliases, broken block references, types with no properties, types with no template, and complexity tiers, each linking to its node.
+- Usage lens with six modes, a legend row and a usage badge on the selected node. Done 2026-09-03.
+- `findings.ts` with tests. Findings drawer listing unused types, unused element types, structural dead ends, duplicate property aliases, broken block references, types with no properties, types with no template, pure mixins and the top complexity tier, each linking to its node. Done 2026-09-03; every planted alias reported; 122 vitest tests.
 - Exit: the findings drawer reports exactly the planted set on the seeded site, on both Umbraco majors.
 
 ### M4, Polish and release (medium)
@@ -527,7 +527,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
 | Hub types (40+ neighbours) make selection views unreadable | Label cap, focus mode with a neighbourhood layout, and only the focused node's edges drawn. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
-| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.4 kB for `api.js`, 39 kB of app and 170 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
+| Measured at the spike: 179 kB gzipped for the workspace entry, 340 kB for the lazy scene chunk, mostly drei | Chunk splitting brings the eager load to 1.0 kB for the workspace entry, 1.2 kB for the document-type-view entry, 0.4 kB for `api.js`, 44 kB of app and 170 kB of vendor, and the 345 kB scene chunk loads only when the city renders. Revisit drei imports at M1 exit; importing controls from `three/addons` directly is the fallback if 345 kB proves to matter. |
 | The manifest entry loaded twice by the backoffice's cache-busting query | Neither entry exports anything another chunk imports; shared code and vendors live in their own chunks; the element registrations are guarded. |
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
@@ -543,7 +543,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Layer | How |
 | --- | --- |
 | Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
-| `model/`, `app/` | 82 vitest tests across 10 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
+| `model/`, `app/` | 122 vitest tests across 12 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
 | Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |
@@ -557,7 +557,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. Focus mode with the camera flight. Done. Screen-space label culling. Done. The Document Type editor tab. Done. The edge layers and URL state. Done. Then M3: the usage endpoint, the usage lens and the findings drawer. Next.
+6. Focus mode with the camera flight. Done. Screen-space label culling. Done. The Document Type editor tab. Done. The edge layers and URL state. Done. M3: the usage endpoint, the usage lens and the findings drawer. Done. Then the M3 tidy-up (dead end absorbs unused composition, no-template noise, element types neutral under a lens), usage in the wrappers, and the backoffice check. Next.
 
 ## 13. Resolved questions
 
