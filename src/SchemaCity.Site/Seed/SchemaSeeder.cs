@@ -331,7 +331,11 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 
     private async Task<IDataType> CreateDataTypeAsync(string name, string editorAlias, string editorUiAlias, object configuration)
     {
-        IDataEditor editor = _propertyEditors[editorAlias];
+        if (_propertyEditors.TryGet(editorAlias, out IDataEditor? editor) is false)
+        {
+            throw new InvalidOperationException($"No property editor is registered for {editorAlias}.");
+        }
+
         var dataType = new DataType(editor, _serializer, UmbracoConstants.System.Root)
         {
             Name = name,
