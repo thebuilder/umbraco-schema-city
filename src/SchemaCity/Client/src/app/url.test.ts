@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LAYERS } from "./scene/layers";
-import { parseUrl, type UrlState, serialiseUrl } from "./url";
+import { parseUrl, type UrlState, serialiseUrl, urlToWrite } from "./url";
 
 const aliases = ["article", "blogPost", "home"];
 
@@ -89,5 +89,26 @@ describe("serialiseUrl", () => {
     expect(serialiseUrl({ type: null, focus: true, layers: [], lens: "none" })).toBe(
       "?layers=",
     );
+  });
+});
+
+describe("urlToWrite", () => {
+  const workspace = "/umbraco/section/settings/workspace/schema-city";
+  const editor = "/umbraco/section/settings/workspace/document-type/edit/a-guid";
+  const state: UrlState = {
+    type: "elementForm",
+    focus: false,
+    layers: ["structure"],
+    lens: "none",
+  };
+
+  it("writes the query onto the route the app was mounted under", () => {
+    expect(urlToWrite(state, workspace, workspace)).toBe(
+      `${workspace}?type=elementForm&layers=structure`,
+    );
+  });
+
+  it("writes nothing once Open in editor has pushed the editor route", () => {
+    expect(urlToWrite(state, workspace, editor)).toBeNull();
   });
 });

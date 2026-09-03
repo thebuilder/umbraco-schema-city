@@ -44,6 +44,23 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
   };
 }
 
+/**
+ * The address to write, or null when the app must keep its hands off the address bar.
+ *
+ * Umbraco's router-slot patches `history.replaceState` to announce a route change, and a
+ * router that is part way through loading a page cancels that navigation the moment it
+ * hears one. So once "Open in editor" has pushed the editor route, one more write from
+ * here both puts our query on Umbraco's path and kills the navigation it started. The
+ * pathname the app mounted on is the whole test: the push moves it before this ever runs.
+ */
+export function urlToWrite(
+  state: UrlState,
+  mountedAt: string,
+  pathname: string,
+): string | null {
+  return pathname === mountedAt ? pathname + serialiseUrl(state) : null;
+}
+
 export function serialiseUrl(state: UrlState): string {
   const parts: string[] = [];
   if (state.type) parts.push(`type=${encodeURIComponent(state.type)}`);

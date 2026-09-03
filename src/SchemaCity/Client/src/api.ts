@@ -29,6 +29,12 @@ export const getUsage = (refresh = false) =>
  * so a route change in 18 or 19 arrives with the package. It is relative to the backoffice
  * base URI, and router-slot patches history.pushState to announce the navigation, so the
  * editor opens without a page load.
+ *
+ * 17.6.2 exports no navigation helper, and this is how the backoffice navigates itself:
+ * every call site, from the dictionary create action to the log viewer's search box, is a
+ * bare history.pushState. What it also does is start an async page load that router-slot
+ * cancels if it hears a second changestate, and history.replaceState raises one, so the
+ * app stops writing its query the moment this has moved the pathname. See url.ts.
  */
 export const openTypeInEditor = (unique: string) =>
   history.pushState(
