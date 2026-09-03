@@ -176,19 +176,23 @@ function Floors({ node, nodesById }: { node: SchemaNode; nodesById: Lookup }) {
 }
 
 export function Inspector({
+  focused,
   neighbourhood,
   node,
   nodesById,
   onClose,
   onOpenType,
   onSelect,
+  onToggleFocus,
 }: {
+  focused: boolean;
   neighbourhood: Neighbourhood;
   node: SchemaNode;
   nodesById: Lookup;
   onClose: () => void;
   onOpenType?: (id: string) => void;
   onSelect: (id: string) => void;
+  onToggleFocus: () => void;
 }) {
   const list = (ids: string[]) => (
     <TypeList ids={ids} nodesById={nodesById} onSelect={onSelect} />
@@ -208,6 +212,13 @@ export function Inspector({
           <p className="truncate font-bold text-phosphor-bright text-sm">{node.name}</p>
           <p className="truncate font-mono text-2xs text-phosphor-dim">{node.alias}</p>
         </div>
+        <Button
+          onClick={onToggleFocus}
+          size="sm"
+          variant={focused ? "signal" : "outline"}
+        >
+          {focused ? "Leave focus" : "Focus"}
+        </Button>
         <Button aria-label="Close inspector" onClick={onClose} size="icon-sm" variant="ghost">
           <XIcon />
         </Button>

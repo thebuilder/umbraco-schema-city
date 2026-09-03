@@ -91,6 +91,9 @@ export function App({
     setFocus(id);
   };
 
+  // Following a link in the inspector while focused moves the whole layout with it,
+  // because the lists you are reading are the thing you are flying between.
+  const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
 
   return (
     <PortalContainer value={portal}>
@@ -149,12 +152,16 @@ export function App({
 
           {selectedNode && neighbourhood ? (
             <Inspector
+              focused={focus === selectedNode.id}
               neighbourhood={neighbourhood}
               node={selectedNode}
               nodesById={nodesById}
               onClose={() => setSelected(null)}
               onOpenType={onOpenType}
-              onSelect={setSelected}
+              onSelect={followLink}
+              onToggleFocus={() =>
+                focus === selectedNode.id ? setFocus(null) : enterFocus(selectedNode.id)
+              }
             />
           ) : null}
         </div>
