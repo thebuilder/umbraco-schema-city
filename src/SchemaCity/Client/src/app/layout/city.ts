@@ -7,9 +7,15 @@ import {
   type NodeLabel,
   layout,
 } from "@dagrejs/dagre";
-import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
+import type {
+  SchemaEdge,
+  SchemaFolder,
+  SchemaGraph,
+  SchemaNode,
+} from "../../model/types";
 
-export type District = "structure" | "detached" | "element";
+/** What a district mostly holds. The scene colours and labels from this. */
+export type DistrictKind = "structure" | "compositions" | "elements" | "mixed";
 
 export type Placement = {
   id: string;
@@ -19,9 +25,30 @@ export type Placement = {
   footprint: number;
   height: number;
   floors: number;
-  district: District;
+  /** Id of the district this building stands in. */
+  district: string;
+  // ponytail: optional, so a hand-built Placement in a scene test does not have to
+  // name one. The layout always sets it; make it required once the scene reads it.
+  districtKind?: DistrictKind;
+  // ponytail: a nested folder is recorded and nothing else. Buildings stay in their
+  // top-level district and the scene tints them by this id. Sub-districts, with their
+  // own slab and street, are the upgrade if a real schema nests two levels deep.
+  /** Id of the nested folder this type sits in, when it sits in one. */
+  folder?: string;
   /** Seconds to wait before this building rises, so the city builds outward. */
   introDelay: number;
+};
+
+/** The ground a district covers, for its slab and its label. */
+export type District = {
+  id: string;
+  name: string;
+  kind: DistrictKind;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  centre: { x: number; z: number };
 };
 
 export type CityBounds = {
@@ -39,17 +66,35 @@ const FLOOR_HEIGHT = 0.6;
 export const ROW_LIMIT = 8;
 const INTRO_STAGGER = 0.06;
 const EMPTY_BOX = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+/** Types the schema files nowhere, and types nothing places when there are no folders. */
+const UNFILED = "unfiled";
+const UNPLACED = "unplaced";
+
+/** What a single type is, before districts are drawn around groups of them. */
+type Role = "structure" | "compositions" | "elements" | "unplaced";
+
+type Group = { id: string; name: string; members: SchemaNode[] };
+type Laid = Group & {
+  kind: DistrictKind;
+  hasStructure: boolean;
+  placements: Placement[];
+};
 
 /**
- * Places every node exactly once, in three districts.
+ * Places every node exactly once, in a district per top-level folder.
  *
- * The structure district is whatever an editor can reach by creating content from a
- * root, ranked top to bottom by dagre. The other two are packed grids, because a
- * detached type or an element type has no position worth computing.
+ * The schema's own folders are the grouping an editor already knows, so they drive the
+ * city. A schema with no folders falls back to four districts named by role, which is
+ * the same partition the city used before folders were read. Inside a district the
+ * allowed-child edges among its own members rank top to bottom, and everything with no
+ * such edge packs into a grid below the ranked block.
  */
-export function layoutCity(graph: SchemaGraph): Placement[] {
+export function cityDistricts(graph: SchemaGraph): {
+  placements: Placement[];
+  districts: District[];
+} {
   const nodes = [...graph.nodes].sort(compareByAlias);
-  if (nodes.length === 0) return [];
+  if (nodes.length === 0) return { placements: [], districts: [] };
 
   const known = new Map(nodes.map((node) => [node.id, node]));
   const alias = (id: string) => known.get(id)?.alias ?? "";
@@ -70,33 +115,32 @@ export function layoutCity(graph: SchemaGraph): Placement[] {
 
   const roads = edges.filter((edge) => edge.kind === "allowedChild");
   const structure = reachableFromRoots(nodes, roads, known);
-  const districtOf = (node: SchemaNode): District =>
+  const composed = new Set(
+    edges.filter((edge) => edge.kind === "composition").map((edge) => edge.to),
+  );
+  const roleOf = (node: SchemaNode): Role =>
     node.isElement
-      ? "element"
+      ? "elements"
       : structure.has(node.id)
         ? "structure"
-        : "detached";
-  const inDistrict = (district: District) =>
-    nodes.filter((node) => districtOf(node) === district);
+        : composed.has(node.id)
+          ? "compositions"
+          : "unplaced";
 
-  const ranked = layoutRanks(
-    inDistrict("structure"),
-    roads.filter((road) => structure.has(road.from) && structure.has(road.to)),
-  );
-  const s = boxOf(ranked);
+  const filed = byFolder(nodes, graph.folders ?? []);
+  // A schema with no folders, or with none that hold a type, gets districts by role.
+  const groups = filed.some((group) => group.id !== UNFILED)
+    ? filed
+    : byRole(nodes, roleOf);
+  const laid = groups.map((group) => layoutDistrict(group, roads, roleOf));
 
-  // Element types go south of the structure district, one street down.
-  const elements = layoutGrid(inDistrict("element"), "element", s.minX, s.maxZ + RANK_GAP);
+  const districts = arrange(laid);
+  return { placements: laid.flatMap((district) => district.placements), districts };
+}
 
-  // Detached types go east of both, so a wide element grid can never grow into them.
-  const detached = layoutGrid(
-    inDistrict("detached"),
-    "detached",
-    Math.max(s.maxX, boxOf(elements).maxX) + RANK_GAP,
-    s.minZ,
-  );
-
-  return [...ranked, ...elements, ...detached];
+/** The placements alone, which is all the scene needs until it draws the slabs. */
+export function layoutCity(graph: SchemaGraph): Placement[] {
+  return cityDistricts(graph).placements;
 }
 
 /** The box the camera has to frame, including each building's own footprint. */
@@ -121,6 +165,182 @@ const footprintOf = (node: SchemaNode) =>
 // ponytail: one floor per group, and a type with no groups still gets a ground floor.
 // M1's building work splits a Tab from a Group; today they are the same slab.
 const floorsOf = (node: SchemaNode) => Math.max(1, node.groups?.length ?? 0);
+
+/** One district per top-level folder, plus Unfiled for the types no folder holds. */
+function byFolder(nodes: SchemaNode[], folders: SchemaFolder[]): Group[] {
+  const parentOf = new Map(folders.map((folder) => [folder.id, folder.parentId]));
+  const nameOf = new Map(folders.map((folder) => [folder.id, folder.name]));
+  const topOf = (id: string) => {
+    let at = id;
+    // Bounded by the folder count, so a parent cycle cannot spin here.
+    for (let i = 0; i < folders.length; i++) {
+      const parent = parentOf.get(at);
+      if (parent == null) break;
+      at = parent;
+    }
+    return at;
+  };
+
+  const groups = new Map<string, Group>();
+  for (const node of nodes) {
+    // A folderId the folder list does not contain is a deleted container, so the type
+    // reads as unfiled rather than inventing a nameless district for it.
+    const top =
+      node.folderId != null && nameOf.has(node.folderId)
+        ? topOf(node.folderId)
+        : UNFILED;
+    const group = groups.get(top);
+    if (group) group.members.push(node);
+    else
+      groups.set(top, {
+        id: top,
+        name: nameOf.get(top) ?? "Unfiled",
+        members: [node],
+      });
+  }
+  return [...groups.values()].sort((a, b) => compare(a.name, b.name));
+}
+
+/** The fallback for a schema with no folders: four districts named by what they hold. */
+function byRole(nodes: SchemaNode[], roleOf: (node: SchemaNode) => Role): Group[] {
+  const named: { id: string; name: string; role: Role }[] = [
+    { id: "pages", name: "Pages", role: "structure" },
+    { id: "compositions", name: "Compositions", role: "compositions" },
+    { id: "elements", name: "Elements", role: "elements" },
+    { id: UNPLACED, name: "Unplaced", role: "unplaced" },
+  ];
+  return named
+    .map(({ id, name, role }) => ({
+      id,
+      name,
+      members: nodes.filter((node) => roleOf(node) === role),
+    }))
+    .filter((group) => group.members.length > 0);
+}
+
+/** The role more than half the members share, or `mixed` when none does. */
+function kindOf(members: SchemaNode[], roleOf: (node: SchemaNode) => Role): DistrictKind {
+  const counts = new Map<Role, number>();
+  for (const member of members) {
+    const role = roleOf(member);
+    counts.set(role, (counts.get(role) ?? 0) + 1);
+  }
+  for (const [role, count] of counts) {
+    if (role !== "unplaced" && count * 2 > members.length) return role;
+  }
+  return "mixed";
+}
+
+/**
+ * Lays one district out around its own origin. Its allowed-child edges rank the members
+ * they touch; everything else packs into a grid one street below that block.
+ */
+function layoutDistrict(
+  group: Group,
+  roads: SchemaEdge[],
+  roleOf: (node: SchemaNode) => Role,
+): Laid {
+  const mine = new Set(group.members.map((node) => node.id));
+  const inside = roads.filter(
+    (road) => road.from !== road.to && mine.has(road.from) && mine.has(road.to),
+  );
+  const linked = new Set(inside.flatMap((road) => [road.from, road.to]));
+  const kind = kindOf(group.members, roleOf);
+
+  const ranked = layoutRanks(
+    group.members.filter((node) => linked.has(node.id)),
+    inside,
+    group.id,
+    kind,
+  );
+  const box = boxOf(ranked);
+  const loose = group.members.filter((node) => !linked.has(node.id));
+  const packed = layoutGrid(
+    loose,
+    group.id,
+    kind,
+    ranked.length > 0 ? box.minX : 0,
+    ranked.length > 0 ? box.maxZ + RANK_GAP : 0,
+    // The grid keeps rippling where the ranks stopped, so a district lights up once.
+    new Set(ranked.map((placement) => placement.introDelay)).size,
+  );
+
+  return {
+    ...group,
+    kind,
+    hasStructure: group.members.some((node) => roleOf(node) === "structure"),
+    placements: [...ranked, ...packed],
+  };
+}
+
+/**
+ * Puts the districts on the map and reports the ground each one ends up covering.
+ *
+ * Compositions north, the structure districts across the middle ordered largest first,
+ * elements south, and everything with no structure in it, Unfiled included, east of the
+ * lot. A street of six units separates any two of them.
+ */
+function arrange(laid: Laid[]): District[] {
+  const bandOf = (district: Laid) =>
+    district.id === UNFILED || district.id === UNPLACED
+      ? "east"
+      : district.kind === "compositions"
+        ? "north"
+        : district.kind === "elements"
+          ? "south"
+          : district.kind === "structure" || district.hasStructure
+            ? "middle"
+            : "east";
+  const bySize = (a: Laid, b: Laid) =>
+    b.members.length - a.members.length || compare(a.name, b.name);
+
+  const districts: District[] = [];
+  const moveTo = (district: Laid, x: number, z: number) => {
+    const box = boxOf(district.placements);
+    for (const placement of district.placements) {
+      placement.position.x += x - box.minX;
+      placement.position.z += z - box.minZ;
+    }
+    const width = box.maxX - box.minX;
+    const depth = box.maxZ - box.minZ;
+    districts.push({
+      id: district.id,
+      name: district.name,
+      kind: district.kind,
+      minX: x,
+      maxX: x + width,
+      minZ: z,
+      maxZ: z + depth,
+      centre: { x: x + width / 2, z: z + depth / 2 },
+    });
+    return { width, depth };
+  };
+
+  let z = 0;
+  for (const band of ["north", "middle", "south"] as const) {
+    const row = laid.filter((district) => bandOf(district) === band).sort(bySize);
+    if (row.length === 0) continue;
+    let x = 0;
+    let depth = 0;
+    for (const district of row) {
+      const size = moveTo(district, x, z);
+      x += size.width + RANK_GAP;
+      depth = Math.max(depth, size.depth);
+    }
+    z += depth + RANK_GAP;
+  }
+
+  // East of every row, so a wide row can never grow into this column.
+  const eastX =
+    districts.length > 0
+      ? districts.reduce((max, district) => Math.max(max, district.maxX), 0) + RANK_GAP
+      : 0;
+  let eastZ = 0;
+  for (const district of laid.filter((d) => bandOf(d) === "east").sort(bySize)) {
+    eastZ += moveTo(district, eastX, eastZ).depth + RANK_GAP;
+  }
+  return districts;
+}
 
 function reachableFromRoots(
   nodes: SchemaNode[],
@@ -153,7 +373,12 @@ function reachableFromRoots(
   return reached;
 }
 
-function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
+function layoutRanks(
+  nodes: SchemaNode[],
+  roads: SchemaEdge[],
+  district: string,
+  kind: DistrictKind,
+): Placement[] {
   if (nodes.length === 0) return [];
 
   const parents = new Map<string, string[]>();
@@ -230,7 +455,7 @@ function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
       let x = -width / 2;
       for (const node of row) {
         const centre = x + footprintOf(node) / 2;
-        placements.push(place(node, centre, rowZ, "structure", step));
+        placements.push(place(node, centre, rowZ, district, kind, step));
         placedX.set(node.id, centre);
         x += footprintOf(node) + FOOTPRINT;
       }
@@ -242,9 +467,11 @@ function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
 
 function layoutGrid(
   nodes: SchemaNode[],
-  district: District,
+  district: string,
+  kind: DistrictKind,
   originX: number,
   originZ: number,
+  firstStep: number,
 ): Placement[] {
   if (nodes.length === 0) return [];
 
@@ -258,7 +485,8 @@ function layoutGrid(
       originX + (column + 0.5) * pitch,
       originZ + (row + 0.5) * pitch,
       district,
-      row,
+      kind,
+      firstStep + row,
     );
   });
 }
@@ -267,7 +495,8 @@ function place(
   node: SchemaNode,
   x: number,
   z: number,
-  district: District,
+  district: string,
+  districtKind: DistrictKind,
   step: number,
 ): Placement {
   const floors = floorsOf(node);
@@ -278,6 +507,9 @@ function place(
     height: floors * FLOOR_HEIGHT,
     floors,
     district,
+    districtKind,
+    // A folder that is not the district's own is a folder nested inside it.
+    ...(node.folderId && node.folderId !== district ? { folder: node.folderId } : {}),
     introDelay: step * INTRO_STAGGER,
   };
 }
