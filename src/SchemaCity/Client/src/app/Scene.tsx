@@ -29,6 +29,18 @@ import { iconColour, rasteriseIcon } from "./scene/icons";
 import { CHAR_PX, LABEL_CAP, LABEL_HEIGHT_PX, pickLabels } from "./scene/labels";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
+import {
+  approach,
+  BOOST,
+  desiredVelocity,
+  FLIGHT_CODES,
+  FLY_SPEED,
+  groundAxes,
+  panSpeed,
+  TURN_SPEED,
+  turnedOffset,
+  turnRates,
+} from "./scene/flight";
 import { buildRoadGeometry, roadFan } from "./scene/roads";
 import {
   fogRange,
@@ -1168,6 +1180,8 @@ function Stage({
 }) {
   const camera = useThree((state) => state.camera);
   const grid = useRef<THREE.Mesh>(null);
+  const stampMeshes = useRef<(THREE.Mesh | null)[]>([]);
+  const viewDirection = useMemo(() => new THREE.Vector3(), []);
   const ray = useMemo(() => new THREE.Raycaster(), []);
   const ground = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const screenCentre = useMemo(() => new THREE.Vector2(0, 0), []);
@@ -1195,7 +1209,50 @@ function Stage({
     [palette, fadeNear, fadeFar],
   );
 
+  // One rasterised name per district, with the island it prints on. The quad it goes
+  // on is placed and sized every frame instead, because both follow the camera.
+  const stampsOf = useMemo(
+    () =>
+      districts.map((district) => {
+        const texture = stampTexture(district.name.toUpperCase(), palette.mono);
+        return {
+          id: district.id,
+          texture,
+          aspect: texture.image.width / texture.image.height,
+          island: {
+            minX: district.minX - ISLAND_PAD,
+            maxX: district.maxX + ISLAND_PAD,
+            minZ: district.minZ - ISLAND_PAD,
+            maxZ: district.maxZ + ISLAND_PAD,
+          },
+        };
+      }),
+    [districts, palette.mono],
+  );
+
   useFrame(() => {
+    // Each name turns about its own vertical to face the camera and grows by the
+    // foreshortening, so it reads as printed on the ground and still reads at all.
+    camera.getWorldDirection(viewDirection);
+    const along = Math.hypot(viewDirection.x, viewDirection.z);
+    const view = {
+      forward:
+        along < 1e-6
+          ? { x: 0, z: -1 }
+          : { x: viewDirection.x / along, z: viewDirection.z / along },
+      elevation: Math.atan2(-viewDirection.y, along),
+    };
+    stampsOf.forEach((printed, index) => {
+      const mesh = stampMeshes.current[index];
+      if (!mesh) return;
+      const stamp = districtStamp(printed.island, printed.aspect, view);
+      mesh.position.set(stamp.x, STAMP_Y, stamp.z);
+      // The spin is applied in the quad's own plane, before the quarter turn that
+      // lays it flat, which makes it a yaw about the world's vertical.
+      mesh.rotation.set(-Math.PI / 2, 0, stamp.spin);
+      mesh.scale.set(stamp.width, stamp.height, 1);
+    });
+
     // The ground point at the centre of the screen, from the camera's own centre
     // ray. The orbit target would do under the isometric camera, whose panning holds
     // it on y = 0, but the Explore camera can look anywhere.
@@ -1273,27 +1330,22 @@ function Stage({
           use for. ponytail: a nested folder's tint is opaque and stands a hundredth of
           a unit higher, so it would cover a name that reached under it. No folder in
           either fixture reaches into the margin the name is printed in. */}
-      {districts.map((district) => {
-        const texture = stampTexture(district.name.toUpperCase(), palette.mono);
-        const stamp = districtStamp(
-          {
-            minX: district.minX - ISLAND_PAD,
-            maxX: district.maxX + ISLAND_PAD,
-            minZ: district.minZ - ISLAND_PAD,
-          },
-          texture.image.width / texture.image.height,
-        );
+      {stampsOf.map((stamp, index) => {
         return (
           <mesh
-            key={district.id}
-            position={[stamp.x, STAMP_Y, stamp.z]}
+            key={stamp.id}
+            ref={(mesh) => {
+              stampMeshes.current[index] = mesh;
+            }}
             rotation={[-Math.PI / 2, 0, 0]}
           >
-            <planeGeometry args={[stamp.width, stamp.height]} />
+            {/* A unit quad, scaled every frame: the size follows the camera now, and
+                rebuilding a geometry per frame per district would not. */}
+            <planeGeometry args={[1, 1]} />
             <meshBasicMaterial
               color={palette.dim}
               depthWrite={false}
-              map={texture}
+              map={stamp.texture}
               opacity={STAMP_OPACITY}
               transparent
             />
@@ -1396,8 +1448,16 @@ function CameraRig({
     const cancel = () => {
       flight.current = null;
     };
+    // A flight key is the reader taking the camera, exactly as a pointer down is.
+    const cancelOnFlightKey = (event: KeyboardEvent) => {
+      if (flownBy(event)) cancel();
+    };
     gl.domElement.addEventListener("pointerdown", cancel);
-    return () => gl.domElement.removeEventListener("pointerdown", cancel);
+    window.addEventListener("keydown", cancelOnFlightKey);
+    return () => {
+      gl.domElement.removeEventListener("pointerdown", cancel);
+      window.removeEventListener("keydown", cancelOnFlightKey);
+    };
   }, [gl]);
 
   useEffect(() => {
@@ -1499,6 +1559,151 @@ function Controls({ span, explore }: { span: number; explore: boolean }) {
       screenSpacePanning={false}
     />
   );
+}
+
+/**
+ * Whether this keystroke is one the city flies by. The app's own handler reads the
+ * target the same way: an event that crossed a shadow boundary reports the host as
+ * its target, so the path says where it really started, and a field being typed into
+ * or anything inside a dialog keeps its letters. A modifier other than Shift means
+ * the key belongs to the browser or to the backoffice around us.
+ */
+function flownBy(event: KeyboardEvent): boolean {
+  if (!FLIGHT_CODES.has(event.code)) return false;
+  if (event.metaKey || event.ctrlKey || event.altKey) return false;
+  const from = event.composedPath()[0];
+  return !(
+    from instanceof HTMLElement &&
+    (from.isContentEditable ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(from.tagName) ||
+      from.closest('[role="dialog"]'))
+  );
+}
+
+/** Scratch, so flying allocates nothing per frame. */
+const FLIGHT_STEP = new THREE.Vector3();
+
+/**
+ * Keyboard flight, the rig that owns the keys. Held keys become a velocity that eases
+ * in and out, which moves the camera and its orbit target together, so the controls
+ * pick the pose back up unchanged the moment a hand goes back to the mouse.
+ *
+ * The isometric camera pans the ground along the screen, at a speed derived from its
+ * zoom so a key covers the same screen distance however far in it is. Explore flies
+ * along its heading, the arrows turn it and R and F change its height.
+ */
+function Flight({ explore }: { explore: boolean }) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as {
+    target: THREE.Vector3;
+    update: () => void;
+  } | null;
+  const size = useThree((state) => state.size);
+  const held = useMemo(() => new Set<string>(), []);
+  const boosting = useRef(false);
+  const velocity = useRef(new THREE.Vector3());
+  const turning = useRef(new THREE.Vector2());
+
+  useEffect(() => {
+    const release = () => {
+      held.clear();
+      boosting.current = false;
+    };
+    const down = (event: KeyboardEvent) => {
+      boosting.current = event.shiftKey;
+      if (!flownBy(event)) {
+        // While a command key is down macOS withholds the keyup of everything else,
+        // so a key let go inside a shortcut would fly on forever. The same goes for
+        // a field or a dialog taking the keyboard mid-flight: stop rather than coast.
+        release();
+        return;
+      }
+      // Without this the arrows scroll the backoffice around the city.
+      event.preventDefault();
+      held.add(event.code);
+    };
+    const up = (event: KeyboardEvent) => {
+      boosting.current = event.shiftKey;
+      // Anything released during a Cmd or Ctrl chord reported no keyup of its own,
+      // so the modifier's own release is the first moment the set can be trusted.
+      if (event.key === "Meta" || event.key === "Control") release();
+      else held.delete(event.code);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", release);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", release);
+      release();
+    };
+  }, [held]);
+
+  useFrame((_, delta) => {
+    if (!controls) return;
+    // A tab that was in the background hands back one enormous delta, which would
+    // teleport the camera as far as the whole time it was away.
+    const step = Math.min(delta, 0.05);
+    const boost = boosting.current ? BOOST : 1;
+    const distance = camera.position.distanceTo(controls.target);
+    const speed = explore
+      ? FLY_SPEED * boost
+      : panSpeed(
+          pixelsPerUnit(
+            camera as THREE.OrthographicCamera & { fov?: number },
+            size.height,
+            distance,
+          ),
+        ) * boost;
+    const wanted = desiredVelocity(
+      held,
+      groundAxes(camera.position, controls.target),
+      speed,
+      explore ? "fly" : "pan",
+    );
+    const moving = velocity.current.set(
+      approach(velocity.current.x, wanted.x, step),
+      approach(velocity.current.y, wanted.y, step),
+      approach(velocity.current.z, wanted.z, step),
+    );
+    // A hundredth of a world unit a second is a stop, and rounding it to one keeps
+    // the controls from being updated on every idle frame for ever.
+    if (moving.lengthSq() < 1e-4) moving.set(0, 0, 0);
+
+    const rates = explore ? turnRates(held) : { yaw: 0, pitch: 0 };
+    const turn = turning.current.set(
+      approach(turning.current.x, rates.yaw * TURN_SPEED * boost, step),
+      approach(turning.current.y, rates.pitch * TURN_SPEED * boost, step),
+    );
+    if (turn.lengthSq() < 1e-6) turn.set(0, 0);
+    if (moving.lengthSq() === 0 && turn.lengthSq() === 0) return;
+
+    if (turn.lengthSq() > 0) {
+      const offset = turnedOffset(
+        FLIGHT_STEP.subVectors(camera.position, controls.target),
+        turn.x * step,
+        turn.y * step,
+        // ponytail: the same clamp `Controls` gives Explore, written twice. Reading
+        // it back off the live controls means typing them wider than the two fields
+        // this rig uses them through.
+        Math.PI / 2,
+      );
+      controls.target.set(
+        camera.position.x - offset.x,
+        camera.position.y - offset.y,
+        camera.position.z - offset.z,
+      );
+    }
+    if (moving.lengthSq() > 0) {
+      FLIGHT_STEP.copy(moving).multiplyScalar(step);
+      camera.position.add(FLIGHT_STEP);
+      controls.target.add(FLIGHT_STEP);
+    }
+    controls.update();
+  });
+
+  return null;
 }
 
 /** Where the camera stands and what it is looking at, as of the last frame. */
@@ -1890,6 +2095,7 @@ export default function Scene({
             </>
           )}
           <Controls explore={explore === true} span={span} />
+          <Flight explore={explore === true} />
         </Canvas>
       ) : null}
     </div>

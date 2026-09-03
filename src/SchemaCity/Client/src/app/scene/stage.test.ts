@@ -80,23 +80,71 @@ test("a world unit measures the same on screen through either camera", () => {
   expect(pixelsPerUnit({ zoom: 1, fov }, size.height, distance * 2)).toBeCloseTo(zoom / 2);
 });
 
-test("a district's name prints at the north-west corner of its island", () => {
-  // "PAGES" tracked out, rasterised: about seven cap heights wide.
-  const stamp = districtStamp({ minX: -20, maxX: 40, minZ: -10 }, 7);
+/** The isometric camera, looking north-west and down at 35.26 degrees. */
+const ISO_VIEW = {
+  forward: { x: -Math.SQRT1_2, z: -Math.SQRT1_2 },
+  elevation: Math.asin(1 / Math.sqrt(3)),
+};
 
-  expect(stamp.height).toBe(STAMP_CAP);
-  expect(stamp.width).toBeCloseTo(STAMP_CAP * 7);
-  // Left edge and north edge, both half an inset in from the island's own.
-  expect(stamp.x - stamp.width / 2).toBeCloseTo(-19.5);
-  expect(stamp.z - stamp.height / 2).toBeCloseTo(-9.5);
+/** Half the ground a turned stamp covers along x and along z. */
+function stampExtent(
+  stamp: { width: number; height: number; spin: number },
+  view: { forward: { x: number; z: number } },
+) {
+  const right = { x: -view.forward.z, z: view.forward.x };
+  return {
+    x: (Math.abs(right.x) * stamp.width + Math.abs(view.forward.x) * stamp.height) / 2,
+    z: (Math.abs(right.z) * stamp.width + Math.abs(view.forward.z) * stamp.height) / 2,
+  };
+}
+
+test("a district's name prints inside the north-west corner of its island", () => {
+  // "PAGES" tracked out, rasterised: about seven cap heights wide.
+  const island = { minX: -20, maxX: 40, minZ: -10, maxZ: 30 };
+  const stamp = districtStamp(island, 7, ISO_VIEW);
+  const extent = stampExtent(stamp, ISO_VIEW);
+
+  // The isometric angle lays a flat quad over sqrt(3) of its own height, so the cap
+  // has to be that much taller in the world to read as STAMP_CAP on screen.
+  expect(stamp.height * Math.sin(ISO_VIEW.elevation)).toBeCloseTo(STAMP_CAP);
+  expect(stamp.width / stamp.height).toBeCloseTo(7);
+  // Half an inset in from the island's own west and north edges, whatever the turn.
+  expect(stamp.x - extent.x).toBeCloseTo(island.minX + 0.5);
+  expect(stamp.z - extent.z).toBeCloseTo(island.minZ + 0.5);
 });
 
-test("a name too wide for its island shrinks instead of hanging over the void", () => {
-  const island = { minX: 0, maxX: 14, minZ: 0 };
-  const stamp = districtStamp(island, 7);
+test("the name turns to face the camera and reads horizontally", () => {
+  for (const azimuth of [0, 0.4, Math.PI / 2, 2.5, -1.9]) {
+    const view = {
+      forward: { x: Math.sin(azimuth), z: Math.cos(azimuth) },
+      elevation: 0.6,
+    };
+    const { spin } = districtStamp({ minX: 0, maxX: 60, minZ: 0, maxZ: 60 }, 7, view);
+    // The quad is laid flat by a quarter turn about x, so its own +x ends up here.
+    const baseline = { x: Math.cos(spin), z: -Math.sin(spin) };
+    // Square to the view direction on the ground, which is what puts the letters
+    // along the screen's horizontal.
+    expect(baseline.x * view.forward.x + baseline.z * view.forward.z).toBeCloseTo(0);
+    // And running to the right of it rather than to the left.
+    expect(view.forward.x * baseline.z - view.forward.z * baseline.x).toBeCloseTo(1);
+  }
+});
+
+test("a name too big for its island shrinks instead of hanging over the void", () => {
+  const island = { minX: 0, maxX: 14, minZ: 0, maxZ: 14 };
+  const stamp = districtStamp(island, 7, ISO_VIEW);
+  const extent = stampExtent(stamp, ISO_VIEW);
 
   expect(stamp.height).toBeLessThan(STAMP_CAP);
-  expect(stamp.x + stamp.width / 2).toBeLessThanOrEqual(island.maxX);
+  expect(stamp.x + extent.x).toBeLessThanOrEqual(island.maxX);
+  expect(stamp.z + extent.z).toBeLessThanOrEqual(island.maxZ);
   // Cap height and width shrink together, so the letters keep their shape.
   expect(stamp.width / stamp.height).toBeCloseTo(7);
+});
+
+test("a grazing view never blows the name up past half the island", () => {
+  const island = { minX: 0, maxX: 60, minZ: 0, maxZ: 40 };
+  const flat = districtStamp(island, 7, { forward: { x: 0, z: -1 }, elevation: 0.02 });
+
+  expect(flat.height).toBeLessThanOrEqual((40 - 1) / 2);
 });
