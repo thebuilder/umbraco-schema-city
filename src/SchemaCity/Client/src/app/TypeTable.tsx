@@ -122,9 +122,9 @@ export function TypeTable({
               interactive content, so clicking it does not also activate the label. */}
           <span className="relative">
             <Input
-              className="h-8 w-64 bg-secondary px-2 pr-7 text-xs normal-case tracking-normal focus-visible:border-phosphor"
+              className="h-8 w-64 min-w-[14rem] bg-secondary px-2 pr-7 text-xs normal-case tracking-normal focus-visible:border-phosphor"
               onChange={(event) => onQuery(event.target.value)}
-              placeholder="Type name, alias or property alias"
+              placeholder="Filter types"
               type="text"
               value={query}
             />

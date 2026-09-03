@@ -81,7 +81,7 @@ export function Findings({
 
   return (
     <Sheet onOpenChange={setOpen} open={open}>
-      <SheetTrigger render={<Button size="sm" variant="outline" />}>
+      <SheetTrigger render={<Button data-trigger size="sm" variant="outline" />}>
         Findings
         <Badge variant={problems > 0 ? "signal" : "outline"}>{findings.length}</Badge>
       </SheetTrigger>

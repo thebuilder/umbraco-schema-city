@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -415,7 +416,7 @@ export function App({
               typeahead this gets for nothing. Swap it if the bundle gets tight. */}
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={<Button size="sm" variant="outline" />}
+              render={<Button data-trigger size="sm" variant="outline" />}
             >
               Layers {layers.length}/{LAYERS.length}
             </DropdownMenuTrigger>
@@ -433,17 +434,31 @@ export function App({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Two ways to look at the same city, and one toggle each rather than a
-              picker, because either one is off most of the time. Turning List off
-              goes back to the isometric city, not to Explore. */}
-          <Toggle
-            onPressedChange={(on) => setView(on ? "explore" : "city")}
-            pressed={view === "explore"}
-            size="sm"
-            variant="outline"
-          >
-            Explore
-          </Toggle>
+          {/* The camera is always one of the two, so it is a segmented pair rather
+              than a lone Explore toggle: one toggle says what Explore is and never
+              what it is instead, which is a fixed isometric angle. List is its own
+              toggle still, because the table is not a third camera, and turning it
+              off goes back to whichever camera the pair is on.
+
+              Picking a camera from the list leaves the list, the way turning
+              Explore on used to. */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
+              Camera
+            </span>
+            <ToggleGroup
+              aria-label="Camera"
+              onValueChange={(value) =>
+                setView(value[0] === "free" ? "explore" : "city")
+              }
+              size="sm"
+              value={[view === "explore" ? "free" : "iso"]}
+              variant="outline"
+            >
+              <ToggleGroupItem value="iso">Iso</ToggleGroupItem>
+              <ToggleGroupItem value="free">Free</ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           <Toggle
             onPressedChange={(on) => setView(on ? "list" : "city")}
             pressed={view === "list"}
@@ -497,7 +512,9 @@ export function App({
             <Findings findings={findings} nodesById={nodesById} onSelect={followLink} />
 
             <Popover>
-              <PopoverTrigger render={<Button size="sm" variant="outline" />}>
+              <PopoverTrigger
+                render={<Button data-trigger size="sm" variant="outline" />}
+              >
                 Legend
               </PopoverTrigger>
               <PopoverContent className="w-80 text-sm">
@@ -510,7 +527,7 @@ export function App({
             {/* No tooltip on a control that opens a dialog: the tooltip's exit
                 animation plays over the dialog opening, which reads as the label
                 flying away. The shortcut goes in the button instead. */}
-            <Button onClick={() => openPalette(true)} size="sm">
+            <Button data-trigger onClick={() => openPalette(true)} size="sm">
               Search
               <Kbd>⌘K</Kbd>
             </Button>

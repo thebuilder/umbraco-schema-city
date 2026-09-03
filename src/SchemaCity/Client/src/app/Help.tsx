@@ -21,7 +21,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "Mouse",
     rows: [
-      { keys: ["Drag"], does: "Orbit around the centre of the view" },
+      {
+        keys: ["Drag"],
+        does: "Iso: orbit around the centre at a fixed angle; Free: orbit freely",
+      },
       { keys: ["Right-drag"], does: "Pan the view" },
       { keys: ["Scroll"], does: "Zoom in and out" },
       {
@@ -36,13 +39,13 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     rows: [
       {
         keys: ["W", "A", "S", "D"],
-        does: "Pan the view along the ground. In Explore, fly forward, left, back, right",
+        does: "Pan the view along the ground. In Free, fly forward, left, back, right",
       },
       {
         keys: ["↑", "←", "↓", "→"],
-        does: "Pan the view. In Explore, turn it: swing the view up, left, down, right",
+        does: "Pan the view. In Free, turn it: swing the view up, left, down, right",
       },
-      { keys: ["R", "F"], does: "Rise and descend, in Explore" },
+      { keys: ["R", "F"], does: "Rise and descend, in Free" },
       { keys: ["Shift"], does: "Hold alongside any of these to go twice as fast" },
       { keys: ["Home"], does: "Reframe the city" },
     ],
@@ -58,7 +61,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         does: "Toggle Structure, Compositions, Blocks, References",
       },
       { keys: ["L"], does: "List view" },
-      { keys: ["E"], does: "Explore camera" },
+      { keys: ["E"], does: "Switch the camera between Iso and Free" },
       { keys: ["?"], does: "Show this page" },
     ],
   },
@@ -97,7 +100,9 @@ export function Help({
           the key that opens the same dialog. */}
       <DialogTrigger
         aria-label="Control reference"
-        render={<Button className="text-xs" size="icon-sm" variant="outline" />}
+        render={
+          <Button className="text-xs" data-trigger size="icon-sm" variant="outline" />
+        }
       >
         ?
       </DialogTrigger>
