@@ -35,6 +35,7 @@ import {
   framingAction,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
+  districtStamp,
   pixelsPerUnit,
   stageMetrics,
   zoomRange,
@@ -50,6 +51,8 @@ type Palette = {
   background: string;
   separator: string;
   land: string;
+  /** The theme's mono stack, for the names printed on the ground. */
+  mono: string;
 };
 
 /** Seconds a building takes to rise, once its own `introDelay` has passed. */
@@ -802,26 +805,20 @@ const MAX_NEIGHBOUR_LABELS = 8;
 const LABEL_LIFT = 0.35;
 const LABEL_CLASS =
   "absolute top-0 left-0 hidden whitespace-nowrap border border-line-strong bg-panel-raised px-1.5 py-0.5 font-mono text-2xs text-phosphor";
-/** A district's name reads as a place on the map, so it has no chip around it. */
-const DISTRICT_LABEL_CLASS =
-  "absolute top-0 left-0 hidden whitespace-nowrap font-mono text-sm uppercase tracking-widest text-phosphor-dim";
-/** Districts sort after the hovered and selected buildings and their neighbours. */
-const DISTRICT_RANK = 3;
 /** A cut fan's count sorts last of all, so it only takes pixels nothing else wants. */
 const FAN_MARKER_RANK = 4;
 
 /**
- * The names on the city, in one DOM layer over the canvas. Candidates are the
- * same as they always were, but which of them are drawn is decided in screen
- * space every time the camera or the layout moves: `pickLabels` keeps the best
- * ranked ones that do not land on each other, and drops the rest.
+ * The building names, in one DOM layer over the canvas. Which of the candidates are
+ * drawn is decided in screen space every time the camera or the layout moves.
+ * `pickLabels` keeps the best ranked ones that do not land on each other, and drops
+ * the rest. District names are not candidates: they are printed on the ground.
  *
  * The layer is built and written to by hand rather than through React, because
  * this runs inside the frame loop and forty spans that only ever change their
  * transform are not worth a render each.
  */
 function Labels({
-  districts,
   nodesById,
   placementsById,
   heights,
@@ -832,8 +829,6 @@ function Labels({
   badge,
   fanMarkers,
 }: {
-  /** The city's districts, each named at the north corner of its island. */
-  districts: District[];
   nodesById: Map<string, SchemaNode>;
   placementsById: Map<string, Placement>;
   heights: Map<string, number>;
@@ -885,31 +880,7 @@ function Labels({
       z: number;
       /** Pixels to raise the box by after projection, so it clears the name below it. */
       lift: number;
-      kind?: "district";
     }[] = [];
-    // The north corner of each island, which is the top corner of the diamond it
-    // draws as under the isometric camera, so the name sits clear of the buildings.
-    // Biggest island first, so when two corners land close enough for one name to
-    // cull the other it is the small district that loses it.
-    for (const district of [...districts].sort(
-      (a, b) =>
-        (b.maxX - b.minX) * (b.maxZ - b.minZ) - (a.maxX - a.minX) * (a.maxZ - a.minZ),
-    )) {
-      built.push({
-        id: `district:${district.id}`,
-        text: district.name.toUpperCase(),
-        rank: DISTRICT_RANK,
-        footprint: Math.max(
-          district.maxX - district.minX,
-          district.maxZ - district.minZ,
-        ) + ISLAND_PAD * 2,
-        x: district.minX - ISLAND_PAD,
-        y: 0,
-        z: district.minZ - ISLAND_PAD,
-        lift: 0,
-        kind: "district",
-      });
-    }
     for (const id of ids) {
       const node = nodesById.get(id);
       const placement = placementsById.get(id);
@@ -959,7 +930,6 @@ function Labels({
     }
     return built;
   }, [
-    districts,
     fanMarkers,
     hovered,
     selected,
@@ -1031,7 +1001,6 @@ function Labels({
         return {
           id: candidate.id,
           text: candidate.text,
-          kind: candidate.kind,
           rank: candidate.rank,
           pinned: candidate.rank < 2,
           x: (anchor.x * 0.5 + 0.5) * size.width,
@@ -1049,8 +1018,6 @@ function Labels({
         return;
       }
       span.style.display = "block";
-      const className = box.kind === "district" ? DISTRICT_LABEL_CLASS : LABEL_CLASS;
-      if (span.className !== className) span.className = className;
       span.style.transform = `translate(${Math.round(box.left)}px, ${Math.round(box.top)}px)`;
       if (span.textContent !== box.text) span.textContent = box.text;
     });
@@ -1089,6 +1056,84 @@ function tint(base: string, toward: string, amount: number): THREE.Color {
 const WHITE = "#ffffff";
 
 /**
+ * Font size a district's name is rasterised at. Its cap height comes out around 72 px,
+ * and the stamp is at most 3 world units tall, so the print carries about 24 px of
+ * texture per world unit. The ground needs 2 to stay crisp at the framing zoom, and
+ * the rest is what Explore leans on when the camera comes down to street level.
+ */
+const STAMP_FONT_PX = 100;
+/**
+ * How heavy the letters are cut. A mono face at its normal weight leaves a stroke
+ * about a pixel wide once the whole city is framed, and a stroke that thin at 0.55
+ * opacity averages away into the slab under it.
+ */
+const STAMP_WEIGHT = 600;
+/** Silkscreen text is spaced out. Ems of extra gap between two letters. */
+const STAMP_TRACKING = "0.32em";
+/**
+ * How solid the print reads against the island under it. Phosphor-dim at 0.8 comes
+ * out around #3f6b60 over the panel colour, which is still darker than any building
+ * and half the strength of a road. Lower than this and the letters go, because the
+ * whole city framed shrinks a 100 px raster to a 17 px cap and the mipmap averages a
+ * thin stroke into the slab.
+ */
+const STAMP_OPACITY = 0.8;
+/**
+ * How far the print stands off the slab it is on. Above the slab so the two never
+ * z-fight, and under the road ribbons at 0.015, so a road crossing an island's margin
+ * runs over the name the way a trace runs over a board's silkscreen.
+ */
+const STAMP_Y = 0.01;
+
+/** One texture per name and font, kept for the life of the page. */
+const stamps = new Map<string, THREE.CanvasTexture>();
+
+/**
+ * A district's name rasterised into a texture that is exactly the ink: as wide as the
+ * tracked-out name and as tall as its cap height. Sizing the texture to the cap rather
+ * than to the font's line box is what lets the caller place the quad by cap height
+ * alone, with no per-font fudge for the ascender and descender space around it.
+ */
+function stampTexture(name: string, font: string): THREE.CanvasTexture {
+  const key = `${name}|${font}`;
+  const found = stamps.get(key);
+  if (found) return found;
+
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const style = () => {
+    if (!context) return;
+    context.font = `${STAMP_WEIGHT} ${STAMP_FONT_PX}px ${font}`;
+    // letterSpacing is Chrome 99 and Safari 17.4. Older than that prints the name
+    // without the tracking rather than not at all.
+    context.letterSpacing = STAMP_TRACKING;
+    // White ink, because the material's colour is what tints it to the theme.
+    context.fillStyle = "#ffffff";
+    context.textBaseline = "alphabetic";
+  };
+  if (context) {
+    style();
+    const measured = context.measureText(name);
+    // The ink's own ascent, which for an uppercase name is its cap height.
+    const cap = Math.max(Math.ceil(measured.actualBoundingBoxAscent), 1);
+    canvas.width = Math.max(Math.ceil(measured.width), 1);
+    canvas.height = cap;
+    // Sizing a canvas resets every drawing state it had, the font included.
+    style();
+    context.fillText(name, 0, cap);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  // The stamp lies on the ground, so every camera reads it at a grazing angle and a
+  // plain mipmap turns the letters to mush. The renderer clamps this to what the
+  // hardware has.
+  texture.anisotropy = 8;
+  stamps.set(key, texture);
+  return texture;
+}
+
+/**
  * The land under a district. Structure is the same panel colour the chrome uses,
  * compositions and mixed are a touch lighter and elements a touch warmer, so the
  * islands read as different places without turning into four colours.
@@ -1106,7 +1151,8 @@ function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
  * does not rescale the world, and the islands come from the city layout as well, so
  * the focused neighbourhood stands on whatever island it lands over.
  *
- * Two draw calls per district plus one per nested folder, and nothing here animates.
+ * Three draw calls per district, the name printed on it included, plus one per nested
+ * folder. Nothing here animates.
  */
 function Stage({
   districts,
@@ -1217,6 +1263,43 @@ function Stage({
           <meshStandardMaterial color={folderColour} metalness={0} roughness={1} />
         </mesh>
       ))}
+      {/* The district's name printed flat on its island, in the margin along the north
+          edge. It writes no depth, so the buildings, the roads and every link stand
+          over it.
+
+          ponytail: the print holds its strength through a selection and through focus
+          mode, where the buildings around it fade. Fading it too means telling the
+          stage which islands are lit, which is a prop and a set the stage has no other
+          use for. ponytail: a nested folder's tint is opaque and stands a hundredth of
+          a unit higher, so it would cover a name that reached under it. No folder in
+          either fixture reaches into the margin the name is printed in. */}
+      {districts.map((district) => {
+        const texture = stampTexture(district.name.toUpperCase(), palette.mono);
+        const stamp = districtStamp(
+          {
+            minX: district.minX - ISLAND_PAD,
+            maxX: district.maxX + ISLAND_PAD,
+            minZ: district.minZ - ISLAND_PAD,
+          },
+          texture.image.width / texture.image.height,
+        );
+        return (
+          <mesh
+            key={district.id}
+            position={[stamp.x, STAMP_Y, stamp.z]}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <planeGeometry args={[stamp.width, stamp.height]} />
+            <meshBasicMaterial
+              color={palette.dim}
+              depthWrite={false}
+              map={texture}
+              opacity={STAMP_OPACITY}
+              transparent
+            />
+          </mesh>
+        );
+      })}
     </>
   );
 }
@@ -1710,6 +1793,7 @@ export default function Scene({
       background: token("--background"),
       dim: token("--phosphor-dim"),
       land: token("--panel"),
+      mono: token("--font-mono") || "ui-monospace, monospace",
       phosphor: token("--phosphor"),
       separator: token("--panel-sunken"),
       signal: token("--signal"),
@@ -1788,7 +1872,6 @@ export default function Scene({
           )}
           <Labels
             badge={selected ? usageBadge(usage, selected) : null}
-            districts={city.districts}
             fanMarkers={fan.markers}
             focusNeighbours={focusNeighbours}
             heights={heights}

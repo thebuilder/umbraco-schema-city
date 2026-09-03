@@ -112,6 +112,43 @@ export function framingAction<B, C>(
   return last.controls === next.controls ? "none" : "snap";
 }
 
+/** Cap height of a district's name printed on its island, in world units. */
+export const STAMP_CAP = 3;
+
+/**
+ * Ground between the island's north and west edges and the name printed on it. The
+ * padding around a district is 3 units, so a 3 unit cap set in from the corner runs
+ * about half a unit past the padding, onto ground the outermost building's own row
+ * leaves empty either side of it.
+ */
+const STAMP_INSET = 0.5;
+
+/**
+ * Where a district's name lies on its island and how big the quad is, in world units.
+ * `island` is the district's box with its padding already added, and `aspect` is the
+ * rasterised name's width over its cap height.
+ *
+ * The name is left-aligned at the north-west corner and runs east along the north
+ * edge, so it reads as printed in the margin the layout already leaves rather than as
+ * a caption placed over the buildings. A name wider than the island shrinks until it
+ * fits, which is what a district of two types would otherwise hang over the void.
+ */
+export function districtStamp(
+  island: { minX: number; maxX: number; minZ: number },
+  aspect: number,
+  cap = STAMP_CAP,
+): { x: number; z: number; width: number; height: number } {
+  const room = island.maxX - island.minX - STAMP_INSET * 2;
+  const height = Math.min(cap, room / Math.max(aspect, 1e-6));
+  const width = height * aspect;
+  return {
+    x: island.minX + STAMP_INSET + width / 2,
+    z: island.minZ + STAMP_INSET + height / 2,
+    width,
+    height,
+  };
+}
+
 export const GRID_VERTEX_SHADER = /* glsl */ `
   varying vec3 vWorld;
   void main() {
