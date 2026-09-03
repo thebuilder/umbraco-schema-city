@@ -55,15 +55,17 @@ export function zoomRange(
 }
 
 /**
- * How far fog reaches, in the view depth an orthographic camera measures it by. Ortho
- * zoom moves no camera, so the city sits at the same depth however far you zoom out,
- * and only the empty ground around it grows. Fog therefore holds at the city's own
- * span until the view is wider than that, which keeps the whole city crisp at every
- * zoom the controls allow and leaves fog to work on the ground past it.
+ * How far fog reaches, in the view depth three measures it by. It does work under an
+ * orthographic camera, which is not obvious: fog reads `-mvPosition.z`, a view-space
+ * depth that no projection touches. It needs no zoom term for the same reason, since
+ * ortho zoom moves no camera and so changes nothing's depth.
+ *
+ * The camera holds its target `span` units away and the isometric angle puts the far
+ * corner of a square city at `span * 1.58`, so fog starting at `span * 1.8` leaves the
+ * whole city crisp at every zoom and only reaches ground well past it.
  */
-export function fogRange(span: number, reach: number): { near: number; far: number } {
-  const depth = Math.max(span, reach);
-  return { near: depth * 1.8, far: depth * 5 };
+export function fogRange(span: number): { near: number; far: number } {
+  return { near: span * 1.8, far: span * 5 };
 }
 
 export const GRID_VERTEX_SHADER = /* glsl */ `

@@ -23,7 +23,6 @@ import {
   fogRange,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
-  groundReach,
   stageMetrics,
   zoomRange,
 } from "./scene/stage";
@@ -680,12 +679,10 @@ const GRID_Y = -(SLAB_HEIGHT + RIM_HEIGHT + 0.05);
  * Three draw calls, and nothing here animates.
  */
 function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; palette: Palette }) {
-  const scene = useThree((state) => state.scene);
-  const size = useThree((state) => state.size);
-  const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
   const controls = useThree((state) => state.controls) as { target: THREE.Vector3 } | null;
   const grid = useRef<THREE.Mesh>(null);
   const { fadeNear, fadeFar, plane } = stageMetrics(span);
+  const fog = fogRange(span);
 
   const uniforms = useMemo(
     () => ({
@@ -693,7 +690,7 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
       // The minor lines are the same phosphor-dim mixed back toward the void, so the
       // grid reads as one thing at two strengths rather than as two colours.
       uMinorColour: {
-        value: new THREE.Color(palette.dim).lerp(new THREE.Color(palette.background), 0.62),
+        value: new THREE.Color(palette.dim).lerp(new THREE.Color(palette.background), 0.5),
       },
       uMajorColour: { value: new THREE.Color(palette.dim) },
       uFadeNear: { value: fadeNear },
@@ -707,15 +704,9 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
     // is the ground point at the centre of the screen. Centring the plane and the fade
     // there is what keeps the fade concentric with what the camera can see.
     const target = controls?.target;
-    if (target && grid.current) {
-      grid.current.position.set(target.x, GRID_Y, target.z);
-      uniforms.uCentre.value.set(target.x, target.z);
-    }
-    if (scene.fog instanceof THREE.Fog) {
-      const { near, far } = fogRange(span, groundReach(camera.zoom, size));
-      scene.fog.near = near;
-      scene.fog.far = far;
-    }
+    if (!target || !grid.current) return;
+    grid.current.position.set(target.x, GRID_Y, target.z);
+    uniforms.uCentre.value.set(target.x, target.z);
   });
 
   const rim = SLAB_MARGIN + RIM_OVERHANG;
@@ -724,7 +715,7 @@ function Stage({ bounds, span, palette }: { bounds: CityBounds; span: number; pa
       <color args={[palette.background]} attach="background" />
       {/* Fog and background have to be the exact same colour or the far ground ends
           in a horizon ring instead of dissolving. */}
-      <fog args={[palette.background, span, span * 5]} attach="fog" />
+      <fog args={[palette.background, fog.near, fog.far]} attach="fog" />
       <mesh frustumCulled={false} ref={grid} renderOrder={-1} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[plane, plane]} />
         <shaderMaterial

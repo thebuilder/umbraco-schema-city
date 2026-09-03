@@ -30,14 +30,11 @@ test("every framing the camera flies to is inside the zoom range", () => {
   }
 });
 
-test("no part of the city is in fog at the framing zoom", () => {
-  const span = 87;
+test("no part of the city is in fog, at any zoom", () => {
   // A ground point is at most (width + depth) / (2 * sqrt(3)) of view depth from the
-  // target, which the camera holds `span` units away. A square city is the deepest one
-  // that frames at a given span, so both sides are the span.
-  const farthest = span + (span + span) / (2 * Math.sqrt(3));
-  for (const size of VIEWPORTS) {
-    const reach = groundReach(framingZoom(span, size), size);
-    expect(fogRange(span, reach).near).toBeGreaterThan(farthest);
+  // target, which the camera holds `span` units away, and ortho zoom moves no camera.
+  // A square city is the deepest one that frames at a given span, so both sides are it.
+  for (const span of [4, 12, 87, 400]) {
+    expect(fogRange(span).near).toBeGreaterThan(span + (span + span) / (2 * Math.sqrt(3)));
   }
 });
