@@ -259,9 +259,12 @@ export function App({
       // browser or to the backoffice around us, not to the city. Shift is the
       // exception, because "?" is Shift and a slash.
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const digit = "1234".indexOf(event.key);
-      if (digit >= 0) {
-        const layer = LAYERS[digit];
+      // Number, not an index into "1234": a key that is the empty string, which is
+      // what a synthetic event without one carries, is at index 0 of any string and
+      // would switch the first layer off.
+      const digit = Number(event.key);
+      if (digit >= 1 && digit <= 4) {
+        const layer = LAYERS[digit - 1];
         // Rebuilt from LAYERS rather than pushed onto, so the URL writes its layers
         // in toolbar order however they were switched on.
         setLayers((on) =>
