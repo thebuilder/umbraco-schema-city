@@ -2,6 +2,8 @@
 // geometry per layer so the scene spends a single draw call on all of them.
 // Pure: no three.js, no React, no DOM.
 import type { EdgeKind, SchemaEdge } from "../../model/types";
+import type { Placement } from "../layout/city";
+import { type RoadGrid, roadGrid, routePoints } from "./roads";
 
 export type Layer = "structure" | "compositions" | "blocks" | "references";
 
@@ -27,12 +29,17 @@ export const LAYER_OF: Record<EdgeKind, Layer> = {
 /** Where a link attaches to a building: its roof, in world units. */
 export type Anchor = { x: number; y: number; z: number };
 
-export type LinkRange = { edge: SchemaEdge; start: number; count: number };
+export type LinkRange = { edges: SchemaEdge[]; start: number; count: number };
 
 /** How high a composition arc rises over the taller of the two roofs it joins. */
 const ARCH = 3;
-/** How close to the ground a block link dips on its way to the element district. */
-const DIP = 0.25;
+/**
+ * How close to the ground a block link and a reference come on their way across the
+ * city. They run the streets there, so they sit just clear of the road ribbons at
+ * 0.015 and of each other.
+ */
+const BLOCK_Y = 0.25;
+const REFERENCE_Y = 0.4;
 /** Samples along one curve. Ten reads as a curve and costs twenty vertices. */
 const SEGMENTS = 10;
 const DASH_ON = 0.55;
@@ -46,17 +53,20 @@ const THICK_OFFSET = 0.09;
  * One flat xyz line-segment list for every edge in `layer`, plus the vertex range
  * each edge occupies so the scene can fade one edge without rebuilding anything.
  *
- * Compositions arch over the roofs, blocks dip to the ground on their way to the
- * element district, and references are dotted straight lines.
+ * Compositions arch over the roofs. Blocks and references drop off their roof, cross
+ * the city along the same streets the roads run, and rise to the other roof, so all
+ * four layers agree about where the ground is walkable. References are dashed.
  */
 export function buildLinkGeometry(
   layer: Exclude<Layer, "structure">,
   edges: SchemaEdge[],
   anchors: Map<string, Anchor>,
+  placements: Map<string, Placement>,
 ): { positions: Float32Array; ranges: LinkRange[] } {
   const positions: number[] = [];
   const ranges: LinkRange[] = [];
   const drawn = new Set<string>();
+  const grid = layer === "compositions" ? null : roadGrid(placements.values());
   // An inherited parent arrives as both an inherits and a composition edge. The
   // thicker arc is the one worth drawing, so the composition twin is dropped
   // whichever order the two came in.
@@ -83,25 +93,63 @@ export function buildLinkGeometry(
     drawn.add(pair);
 
     const start = positions.length / 3;
-    if (layer === "references") {
-      pushDashes(positions, from, to);
+    if (grid) {
+      const path = groundPath(
+        grid,
+        from,
+        to,
+        placements.get(edge.from),
+        placements.get(edge.to),
+        layer === "references" ? REFERENCE_Y : BLOCK_Y,
+      );
+      for (let i = 1; i < path.length; i++) {
+        const a = path[i - 1] as Anchor;
+        const b = path[i] as Anchor;
+        if (layer === "references") pushDashes(positions, a, b);
+        else positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      }
     } else {
       // A quadratic curve only travels half way to its control point, so the
       // control is put twice as far out as the height the curve should reach.
       const apex = (height: number) => 2 * height - (from.y + to.y) / 2;
       const control = {
         x: (from.x + to.x) / 2,
-        y: layer === "compositions" ? apex(Math.max(from.y, to.y) + ARCH) : apex(DIP),
+        y: apex(Math.max(from.y, to.y) + ARCH),
         z: (from.z + to.z) / 2,
       };
       for (const offset of edge.kind === "inherits" ? [-THICK_OFFSET, THICK_OFFSET] : [0]) {
         pushCurve(positions, from, control, to, offset);
       }
     }
-    ranges.push({ edge, start, count: positions.length / 3 - start });
+    ranges.push({ edges: [edge], start, count: positions.length / 3 - start });
   }
 
   return { positions: new Float32Array(positions), ranges };
+}
+
+/**
+ * Roof, down to the street, along the streets to the other building's column, then
+ * up to its roof. It is the road route with a height on it, so a block link and the
+ * road under it turn the same corners instead of crossing at an angle.
+ */
+function groundPath(
+  grid: RoadGrid,
+  from: Anchor,
+  to: Anchor,
+  fromPlacement: Placement | undefined,
+  toPlacement: Placement | undefined,
+  y: number,
+): Anchor[] {
+  if (!fromPlacement || !toPlacement) return [from, to];
+  return [
+    from,
+    ...routePoints(grid, fromPlacement, toPlacement).map((point) => ({
+      x: point.x,
+      y,
+      z: point.z,
+    })),
+    to,
+  ];
 }
 
 /** A quadratic curve as `SEGMENTS` joined segments, shifted sideways by `offset`. */
@@ -136,7 +184,9 @@ function pushCurve(
 
 // ponytail: dashes are cut into the geometry rather than drawn with
 // LineDashedMaterial, which would need computeLineDistances on a geometry React has
-// not attached yet. The seeded schema has 38 reference links to cut.
+// not attached yet. The dash phase restarts at every corner of the route, so a corner
+// always falls on a dash boundary rather than inside one. The seeded schema has 38
+// reference links to cut.
 function pushDashes(out: number[], from: Anchor, to: Anchor) {
   const span = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
   if (span < 1e-6) return;

@@ -385,6 +385,16 @@ Entry is a double-click, Enter on the selected node, or the inspector's Focus bu
 
 Ceiling: more than about 30 parents plus compositions at once pushes the outer arc into the north-west grid. Nothing in the seeded schema is close.
 
+### Roads (`app/scene/roads.ts`)
+
+1. Roads follow the streets. A road leaves its parent's face, drops to the street between the parent's row and the child's row, runs along that street to the child's column and enters the child's face, so every run is north-south or east-west. Straight ribbons between building centres crossed 292 times on the seeded schema, which reads as wiring rather than as a city; the same 64 roads routed this way cross 117 times.
+2. The rows and the streets are read off the placements rather than passed down from the layout. A row is a band of z that buildings occupy, and anything between two bands is ground nothing stands on. One rule covers the gap between two folded rows of a rank, the street between two ranks and the void between two islands, so a road between districts needs no second rule.
+3. A road that skips a rank runs along its parent's own street, then descends the child's column past every street in between. It joins the same trunk as the parent's other roads, which is what a route down the nearest column instead would lose.
+4. Runs that lie on top of each other merge into one before geometry is built. Two children of one parent leave it by the same drop and fork at their own columns, and two parents of one child share the run into it, so a hub draws as one trunk that forks rather than as one ribbon per edge, and nothing z-fights. Two parents on one street take separate lanes 0.35 units apart, alternating around the mid-line and clamped to what the street holds. Lanes go by the order a parent reached the street, not by a channel router.
+5. Chevrons ride the last 4.2 units before the child, pointing at it. A type that allows itself as a child keeps the small ring beside the building. Everything is still one merged `BufferGeometry`.
+6. A building with more than three allowed parents draws only its nearest road in the overview, the one crossing fewest streets and the leftmost of those, and carries a "+N parents" marker on the label layer. The marker is the lowest priority label candidate, so it only takes pixels no name wants. Hovering or selecting the building draws its whole fan, and focus mode draws every road. Three is the point past which a fan reads as a knot rather than as a count; on the seeded schema one type crosses it, at five parents. A parent with many children is not cut, because the trunk absorbs it.
+7. The block and reference layers route their ground segments the same way, so all four layers agree about where the ground is walkable. Composition arcs stay arcs.
+
 ### Encoding
 
 | Visual | Data |
@@ -400,10 +410,10 @@ Ceiling: more than about 30 parents plus compositions at once pushes the outer a
 | Property window | one small quad per property, walked around the walls of its group's floor: the floor's own colour turned up, and turned up further when the property is mandatory. Element Types have no floors, so they have no windows |
 | Usage badge | Usage count on the label layer above the selected node, whatever the lens |
 | Selection | signal pink outline and label |
-| Road (`allowedChild`) | flat ribbon on the ground with animated chevrons in the direction of the edge |
+| Road (`allowedChild`) | flat ribbon along the streets, with animated chevrons on the last stretch into the child. See Roads below |
 | Bridge (`composition` / `inherits`) | elevated quadratic arc, apex one arch above the taller roof. `inherits` is drawn as two arcs a hair apart, because WebGL ignores a line width above 1 |
-| Block link | thin solid line dipping to ground level toward the target element type. Dashes are what tells a reference apart from it |
-| Reference | dotted line, hidden unless the References layer is on |
+| Block link | thin solid line off the roof, down to the streets, along them to the target element type and up to its roof. Dashes are what tells a reference apart from it |
+| Reference | the same street route, dashed and a little higher, hidden unless the References layer is on |
 | District | One padded island per district: slab and rim, colour shifted by kind (compositions lighter, elements warmer), the name at the north corner; a nested folder is a lighter rectangle under its members |
 
 ### Usage lens

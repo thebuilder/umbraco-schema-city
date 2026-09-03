@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SchemaEdge } from "../../model/types";
 import type { Placement } from "../layout/city";
-import { buildRoadGeometry } from "./roads";
+import { buildRoadGeometry, planRoads, roadFan, type RoadSegment } from "./roads";
 
 function placement(id: string, x: number, z: number): Placement {
   return {
@@ -16,12 +16,199 @@ function placement(id: string, x: number, z: number): Placement {
   };
 }
 
+/** Two rows nine units apart, which is one street, as the layout builds them. */
 const placements = new Map([
   ["a", placement("a", 0, 0)],
-  ["b", placement("b", 6, 0)],
+  ["b", placement("b", 6, 11)],
 ]);
 
 const road = (from: string, to: string): SchemaEdge => ({ kind: "allowedChild", from, to });
+
+const vertical = (segment: RoadSegment) => Math.abs(segment.x1 - segment.x0) < 1e-6;
+const horizontal = (segment: RoadSegment) => Math.abs(segment.z1 - segment.z0) < 1e-6;
+
+/** How many pairs of segments cross, which is what a wiring mess measures as. */
+function crossings(segments: RoadSegment[]): number {
+  const span = (a: number, b: number) => [Math.min(a, b), Math.max(a, b)] as const;
+  let count = 0;
+  for (const one of segments.filter(vertical)) {
+    const [zLow, zHigh] = span(one.z0, one.z1);
+    for (const other of segments.filter(horizontal)) {
+      const [xLow, xHigh] = span(other.x0, other.x1);
+      // A shared endpoint is a corner, not a crossing, so both spans have to be
+      // strictly straddled.
+      if (one.x0 <= xLow || one.x0 >= xHigh) continue;
+      if (other.z0 <= zLow || other.z0 >= zHigh) continue;
+      count++;
+    }
+  }
+  return count;
+}
+
+describe("planRoads", () => {
+  it("draws nothing for an empty edge list", () => {
+    expect(planRoads(placements, [])).toEqual([]);
+  });
+
+  it("drops a road to the street, along it, and up into the child", () => {
+    const segments = planRoads(placements, [road("a", "b")]);
+    expect(segments).toHaveLength(3);
+
+    const [drop, run, rise] = segments as [RoadSegment, RoadSegment, RoadSegment];
+    expect(vertical(drop)).toBe(true);
+    expect(horizontal(run)).toBe(true);
+    expect(vertical(rise)).toBe(true);
+    // The street between the two rows is the middle of the nine units between them.
+    expect(run.z0).toBeCloseTo(5.5, 6);
+    expect(drop.x0).toBeCloseTo(0, 6);
+    expect(rise.x0).toBeCloseTo(6, 6);
+    // The drop starts at the parent's south face and the rise ends at the child's
+    // north face, so neither runs under a building.
+    expect(Math.min(drop.z0, drop.z1)).toBeCloseTo(1, 6);
+    expect(Math.max(rise.z0, rise.z1)).toBeCloseTo(10, 6);
+  });
+
+  it("gives two children of one parent a single shared trunk", () => {
+    const two = new Map(placements);
+    two.set("c", placement("c", -6, 11));
+    const segments = planRoads(two, [road("a", "b"), road("a", "c")]);
+
+    // One drop out of the parent, one street run covering both children's columns,
+    // and one rise into each child.
+    expect(segments.filter(vertical)).toHaveLength(3);
+    const runs = segments.filter(horizontal);
+    expect(runs).toHaveLength(1);
+    const run = runs[0] as RoadSegment;
+    expect(Math.min(run.x0, run.x1)).toBeCloseTo(-6, 6);
+    expect(Math.max(run.x0, run.x1)).toBeCloseTo(6, 6);
+    expect(run.edges).toHaveLength(2);
+  });
+
+  it("takes a rank-skipping edge along the street and down the child's column", () => {
+    const three = new Map(placements);
+    three.set("c", placement("c", 12, 22));
+    const segments = planRoads(three, [road("a", "c")]);
+
+    // One street run, on the parent's own street, so a road that skips a rank still
+    // joins the same trunk as the parent's other roads.
+    const runs = segments.filter(horizontal);
+    expect(runs).toHaveLength(1);
+    expect((runs[0] as RoadSegment).z0).toBeCloseTo(5.5, 6);
+    // Then straight down the child's column, past the rank in between at the street
+    // that crosses it, rather than cutting the corner diagonally.
+    const descent = segments.filter((segment) => vertical(segment) && segment.x0 === 12);
+    expect(descent).toHaveLength(1);
+    const [{ z0, z1 }] = descent as [RoadSegment];
+    expect(Math.min(z0, z1)).toBeCloseTo(5.5, 6);
+    expect(Math.max(z0, z1)).toBeCloseTo(21, 6);
+    // Every run is north-south or east-west, whatever the road skips.
+    expect(segments.every((segment) => vertical(segment) || horizontal(segment))).toBe(true);
+  });
+
+  it("merges two parents' runs into the same child instead of stacking them", () => {
+    const shared = new Map(placements);
+    shared.set("c", placement("c", 12, 0));
+    const segments = planRoads(shared, [road("a", "b"), road("c", "b")]);
+
+    // Both roads end in the same rise into b's north face, so it is drawn once.
+    const rises = segments.filter(
+      (segment) => vertical(segment) && Math.abs(segment.x0 - 6) < 1e-6,
+    );
+    expect(rises).toHaveLength(1);
+    expect((rises[0] as RoadSegment).edges).toHaveLength(2);
+  });
+
+  it("keeps two parents on one street in separate lanes", () => {
+    const two = new Map(placements);
+    two.set("c", placement("c", 12, 0));
+    two.set("d", placement("d", 18, 11));
+    const runs = planRoads(two, [road("a", "b"), road("c", "d")]).filter(horizontal);
+    expect(runs).toHaveLength(2);
+    expect((runs[0] as RoadSegment).z0).not.toBeCloseTo((runs[1] as RoadSegment).z0, 6);
+  });
+
+  it("crosses less than the straight ribbons it replaced", () => {
+    // Four parents in one row, each allowing the other row's four children. Straight
+    // centre-to-centre ribbons cross wherever two of them disagree about order; the
+    // street routing meets on one street instead, where only the forks cross.
+    const grid = new Map<string, Placement>();
+    for (let i = 0; i < 4; i++) {
+      grid.set(`p${i}`, placement(`p${i}`, i * 5, 0));
+      grid.set(`c${i}`, placement(`c${i}`, (3 - i) * 5, 11));
+    }
+    const edges = [...Array(4).keys()].flatMap((p) =>
+      [...Array(4).keys()].map((c) => road(`p${p}`, `c${c}`)),
+    );
+    // Sixteen straight ribbons over a reversed row cross 174 times by the same count.
+    const straight = edges.map((edge) => ({
+      x0: (grid.get(edge.from) as Placement).position.x,
+      z0: 0,
+      x1: (grid.get(edge.to) as Placement).position.x,
+      z1: 11,
+      edges: [edge],
+      into: null,
+    }));
+    expect(crossings(planRoads(grid, edges))).toBeLessThan(straightCrossings(straight));
+  });
+});
+
+/** Crossings between arbitrary straight ribbons, which are not axis aligned. */
+function straightCrossings(
+  segments: { x0: number; z0: number; x1: number; z1: number }[],
+): number {
+  const side = (ax: number, az: number, bx: number, bz: number, cx: number, cz: number) =>
+    Math.sign((bx - ax) * (cz - az) - (bz - az) * (cx - ax));
+  let count = 0;
+  for (let i = 0; i < segments.length; i++) {
+    for (let j = i + 1; j < segments.length; j++) {
+      const a = segments[i] as (typeof segments)[number];
+      const b = segments[j] as (typeof segments)[number];
+      const d1 = side(a.x0, a.z0, a.x1, a.z1, b.x0, b.z0);
+      const d2 = side(a.x0, a.z0, a.x1, a.z1, b.x1, b.z1);
+      const d3 = side(b.x0, b.z0, b.x1, b.z1, a.x0, a.z0);
+      const d4 = side(b.x0, b.z0, b.x1, b.z1, a.x1, a.z1);
+      if (d1 !== d2 && d3 !== d4 && d1 !== 0 && d2 !== 0 && d3 !== 0 && d4 !== 0) count++;
+    }
+  }
+  return count;
+}
+
+describe("roadFan", () => {
+  const wide = new Map<string, Placement>([["child", placement("child", 0, 11)]]);
+  for (let i = 0; i < 4; i++) wide.set(`p${i}`, placement(`p${i}`, i * 5, 0));
+  const fanEdges = [...Array(4).keys()].map((i) => road(`p${i}`, "child"));
+
+  it("draws one road of a four-parent fan in the overview", () => {
+    const fan = roadFan(wide, fanEdges, new Set());
+    expect(fan.edges).toHaveLength(1);
+    // The nearest parent is the leftmost of the four, which are all one street away.
+    expect((fan.edges[0] as SchemaEdge).from).toBe("p0");
+    expect(fan.markers).toEqual([{ id: "child", hidden: 3 }]);
+  });
+
+  it("draws the whole fan once the child is selected", () => {
+    const fan = roadFan(wide, fanEdges, new Set(["child"]));
+    expect(fan.edges).toHaveLength(4);
+    expect(fan.markers).toEqual([]);
+  });
+
+  it("draws the whole fan in focus mode", () => {
+    expect(roadFan(wide, fanEdges, null).edges).toHaveLength(4);
+  });
+
+  it("leaves a three-parent fan alone", () => {
+    const fan = roadFan(wide, fanEdges.slice(0, 3), new Set());
+    expect(fan.edges).toHaveLength(3);
+    expect(fan.markers).toEqual([]);
+  });
+
+  it("keeps a parent's own children, however many it has", () => {
+    const hub = new Map<string, Placement>([["hub", placement("hub", 0, 0)]]);
+    for (let i = 0; i < 6; i++) hub.set(`c${i}`, placement(`c${i}`, i * 5, 11));
+    const edges = [...Array(6).keys()].map((i) => road("hub", `c${i}`));
+    expect(roadFan(hub, edges, new Set()).edges).toHaveLength(6);
+  });
+});
 
 describe("buildRoadGeometry", () => {
   it("draws nothing for an empty edge list", () => {
@@ -35,7 +222,7 @@ describe("buildRoadGeometry", () => {
       road("a", "b"),
       { kind: "composition", from: "a", to: "b" },
     ]);
-    expect(ranges).toHaveLength(1);
+    expect(ranges).toHaveLength(3);
   });
 
   it("skips an edge whose end has no placement", () => {
@@ -44,35 +231,18 @@ describe("buildRoadGeometry", () => {
     expect(ranges).toEqual([]);
   });
 
-  it("draws a ribbon starting past the parent's footprint edge", () => {
-    const { positions, ranges } = buildRoadGeometry(placements, [road("a", "b")]);
-    expect(ranges).toHaveLength(1);
-    expect(positions.length).toBeGreaterThan(0);
-
-    // Every ribbon and chevron vertex sits strictly inside the gap between
-    // the two footprints, never on top of either building.
-    for (let i = 0; i < positions.length; i += 3) {
-      expect(positions[i]).toBeGreaterThanOrEqual(1);
-      expect(positions[i]).toBeLessThanOrEqual(5);
-    }
-  });
-
-  it("aims chevrons at a child sitting north-east of its parent", () => {
-    // Folding a wide rank onto extra rows puts some children above and beside their
-    // parent instead of straight below it, so the ribbon runs in any direction.
-    const folded = new Map([
-      ["parent", placement("parent", 0, 0)],
-      ["child", placement("child", 7, -9)],
-    ]);
-    const { positions } = buildRoadGeometry(folded, [road("parent", "child")]);
+  it("points the chevrons at the child", () => {
+    const { positions } = buildRoadGeometry(placements, [road("a", "b")]);
     const at = (v: number) => ({ x: positions[v * 3] as number, z: positions[v * 3 + 2] as number });
 
-    // Six ribbon vertices, then one triangle per chevron, tip first.
-    expect(positions.length / 3).toBeGreaterThan(6);
-    for (let v = 6; v < positions.length / 3; v += 3) {
+    // Three ribbons of six vertices each, then one triangle per chevron, tip first.
+    const chevrons = positions.length / 3 - 18;
+    expect(chevrons).toBeGreaterThan(0);
+    for (let v = 18; v < positions.length / 3; v += 3) {
       const [tip, backA, backB] = [at(v), at(v + 1), at(v + 2)];
-      expect(tip.x).toBeGreaterThan(Math.max(backA.x, backB.x));
-      expect(tip.z).toBeLessThan(Math.min(backA.z, backB.z));
+      // The child is south of the street, so every chevron tip points that way.
+      expect(tip.z).toBeGreaterThan(Math.max(backA.z, backB.z));
+      expect(tip.x).toBeCloseTo((backA.x + backB.x) / 2, 6);
     }
   });
 
@@ -85,9 +255,13 @@ describe("buildRoadGeometry", () => {
     }
   });
 
-  it("gives every edge a distinct, contiguous vertex range", () => {
-    const { ranges } = buildRoadGeometry(placements, [road("a", "b"), road("b", "a")]);
-    expect(ranges[0]?.start).toBe(0);
-    expect(ranges[1]?.start).toBe(ranges[0]?.count);
+  it("gives every run a distinct, contiguous vertex range", () => {
+    const { ranges, positions } = buildRoadGeometry(placements, [road("a", "b")]);
+    let next = 0;
+    for (const range of ranges) {
+      expect(range.start).toBe(next);
+      next += range.count;
+    }
+    expect(next).toBe(positions.length / 3);
   });
 });
