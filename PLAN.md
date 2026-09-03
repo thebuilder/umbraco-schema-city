@@ -499,15 +499,16 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - `UsageCollector` and `usage` endpoint with caching. Tests for the aggregation. Done 2026-09-03; four queries, 17 backend tests, and a deterministic `medium-usage.json` exported by the seeder.
 - Usage lens with six modes, a legend row and a usage badge on the selected node. Done 2026-09-03.
 - `findings.ts` with tests. Findings drawer listing unused types, unused element types, structural dead ends, duplicate property aliases, broken block references, types with no properties, types with no template, pure mixins and the top complexity tier, each linking to its node. Done 2026-09-03; every planted alias reported; 122 vitest tests.
-- Exit: the findings drawer reports exactly the planted set on the seeded site, on both Umbraco majors.
+- Tidy-up done 2026-09-03: dead end absorbs unused composition, no-template notes only for placeable types on schemas that use templates, element types neutral under a lens; the seeded schema reports 115 findings with usage, every planted alias once.
+- Exit: met 2026-09-03. The findings drawer reports every planted alias once on the seeded site, on both Umbraco majors, plus the 47 genuinely unused seeded types.
 
 ### M4, Polish and release (medium)
 
+- World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. (in progress)
+- README with screenshots, NuGet packaging with the `[17.0.0, 19.0.0)` range, Umbraco Marketplace metadata. (in progress)
 - Roof icons, property "windows" on floors, Explore perspective toggle, list view fallback.
-- World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom.
 - Empty state (no Document Types), error state (endpoint 403/500), loading skeleton.
 - Perf pass, only if the pathological fixture drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
-- README with screenshots, NuGet packaging with the `[17.0.0, 19.0.0)` range, Umbraco Marketplace metadata.
 - Exit: `SchemaCity 1.0.0` on NuGet.
 
 ### Later, explicitly not v1
@@ -545,7 +546,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
 | `model/`, `app/` | 122 vitest tests across 12 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
-| End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it |
+| End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph endpoint's 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 at the M3 merge, green on both majors |
 | Performance | `pathological.json` in the dev harness, with the browser's own frame profiler |
 
 ---
@@ -557,7 +558,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. Focus mode with the camera flight. Done. Screen-space label culling. Done. The Document Type editor tab. Done. The edge layers and URL state. Done. M3: the usage endpoint, the usage lens and the findings drawer. Done. Then the M3 tidy-up (dead end absorbs unused composition, no-template noise, element types neutral under a lens), usage in the wrappers, and the backoffice check. Next.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens, pending a login. Then M4: world stage, packaging, states (in progress), then roof icons, property windows, Explore camera, list view. Next.
 
 ## 13. Resolved questions
 
