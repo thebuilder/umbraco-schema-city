@@ -380,6 +380,17 @@ export function App({
     setFocus(id);
   };
 
+  /**
+   * Done with this node: closing the inspector and clicking bare ground both leave
+   * focus and clear the selection in one step, because either one is the reader
+   * putting the type down. Escape keeps its two steps, which is how you leave focus
+   * and go on reading the type you were focused on.
+   */
+  const done = () => {
+    setFocus(null);
+    setSelected(null);
+  };
+
   // Following a link, from the inspector or the palette, while focused moves the
   // whole layout with it. The lists you are reading are what you fly between.
   const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
@@ -583,7 +594,7 @@ export function App({
                   inspectorWidth={selectedNode && neighbourhood ? INSPECTOR_WIDTH : 0}
                   layers={layers}
                   onFocus={enterFocus}
-                  onSelect={setSelected}
+                  onSelect={(id) => (id === null ? done() : setSelected(id))}
                   reframe={reframe}
                   scale={scale}
                   selected={selected}
@@ -600,7 +611,7 @@ export function App({
               neighbourhood={neighbourhood}
               node={selectedNode}
               nodesById={nodesById}
-              onClose={() => setSelected(null)}
+              onClose={done}
               onOpenType={onOpenType}
               onSelect={followLink}
               onToggleFocus={() =>
