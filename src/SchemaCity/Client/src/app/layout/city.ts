@@ -36,7 +36,7 @@ const FOOTPRINT = 2;
 const RANK_GAP = 6;
 const FLOOR_HEIGHT = 0.6;
 /** Buildings in one row, everywhere. A wider rank folds onto more rows. */
-const ROW_LIMIT = 8;
+export const ROW_LIMIT = 8;
 const INTRO_STAGGER = 0.06;
 const EMPTY_BOX = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
 
