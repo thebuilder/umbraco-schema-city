@@ -10,8 +10,8 @@ import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
-import { getGraph, openTypeInEditor } from "./api.js";
-import type { SchemaGraph } from "./model/types.js";
+import { getGraph, getUsage, openTypeInEditor } from "./api.js";
+import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
  * The Relationships tab on the Document Type editor. Same React app as the workspace,
@@ -23,6 +23,7 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
 ) {
   #root?: Root;
   #graph?: SchemaGraph;
+  #usage?: UsageReport;
   #unique?: string;
   #failed = false;
 
@@ -60,6 +61,18 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
     this.#failed = Boolean(error);
     this.#graph = data ?? undefined;
     this.#draw();
+    if (!this.#graph) return;
+
+    // Usage is the slow half, and the city is worth looking at without it, so it
+    // starts only once the graph has drawn. A failure leaves `usage` undefined,
+    // which is what disables the lens picker, and says so once.
+    const usage = await tryExecute(this, getUsage());
+    if (usage.error) {
+      console.warn("Schema City: the usage endpoint did not answer, so the lens stays off.");
+      return;
+    }
+    this.#usage = usage.data ?? undefined;
+    this.#draw();
   }
 
   #draw() {
@@ -73,6 +86,7 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
           graph={this.#graph}
           initial={{ type: this.#unique, focus: true }}
           onOpenType={openTypeInEditor}
+          usage={this.#usage}
         />
       ) : (
         <p className="p-4 font-mono text-sm text-phosphor-dim">
