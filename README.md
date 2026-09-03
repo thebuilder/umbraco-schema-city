@@ -90,8 +90,10 @@ boots the site and checks that the backoffice answers, that
 `/App_Plugins/SchemaCity/umbraco-package.json` is served, and that the graph and usage endpoints
 both refuse an anonymous caller with 401. Compiling is not enough on its own. Umbraco finds
 composers and controllers by scanning types at boot, so a type that vanished between majors only
-shows up when the site runs. The site's Umbraco version is the `UmbracoVersion` MSBuild property,
-default 17.6.2, so the same switch works locally:
+shows up when the site runs. The 17.6.2 leg also runs `dotnet pack` and checks that the nupkg
+carries `staticwebassets/App_Plugins/SchemaCity/workspace.js`, ships no `.map` files, and is under
+1 MB. The site's Umbraco version is the `UmbracoVersion` MSBuild property, default 17.6.2, so the
+same switch works locally:
 
 ```bash
 dotnet build SchemaCity.sln -c Release -p:UmbracoVersion=18.1.1
