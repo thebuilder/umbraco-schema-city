@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PropertyGroup, SchemaNode } from "../../model/types";
 import type { Placement } from "../layout/city";
+import type { SchemaProperty } from "../../model/types";
 import { buildFloorCells, buildPlazaCells, smootherstep } from "./buildings";
 
 function node(id: string, extra: Partial<SchemaNode> = {}): SchemaNode {
@@ -49,6 +50,65 @@ function placement(id: string, extra: Partial<Placement> = {}): Placement {
     ...extra,
   };
 }
+
+const property = (alias: string, mandatory = false): SchemaProperty => ({
+  alias,
+  name: alias,
+  dataTypeId: "d",
+  editorAlias: "Umbraco.TextBox",
+  editorUiAlias: null,
+  mandatory,
+  variesByCulture: false,
+  fromCompositionId: null,
+  targets: [],
+});
+
+describe("property windows", () => {
+  it("puts one window per property on the walls of its own floor", () => {
+    const nodes = new Map([
+      [
+        "a",
+        node("a", {
+          groups: [
+            group({ properties: [property("one"), property("two", true)] }),
+            group({ alias: "b", fromCompositionId: "comp", properties: [property("three")] }),
+          ],
+        }),
+      ],
+    ]);
+    const { windows } = buildFloorCells(nodes, [placement("a")]);
+
+    expect(windows).toHaveLength(3);
+    expect(windows.map((w) => w.kind)).toEqual(["own", "own", "composed"]);
+    expect(windows.map((w) => w.mandatory)).toEqual([false, true, false]);
+    // Two windows on one floor land on opposite walls, and the composed floor's
+    // window sits a floor higher.
+    expect(windows[0].rotY).not.toBe(windows[1].rotY);
+    expect(windows[0].cy).toBeCloseTo(0.3);
+    expect(windows[2].cy).toBeCloseTo(0.9);
+    // Every window stands just off the 2-unit footprint, never inside it.
+    for (const w of windows) {
+      expect(Math.max(Math.abs(w.cx), Math.abs(w.cz))).toBeCloseTo(1.012);
+    }
+  });
+
+  it("stops a row of windows before it draws on itself", () => {
+    const properties = Array.from({ length: 60 }, (_, i) => property(`p${i}`));
+    const nodes = new Map([["a", node("a", { groups: [group({ properties })] })]]);
+    const { windows } = buildFloorCells(nodes, [placement("a")]);
+
+    // A 2-unit footprint has 8 units of wall, and windows sit 0.28 apart.
+    expect(windows).toHaveLength(28);
+  });
+
+  it("gives an Element Type no windows, because it has no floors", () => {
+    const nodes = new Map([
+      ["a", node("a", { isElement: true, groups: [group({ properties: [property("one")] })] })],
+    ]);
+
+    expect(buildFloorCells(nodes, [placement("a")]).windows).toEqual([]);
+  });
+});
 
 describe("buildFloorCells", () => {
   it("gives a node with no groups one own floor", () => {

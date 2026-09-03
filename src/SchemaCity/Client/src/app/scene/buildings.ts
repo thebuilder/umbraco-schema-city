@@ -18,6 +18,19 @@ export type FloorCell = {
   sz: number;
 };
 
+/** One property, as a lit quad on the wall of the floor its group is. */
+export type WindowCell = {
+  buildingId: string;
+  /** The floor's kind, so a window takes the colour of the floor it is cut into. */
+  kind: "own" | "composed";
+  mandatory: boolean;
+  cx: number;
+  cy: number;
+  cz: number;
+  /** Rotation about y, in radians: which of the four walls this window is on. */
+  rotY: number;
+};
+
 export type PlazaCell = {
   buildingId: string;
   cx: number;
@@ -28,6 +41,12 @@ export type PlazaCell = {
 };
 
 export const FLOOR_HEIGHT = 0.6;
+export const WINDOW_WIDTH = 0.16;
+export const WINDOW_HEIGHT = 0.24;
+/** Smallest distance between two window centres. A longer row is cut off here. */
+const WINDOW_PITCH = 0.28;
+/** How far a window stands off the wall, so the two never z-fight. */
+const WINDOW_STANDOFF = 0.012;
 const SEPARATOR_HEIGHT = 0.06;
 const ELEMENT_HEIGHT = FLOOR_HEIGHT;
 const PLAZA_MARGIN = 0.6;
@@ -50,14 +69,65 @@ export function smootherstep(p: number): number {
 }
 
 /**
- * One instance per floor, tab separator or element warehouse box, plus the
- * total mass height of each building for its hit box and label height.
+ * The windows on one floor: one per property in the group, walked around the four
+ * walls from the middle of the front one. Two properties put one window on the front
+ * wall and one on the back, which is what a row of them wrapping looks like.
+ *
+ * ponytail: past `footprint * 4 / WINDOW_PITCH` windows the row would draw on top of
+ * itself, so it stops there. That is 28 properties in one group on the smallest
+ * building, against 8 in the busiest group of the seeded schema. Two rows of windows
+ * per floor is the fix if a schema ever passes it.
+ */
+function pushWindows(
+  out: WindowCell[],
+  group: PropertyGroup,
+  buildingId: string,
+  footprint: number,
+  x: number,
+  y: number,
+  z: number,
+) {
+  const perimeter = footprint * 4;
+  const count = Math.min(group.properties?.length ?? 0, Math.floor(perimeter / WINDOW_PITCH));
+  const half = footprint / 2 + WINDOW_STANDOFF;
+
+  for (let i = 0; i < count; i++) {
+    const at = ((i + 0.5) / count) * perimeter;
+    const wall = Math.floor(at / footprint);
+    const along = (at % footprint) - footprint / 2;
+    // Anticlockwise from the front wall, which faces +z, the way a plane does.
+    const [cx, cz, rotY] = (
+      [
+        [along, half, 0],
+        [half, -along, Math.PI / 2],
+        [-along, -half, Math.PI],
+        [-half, along, -Math.PI / 2],
+      ] as const
+    )[wall] ?? [along, half, 0];
+
+    out.push({
+      buildingId,
+      kind: group.fromCompositionId ? "composed" : "own",
+      mandatory: group.properties[i]?.mandatory ?? false,
+      cx: x + cx,
+      cy: y,
+      cz: z + cz,
+      rotY,
+    });
+  }
+}
+
+/**
+ * One instance per floor, tab separator or element warehouse box, one per property
+ * on the wall of its group's floor, plus the total mass height of each building for
+ * its hit box and label height.
  */
 export function buildFloorCells(
   nodesById: Map<string, SchemaNode>,
   placements: Placement[],
-): { cells: FloorCell[]; heights: Map<string, number> } {
+): { cells: FloorCell[]; windows: WindowCell[]; heights: Map<string, number> } {
   const cells: FloorCell[] = [];
+  const windows: WindowCell[] = [];
   const heights = new Map<string, number>();
 
   for (const placement of placements) {
@@ -116,12 +186,13 @@ export function buildFloorCells(
         sy: FLOOR_HEIGHT,
         sz: footprint,
       });
+      pushWindows(windows, group, placement.id, footprint, x, base + y + FLOOR_HEIGHT / 2, z);
       y += FLOOR_HEIGHT;
     });
     heights.set(placement.id, y);
   }
 
-  return { cells, heights };
+  return { cells, windows, heights };
 }
 
 /** A flat plaza disc under every root building that is not an Element Type. */

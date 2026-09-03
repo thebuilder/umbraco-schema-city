@@ -13,6 +13,9 @@ import {
   type FloorCellKind,
   type PlazaCell,
   smootherstep,
+  WINDOW_HEIGHT,
+  WINDOW_WIDTH,
+  type WindowCell,
 } from "./scene/buildings";
 import { neighboursOf } from "./scene/graph-links";
 import { iconColour, rasteriseIcon } from "./scene/icons";
@@ -81,6 +84,7 @@ function groupByKind(cells: FloorCell[]): Record<FloorCellKind, FloorCell[]> {
 
 function Buildings({
   cellsByKind,
+  windows,
   plazas,
   heights,
   placements,
@@ -95,6 +99,7 @@ function Buildings({
   onHover,
 }: {
   cellsByKind: Record<FloorCellKind, FloorCell[]>;
+  windows: WindowCell[];
   plazas: PlazaCell[];
   heights: Map<string, number>;
   placements: Placement[];
@@ -114,8 +119,12 @@ function Buildings({
   const separatorRef = useRef<THREE.InstancedMesh>(null);
   const elementRef = useRef<THREE.InstancedMesh>(null);
   const plazaRef = useRef<THREE.InstancedMesh>(null);
+  const windowRef = useRef<THREE.InstancedMesh>(null);
   const hitRef = useRef<THREE.InstancedMesh>(null);
   const scratch = useMemo(() => new THREE.Object3D(), []);
+  // Windows are the only thing here that is turned, and a shared scratch object
+  // would leave that rotation on the next floor box written through it.
+  const turned = useMemo(() => new THREE.Object3D(), []);
   const introDone = useRef(reducedMotion);
 
   const meshRefs = useMemo(
@@ -156,6 +165,15 @@ function Buildings({
     mesh.setMatrixAt(index, scratch.matrix);
   }
 
+  /** A window rises with the floor it is cut into, on the same progress. */
+  function applyWindow(mesh: THREE.InstancedMesh, index: number, cell: WindowCell, progress: number) {
+    turned.position.set(cell.cx, cell.cy * progress, cell.cz);
+    turned.rotation.set(0, cell.rotY, 0);
+    turned.scale.set(WINDOW_WIDTH, Math.max(WINDOW_HEIGHT * progress, 0.0001), 1);
+    turned.updateMatrix();
+    mesh.setMatrixAt(index, turned.matrix);
+  }
+
   // Sets every mesh to its resting position (or, unless reduced motion is on,
   // to the ground) before the first paint. The frame loop below takes over
   // from there until every building has risen. It runs again on every frame of
@@ -170,6 +188,13 @@ function Buildings({
       cellsByKind[kind].forEach((cell, i) => applyCell(mesh, i, cell, startProgress));
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
+    }
+
+    const window = windowRef.current;
+    if (window) {
+      windows.forEach((cell, i) => applyWindow(window, i, cell, startProgress));
+      window.instanceMatrix.needsUpdate = true;
+      window.computeBoundingSphere();
     }
 
     const plaza = plazaRef.current;
@@ -202,7 +227,7 @@ function Buildings({
       hit.computeBoundingSphere();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cellsByKind, plazas, placements, heights, reducedMotion]);
+  }, [cellsByKind, windows, plazas, placements, heights, reducedMotion]);
 
   useFrame((state) => {
     if (introDone.current) return;
@@ -216,6 +241,18 @@ function Buildings({
         applyCell(mesh, i, cell, smootherstep((elapsed - delay) / INTRO_DURATION));
       });
       mesh.instanceMatrix.needsUpdate = true;
+    }
+    const window = windowRef.current;
+    if (window) {
+      windows.forEach((cell, i) =>
+        applyWindow(
+          window,
+          i,
+          cell,
+          smootherstep((elapsed - (introDelayById.get(cell.buildingId) ?? 0)) / INTRO_DURATION),
+        ),
+      );
+      window.instanceMatrix.needsUpdate = true;
     }
     if (elapsed >= introEnd) introDone.current = true;
   });
@@ -247,6 +284,22 @@ function Buildings({
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
 
+    // A window is the floor's own colour turned up, so it carries the lens, the
+    // selection and the fade without a second set of rules. Mandatory properties
+    // are turned up further, which is the one thing the wall does not already say.
+    const window = windowRef.current;
+    if (window) {
+      windows.forEach((cell, i) =>
+        window.setColorAt(
+          i,
+          colourFor(cell.kind, cell.buildingId)
+            .clone()
+            .multiplyScalar(cell.mandatory ? 1.9 : 1.45),
+        ),
+      );
+      if (window.instanceColor) window.instanceColor.needsUpdate = true;
+    }
+
     const plaza = plazaRef.current;
     if (plaza) {
       plazas.forEach((cell, i) => {
@@ -257,7 +310,7 @@ function Buildings({
       if (plaza.instanceColor) plaza.instanceColor.needsUpdate = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cellsByKind, plazas, selected, hovered, neighbours, colors, scale]);
+  }, [cellsByKind, windows, plazas, selected, hovered, neighbours, colors, scale]);
 
   const pick = (event: ThreeEvent<MouseEvent | PointerEvent>) => placements[event.instanceId ?? -1];
 
@@ -285,6 +338,12 @@ function Buildings({
         <instancedMesh args={[undefined, undefined, cellsByKind.element.length]} ref={elementRef}>
           <boxGeometry />
           <meshStandardMaterial metalness={0.05} roughness={0.7} />
+        </instancedMesh>
+      )}
+      {windows.length > 0 && (
+        <instancedMesh args={[undefined, undefined, windows.length]} ref={windowRef}>
+          <planeGeometry />
+          <meshBasicMaterial toneMapped={false} />
         </instancedMesh>
       )}
       {plazas.length > 0 && (
@@ -1184,9 +1243,13 @@ export default function Scene({
   // In focus mode the lit set is the focused node's, so clicking through the
   // neighbourhood does not dim the layout you are standing in.
   const neighbours = focusNeighbours ?? selectionNeighbours;
-  const { cellsByKind, heights } = useMemo(() => {
+  const { cellsByKind, windows, heights } = useMemo(() => {
     const built = buildFloorCells(nodesById, placements);
-    return { cellsByKind: groupByKind(built.cells), heights: built.heights };
+    return {
+      cellsByKind: groupByKind(built.cells),
+      windows: built.windows,
+      heights: built.heights,
+    };
   }, [nodesById, placements]);
   const plazas = useMemo(() => buildPlazaCells(nodesById, placements), [nodesById, placements]);
   const iconGroups = useIconGroups(icons, nodesById, palette?.phosphor ?? "");
@@ -1255,6 +1318,7 @@ export default function Scene({
             reducedMotion={reducedMotion}
             scale={scale ?? null}
             selected={selected}
+            windows={windows}
           />
           {iconGroups.length > 0 ? (
             <RoofIcons
