@@ -1,0 +1,24 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+.idea/
+artifacts/
+*.nupkg
+
+# Node
+node_modules/
+
+# Vite output, generated from Client/
+src/SchemaCity/wwwroot/App_Plugins/SchemaCity/
+
+# Umbraco runtime
+umbraco/Data/
+umbraco/Logs/
+umbraco/models/
+wwwroot/media/
+appsettings.Local.json
+
+# macOS
+.DS_Store
