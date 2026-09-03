@@ -134,7 +134,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             await SeedAsync();
         }
 
-        ExportFixture();
+        await ExportFixtureAsync();
     }
 
     private async Task SeedAsync()
@@ -657,7 +657,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// harness renders a real schema. GeneratedAt is pinned, otherwise every boot would rewrite
     /// the file and dirty the working tree.
     /// </summary>
-    private void ExportFixture()
+    private async Task ExportFixtureAsync()
     {
         string clientRoot = Path.GetFullPath(Path.Combine(_hostEnvironment.ContentRootPath, "..", "SchemaCity", "Client"));
         if (Directory.Exists(clientRoot) is false)
@@ -668,9 +668,13 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         string directory = Path.Combine(clientRoot, "dev", "fixtures");
         Directory.CreateDirectory(directory);
 
+        // The full list from the service, not _editors: that field leaves out
+        // _brokenBlockList on purpose, so exactly one Document Type uses it, and the exported
+        // fixture still has to carry the broken block reference that Data Type plants.
         SchemaGraph graph = SchemaGraphBuilder.BuildGraph(
             _contentTypeService.GetAll(),
-            _contentTypeService.GetContainers([]));
+            _contentTypeService.GetContainers([]),
+            await _dataTypeService.GetAllAsync());
 
         string path = Path.Combine(directory, "medium.json");
         System.IO.File.WriteAllText(path, JsonSerializer.Serialize(graph with { GeneratedAt = DateTimeOffset.UnixEpoch }, FixtureJson));
