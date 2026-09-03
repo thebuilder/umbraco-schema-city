@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import mediumUsageFixture from "../../dev/fixtures/medium-usage.json";
 import mediumFixture from "../../dev/fixtures/medium.json";
+import pathologicalUsageFixture from "../../dev/fixtures/pathological-usage.json";
+import pathologicalFixture from "../../dev/fixtures/pathological.json";
 import smallFixture from "../../dev/fixtures/small.json";
 import { type FindingKind, findFindings } from "./findings";
 import type {
@@ -14,6 +16,8 @@ import type {
 const small = smallFixture as unknown as SchemaGraph;
 const medium = mediumFixture as unknown as SchemaGraph;
 const mediumUsage = mediumUsageFixture as unknown as UsageReport;
+const pathological = pathologicalFixture as unknown as SchemaGraph;
+const pathologicalUsage = pathologicalUsageFixture as unknown as UsageReport;
 
 function node(alias: string, extra: Partial<SchemaNode> = {}): SchemaNode {
   return {
@@ -324,5 +328,64 @@ describe("findFindings on the seeded medium.json", () => {
     for (const [, kind] of planted.filter(([, k]) => k !== "unusedType")) {
       expect(kinds.has(kind)).toBe(true);
     }
+  });
+});
+
+/**
+ * What the rules make of the pathological fixture, per kind. The generator plants the
+ * shapes and prints them; these are the rows that come out.
+ *
+ * unusedType is every non-element type the usage report leaves at zero, 224 of the
+ * 260. deadEnd is the 15 orphans, the 2 compositions nothing uses and archive00, the
+ * head of a tree no root reaches. pureMixin is the 10 compositions that are used, and
+ * complexity is the 20 types carrying 30 properties. There is no unusedElementType
+ * row on purpose: the 30 block hosts between them reach all 40 Element Types.
+ */
+const PLANTED = {
+  unusedType: 224,
+  deadEnd: 18,
+  duplicateAlias: 4,
+  brokenBlock: 3,
+  noProperties: 5,
+  noTemplate: 6,
+  pureMixin: 10,
+  complexity: 20,
+};
+
+describe("findFindings on the pathological fixture", () => {
+  // dev/make-pathological.mjs plants the shapes and prints what it planted; these are
+  // the rows the rules make of them. A count that moves here means either the
+  // generator or a rule changed, and both are worth reading the diff for.
+  it("counts every kind the generator planted", () => {
+    const counts: Record<string, number> = {};
+    for (const finding of findFindings(pathological, pathologicalUsage))
+      counts[finding.kind] = (counts[finding.kind] ?? 0) + 1;
+
+    expect(counts).toEqual(PLANTED);
+  });
+
+  it("reports one row per broken block host and per duplicate alias", () => {
+    const named = (kind: FindingKind) =>
+      findFindings(pathological, pathologicalUsage)
+        .filter((finding) => finding.kind === kind)
+        .map((finding) => pathological.nodes.find((n) => n.id === finding.nodeId)?.alias);
+
+    expect(named("brokenBlock")).toEqual(["editorial27", "editorial28", "editorial29"]);
+    expect(named("duplicateAlias")).toEqual([
+      "editorial00",
+      "editorial01",
+      "page00",
+      "page01",
+    ]);
+  });
+
+  it("drops the usage rules and keeps the rest without a report", () => {
+    const counts: Record<string, number> = {};
+    for (const finding of findFindings(pathological))
+      counts[finding.kind] = (counts[finding.kind] ?? 0) + 1;
+
+    const { unusedType, ...rest } = PLANTED;
+    expect(unusedType).toBeGreaterThan(0);
+    expect(counts).toEqual(rest);
   });
 });
