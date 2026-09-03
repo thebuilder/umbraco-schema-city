@@ -99,7 +99,9 @@ function Legend() {
         <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
           <LegendRow mark={<Tint className="bg-phosphor" />}>Own property group</LegendRow>
           <LegendRow mark={<Tint className="bg-phosphor/45" />}>Composed group</LegendRow>
-          <LegendRow mark={<Tint className="bg-amber" />}>Element Type</LegendRow>
+          <LegendRow mark={<Tint className="bg-amber" />}>
+            Element Type, until a lens is on
+          </LegendRow>
           <LegendRow mark={<Tint className="bg-phosphor-dim" />}>Root plaza</LegendRow>
           <LegendRow mark={<Tint className="bg-signal" />}>Selected</LegendRow>
         </ul>

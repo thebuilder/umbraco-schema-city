@@ -8,7 +8,6 @@ import type { SchemaGraph, SchemaNode, UsageReport } from "./types";
 export type FindingKind =
   | "unusedType"
   | "unusedElementType"
-  | "unusedComposition"
   | "deadEnd"
   | "duplicateAlias"
   | "brokenBlock"
@@ -38,7 +37,6 @@ export type Finding = {
 export const FINDING_KINDS: readonly FindingKind[] = [
   "unusedType",
   "unusedElementType",
-  "unusedComposition",
   "deadEnd",
   "duplicateAlias",
   "brokenBlock",
@@ -51,7 +49,6 @@ export const FINDING_KINDS: readonly FindingKind[] = [
 export const FINDING_LABEL: Record<FindingKind, string> = {
   unusedType: "Unused type",
   unusedElementType: "Unused Element Type",
-  unusedComposition: "Unused composition",
   deadEnd: "Dead end",
   duplicateAlias: "Duplicate alias",
   brokenBlock: "Broken block",
@@ -64,7 +61,6 @@ export const FINDING_LABEL: Record<FindingKind, string> = {
 const SEVERITY: Record<FindingKind, FindingSeverity> = {
   unusedType: "problem",
   unusedElementType: "problem",
-  unusedComposition: "problem",
   deadEnd: "problem",
   duplicateAlias: "problem",
   brokenBlock: "problem",
@@ -160,6 +156,7 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
   const topTier = (topScore * (COMPLEXITY_TIERS - 1)) / COMPLEXITY_TIERS;
 
   const totalOf = (id: string) => usage?.byType[id]?.total ?? 0;
+  const anyTemplates = nodes.some((node) => node.templates.length > 0);
   const found: Finding[] = [];
   const add = (
     kind: FindingKind,
@@ -191,20 +188,15 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
       add("unusedElementType", node, "No block editor uses this Element Type");
     }
 
-    // The plan's "exists only to be composed" is exactly this: nothing creates it
-    // and nothing has been created from it. Whether anything composes it is the
-    // finding. Without a usage report the instance half is simply true, so the
-    // rule still holds on the schema alone.
-    if (!node.isElement && !creatable && composers === 0 && totalOf(node.id) === 0) {
+    // A type nothing composes and nothing can create is a structural dead end, and
+    // this one row says so. A type something composes is a mixin doing its job, so
+    // it is never a dead end; the pure mixin note below covers it instead.
+    if (!node.isElement && !creatable && composers === 0) {
       add(
-        "unusedComposition",
+        "deadEnd",
         node,
-        "Nothing composes this type, and nothing can create it",
+        "No root, no allowed parent, not an element, and nothing composes it",
       );
-    }
-
-    if (!node.isElement && !creatable) {
-      add("deadEnd", node, "Not allowed at root and no type allows it as a child");
     }
 
     const duplicates = duplicateAliases(node);
@@ -232,7 +224,10 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
       add("noProperties", node, "No own and no composed properties");
     }
 
-    if (!node.isElement && node.templates.length === 0) {
+    // Only worth saying on a schema that uses templates at all, and only about a
+    // type an editor can actually create. A headless site has no templates
+    // anywhere, and a composition renders through its users, not on its own.
+    if (anyTemplates && creatable && !node.isElement && node.templates.length === 0) {
       add("noTemplate", node, "No template is allowed, so it renders nothing");
     }
 

@@ -51,4 +51,5 @@ jobs:
           test "$(code /App_Plugins/SchemaCity/umbraco-package.json)" = 200
           test "$(code /umbraco)" = 200
           test "$(code /umbraco/management/api/v1/schema-city/graph)" = 401
+          test "$(code /umbraco/management/api/v1/schema-city/usage)" = 401
           pkill -f SchemaCity.Site || true

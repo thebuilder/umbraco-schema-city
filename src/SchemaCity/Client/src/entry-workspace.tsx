@@ -9,8 +9,8 @@ import { tryExecute } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
-import { getGraph, openTypeInEditor } from "./api.js";
-import type { SchemaGraph } from "./model/types.js";
+import { getGraph, getUsage, openTypeInEditor } from "./api.js";
+import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
  * The one file that knows about Umbraco. It fetches the graph, hands it to the React
@@ -20,6 +20,7 @@ import type { SchemaGraph } from "./model/types.js";
 export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
   #root?: Root;
   #graph?: SchemaGraph;
+  #usage?: UsageReport;
   #failed = false;
 
   override connectedCallback() {
@@ -44,6 +45,18 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
     this.#failed = Boolean(error);
     this.#graph = data ?? undefined;
     this.#draw();
+    if (!this.#graph) return;
+
+    // Usage is the slow half, and the city is worth looking at without it, so it
+    // starts only once the graph has drawn. A failure leaves `usage` undefined,
+    // which is what disables the lens picker, and says so once.
+    const usage = await tryExecute(this, getUsage());
+    if (usage.error) {
+      console.warn("Schema City: the usage endpoint did not answer, so the lens stays off.");
+      return;
+    }
+    this.#usage = usage.data ?? undefined;
+    this.#draw();
   }
 
   #draw() {
@@ -51,7 +64,7 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
 
     this.#root.render(
       this.#graph ? (
-        <App graph={this.#graph} onOpenType={openTypeInEditor} />
+        <App graph={this.#graph} onOpenType={openTypeInEditor} usage={this.#usage} />
       ) : (
         <p className="p-4 font-mono text-sm text-phosphor-dim">
           {this.#failed ? "The graph endpoint did not answer." : "Loading…"}

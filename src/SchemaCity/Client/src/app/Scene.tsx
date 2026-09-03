@@ -212,16 +212,19 @@ function Buildings({
   useEffect(() => {
     const lit = (id: string) => neighbours === null || neighbours.has(id);
     // A lens repaints the buildings it has a number for. The ones it says nothing
-    // about, Element Types under every content lens, keep the colour they had.
+    // about are Element Types, which have no content of their own, and under a lens
+    // they go phosphor-dim: amber is the zero end of the ramp, and an amber district
+    // sitting next to it reads as the emptiest place in the city.
     const lensColour = (buildingId: string) => {
       const t = scale?.t.get(buildingId);
       return t === undefined || !scale ? null : rampColour(scale.ramp, t, colors);
     };
     const colourFor = (kind: FloorCellKind, buildingId: string) => {
+      const unlit = scale && kind === "element" ? colors.dim : colors[kind];
       const base =
         buildingId === selected
           ? colors.signal
-          : lensColour(buildingId) ?? colors[kind];
+          : lensColour(buildingId) ?? unlit;
       const bright = buildingId === hovered ? base.clone().multiplyScalar(HOVER_BRIGHTEN) : base;
       return lit(buildingId) ? bright : bright.clone().lerp(colors.fade, FADE_MIX);
     };
