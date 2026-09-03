@@ -3,12 +3,23 @@
   "version": "0.1.0",
   "extensions": [
     {
-      "type": "dashboard",
-      "alias": "SchemaCity.Dashboard",
-      "name": "Schema City Dashboard",
-      "element": "/App_Plugins/SchemaCity/dashboard.js",
-      "weight": -10,
-      "meta": { "label": "Schema City", "pathname": "schema-city" },
+      "type": "workspace",
+      "alias": "SchemaCity.Workspace",
+      "name": "Schema City Workspace",
+      "element": "/App_Plugins/SchemaCity/workspace.js",
+      "meta": { "entityType": "schema-city" }
+    },
+    {
+      "type": "menuItem",
+      "alias": "SchemaCity.MenuItem",
+      "name": "Schema City Menu Item",
+      "weight": 50,
+      "meta": {
+        "label": "Schema City",
+        "icon": "icon-map-alt",
+        "entityType": "schema-city",
+        "menus": ["Umb.Menu.AdvancedSettings"]
+      },
       "conditions": [
         { "alias": "Umb.Condition.SectionAlias", "match": "Umb.Section.Settings" }
       ]

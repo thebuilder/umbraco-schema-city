@@ -11,8 +11,8 @@ import { getGraph } from "./api.js";
 import type { SchemaNode } from "./model/types.js";
 
 /** Lists what the graph endpoint returns. The city itself lands in M1. */
-@customElement("schema-city-dashboard")
-export class SchemaCityDashboardElement extends UmbElementMixin(LitElement) {
+@customElement("schema-city-workspace")
+export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
   @state()
   private _nodes?: SchemaNode[];
 
@@ -61,16 +61,19 @@ export class SchemaCityDashboardElement extends UmbElementMixin(LitElement) {
     css`
       :host {
         display: block;
+        height: 100%;
         padding: var(--uui-size-layout-1);
+        box-sizing: border-box;
+        overflow: auto;
       }
     `,
   ];
 }
 
-export default SchemaCityDashboardElement;
+export default SchemaCityWorkspaceElement;
 
 declare global {
   interface HTMLElementTagNameMap {
-    "schema-city-dashboard": SchemaCityDashboardElement;
+    "schema-city-workspace": SchemaCityWorkspaceElement;
   }
 }
