@@ -732,9 +732,25 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         }
     }
 
+    /// <summary>
+    /// Umbraco 18 removed <c>IContentTypeBaseService.Save</c>. CreateAsync and UpdateAsync are on
+    /// both majors, and HasIdentity is what picks between them.
+    /// </summary>
+    /// <remarks>
+    /// ponytail: this blocks so the six callers stay synchronous. Make the chain async if a later
+    /// seeder step has real work to overlap.
+    /// </remarks>
     private void Save(IContentType type)
     {
-        _contentTypeService.Save(type, UmbracoConstants.Security.SuperUserId);
+        Attempt<ContentTypeOperationStatus> attempt = (type.HasIdentity
+            ? _contentTypeService.UpdateAsync(type, UmbracoConstants.Security.SuperUserKey)
+            : _contentTypeService.CreateAsync(type, UmbracoConstants.Security.SuperUserKey))
+            .GetAwaiter().GetResult();
+        if (attempt.Success is false)
+        {
+            throw new InvalidOperationException($"Could not save Document Type {type.Alias}: {attempt.Result}.");
+        }
+
         _types[type.Alias!] = type;
     }
 
