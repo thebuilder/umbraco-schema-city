@@ -1179,8 +1179,6 @@ function Stage({
 }) {
   const camera = useThree((state) => state.camera);
   const grid = useRef<THREE.Mesh>(null);
-  const stampMeshes = useRef<(THREE.Mesh | null)[]>([]);
-  const viewDirection = useMemo(() => new THREE.Vector3(), []);
   const ray = useMemo(() => new THREE.Raycaster(), []);
   const ground = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const screenCentre = useMemo(() => new THREE.Vector2(0, 0), []);
@@ -1208,50 +1206,27 @@ function Stage({
     [palette, fadeNear, fadeFar],
   );
 
-  // One rasterised name per district, with the island it prints on. The quad it goes
-  // on is placed and sized every frame instead, because both follow the camera.
+  // One rasterised name per district, with the quad it prints on. The name is fixed
+  // to its island, so this is worked out once rather than followed every frame.
   const stampsOf = useMemo(
     () =>
       districts.map((district) => {
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
-        return {
-          id: district.id,
-          texture,
-          aspect: texture.image.width / texture.image.height,
-          island: {
+        const stamp = districtStamp(
+          {
             minX: district.minX - ISLAND_PAD,
             maxX: district.maxX + ISLAND_PAD,
             minZ: district.minZ - ISLAND_PAD,
             maxZ: district.maxZ + ISLAND_PAD,
           },
-        };
+          texture.image.width / texture.image.height,
+        );
+        return { id: district.id, texture, stamp };
       }),
     [districts, palette.mono],
   );
 
   useFrame(() => {
-    // Each name turns about its own vertical to face the camera and grows by the
-    // foreshortening, so it reads as printed on the ground and still reads at all.
-    camera.getWorldDirection(viewDirection);
-    const along = Math.hypot(viewDirection.x, viewDirection.z);
-    const view = {
-      forward:
-        along < 1e-6
-          ? { x: 0, z: -1 }
-          : { x: viewDirection.x / along, z: viewDirection.z / along },
-      elevation: Math.atan2(-viewDirection.y, along),
-    };
-    stampsOf.forEach((printed, index) => {
-      const mesh = stampMeshes.current[index];
-      if (!mesh) return;
-      const stamp = districtStamp(printed.island, printed.aspect, view);
-      mesh.position.set(stamp.x, STAMP_Y, stamp.z);
-      // The spin is applied in the quad's own plane, before the quarter turn that
-      // lays it flat, which makes it a yaw about the world's vertical.
-      mesh.rotation.set(-Math.PI / 2, 0, stamp.spin);
-      mesh.scale.set(stamp.width, stamp.height, 1);
-    });
-
     // The ground point at the centre of the screen, from the camera's own centre
     // ray. The orbit target would do under the isometric camera, whose panning holds
     // it on y = 0, but the Explore camera can look anywhere.
@@ -1329,28 +1304,22 @@ function Stage({
           use for. ponytail: a nested folder's tint is opaque and stands a hundredth of
           a unit higher, so it would cover a name that reached under it. No folder in
           either fixture reaches into the margin the name is printed in. */}
-      {stampsOf.map((stamp, index) => {
-        return (
-          <mesh
-            key={stamp.id}
-            ref={(mesh) => {
-              stampMeshes.current[index] = mesh;
-            }}
-            rotation={[-Math.PI / 2, 0, 0]}
-          >
-            {/* A unit quad, scaled every frame: the size follows the camera now, and
-                rebuilding a geometry per frame per district would not. */}
-            <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial
-              color={palette.dim}
-              depthWrite={false}
-              map={stamp.texture}
-              opacity={STAMP_OPACITY}
-              transparent
-            />
-          </mesh>
-        );
-      })}
+      {stampsOf.map(({ id, stamp, texture }) => (
+        <mesh
+          key={id}
+          position={[stamp.x, STAMP_Y, stamp.z]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <planeGeometry args={[stamp.width, stamp.height]} />
+          <meshBasicMaterial
+            color={palette.dim}
+            depthWrite={false}
+            map={texture}
+            opacity={STAMP_OPACITY}
+            transparent
+          />
+        </mesh>
+      ))}
     </>
   );
 }
