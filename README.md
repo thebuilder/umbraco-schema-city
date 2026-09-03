@@ -64,7 +64,9 @@ dotnet test SchemaCity.sln
 
 The .NET build runs `npm ci` and `npm run build` in `Client/` when the Vite output is missing, so
 `dotnet pack src/SchemaCity/SchemaCity.csproj -c Release` works from a clean checkout. Pass
-`-p:SkipClientBuild=true` where npm has already run. The client builds on its own too:
+`-p:SkipClientBuild=true` where npm has already run. The library build writes no source maps,
+which keeps the package at 2.6 MB unpacked instead of 9.5 MB, so debug the client through
+`npm run dev`, where the Vite dev server serves its own maps. The client builds on its own too:
 
 ```bash
 cd src/SchemaCity/Client
