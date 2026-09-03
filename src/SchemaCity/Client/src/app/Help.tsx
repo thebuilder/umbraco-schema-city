@@ -97,7 +97,9 @@ export function Help({
           the key that opens the same dialog. */}
       <DialogTrigger
         aria-label="Control reference"
-        render={<Button className="text-xs" size="icon-sm" variant="outline" />}
+        render={
+          <Button className="text-xs" data-trigger size="icon-sm" variant="outline" />
+        }
       >
         ?
       </DialogTrigger>

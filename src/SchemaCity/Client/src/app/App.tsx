@@ -415,7 +415,7 @@ export function App({
               typeahead this gets for nothing. Swap it if the bundle gets tight. */}
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={<Button size="sm" variant="outline" />}
+              render={<Button data-trigger size="sm" variant="outline" />}
             >
               Layers {layers.length}/{LAYERS.length}
             </DropdownMenuTrigger>
@@ -497,7 +497,9 @@ export function App({
             <Findings findings={findings} nodesById={nodesById} onSelect={followLink} />
 
             <Popover>
-              <PopoverTrigger render={<Button size="sm" variant="outline" />}>
+              <PopoverTrigger
+                render={<Button data-trigger size="sm" variant="outline" />}
+              >
                 Legend
               </PopoverTrigger>
               <PopoverContent className="w-80 text-sm">
@@ -510,7 +512,7 @@ export function App({
             {/* No tooltip on a control that opens a dialog: the tooltip's exit
                 animation plays over the dialog opening, which reads as the label
                 flying away. The shortcut goes in the button instead. */}
-            <Button onClick={() => openPalette(true)} size="sm">
+            <Button data-trigger onClick={() => openPalette(true)} size="sm">
               Search
               <Kbd>⌘K</Kbd>
             </Button>
