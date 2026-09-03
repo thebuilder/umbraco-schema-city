@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SchemaCity.Graph;
 using SchemaCity.Models;
+using SchemaCity.Usage;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -79,6 +80,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     private readonly IConfigurationEditorJsonSerializer _serializer;
     private readonly IShortStringHelper _shortStringHelper;
     private readonly ITemplateService _templateService;
+    private readonly UsageCollector _usageCollector;
 
     /// <summary>Data Types the seeded property types point at, in rotation order.</summary>
     private readonly List<IDataType> _editors = [];
@@ -103,7 +105,8 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         PropertyEditorCollection propertyEditors,
         IConfigurationEditorJsonSerializer serializer,
         IShortStringHelper shortStringHelper,
-        ITemplateService templateService)
+        ITemplateService templateService,
+        UsageCollector usageCollector)
     {
         _contentService = contentService;
         _contentTypeService = contentTypeService;
@@ -115,6 +118,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         _serializer = serializer;
         _shortStringHelper = shortStringHelper;
         _templateService = templateService;
+        _usageCollector = usageCollector;
     }
 
     public async Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
@@ -655,9 +659,11 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     // ---------------------------------------------------------------- fixture export
 
     /// <summary>
-    /// Writes the same graph the endpoint returns to Client/dev/fixtures/medium.json, so the dev
-    /// harness renders a real schema. GeneratedAt is pinned, otherwise every boot would rewrite
-    /// the file and dirty the working tree.
+    /// Writes what the two endpoints return to Client/dev/fixtures/medium.json and
+    /// medium-usage.json, so the dev harness renders a real schema and its real counts. The two
+    /// timestamps are pinned, otherwise every boot would rewrite the files and dirty the working
+    /// tree. LastEdited is pinned per row rather than in the seeder, because fixing the real dates
+    /// would mean writing umbracoContentVersion.versionDate behind the content service's back.
     /// </summary>
     private async Task ExportFixtureAsync()
     {
@@ -681,6 +687,19 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         string path = Path.Combine(directory, "medium.json");
         System.IO.File.WriteAllText(path, JsonSerializer.Serialize(graph with { GeneratedAt = DateTimeOffset.UnixEpoch }, FixtureJson));
         _logger.LogInformation("Schema City seeder: wrote {Nodes} nodes to {Path}.", graph.Nodes.Count, path);
+
+        UsageReport usage = _usageCollector.Query();
+        UsageReport pinned = usage with
+        {
+            GeneratedAt = DateTimeOffset.UnixEpoch,
+            ByType = usage.ByType.ToDictionary(
+                row => row.Key,
+                row => row.Value.LastEdited is null ? row.Value : row.Value with { LastEdited = DateTime.UnixEpoch }),
+        };
+
+        string usagePath = Path.Combine(directory, "medium-usage.json");
+        System.IO.File.WriteAllText(usagePath, JsonSerializer.Serialize(pinned, FixtureJson));
+        _logger.LogInformation("Schema City seeder: wrote {Types} usage rows to {Path}.", pinned.ByType.Count, usagePath);
     }
 
     // ---------------------------------------------------------------- small helpers
