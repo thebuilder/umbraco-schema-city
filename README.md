@@ -1,8 +1,9 @@
 # Schema City
 
 An Umbraco backoffice extension that draws the content model as a map you can walk around.
-This is milestone M0: a Settings dashboard that lists the Document Types it gets from one
-endpoint. The city itself comes later. `PLAN.md` has the whole plan.
+This is milestone M0: a Schema City entry in the Settings sidebar, under Advanced, that opens a
+workspace listing the Document Types it gets from one endpoint. The city itself comes later.
+`PLAN.md` has the whole plan.
 
 Umbraco 17 and 18 are supported from one package, dependency range `[17.0.0, 19.0.0)`.
 
@@ -62,7 +63,8 @@ dotnet run --project src/SchemaCity.Site
 ```
 
 It listens on https://localhost:44341 and http://localhost:61801, installs itself into a SQLite
-file on first boot, and puts the dashboard under Settings. The login is in
+file on first boot, and puts Schema City in the Settings sidebar under Advanced, next to
+Relations and Log Viewer. The login is in
 `src/SchemaCity.Site/README.md`.
 
 ## Licence

@@ -29,7 +29,7 @@ These apply to every commit, every file and every generated sentence.
 - One node per Document Type. Geometry comes from the schema only, never from usage, so the map is spatially stable.
 - Relationship layers, never all edges at once: `Structure`, `Compositions`, `Blocks`, `References`, plus a `Usage` lens.
 - Selecting a node fades everything unrelated and opens an inspector sidebar. Double-click flies into the node (focus mode).
-- Home is a full-screen dashboard under Settings. A `Relationships` workspace view on the Document Type editor opens the same map pre-focused.
+- Home is a Settings sidebar entry (Advanced group) that opens a full-area workspace. A `Relationships` workspace view on the Document Type editor opens the same map pre-focused.
 - Lit + Three.js, following the v17 extension architecture. Detailed data lives in the inspector, not floating in the scene.
 - Reuse fsn's ideas and small mechanisms; do not adapt fsn into a third adapter and do not extract a shared framework before a second graph exists.
 - Content mode (real content instances) is out of v1.
@@ -53,7 +53,7 @@ These apply to every commit, every file and every generated sentence.
 
 8. **MIT licence, public repository from M1.**
 
-9. **Settings tool only, gated by Umbraco's own permissions.** The dashboard is conditioned on the Settings section and both endpoints require `SectionAccessSettings`, so administrators control access per user group through the normal Users area. No custom permission or editor-facing view in v1.
+9. **Settings tool only, gated by Umbraco's own permissions.** The menu item is conditioned on the Settings section and both endpoints require `SectionAccessSettings`, so administrators control access per user group through the normal Users area. No custom permission or editor-facing view in v1.
 
 10. **The seeded schema is the test bed.** No real project is required. The seeder plants known findings (orphans, unused compositions, dead ends, an unused element type) so tests and milestone exits assert against a deterministic expected set.
 
@@ -91,9 +91,9 @@ schema-city/
           model/                     graph types, indexes, findings, search  (no DOM, no three)
           layout/                    dagre -> placements, focus layout
           scene/                     three.js: buildings, roads, camera, picking, labels
-          ui/                        Lit elements: dashboard, toolbar, inspector, search, legend
+          ui/                        Lit elements: map host, toolbar, inspector, search, legend
           workspace/                 Document Type workspace view
-          entry-dashboard.ts  entry-workspace.ts
+          entry-workspace.ts  entry-document-type-view.ts
         dev/
           index.html  main.ts        harness, loads fixtures without Umbraco
           fixtures/*.json
@@ -109,7 +109,7 @@ Scaffold command (verified against the v17 docs):
 dotnet new umbraco-extension -n SchemaCity -ex
 ```
 
-The `-ex` example gives a controller, a Swagger composer and a dashboard. Keep the controller shape, delete the Swagger and generated-client wiring (see section 5), replace the dashboard. There is no controller base class until a second controller exists; `GraphController` carries the route and API attributes itself.
+The `-ex` example gives a controller, a Swagger composer and a dashboard. Keep the controller shape, delete the Swagger and generated-client wiring (see section 5), replace the dashboard with the workspace. There is no controller base class until a second controller exists; `GraphController` carries the route and API attributes itself.
 
 Naming: NuGet id `SchemaCity`, namespace `SchemaCity`, route `schema-city`, custom element prefix `schema-city-`, extension alias prefix `SchemaCity.`.
 
@@ -237,7 +237,7 @@ Caching and invalidation:
 - The builder keeps the last `SchemaGraph` in a field and is registered as a singleton. Its two `INotificationHandler` registrations for `ContentTypeCacheRefresherNotification` and `DataTypeCacheRefresherNotification` are factory registrations that resolve that same singleton. Umbraco's `AddNotificationHandler` registers handlers as transient, which would clear a cache nobody reads. Those notifications fire on every server after any save, delete or move, so load balancing needs nothing extra.
 - `UsageCollector` caches for 60 seconds. `?refresh=true` bypasses. No lock around the cold path; the query is one round trip.
 
-Authorization: `[Authorize(Policy = AuthorizationPolicies.SectionAccessSettings)]` on both controllers. The dashboard is only registered under Settings, and the workspace view is inside the Settings section. Access is therefore whatever the administrator grants a user group for Settings; the package adds no permission of its own.
+Authorization: `[Authorize(Policy = AuthorizationPolicies.SectionAccessSettings)]` on both controllers. The menu item is only registered under Settings, and the workspace view is inside the Settings section. Access is therefore whatever the administrator grants a user group for Settings; the package adds no permission of its own.
 
 Resulting routes:
 
@@ -256,7 +256,7 @@ GET /umbraco/management/api/v1/schema-city/usage?refresh=false
 - `scene/` owns three.js and knows nothing about Umbraco. It takes `Placement[]` and `SchemaGraph` and emits events (`select`, `open`, `hover`).
 - `ui/` is Lit elements using `uui-*` components and Umbraco contexts. It is the only layer that talks to the API client.
 - `workspace/` reuses `<schema-city-map>` with a `focus` attribute.
-- `<schema-city-map>` imports nothing from `@umbraco-cms/backoffice`. It takes the graph and usage objects as properties, takes `focus` as an attribute, and emits an `open-type` event with the type id. The dashboard and workspace-view wrappers are the only Umbraco-aware code: they fetch, read the workspace context, resolve icons, and turn `open-type` into an editor link. The harness fills the same inputs from fixtures and a query string.
+- `<schema-city-map>` imports nothing from `@umbraco-cms/backoffice`. It takes the graph and usage objects as properties, takes `focus` as an attribute, and emits an `open-type` event with the type id. The workspace and workspace-view wrappers are the only Umbraco-aware code: they fetch, read the workspace context, resolve icons, and turn `open-type` into an editor link. The harness fills the same inputs from fixtures and a query string.
 
 ### Extension manifests (`public/umbraco-package.json`)
 
@@ -266,19 +266,30 @@ GET /umbraco/management/api/v1/schema-city/usage?refresh=false
   "version": "0.1.0",
   "extensions": [
     {
-      "type": "dashboard",
-      "alias": "SchemaCity.Dashboard",
-      "name": "Schema City Dashboard",
-      "element": "/App_Plugins/SchemaCity/dashboard.js",
-      "weight": -10,
-      "meta": { "label": "Schema City", "pathname": "schema-city" },
+      "type": "workspace",
+      "alias": "SchemaCity.Workspace",
+      "name": "Schema City Workspace",
+      "element": "/App_Plugins/SchemaCity/workspace.js",
+      "meta": { "entityType": "schema-city" }
+    },
+    {
+      "type": "menuItem",
+      "alias": "SchemaCity.MenuItem",
+      "name": "Schema City Menu Item",
+      "weight": 50,
+      "meta": {
+        "label": "Schema City",
+        "icon": "icon-map-alt",
+        "entityType": "schema-city",
+        "menus": ["Umb.Menu.AdvancedSettings"]
+      },
       "conditions": [{ "alias": "Umb.Condition.SectionAlias", "match": "Umb.Section.Settings" }]
     },
     {
       "type": "workspaceView",
       "alias": "SchemaCity.DocumentTypeView",
       "name": "Schema City Relationships View",
-      "element": "/App_Plugins/SchemaCity/workspace.js",
+      "element": "/App_Plugins/SchemaCity/document-type-view.js",
       "weight": 50,
       "meta": { "label": "Relationships", "pathname": "relationships", "icon": "icon-map" },
       "conditions": [{ "alias": "Umb.Condition.WorkspaceAlias", "match": "Umb.Workspace.DocumentType" }]
@@ -287,11 +298,21 @@ GET /umbraco/management/api/v1/schema-city/usage?refresh=false
 }
 ```
 
+The menu item and the workspace are joined by `meta.entityType`. `umb-menu-item-default` builds its
+href as `section/{section pathname}/workspace/{entityType}`, so the entry links to
+`/umbraco/section/settings/workspace/schema-city`, and `umb-workspace` then renders the one
+`workspace` extension whose `meta.entityType` matches. This is how Log Viewer, Relations,
+Extension Insights and Webhooks all sit in the Advanced group. The workspace carries no `kind`,
+so our element is the whole workspace area with no header and no view tabs; `kind: "default"`
+would add a headline and a tab strip, and `kind: "routable"` would add child routes we have no
+use for. The element sets `display: block; height: 100%` to fill that area. Weight 50 puts the
+entry below Umbraco's own four rather than reordering them.
+
 The workspace view consumes `UMB_DOCUMENT_TYPE_WORKSPACE_CONTEXT` (from `@umbraco-cms/backoffice/document-type`) and observes `unique` to get the key. Verify the exact token name against the v17 package when scaffolding; the pattern is the same for every workspace.
 
 ### Vite
 
-Library mode, ES output, one entry today (`dashboard`; `workspace` arrives in M2), `rollupOptions.external: [/^@umbraco/]`, no `base` until M1 splits the three.js chunk out, at which point `base: "/App_Plugins/SchemaCity/"` is needed so chunk URLs resolve. Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the dashboard element, so opening Settings never pays for three.js. Only opening the dashboard does.
+Library mode, ES output, one entry today (`workspace`; `document-type-view` arrives in M2), `rollupOptions.external: [/^@umbraco/]`, no `base` until M1 splits the three.js chunk out, at which point `base: "/App_Plugins/SchemaCity/"` is needed so chunk URLs resolve. Three.js and dagre are bundled. The scene module is a separate chunk loaded by dynamic import from the workspace element, so opening Settings never pays for three.js. Only opening Schema City does.
 
 ### API client
 
@@ -413,7 +434,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Dev harness with a hand-written `small.json`.
 - CI: `npm ci`, `npm run build`, `dotnet build`, `dotnet test`, then boot the site and check the manifest, the backoffice and a 401 from the graph endpoint, on Umbraco 17.6.2 and 18.1.1.
 - Done 2026-09-03 on Umbraco 17.6.2, with 18.1.1 as the second CI target.
-- Exit: the Settings dashboard shows "Schema City, 80 types" from the real endpoint.
+- Exit: the Schema City entry in the Settings sidebar shows "Schema City, 80 types" from the real endpoint.
 
 ### M1, The city (large)
 
@@ -463,7 +484,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | --- | --- |
 | Layered layout shifts a lot when one type is added, breaking spatial memory | Deterministic input order limits it. Pinning is the later fix. Say so in the README. |
 | Dagre edge routing looks poor with many-to-many allowed children | Roads are drawn as straight ribbons between buildings, not along dagre's polyline, so routing quality matters less. Swap to ELK if it ever matters. |
-| Three.js bundle size in the backoffice | Separate chunk, loaded only when the dashboard opens. |
+| Three.js bundle size in the backoffice | Separate chunk, loaded only when the workspace opens. |
 | Usage queries slow on large installs | One grouped query for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
 | Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements, and let the CI boot step on both majors be the detector. |
 | Shadow DOM and WebGL canvas sizing | `ResizeObserver` on the host element, `devicePixelRatio` cap at 2. |
