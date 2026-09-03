@@ -33,7 +33,8 @@ const FOOTPRINT = 2;
 /** Gap between two dagre ranks, and the street between two districts. */
 const RANK_GAP = 6;
 const FLOOR_HEIGHT = 0.6;
-const GRID_COLUMNS = 8;
+/** Buildings in one row, everywhere. A wider rank folds onto more rows. */
+const ROW_LIMIT = 8;
 const INTRO_STAGGER = 0.06;
 const EMPTY_BOX = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
 
@@ -154,16 +155,13 @@ function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
   if (nodes.length === 0) return [];
 
   const graph = new Graph<GraphLabel, NodeLabel, EdgeLabel>();
-  graph.setGraph({
-    rankdir: "TB",
-    ranker: "network-simplex",
-    nodesep: FOOTPRINT,
-    ranksep: RANK_GAP,
-  });
+  // Only the rank and the left-to-right order inside it are read back, so dagre needs
+  // no separation settings. Its own x would be useless here: an allowed-child graph is
+  // shallow and wide, and the dummy nodes it threads through a rank for every edge that
+  // skips one stretch a rank of twenty types across hundreds of units.
+  graph.setGraph({ rankdir: "TB", ranker: "network-simplex" });
   graph.setDefaultEdgeLabel(() => ({}));
   for (const node of nodes) {
-    // Dagre separates nodes in the units it is given, so feeding it world units means
-    // the result needs no scaling and a wide building gets the room it needs.
     const footprint = footprintOf(node);
     graph.setNode(node.id, { width: footprint, height: footprint });
   }
@@ -176,15 +174,39 @@ function layoutRanks(nodes: SchemaNode[], roads: SchemaEdge[]): Placement[] {
 
   const at = (id: string) => graph.node(id) as { x: number; y: number };
   // Dagre keeps the rank number in its own layout copy and only writes x and y back,
-  // so the distinct y values in order are the ranks the ripple needs.
-  const ranks = [...new Set(nodes.map((node) => at(node.id).y))].sort(
-    (a, b) => a - b,
-  );
+  // so nodes sharing a y are a rank and their y in order is the rank order.
+  const ranks = new Map<number, SchemaNode[]>();
+  for (const node of nodes) {
+    const rank = ranks.get(at(node.id).y);
+    if (rank) rank.push(node);
+    else ranks.set(at(node.id).y, [node]);
+  }
 
-  return nodes.map((node) => {
-    const { x, y } = at(node.id);
-    return place(node, x, y, "structure", ranks.indexOf(y));
-  });
+  const placements: Placement[] = [];
+  let z = 0;
+  for (const [step, y] of [...ranks.keys()].sort((a, b) => a - b).entries()) {
+    const members = (ranks.get(y) as SchemaNode[]).sort(
+      (a, b) => at(a.id).x - at(b.id).x || compare(a.alias, b.alias),
+    );
+    // One depth for the whole rank, so a row of narrow buildings cannot slide under the
+    // row behind it. Rows sit one footprint plus a gap apart inside the rank's band.
+    const depth = Math.max(...members.map(footprintOf));
+    const rows = Math.ceil(members.length / ROW_LIMIT);
+    for (let i = 0; i < members.length; i += ROW_LIMIT) {
+      const row = members.slice(i, i + ROW_LIMIT);
+      const width =
+        row.reduce((sum, node) => sum + footprintOf(node), 0) +
+        FOOTPRINT * (row.length - 1);
+      const rowZ = z + (i / ROW_LIMIT) * (depth + FOOTPRINT) + depth / 2;
+      let x = -width / 2;
+      for (const node of row) {
+        placements.push(place(node, x + footprintOf(node) / 2, rowZ, "structure", step));
+        x += footprintOf(node) + FOOTPRINT;
+      }
+    }
+    z += rows * depth + (rows - 1) * FOOTPRINT + RANK_GAP;
+  }
+  return placements;
 }
 
 function layoutGrid(
@@ -198,8 +220,8 @@ function layoutGrid(
   // One pitch for the whole grid, so squares of different widths still cannot touch.
   const pitch = Math.max(...nodes.map(footprintOf)) + FOOTPRINT;
   return nodes.map((node, i) => {
-    const row = Math.floor(i / GRID_COLUMNS);
-    const column = i % GRID_COLUMNS;
+    const row = Math.floor(i / ROW_LIMIT);
+    const column = i % ROW_LIMIT;
     return place(
       node,
       originX + (column + 0.5) * pitch,
