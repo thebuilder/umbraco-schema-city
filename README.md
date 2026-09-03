@@ -29,14 +29,21 @@ npm ci
 npm run build
 ```
 
-`npm run generate-client` regenerates `src/api/` from the running site's Swagger document at
-`/umbraco/swagger/schema-city/swagger.json`, so the site has to be running for that one.
+`npm run dev` runs the fixture harness without Umbraco.
+
+There is no generated API client. Umbraco 18 replaced Swashbuckle with the built-in ASP.NET
+Core OpenAPI stack, and the two extension APIs share nothing, so the package registers no
+OpenAPI document. `Client/src/api.ts` calls the endpoint by hand instead.
 
 ## CI
 
 `.github/workflows/ci.yml` runs on push and pull request. It builds the client with Node 24,
 then builds and tests the solution twice, once against Umbraco 17.6.2 and once against 18.1.1.
-The matrix compiles and runs the unit tests; it does not boot the site.
+Each leg then boots the site and checks that the backoffice answers, that
+`/App_Plugins/SchemaCity/umbraco-package.json` is served, and that the graph endpoint refuses
+an anonymous caller with 401. Compiling is not enough on its own. Umbraco finds composers and
+controllers by scanning types at boot, so a type that vanished between majors only shows up
+when the site runs.
 
 The site's Umbraco version is the `UmbracoVersion` MSBuild property, default 17.6.2, so the
 same switch works locally:
