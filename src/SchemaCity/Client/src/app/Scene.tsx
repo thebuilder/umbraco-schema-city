@@ -348,14 +348,22 @@ function Labels({
   );
 }
 
-/** Fits the ortho camera to the city bounds. M1's isometric lock lands separately. */
+/** A (1,1,1) view direction is a true isometric angle: 45° azimuth, ~35.26° elevation. */
+const ISO_POLAR_ANGLE = Math.acos(1 / Math.sqrt(3));
+
+/** Fits the ortho camera to the city bounds, at a true isometric angle. */
 function CameraFrame({ bounds }: { bounds: CityBounds }) {
   const { camera, size } = useThree();
 
   useEffect(() => {
     const ortho = camera as THREE.OrthographicCamera;
     const span = Math.max(bounds.width, bounds.depth, 4) * 1.5;
-    ortho.position.set(bounds.centre.x + span, span * 0.9, bounds.centre.z + span);
+    const direction = new THREE.Vector3(1, 1, 1).normalize();
+    ortho.position.set(
+      bounds.centre.x + direction.x * span,
+      direction.y * span,
+      bounds.centre.z + direction.z * span,
+    );
     ortho.lookAt(bounds.centre.x, 0, bounds.centre.z);
     ortho.zoom = Math.min(size.width, size.height) / span;
     ortho.updateProjectionMatrix();
@@ -456,7 +464,12 @@ export default function Scene({
             selected={selected}
           />
           <CameraFrame bounds={bounds} />
-          <OrbitControls makeDefault target={[bounds.centre.x, 0, bounds.centre.z]} />
+          <OrbitControls
+            makeDefault
+            maxPolarAngle={ISO_POLAR_ANGLE}
+            minPolarAngle={ISO_POLAR_ANGLE}
+            target={[bounds.centre.x, 0, bounds.centre.z]}
+          />
         </Canvas>
       ) : null}
     </div>
