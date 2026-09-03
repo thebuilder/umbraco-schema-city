@@ -214,11 +214,8 @@ export function App({
   const [view, setView] = useState<View>(start.view);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  // Bumped by Home when there is no focus to leave. ponytail: it remounts the scene,
-  // which replays the intro rise as well as reframing. The camera only flies when its
-  // bounds change identity, and App has no other way to say "same city, frame it
-  // again"; a reframe counter Scene passes to CameraRig would do it without the
-  // remount.
+  // Bumped by Home when there is no focus to leave. The scene passes it to the
+  // camera rig, which flies back to the city framing and leaves the buildings alone.
   const [reframe, setReframe] = useState(0);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
@@ -539,10 +536,10 @@ export function App({
                   focus={focus}
                   graph={graph}
                   icons={icons}
-                  key={reframe}
                   layers={layers}
                   onFocus={enterFocus}
                   onSelect={setSelected}
+                  reframe={reframe}
                   scale={scale}
                   selected={selected}
                   usage={usage}

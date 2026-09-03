@@ -93,15 +93,16 @@ export function pixelsPerUnit(
  * every resize and on some scrolls, so most runs are about nothing the camera cares
  * about. Re-framing on those throws away the orbit, pan and zoom the reader is in
  * the middle of, which is the whole reason this decision is its own function:
- * only a new set of bounds moves the camera, and only the first framing and the one
- * that follows the controls arriving snap instead of flying.
+ * only a new set of bounds or a bumped `reframe` moves the camera, and only the
+ * first framing and the one that follows the controls arriving snap instead of
+ * flying. `reframe` is how Home asks for the same city to be framed again.
  */
 export function framingAction<B, C>(
-  last: { bounds: B; controls: C } | null,
-  next: { bounds: B; controls: C },
+  last: { bounds: B; controls: C; reframe: number } | null,
+  next: { bounds: B; controls: C; reframe: number },
 ): "none" | "snap" | "fly" {
   if (last === null) return "snap";
-  if (last.bounds !== next.bounds) return "fly";
+  if (last.bounds !== next.bounds || last.reframe !== next.reframe) return "fly";
   // The orbit controls arrive one render after the first framing, and the target
   // they were created with is the origin, so that framing has to be applied again.
   return last.controls === next.controls ? "none" : "snap";

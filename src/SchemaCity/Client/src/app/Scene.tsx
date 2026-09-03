@@ -1225,6 +1225,8 @@ type View = {
 
 /** Milliseconds the camera takes to reach a new framing. */
 const FLIGHT_MS = 700;
+/** Home is a shorter trip: the city is already on screen, only badly aimed. */
+const REFRAME_MS = 400;
 
 /** fsn's easing for the establishing shot. */
 const easeInOutCubic = (t: number) =>
@@ -1252,7 +1254,16 @@ function viewOf(bounds: CityBounds, size: { width: number; height: number }): Vi
  * it is, because a camera that keeps moving after you grab it is a camera fighting
  * you. A resize is not a new framing, so the view it has is the view it keeps.
  */
-function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotion: boolean }) {
+function CameraRig({
+  bounds,
+  reframe,
+  reducedMotion,
+}: {
+  bounds: CityBounds;
+  /** Bumped by Home to ask for the same city to be framed again. */
+  reframe: number;
+  reducedMotion: boolean;
+}) {
   const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
   const controls = useThree((state) => state.controls) as {
     target: THREE.Vector3;
@@ -1260,8 +1271,18 @@ function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotio
   } | null;
   const gl = useThree((state) => state.gl);
   const size = useThree((state) => state.size);
-  const flight = useRef<{ from: View; to: View; started: number } | null>(null);
-  const framed = useRef<{ bounds: CityBounds; controls: unknown } | null>(null);
+  const flight = useRef<{
+    from: View;
+    to: View;
+    started: number;
+    ms: number;
+    ease: (t: number) => number;
+  } | null>(null);
+  const framed = useRef<{
+    bounds: CityBounds;
+    controls: unknown;
+    reframe: number;
+  } | null>(null);
 
   const view = useMemo(() => viewOf(bounds, size), [bounds, size]);
 
@@ -1293,8 +1314,9 @@ function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotio
     // does a dozen times over, and hover, selection and lens changes all re-render
     // the scene around it. Framing again on any of those puts the camera back where
     // it started, so only a new set of bounds is allowed to move it.
-    const action = framingAction(framed.current, { bounds, controls });
-    framed.current = { bounds, controls };
+    const asked = framed.current !== null && framed.current.reframe !== reframe;
+    const action = framingAction(framed.current, { bounds, controls, reframe });
+    framed.current = { bounds, controls, reframe };
     if (action === "none") return;
     if (action === "snap" || reducedMotion) {
       apply(view);
@@ -1309,14 +1331,16 @@ function CameraRig({ bounds, reducedMotion }: { bounds: CityBounds; reducedMotio
       },
       to: view,
       started: performance.now(),
+      ms: asked ? REFRAME_MS : FLIGHT_MS,
+      ease: asked ? smootherstep : easeInOutCubic,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, bounds, controls, reducedMotion]);
+  }, [view, bounds, controls, reframe, reducedMotion]);
 
   useFrame(() => {
     const moving = flight.current;
     if (!moving) return;
-    const t = easeInOutCubic(Math.min(1, (performance.now() - moving.started) / FLIGHT_MS));
+    const t = moving.ease(Math.min(1, (performance.now() - moving.started) / moving.ms));
     const span = moving.from.span + (moving.to.span - moving.from.span) * t;
 
     camera.position.lerpVectors(moving.from.position, moving.to.position, t);
@@ -1473,6 +1497,7 @@ export default function Scene({
   layers,
   icons,
   explore,
+  reframe = 0,
   onSelect,
   onFocus,
 }: {
@@ -1487,6 +1512,11 @@ export default function Scene({
   layers: readonly Layer[];
   /** The Explore toggle: a free perspective camera instead of the isometric one. */
   explore?: boolean;
+  /**
+   * Bumped to frame the whole city again. It is a count rather than a flag because
+   * the camera has to answer Home a second time from wherever the reader took it.
+   */
+  reframe?: number;
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
 }) {
@@ -1734,7 +1764,7 @@ export default function Scene({
             <ExploreCamera bounds={bounds} pose={pose} span={span} />
           ) : (
             <>
-              <CameraRig bounds={bounds} reducedMotion={reducedMotion} />
+              <CameraRig bounds={bounds} reducedMotion={reducedMotion} reframe={reframe} />
               <PoseTracker pose={pose} />
             </>
           )}

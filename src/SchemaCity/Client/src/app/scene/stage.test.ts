@@ -50,13 +50,16 @@ test("only a new framing moves the camera", () => {
   const bounds = { width: 40, depth: 87, centre: { x: 0, z: 0 } };
   const other = { ...bounds };
   const controls = {};
+  const at = { bounds, controls, reframe: 0 };
 
-  expect(framingAction(null, { bounds, controls })).toBe("snap");
+  expect(framingAction(null, at)).toBe("snap");
   // The same bounds again is a re-render, a resize or a scroll, and the reader may
   // be mid-orbit through any of them.
-  expect(framingAction({ bounds, controls }, { bounds, controls })).toBe("none");
-  expect(framingAction({ bounds, controls: null }, { bounds, controls })).toBe("snap");
-  expect(framingAction({ bounds, controls }, { bounds: other, controls })).toBe("fly");
+  expect(framingAction(at, at)).toBe("none");
+  expect(framingAction({ ...at, controls: null }, at)).toBe("snap");
+  expect(framingAction(at, { ...at, bounds: other })).toBe("fly");
+  // Home asks for the city it is already looking at, so nothing but the count moves.
+  expect(framingAction(at, { ...at, reframe: 1 })).toBe("fly");
 });
 
 test("a world unit measures the same on screen through either camera", () => {
