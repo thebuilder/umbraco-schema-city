@@ -3,7 +3,7 @@
 // placement to the one this returns, and back.
 import type { Neighbourhood, PropertyTargets } from "../../model/neighbourhood";
 import type { SchemaGraph } from "../../model/types";
-import { ROW_LIMIT, STREET, type Placement } from "./city";
+import { cityBounds, ISLAND_PAD, ROW_LIMIT, STREET, type Placement } from "./city";
 
 /** Ground between two buildings in a row, and between two rows, as the city uses. */
 const GAP = 3;
@@ -13,6 +13,15 @@ const PLATFORM = 3;
 const ARC_HALF = Math.PI / 3;
 /** Footprint of an id the city never placed, which only a stale edge can be. */
 const FOOTPRINT = 2;
+
+/** The ground a focused neighbourhood covers, for the island under it and the camera. */
+export type FocusBounds = {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  centre: { x: number; z: number };
+};
 
 type Spot = { x: number; z: number; y: number };
 type Box = { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -231,4 +240,29 @@ export function layoutFocus(
     const spot = spots.get(placement.id);
     return spot ? { ...placement, position: { x: spot.x, z: spot.z }, y: spot.y } : placement;
   });
+}
+
+/**
+ * The ground the neighbourhood covers, with an island's padding around it, so the
+ * scene can draw a slab under it and frame the camera on the same box. Pass the
+ * placements the focus layout moved: the focused node and its neighbours.
+ */
+export function focusBounds(placements: Placement[]): FocusBounds {
+  const { width, depth, centre } = cityBounds(placements, ISLAND_PAD);
+  return {
+    minX: centre.x - width / 2,
+    maxX: centre.x + width / 2,
+    minZ: centre.z - depth / 2,
+    maxZ: centre.z + depth / 2,
+    centre,
+  };
+}
+
+/**
+ * The focused node's city position. The layout puts that node at the origin and
+ * measures the neighbourhood from there, so the scene adds this to stand the focus
+ * island where the node was, over the city it came from.
+ */
+export function focusAnchor(cityPlacements: Placement[], focusId: string): { x: number; z: number } {
+  return cityPlacements.find((placement) => placement.id === focusId)?.position ?? { x: 0, z: 0 };
 }
