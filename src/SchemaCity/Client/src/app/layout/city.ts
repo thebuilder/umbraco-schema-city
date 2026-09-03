@@ -95,6 +95,14 @@ export const ROW_LIMIT = 8;
  * The most buildings a rank can hold and still share its band with the rank below.
  * Two is where a rank stops paying for the street under it: a fuller rank reads as a
  * generation of its own, and merging those would widen districts that fold fine.
+ *
+ * ponytail: a fixed threshold and a greedy left-to-right pass, so a run of ranks
+ * sized 1, 1, 3, 1 merges the first two and starts again at the fourth rather than
+ * asking which grouping leaves the district squarest. Raising it to four takes the
+ * pathological fixture's Editorial folder from 2.12 to about 1.8 and costs the
+ * medium fixture's Pages a wider band and more road crossings, so it stays at two
+ * until a real schema asks otherwise; packing bands by district aspect is the
+ * upgrade, and it is a search rather than a scan.
  */
 export const SPARSE_RANK = 2;
 const INTRO_STAGGER = 0.06;
