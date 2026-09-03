@@ -1711,7 +1711,14 @@ function PoseTracker({ pose }: { pose: React.RefObject<Pose | null> }) {
   return null;
 }
 
-const EXPLORE_FOV = 45;
+/**
+ * The Explore camera's field of view. At 45 the near corners of the city stretched:
+ * a building at the edge of the frame leaned away from one at the centre far enough
+ * to read as a different shape. 40 is a longer lens, so the stand-off grows and the
+ * perspective flattens, and the city still fills the same screen height because that
+ * distance is worked out from this angle.
+ */
+const EXPLORE_FOV = 40;
 
 /**
  * The Explore camera. It starts at the isometric camera's own direction and target,
