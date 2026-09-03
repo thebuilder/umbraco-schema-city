@@ -99,7 +99,7 @@ schema-city/
           components/ui/                afterglow primitives, copy-in via the shadcn CLI
         dev/
           index.html  main.ts        harness, loads fixtures without Umbraco
-          fixtures/*.json            graph and usage fixtures, exported by the seeder
+          fixtures/*.json            graph and usage fixtures; the medium ones are exported by the seeder
     SchemaCity.Site/                 throwaway Umbraco 17 site referencing SchemaCity
       Seed/SchemaSeeder.cs           dev-only: creates ~80 Document Types on first boot
   tests/
