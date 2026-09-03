@@ -40,7 +40,10 @@ export default defineConfig({
     // Served by the host site as static web assets of this Razor Class Library.
     outDir: "../wwwroot/App_Plugins/SchemaCity",
     emptyOutDir: true,
-    sourcemap: true,
+    // No source maps in the package: they were 6.9 MB of a 9.5 MB nupkg and the backoffice
+    // never asks for them. The dev harness (npm run dev) runs through the Vite dev server,
+    // which serves its own maps, so debugging the client is unaffected.
+    sourcemap: false,
     rollupOptions: {
       external: [/^@umbraco/],
       // The scene chunk imports React from the entry chunk, which under "strict" makes
