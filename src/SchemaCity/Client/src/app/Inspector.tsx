@@ -1,10 +1,10 @@
 import { XIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Neighbourhood, PropertyTargets } from "../model/neighbourhood";
-import type { PropertyGroup, SchemaNode } from "../model/types";
+import type { PropertyGroup, SchemaNode, TypeUsage } from "../model/types";
 
 type Lookup = Map<string, SchemaNode>;
 
@@ -175,6 +175,34 @@ function Floors({ node, nodesById }: { node: SchemaNode; nodesById: Lookup }) {
   );
 }
 
+/** What the usage report says about this one type. Absent until the report arrives. */
+function Usage({ usage }: { usage: TypeUsage }) {
+  const rows: [string, string][] = [
+    ["Total", usage.total.toLocaleString()],
+    ["Published", usage.published.toLocaleString()],
+    ["Drafts", usage.drafts.toLocaleString()],
+    ["Trashed", usage.trashed.toLocaleString()],
+    ["Root instances", usage.rootInstances.toLocaleString()],
+    ["Cultures", usage.cultures.length > 0 ? usage.cultures.join(", ") : "none"],
+    // The date half of the timestamp, not a formatted local date, so the panel
+    // reads the same on every machine the backoffice runs on.
+    ["Last edited", usage.lastEdited ? usage.lastEdited.slice(0, 10) : "never"],
+  ];
+
+  return (
+    <Section title="Usage">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-2">
+        {rows.map(([label, value]) => (
+          <Fragment key={label}>
+            <dt className="text-3xs text-phosphor-dim">{label}</dt>
+            <dd className="justify-self-end truncate text-phosphor text-xs">{value}</dd>
+          </Fragment>
+        ))}
+      </dl>
+    </Section>
+  );
+}
+
 export function Inspector({
   focused,
   neighbourhood,
@@ -184,6 +212,7 @@ export function Inspector({
   onOpenType,
   onSelect,
   onToggleFocus,
+  usage,
 }: {
   focused: boolean;
   neighbourhood: Neighbourhood;
@@ -193,6 +222,7 @@ export function Inspector({
   onOpenType?: (id: string) => void;
   onSelect: (id: string) => void;
   onToggleFocus: () => void;
+  usage?: TypeUsage;
 }) {
   const list = (ids: string[]) => (
     <TypeList ids={ids} nodesById={nodesById} onSelect={onSelect} />
@@ -236,6 +266,7 @@ export function Inspector({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-3 px-3 py-3">
+          {usage ? <Usage usage={usage} /> : null}
           {neighbourhood.compositions.length > 0 ? (
             <Section title="Compositions">{list(neighbourhood.compositions)}</Section>
           ) : null}
