@@ -557,7 +557,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. Focus mode with the camera flight. Done. Screen-space label culling. Done. The Document Type editor tab. Done. Then the edge layers and URL state. Next.
+6. Focus mode with the camera flight. Done. Screen-space label culling. Done. The Document Type editor tab. Done. The edge layers and URL state. Done. Then M3: the usage endpoint, the usage lens and the findings drawer. Next.
 
 ## 13. Resolved questions
 
