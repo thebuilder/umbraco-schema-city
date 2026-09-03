@@ -1,9 +1,11 @@
-// The three things about the view worth putting in a link: which type is open,
-// whether it is focused, and which layers are on. Pure: no DOM, no React.
+// What about the view is worth putting in a link: which type is open, whether it
+// is focused, which layers are on and which usage lens is running. Pure: no DOM,
+// no React.
 //
 // The host owns the address bar. The harness lets the app write its own query
 // string, and the workspace wrapper takes the same state through onStateChange
 // and mirrors it into the backoffice route instead.
+import { type Lens, LENSES } from "./scene/lens";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 
 export type UrlState = {
@@ -11,10 +13,11 @@ export type UrlState = {
   type: string | null;
   focus: boolean;
   layers: Layer[];
+  lens: Lens;
 };
 
 /**
- * `?type=article&focus=1&layers=structure,blocks`. An alias the schema does not
+ * `?type=article&focus=1&layers=structure,blocks&lens=count`. An alias the schema does not
  * have is dropped rather than selecting nothing, because a link that outlived a
  * rename should still show the city.
  */
@@ -23,6 +26,7 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
   const type = params.get("type");
   const known = type !== null && new Set(aliases).has(type) ? type : null;
   const layers = params.get("layers");
+  const lens = params.get("lens");
 
   return {
     type: known,
@@ -34,6 +38,9 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
       layers === null
         ? [...DEFAULT_LAYERS]
         : LAYERS.filter((layer) => layers.split(",").includes(layer)),
+    // A lens the app does not have, and a link written before the usage report
+    // existed, both read as no lens rather than as an error.
+    lens: LENSES.find((candidate) => candidate === lens) ?? "none",
   };
 }
 
@@ -43,5 +50,6 @@ export function serialiseUrl(state: UrlState): string {
   if (state.type && state.focus) parts.push("focus=1");
   // Always written, so that turning every layer off survives a reload.
   parts.push(`layers=${state.layers.join(",")}`);
+  if (state.lens !== "none") parts.push(`lens=${state.lens}`);
   return `?${parts.join("&")}`;
 }

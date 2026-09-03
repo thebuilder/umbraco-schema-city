@@ -10,6 +10,7 @@ describe("parseUrl", () => {
       type: null,
       focus: false,
       layers: ["structure"],
+      lens: "none",
     });
   });
 
@@ -18,6 +19,7 @@ describe("parseUrl", () => {
       type: "article",
       focus: true,
       layers: ["structure", "compositions"],
+      lens: "none",
     });
   });
 
@@ -26,6 +28,7 @@ describe("parseUrl", () => {
       type: null,
       focus: false,
       layers: ["structure"],
+      lens: "none",
     });
   });
 
@@ -35,6 +38,11 @@ describe("parseUrl", () => {
 
   it("drops layer names it does not know", () => {
     expect(parseUrl("?layers=blocks,usage", aliases).layers).toEqual(["blocks"]);
+  });
+
+  it("reads a lens name, and reads one it does not know as no lens", () => {
+    expect(parseUrl("?lens=published", aliases).lens).toBe("published");
+    expect(parseUrl("?lens=temperature", aliases).lens).toBe("none");
   });
 
   it("reads an empty layer list as every layer off", () => {
@@ -55,24 +63,31 @@ describe("serialiseUrl", () => {
     expect(parseUrl(serialiseUrl(state), aliases)).toEqual(state);
 
   it("round-trips the default state", () => {
-    roundTrips({ type: null, focus: false, layers: ["structure"] });
+    roundTrips({ type: null, focus: false, layers: ["structure"], lens: "none" });
   });
 
   it("round-trips a focused type with every layer on", () => {
-    roundTrips({ type: "blogPost", focus: true, layers: [...LAYERS] });
+    roundTrips({ type: "blogPost", focus: true, layers: [...LAYERS], lens: "cultures" });
   });
 
   it("round-trips a selection with no layers at all", () => {
-    roundTrips({ type: "home", focus: false, layers: [] });
+    roundTrips({ type: "home", focus: false, layers: [], lens: "unused" });
   });
 
   it("writes the documented shape", () => {
-    expect(serialiseUrl({ type: "article", focus: true, layers: ["structure", "compositions"] })).toBe(
-      "?type=article&focus=1&layers=structure,compositions",
-    );
+    expect(
+      serialiseUrl({
+        type: "article",
+        focus: true,
+        layers: ["structure", "compositions"],
+        lens: "count",
+      }),
+    ).toBe("?type=article&focus=1&layers=structure,compositions&lens=count");
   });
 
   it("leaves the focus flag out when there is no type", () => {
-    expect(serialiseUrl({ type: null, focus: true, layers: [] })).toBe("?layers=");
+    expect(serialiseUrl({ type: null, focus: true, layers: [], lens: "none" })).toBe(
+      "?layers=",
+    );
   });
 });
