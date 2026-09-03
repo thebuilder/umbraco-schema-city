@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,27 +9,22 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Kbd } from "@/components/ui/kbd";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { PortalContainer } from "@/portal";
+import { neighbourhoods } from "../model/neighbourhood";
+import { searchNodes } from "../model/search";
 import type { SchemaGraph } from "../model/types";
+import { Inspector } from "./Inspector";
 
 // three.js, fiber and drei are a third of the bundle, so they load with the scene
 // rather than with the workspace element.
@@ -44,6 +39,7 @@ export function App({
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,7 +56,24 @@ export function App({
   }, []);
 
   const nodes = graph.nodes;
-  const selectedNode = nodes.find((node) => node.id === selected);
+  const nodesById = useMemo(
+    () => new Map(nodes.map((node) => [node.id, node])),
+    [nodes],
+  );
+  const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
+  const hits = useMemo(() => searchNodes(nodes, query), [nodes, query]);
+  const selectedNode = selected ? nodesById.get(selected) : undefined;
+  const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
+
+  const openPalette = (open: boolean) => {
+    setPaletteOpen(open);
+    if (!open) setQuery("");
+  };
+
+  const pick = (id: string) => {
+    setSelected(id);
+    openPalette(false);
+  };
 
   return (
     <PortalContainer value={portal}>
@@ -72,24 +85,6 @@ export function App({
           <Badge>{nodes.length} types</Badge>
 
           <div className="ml-auto flex items-center gap-2">
-            <Dialog>
-              <DialogTrigger render={<Button size="sm" variant="outline" />}>
-                Types
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>First 10 types</DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="max-h-64">
-                  <ol className="space-y-1 text-phosphor text-sm">
-                    {nodes.slice(0, 10).map((node) => (
-                      <li key={node.id}>{node.name}</li>
-                    ))}
-                  </ol>
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-
             <Popover>
               <PopoverTrigger render={<Button size="sm" variant="outline" />}>
                 Legend
@@ -104,7 +99,7 @@ export function App({
 
             <Tooltip>
               <TooltipTrigger
-                render={<Button onClick={() => setPaletteOpen(true)} size="sm" />}
+                render={<Button onClick={() => openPalette(true)} size="sm" />}
               >
                 Search
               </TooltipTrigger>
@@ -116,53 +111,58 @@ export function App({
         </div>
 
         <div className="relative flex-1">
-          <Suspense
-            fallback={
-              <p className="p-4 text-phosphor-dim text-sm">Loading the scene…</p>
-            }
-          >
-            <Scene graph={graph} onSelect={setSelected} selected={selected} />
-          </Suspense>
+          {/* drei's Html labels carry a z-index near 2^24, so the scene gets a
+              stacking context of its own and the inspector sits above it on a
+              plain z-10 instead of having to outbid that number. */}
+          <div className="absolute inset-0 z-0">
+            <Suspense
+              fallback={
+                <p className="p-4 text-phosphor-dim text-sm">Loading the scene…</p>
+              }
+            >
+              <Scene graph={graph} onSelect={setSelected} selected={selected} />
+            </Suspense>
+          </div>
 
-          {selectedNode ? (
-            <div className="absolute top-4 right-4 w-64 border border-line-strong bg-panel-raised p-4 text-sm shadow-panel">
-              <p className="font-bold text-phosphor-bright">
-                {selectedNode.name}
-              </p>
-              <p className="text-muted-foreground">{selectedNode.alias}</p>
-              <Button
-                className="mt-3 w-full"
-                onClick={() => onOpenType?.(selectedNode.id)}
-                size="sm"
-                variant="primary"
-              >
-                Open
-              </Button>
-            </div>
+          {selectedNode && neighbourhood ? (
+            <Inspector
+              neighbourhood={neighbourhood}
+              node={selectedNode}
+              nodesById={nodesById}
+              onClose={() => setSelected(null)}
+              onOpenType={onOpenType}
+              onSelect={setSelected}
+            />
           ) : null}
         </div>
 
-        <CommandDialog onOpenChange={setPaletteOpen} open={paletteOpen}>
-          {/* Afterglow's CommandDialog is the dialog only, so the cmdk root is ours. */}
-          <Command>
-            <CommandInput placeholder="Find a type…" />
+        <CommandDialog onOpenChange={openPalette} open={paletteOpen}>
+          {/* Afterglow's CommandDialog is the dialog only, so the cmdk root is ours.
+              Filtering is ours too: cmdk scores its own item labels, which would
+              miss the property aliases the rows do not print. */}
+          <Command shouldFilter={false}>
+            <CommandInput
+              onValueChange={setQuery}
+              placeholder="Find a type or a property alias…"
+              value={query}
+            />
             <CommandList>
-              <CommandEmpty>No type matches.</CommandEmpty>
-              {nodes.map((node) => (
-                <CommandItem
-                  key={node.id}
-                  onSelect={() => {
-                    setSelected(node.id);
-                    setPaletteOpen(false);
-                  }}
-                  value={`${node.name} ${node.alias}`}
-                >
-                  {node.name}
-                  <span className="ml-auto text-phosphor-dim text-2xs">
-                    {node.alias}
-                  </span>
-                </CommandItem>
-              ))}
+              {query.trim() === "" ? null : hits.length === 0 ? (
+                <CommandEmpty>No type matches.</CommandEmpty>
+              ) : (
+                hits.map((hit) => (
+                  <CommandItem
+                    key={hit.node.id}
+                    onSelect={() => pick(hit.node.id)}
+                    value={hit.node.id}
+                  >
+                    {hit.node.name}
+                    <span className="ml-auto text-2xs text-phosphor-dim">
+                      {hit.propertyAlias ?? hit.node.alias}
+                    </span>
+                  </CommandItem>
+                ))
+              )}
             </CommandList>
           </Command>
         </CommandDialog>
