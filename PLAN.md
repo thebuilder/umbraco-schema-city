@@ -339,7 +339,7 @@ Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.
 
 ### Packaging
 
-`dotnet pack src/SchemaCity/SchemaCity.csproj -c Release` from a clean clone produces `SchemaCity.1.0.0.nupkg`. It carries the built client as static web assets under `staticwebassets/App_Plugins/SchemaCity/`, which a host serves at `/App_Plugins/SchemaCity/` because `StaticWebAssetBasePath` is `/`, plus the README, the MIT licence, the author and the four Umbraco dependencies at `[17.0.0, 19.0.0)`. A `BuildClient` MSBuild target runs `npm ci` (only when `node_modules` is missing) and `npm run build`, with `BeforeTargets="ResolveProjectStaticWebAssets"`, and only when `wwwroot/App_Plugins/SchemaCity/workspace.js` is missing. The target then adds `wwwroot/**` back as `Content` itself, because the SDK globs `Content` at evaluation time, before Vite has written anything. `-p:SkipClientBuild=true` skips the target, and CI passes it after running its own npm build. The package measured 9.5 MB with 6.9 MB of `.js.map` in it, so the packaged build is being changed to ship no source maps. CI packs on the 17.6.2 leg and asserts the nupkg carries `workspace.js`, ships no `.map` files and is under 1 MB; it measured 599 KB at first and 629 KB after the M4 scene work.
+`dotnet pack src/SchemaCity/SchemaCity.csproj -c Release` from a clean clone produces `SchemaCity.1.0.0.nupkg`. It carries the built client as static web assets under `staticwebassets/App_Plugins/SchemaCity/`, which a host serves at `/App_Plugins/SchemaCity/` because `StaticWebAssetBasePath` is `/`, plus the README, the MIT licence, the author and the four Umbraco dependencies at `[17.0.0, 19.0.0)`. A `BuildClient` MSBuild target runs `npm ci` (only when `node_modules` is missing) and `npm run build`, with `BeforeTargets="ResolveProjectStaticWebAssets"`, and only when `wwwroot/App_Plugins/SchemaCity/workspace.js` is missing. The target then adds `wwwroot/**` back as `Content` itself, because the SDK globs `Content` at evaluation time, before Vite has written anything. `-p:SkipClientBuild=true` skips the target, and CI passes it after running its own npm build. The package measured 9.5 MB with 6.9 MB of `.js.map` in it, so the packaged build is being changed to ship no source maps. CI packs on the 17.6.2 leg and asserts the nupkg carries `workspace.js`, ships no `.map` files and is under 1 MB; it measured 599 KB at first, 629 KB after the M4 scene work and 642 KB after the focus pass.
 
 ### API client
 
@@ -511,7 +511,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - `app/layout/city.ts` with districts and dagre; tests for determinism, cycles, empty schema, 300-node performance. Done 2026-09-03, 15 tests, about 30 ms for 300 nodes.
 - Scene in R3F: ground, buildings with floors and tints, roads with chevrons, ortho camera, drei orbit controls and zoom, hover, select, fade, a DOM label layer with screen-space culling, intro rise.
 - Inspector with all schema sections. Search palette. Done 2026-09-03; 42 tests.
-- Exit: usable on the seeded schema (the pathological fixture followed in M4); 300 types at 60 fps on an M-series laptop.
+- Exit: usable on the seeded schema (the pathological fixture followed in M4); 300 types at 60 fps (measured in the harness only: 165 fps on the seeded schema, an M-series Mac).
 
 ### M2, Layers and focus (medium)
 
