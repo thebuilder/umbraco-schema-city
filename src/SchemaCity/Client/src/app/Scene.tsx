@@ -693,7 +693,14 @@ function fadeColors(
   return array;
 }
 
-/** The Structure layer: every allowedChild edge as a ribbon on the ground. */
+/**
+ * The Structure layer: every allowedChild edge as a ribbon on the ground.
+ *
+ * Phosphor-dim keeps the overview's hundreds of roads behind the buildings. Focus
+ * mode draws one node's edges and nothing else, so there is no crowd to hold back
+ * and the roads take the full phosphor, which is what makes them read at the width
+ * the README's screenshot is taken at.
+ */
 function Roads({
   placementsById,
   edges,
@@ -716,7 +723,7 @@ function Roads({
       fadeColors(
         ranges,
         positions.length,
-        new THREE.Color(palette.dim),
+        new THREE.Color(focus ? palette.phosphor : palette.dim),
         palette.background,
         selected,
         focus,
