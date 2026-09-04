@@ -41,14 +41,19 @@ function guid(name) {
 }
 
 /** Numeric Recipes' LCG. Seeded, so the usage counts are the same on every run. */
-let seed = 20260903;
-const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+let seed = 20_260_903;
+const random = () => {
+  seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
+  return seed / 2 ** 32;
+};
 const between = (low, high) => low + Math.floor(random() * (high - low + 1));
 
+const CAPITAL = /([A-Z])/g;
+const FIRST = /^./;
 const titleOf = (alias) =>
-  alias.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
-const pad = (n, width = 2) => String(n).padStart(width, "0");
-const range = (count, from = 0) => Array.from({ length: count }, (_, i) => i + from);
+  alias.replace(CAPITAL, " $1").replace(FIRST, (c) => c.toUpperCase());
+const pad = (value, width = 2) => String(value).padStart(width, "0");
+const range = (length, from = 0) => Array.from({ length }, (_, i) => i + from);
 
 const ICONS = [
   "icon-document",
@@ -60,7 +65,15 @@ const ICONS = [
   "icon-users",
   "icon-calendar",
 ];
-const COLORS = [null, "color-blue", null, "color-green", null, "color-orange", null];
+const COLORS = [
+  null,
+  "color-blue",
+  null,
+  "color-green",
+  null,
+  "color-orange",
+  null,
+];
 const EDITORS = [
   ["Umbraco.TextBox", "Umb.PropertyEditorUi.TextBox"],
   ["Umbraco.TextArea", "Umb.PropertyEditorUi.TextArea"],
@@ -84,7 +97,9 @@ const folders = FOLDERS.map(([name]) => ({
   name,
   parentId: null,
 }));
-const folderId = Object.fromEntries(folders.map((folder) => [folder.name, folder.id]));
+const folderId = Object.fromEntries(
+  folders.map((folder) => [folder.name, folder.id])
+);
 
 // ------------------------------------------------------------------ types
 
@@ -157,7 +172,8 @@ for (const alias of orphans.slice(12)) add(alias, "Legacy");
 // ------------------------------------------------------------------ edges
 
 const edges = [];
-const road = (from, to) => edges.push({ kind: "allowedChild", from: id(from), to: id(to) });
+const road = (from, to) =>
+  edges.push({ kind: "allowedChild", from: id(from), to: id(to) });
 
 road("root0", "hubPage");
 for (const child of hubChildren) road("hubPage", child);
@@ -181,7 +197,8 @@ for (let i = 1; i < 12; i++) road(`page${pad(i - 1)}`, `page${pad(i)}`);
 // A broad tree over the rest of the pages, reached by the last two roots.
 road("root4", "page12");
 road("root5", "page24");
-for (let i = 13; i < 48; i++) road(`page${pad(12 + Math.floor((i - 13) / 3))}`, `page${pad(i)}`);
+for (let i = 13; i < 48; i++)
+  road(`page${pad(12 + Math.floor((i - 13) / 3))}`, `page${pad(i)}`);
 
 // The eight rank-skipping edges, each landing at least two ranks below its parent.
 const SKIPS = [
@@ -199,21 +216,28 @@ for (const [from, to] of SKIPS) road(from, to);
 // Editorial hangs off root0, so its 80 types rank as structure rather than piling
 // into one grid, and the middle band has two districts to order by size.
 road("root0", "editorial00");
-for (let i = 1; i < 80; i++) road(`editorial${pad(Math.floor((i - 1) / 4))}`, `editorial${pad(i)}`);
+for (let i = 1; i < 80; i++)
+  road(`editorial${pad(Math.floor((i - 1) / 4))}`, `editorial${pad(i)}`);
 
 // Archive is reachable from nothing, which is the district-with-no-roots case.
-for (let i = 1; i < 33; i++) road(`archive${pad(Math.floor((i - 1) / 4))}`, `archive${pad(i)}`);
+for (let i = 1; i < 33; i++)
+  road(`archive${pad(Math.floor((i - 1) / 4))}`, `archive${pad(i)}`);
 
 // Compositions: 100 types use the ten mixins, and four of them use two mixins that
 // both contribute the same property alias.
 const DUPLICATE_ALIAS = "sharedHeadline";
 const dupTypes = ["page00", "page01", "editorial00", "editorial01"];
-const composers = [...pages, ...editorial.slice(0, 50), "archive00", "archive01"];
+const composers = [
+  ...pages,
+  ...editorial.slice(0, 50),
+  "archive00",
+  "archive01",
+];
 const usedMixins = new Map(
   composers.map((alias, i) => [
     alias,
     dupTypes.includes(alias) ? [mixins[0], mixins[1]] : [mixins[i % 10]],
-  ]),
+  ])
 );
 for (const [alias, used] of usedMixins)
   for (const mixin of used)
@@ -236,7 +260,9 @@ for (const alias of inheritors) {
 const blockHosts = editorial.slice(0, 30);
 const blocksOf = new Map(blockHosts.map((alias) => [alias, []]));
 elements.forEach((element, i) => {
-  blocksOf.get(blockHosts[i % 30]).push({ nodeId: id(element), role: "content" });
+  blocksOf
+    .get(blockHosts[i % 30])
+    .push({ nodeId: id(element), role: "content" });
 });
 const settingsHosts = blockHosts.slice(0, 5);
 settingsHosts.forEach((alias, i) => {
@@ -244,7 +270,7 @@ settingsHosts.forEach((alias, i) => {
 });
 const brokenHosts = blockHosts.slice(27);
 const brokenTargets = new Map(
-  brokenHosts.map((alias, i) => [alias, guid(`deleted-element/${i}`)]),
+  brokenHosts.map((alias, i) => [alias, guid(`deleted-element/${i}`)])
 );
 for (const [alias, targets] of blocksOf)
   for (const target of targets)
@@ -267,7 +293,7 @@ for (const [alias, target] of brokenTargets)
 // References: six pickers, two targets each.
 const referenceHosts = editorial.slice(30, 36);
 const referencesOf = new Map(
-  referenceHosts.map((alias, i) => [alias, [pages[i], pages[i + 6]]]),
+  referenceHosts.map((alias, i) => [alias, [pages[i], pages[i + 6]]])
 );
 for (const [alias, targets] of referencesOf)
   for (const target of targets)
@@ -287,7 +313,8 @@ for (const alias of MULTILINGUAL) byAlias.get(alias).variesByCulture = true;
 
 let propertyIndex = 0;
 function property(owner, alias, extra = {}) {
-  const [editorAlias, editorUiAlias] = EDITORS[propertyIndex++ % EDITORS.length];
+  const [editorAlias, editorUiAlias] =
+    EDITORS[propertyIndex++ % EDITORS.length];
   return {
     alias,
     name: titleOf(alias),
@@ -319,9 +346,18 @@ const own = (owner, n) =>
   range(n).map((i) => property(owner, `${owner.alias}Field${pad(i)}`));
 
 // The twenty heavy types: 30 properties over six groups, two of them Tabs.
-const heavy = new Set([...hubChildren.slice(0, 10), ...editorial.slice(50, 60)]);
+const heavy = new Set([
+  ...hubChildren.slice(0, 10),
+  ...editorial.slice(50, 60),
+]);
 // The five with nothing at all, spread over an orphan district and a reached one.
-const empty = new Set(["orphan13", "orphan14", "archive30", "archive31", "archive32"]);
+const empty = new Set([
+  "orphan13",
+  "orphan14",
+  "archive30",
+  "archive31",
+  "archive32",
+]);
 
 nodes.forEach((node, index) => {
   if (empty.has(node.alias)) return;
@@ -332,8 +368,10 @@ nodes.forEach((node, index) => {
         node,
         `section${g}`,
         g < 2 ? "Tab" : "Group",
-        range(5).map((i) => property(node, `${node.alias}Field${pad(g * 5 + i)}`)),
-      ),
+        range(5).map((i) =>
+          property(node, `${node.alias}Field${pad(g * 5 + i)}`)
+        )
+      )
     );
     return;
   }
@@ -341,13 +379,13 @@ nodes.forEach((node, index) => {
   const properties = own(node, node.isElement ? 2 : 2 + (index % 3));
   if (blocksOf.has(node.alias))
     properties.push(
-      property(node, "blocks", { targets: blocksOf.get(node.alias) }),
+      property(node, "blocks", { targets: blocksOf.get(node.alias) })
     );
   if (brokenTargets.has(node.alias))
     properties.push(
       property(node, "legacyBlocks", {
         targets: [{ nodeId: brokenTargets.get(node.alias), role: "content" }],
-      }),
+      })
     );
   if (referencesOf.has(node.alias))
     properties.push(
@@ -355,7 +393,7 @@ nodes.forEach((node, index) => {
         targets: referencesOf
           .get(node.alias)
           .map((alias) => ({ nodeId: id(alias), role: "picker" })),
-      }),
+      })
     );
   node.groups = [group(node, "content", "Tab", properties)];
 });
@@ -368,28 +406,40 @@ for (const alias of mixins.slice(0, 2)) {
 }
 
 for (const node of nodes)
-  node.ownPropertyCount = node.groups.reduce((sum, g) => sum + g.properties.length, 0);
+  node.ownPropertyCount = node.groups.reduce(
+    (sum, g) => sum + g.properties.length,
+    0
+  );
 
 /** A composed copy of the source's own groups, marked with where they came from. */
 function composedGroups(source) {
   // Only the source's own groups: copying what it was itself composed of would hand
   // two types the same alias from two origins and invent duplicate-alias findings.
-  return source.groups.filter((g) => g.fromCompositionId === null).map((g) => ({
-    ...g,
-    id: guid(`group/composed/${source.alias}/${g.alias}`),
-    fromCompositionId: source.id,
-    properties: g.properties.map((p) => ({ ...p, fromCompositionId: source.id })),
-  }));
+  return source.groups
+    .filter((g) => g.fromCompositionId === null)
+    .map((g) => ({
+      ...g,
+      id: guid(`group/composed/${source.alias}/${g.alias}`),
+      fromCompositionId: source.id,
+      properties: g.properties.map((p) => ({
+        ...p,
+        fromCompositionId: source.id,
+      })),
+    }));
 }
 
 for (const [alias, used] of usedMixins)
-  for (const mixin of used) byAlias.get(alias).groups.push(...composedGroups(byAlias.get(mixin)));
+  for (const mixin of used)
+    byAlias.get(alias).groups.push(...composedGroups(byAlias.get(mixin)));
 for (const alias of inheritors)
   byAlias.get(alias).groups.push(...composedGroups(byAlias.get("page12")));
 
 for (const node of nodes) {
   const composed = node.groups.filter((g) => g.fromCompositionId !== null);
-  node.composedPropertyCount = composed.reduce((sum, g) => sum + g.properties.length, 0);
+  node.composedPropertyCount = composed.reduce(
+    (sum, g) => sum + g.properties.length,
+    0
+  );
 }
 
 // ------------------------------------------------------------------ templates
@@ -399,7 +449,8 @@ for (const node of nodes) {
 const noTemplate = new Set(range(6, 40).map((i) => `page${pad(i)}`));
 for (const node of nodes) {
   if (node.isElement || mixins.includes(node.alias)) continue;
-  if (node.alias.startsWith("mixinUnused") || noTemplate.has(node.alias)) continue;
+  if (node.alias.startsWith("mixinUnused") || noTemplate.has(node.alias))
+    continue;
   node.templates = [
     {
       id: guid(`template/${node.alias}`),
@@ -415,7 +466,11 @@ for (const node of nodes) {
 const busy = ["hubPage", ...roots.slice(0, 5), ...pages.slice(0, 4)];
 // editorial00 is in here so all five of the multilingual types have content to be
 // multilingual about.
-const quiet = ["editorial00", ...hubChildren.slice(10, 25), ...editorial.slice(60, 70)];
+const quiet = [
+  "editorial00",
+  ...hubChildren.slice(10, 25),
+  ...editorial.slice(60, 70),
+];
 
 const byType = {};
 for (const node of nodes)
@@ -457,7 +512,11 @@ const references = [
   ["editorial32", "page02"],
   ["hubPage", "page00"],
   ["root0", "hubPage"],
-].map(([from, to]) => ({ fromType: id(from), toType: id(to), count: between(1, 90) }));
+].map(([from, to]) => ({
+  fromType: id(from),
+  toType: id(to),
+  count: between(1, 90),
+}));
 
 // ------------------------------------------------------------------ write
 
@@ -469,7 +528,7 @@ edges.sort(
     order(a.kind, b.kind) ||
     order(aliasOf.get(a.from) ?? a.from, aliasOf.get(b.from) ?? b.from) ||
     order(aliasOf.get(a.to) ?? a.to, aliasOf.get(b.to) ?? b.to) ||
-    order(a.propertyAlias ?? "", b.propertyAlias ?? ""),
+    order(a.propertyAlias ?? "", b.propertyAlias ?? "")
 );
 
 const write = (name, value) =>
@@ -496,5 +555,5 @@ console.log(
     `types with no properties ${nodes.filter((n) => n.ownPropertyCount + n.composedPropertyCount === 0).length}, with 25 or more ${nodes.filter((n) => n.ownPropertyCount + n.composedPropertyCount >= 25).length}`,
     `types with a duplicate alias ${dupTypes.length} (${DUPLICATE_ALIAS})`,
     `usage: ${Object.values(byType).filter((u) => u.total === 0).length} at zero, ${Object.values(byType).filter((u) => u.total >= 100).length} in the hundreds, ${Object.values(byType).filter((u) => u.cultures.length === 3).length} with three cultures, ${references.length} references`,
-  ].join("\n"),
+  ].join("\n")
 );

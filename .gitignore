@@ -10,6 +10,9 @@ artifacts/
 # Node
 node_modules/
 
+# fallow's analysis cache
+.fallow/
+
 # Vite output, generated from Client/
 src/SchemaCity/wwwroot/App_Plugins/SchemaCity/
 

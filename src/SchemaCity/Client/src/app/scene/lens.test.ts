@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import mediumUsageFixture from "../../../dev/fixtures/medium-usage.json";
 import mediumFixture from "../../../dev/fixtures/medium.json";
-import type { SchemaGraph, SchemaNode, TypeUsage, UsageReport } from "../../model/types";
+import mediumUsageFixture from "../../../dev/fixtures/medium-usage.json";
+import type {
+  SchemaGraph,
+  SchemaNode,
+  TypeUsage,
+  UsageReport,
+} from "../../model/types";
 import { lensScale, usageBadge } from "./lens";
 
 const medium = mediumFixture as unknown as SchemaGraph;
@@ -74,7 +79,12 @@ describe("lensScale", () => {
   });
 
   it("leaves Element Types out of every lens about content", () => {
-    for (const lens of ["count", "published", "cultures", "references"] as const) {
+    for (const lens of [
+      "count",
+      "published",
+      "cultures",
+      "references",
+    ] as const) {
       expect(lensScale(graph, usage, lens)?.t.has("hero")).toBe(false);
     }
   });

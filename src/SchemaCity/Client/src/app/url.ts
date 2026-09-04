@@ -5,8 +5,9 @@
 // The host owns the address bar. The harness lets the app write its own query
 // string, and the workspace wrapper takes the same state through onStateChange
 // and mirrors it into the backoffice route instead.
-import { type Lens, LENSES } from "./scene/lens";
+
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
+import { LENSES, type Lens } from "./scene/lens";
 
 /**
  * Which view is on screen. `city` is the isometric map, `explore` is the same city
@@ -16,7 +17,7 @@ import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
  */
 export type View = "city" | "explore" | "list";
 
-export const VIEWS: readonly View[] = ["city", "explore", "list"];
+const VIEWS: readonly View[] = ["city", "explore", "list"];
 
 export type UrlState = {
   /** Alias of the type the view is about, or null when nothing is selected. */
@@ -70,7 +71,7 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
 export function urlToWrite(
   state: UrlState,
   mountedAt: string,
-  pathname: string,
+  pathname: string
 ): string | null {
   return pathname === mountedAt ? pathname + serialiseUrl(state) : null;
 }

@@ -47,7 +47,11 @@ export function typeRows(graph: SchemaGraph, usage?: UsageReport): TypeRow[] {
  * the usage report says nothing about at the bottom either way. Ties fall back to
  * the name, so the order is stable however often you click a header.
  */
-export function sortRows(rows: TypeRow[], key: SortKey, ascending: boolean): TypeRow[] {
+export function sortRows(
+  rows: TypeRow[],
+  key: SortKey,
+  ascending: boolean
+): TypeRow[] {
   const number = (row: TypeRow) => {
     const value = row[key];
     if (typeof value === "number") return value;
@@ -57,7 +61,7 @@ export function sortRows(rows: TypeRow[], key: SortKey, ascending: boolean): Typ
   const compare = (a: TypeRow, b: TypeRow) =>
     key === "name" || key === "alias"
       ? String(a[key]).localeCompare(String(b[key]))
-      : (number(a) - number(b) || a.name.localeCompare(b.name));
+      : number(a) - number(b) || a.name.localeCompare(b.name);
 
   return [...rows].sort((a, b) => (ascending ? compare(a, b) : -compare(a, b)));
 }
@@ -101,20 +105,35 @@ export function TypeTable({
   // decides the order, and searchNodes decides what is in it.
   const matched = useMemo(() => {
     if (query.trim() === "") return null;
-    return new Set(searchNodes(graph.nodes, query, graph.nodes.length).map((hit) => hit.node.id));
+    return new Set(
+      searchNodes(graph.nodes, query, graph.nodes.length).map(
+        (hit) => hit.node.id
+      )
+    );
   }, [graph.nodes, query]);
   const shown = useMemo(
-    () => sortRows(matched ? rows.filter((row) => matched.has(row.id)) : rows, sort.key, sort.ascending),
-    [rows, matched, sort],
+    () =>
+      sortRows(
+        matched ? rows.filter((row) => matched.has(row.id)) : rows,
+        sort.key,
+        sort.ascending
+      ),
+    [rows, matched, sort]
   );
 
-  const columns = usage ? COLUMNS : COLUMNS.filter((column) => column.key !== "usage");
+  const columns = usage
+    ? COLUMNS
+    : COLUMNS.filter((column) => column.key !== "usage");
   const toggle = (key: SortKey) =>
-    setSort((was) => ({ key, ascending: was.key === key ? !was.ascending : true }));
+    setSort((was) => ({
+      key,
+      ascending: was.key === key ? !was.ascending : true,
+    }));
 
   return (
     <div className="flex h-full flex-col bg-background">
       <div className="flex items-center gap-3 border-line border-b px-4 py-2">
+        {/* biome-ignore lint/a11y/noLabelWithoutControl: the Input is inside this label; the rule does not follow the component. */}
         <label className="flex items-center gap-2 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
           Filter
           {/* type="text" and our own clear button, because a search field draws the
@@ -148,7 +167,8 @@ export function TypeTable({
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full border-collapse font-mono text-xs">
           <caption className="sr-only">
-            Every Document Type in the schema. Choosing a row opens it in the inspector.
+            Every Document Type in the schema. Choosing a row opens it in the
+            inspector.
           </caption>
           <thead className="sticky top-0 z-10 bg-panel">
             <tr>
@@ -173,7 +193,11 @@ export function TypeTable({
                     type="button"
                   >
                     {column.label}
-                    {sort.key === column.key ? (sort.ascending ? " ▲" : " ▼") : ""}
+                    {sort.key === column.key
+                      ? sort.ascending
+                        ? " ▲"
+                        : " ▼"
+                      : ""}
                   </button>
                 </th>
               ))}
@@ -206,7 +230,9 @@ export function TypeTable({
                 <td className={`${CELL} text-right`}>{row.composed}</td>
                 <td className={`${CELL} text-right`}>{row.children}</td>
                 {usage ? (
-                  <td className={`${CELL} text-right`}>{row.usage?.toLocaleString()}</td>
+                  <td className={`${CELL} text-right`}>
+                    {row.usage?.toLocaleString()}
+                  </td>
                 ) : null}
               </tr>
             ))}

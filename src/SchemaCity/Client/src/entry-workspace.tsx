@@ -5,11 +5,11 @@ import {
   LitElement,
   unsafeCSS,
 } from "@umbraco-cms/backoffice/external/lit";
-import { UmbApiError, tryExecute } from "@umbraco-cms/backoffice/resources";
+import { tryExecute, UmbApiError } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
+import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
-import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
@@ -17,7 +17,7 @@ import type { SchemaGraph, UsageReport } from "./model/types.js";
  * app as a property, and takes the app's callbacks back. Everything under app/ is
  * plain React and runs unchanged in the fixture harness.
  */
-export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
+class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
   #root?: Root;
   #graph?: SchemaGraph;
   #usage?: UsageReport;
@@ -37,7 +37,9 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
 
   override firstUpdated() {
     // Created once and never again. Re-creating it would tear down the WebGL context.
-    this.#root = createRoot(this.renderRoot.querySelector("#app") as HTMLElement);
+    this.#root = createRoot(
+      this.renderRoot.querySelector("#app") as HTMLElement
+    );
     this.#draw();
   }
 
@@ -62,7 +64,9 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
     // which is what disables the lens picker, and says so once.
     const usage = await tryExecute(this, getUsage());
     if (usage.error) {
-      console.warn("Schema City: the usage endpoint did not answer, so the lens stays off.");
+      console.warn(
+        "Schema City: the usage endpoint did not answer, so the lens stays off."
+      );
       return;
     }
     this.#usage = usage.data ?? undefined;
@@ -70,7 +74,10 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
   }
 
   async #loadIcons(graph: SchemaGraph) {
-    this.#icons = await resolveIcons(this, graph.nodes.map((node) => node.icon));
+    this.#icons = await resolveIcons(
+      this,
+      graph.nodes.map((node) => node.icon)
+    );
     this.#draw();
   }
 
@@ -89,7 +96,7 @@ export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
         <p className="p-4 font-mono text-sm text-phosphor-dim">
           {this.#failed ?? "Loading…"}
         </p>
-      ),
+      )
     );
   }
 

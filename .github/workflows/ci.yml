@@ -10,7 +10,10 @@ jobs:
       matrix:
         umbraco: [17.6.2, 18.1.1]
     steps:
+      # Full history, because fallow's audit gate diffs the client against the base commit.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -24,6 +27,16 @@ jobs:
 
       - run: npm ci
         working-directory: src/SchemaCity/Client
+
+      - run: npm run lint
+        working-directory: src/SchemaCity/Client
+
+      # Only on a pull request: the gate compares the changed files against the base,
+      # and a push has nothing to compare them to.
+      - name: audit the changed client code
+        if: github.event_name == 'pull_request'
+        working-directory: src/SchemaCity/Client
+        run: npm run fallow -- --base '${{ github.event.pull_request.base.sha }}' --format github-annotations
 
       - run: npm run build
         working-directory: src/SchemaCity/Client

@@ -1,11 +1,11 @@
 // Turns a SchemaGraph into ground positions. Pure: no three.js, no React, no DOM.
 // The scene reads the output and owns everything visual.
 import {
-  Graph,
   type EdgeLabel,
+  Graph,
   type GraphLabel,
-  type NodeLabel,
   layout,
+  type NodeLabel,
 } from "@dagrejs/dagre";
 import type {
   SchemaEdge,
@@ -157,14 +157,14 @@ export function cityDistricts(graph: SchemaGraph): {
             compare(alias(a.from), alias(b.from)) ||
             compare(alias(a.to), alias(b.to)) ||
             compare(a.kind, b.kind) ||
-            compare(a.propertyAlias ?? "", b.propertyAlias ?? ""),
+            compare(a.propertyAlias ?? "", b.propertyAlias ?? "")
         )
     : [];
 
   const roads = edges.filter((edge) => edge.kind === "allowedChild");
   const structure = reachableFromRoots(nodes, roads, known);
   const composed = new Set(
-    edges.filter((edge) => edge.kind === "composition").map((edge) => edge.to),
+    edges.filter((edge) => edge.kind === "composition").map((edge) => edge.to)
   );
   const roleOf = (node: SchemaNode): Role =>
     node.isElement
@@ -183,7 +183,10 @@ export function cityDistricts(graph: SchemaGraph): {
   const laid = groups.map((group) => layoutDistrict(group, roads, roleOf));
 
   const districts = arrange(laid);
-  return { placements: laid.flatMap((district) => district.placements), districts };
+  return {
+    placements: laid.flatMap((district) => district.placements),
+    districts,
+  };
 }
 
 /** The placements alone, for a caller with no use for the district boxes. */
@@ -210,7 +213,8 @@ const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 // Not localeCompare, because its order depends on the machine's locale and the city
 // has to be the same everywhere.
-const compareByAlias = (a: SchemaNode, b: SchemaNode) => compare(a.alias, b.alias);
+const compareByAlias = (a: SchemaNode, b: SchemaNode) =>
+  compare(a.alias, b.alias);
 
 const footprintOf = (node: SchemaNode) =>
   FOOTPRINT + 0.25 * Math.min(Math.max(node.ownPropertyCount, 0), 12);
@@ -221,13 +225,16 @@ const floorsOf = (node: SchemaNode) => Math.max(1, node.groups?.length ?? 0);
 
 /** One district per top-level folder, plus Unfiled for the types no folder holds. */
 function byFolder(nodes: SchemaNode[], folders: SchemaFolder[]): Group[] {
-  const parentOf = new Map(folders.map((folder) => [folder.id, folder.parentId]));
+  const parentOf = new Map(
+    folders.map((folder) => [folder.id, folder.parentId])
+  );
   const nameOf = new Map(folders.map((folder) => [folder.id, folder.name]));
   const topOf = (id: string) => {
     let at = id;
     // Bounded by the folder count, so a parent cycle cannot spin here.
-    for (let i = 0; i < folders.length; i++) {
+    for (let hops = folders.length; hops > 0; hops--) {
       const parent = parentOf.get(at);
+      // biome-ignore lint/suspicious/noEqualsToNull: parentOf holds null for a top-level folder, so this has to catch null and undefined alike.
       if (parent == null) break;
       at = parent;
     }
@@ -239,7 +246,7 @@ function byFolder(nodes: SchemaNode[], folders: SchemaFolder[]): Group[] {
     // A folderId the folder list does not contain is a deleted container, so the type
     // reads as unfiled rather than inventing a nameless district for it.
     const top =
-      node.folderId != null && nameOf.has(node.folderId)
+      node.folderId !== null && nameOf.has(node.folderId)
         ? topOf(node.folderId)
         : UNFILED;
     const group = groups.get(top);
@@ -255,7 +262,10 @@ function byFolder(nodes: SchemaNode[], folders: SchemaFolder[]): Group[] {
 }
 
 /** The fallback for a schema with no folders: four districts named by what they hold. */
-function byRole(nodes: SchemaNode[], roleOf: (node: SchemaNode) => Role): Group[] {
+function byRole(
+  nodes: SchemaNode[],
+  roleOf: (node: SchemaNode) => Role
+): Group[] {
   const named: { id: string; name: string; role: Role }[] = [
     { id: "pages", name: "Pages", role: "structure" },
     { id: "compositions", name: "Compositions", role: "compositions" },
@@ -272,7 +282,10 @@ function byRole(nodes: SchemaNode[], roleOf: (node: SchemaNode) => Role): Group[
 }
 
 /** The role more than half the members share, or `mixed` when none does. */
-function kindOf(members: SchemaNode[], roleOf: (node: SchemaNode) => Role): DistrictKind {
+function kindOf(
+  members: SchemaNode[],
+  roleOf: (node: SchemaNode) => Role
+): DistrictKind {
   const counts = new Map<Role, number>();
   for (const member of members) {
     const role = roleOf(member);
@@ -291,11 +304,11 @@ function kindOf(members: SchemaNode[], roleOf: (node: SchemaNode) => Role): Dist
 function layoutDistrict(
   group: Group,
   roads: SchemaEdge[],
-  roleOf: (node: SchemaNode) => Role,
+  roleOf: (node: SchemaNode) => Role
 ): Laid {
   const mine = new Set(group.members.map((node) => node.id));
   const inside = roads.filter(
-    (road) => road.from !== road.to && mine.has(road.from) && mine.has(road.to),
+    (road) => road.from !== road.to && mine.has(road.from) && mine.has(road.to)
   );
   const linked = new Set(inside.flatMap((road) => [road.from, road.to]));
   const kind = kindOf(group.members, roleOf);
@@ -304,7 +317,7 @@ function layoutDistrict(
     group.members.filter((node) => linked.has(node.id)),
     inside,
     group.id,
-    kind,
+    kind
   );
   const box = boxOf(ranked);
   const loose = group.members.filter((node) => !linked.has(node.id));
@@ -315,7 +328,7 @@ function layoutDistrict(
     ranked.length > 0 ? box.minX : 0,
     ranked.length > 0 ? box.maxZ + STREET : 0,
     // The grid keeps rippling where the ranks stopped, so a district lights up once.
-    new Set(ranked.map((placement) => placement.introDelay)).size,
+    new Set(ranked.map((placement) => placement.introDelay)).size
   );
 
   return {
@@ -351,30 +364,32 @@ function arrange(laid: Laid[]): District[] {
   // The district's box starts at (x, z) and its buildings a stamp margin south of
   // that, so the ground the name stands on is inside the district rather than in the
   // street, and two islands stay a void apart however deep the margin grows.
-  const moveTo = (district: Laid, x: number, z: number) => {
-    const box = boxOf(district.placements);
-    for (const placement of district.placements) {
-      placement.position.x += x - box.minX;
-      placement.position.z += z + STAMP_MARGIN - box.minZ;
+  const moveTo = (island: Laid, toX: number, toZ: number) => {
+    const box = boxOf(island.placements);
+    for (const placement of island.placements) {
+      placement.position.x += toX - box.minX;
+      placement.position.z += toZ + STAMP_MARGIN - box.minZ;
     }
     const width = box.maxX - box.minX;
     const depth = box.maxZ - box.minZ + STAMP_MARGIN;
     districts.push({
-      id: district.id,
-      name: district.name,
-      kind: district.kind,
-      minX: x,
-      maxX: x + width,
-      minZ: z,
-      maxZ: z + depth,
-      centre: { x: x + width / 2, z: z + depth / 2 },
+      id: island.id,
+      name: island.name,
+      kind: island.kind,
+      minX: toX,
+      maxX: toX + width,
+      minZ: toZ,
+      maxZ: toZ + depth,
+      centre: { x: toX + width / 2, z: toZ + depth / 2 },
     });
     return { width, depth };
   };
 
   let z = 0;
   for (const band of ["north", "middle", "south"] as const) {
-    const row = laid.filter((district) => bandOf(district) === band).sort(bySize);
+    const row = laid
+      .filter((district) => bandOf(district) === band)
+      .sort(bySize);
     if (row.length === 0) continue;
     let x = 0;
     let depth = 0;
@@ -389,10 +404,13 @@ function arrange(laid: Laid[]): District[] {
   // East of every row, so a wide row can never grow into this column.
   const eastX =
     districts.length > 0
-      ? districts.reduce((max, district) => Math.max(max, district.maxX), 0) + DISTRICT_GAP
+      ? districts.reduce((max, district) => Math.max(max, district.maxX), 0) +
+        DISTRICT_GAP
       : 0;
   let eastZ = 0;
-  for (const district of laid.filter((d) => bandOf(d) === "east").sort(bySize)) {
+  for (const district of laid
+    .filter((d) => bandOf(d) === "east")
+    .sort(bySize)) {
     eastZ += moveTo(district, eastX, eastZ).depth + DISTRICT_GAP;
   }
   return districts;
@@ -401,7 +419,7 @@ function arrange(laid: Laid[]): District[] {
 function reachableFromRoots(
   nodes: SchemaNode[],
   roads: SchemaEdge[],
-  known: Map<string, SchemaNode>,
+  known: Map<string, SchemaNode>
 ) {
   const children = new Map<string, string[]>();
   for (const road of roads) {
@@ -419,6 +437,7 @@ function reachableFromRoots(
     }
   }
   // Breadth first over the queue as it grows. The reached check ends a cycle.
+  // biome-ignore lint/style/useForOf: the loop re-reads the length the body appends to.
   for (let i = 0; i < queue.length; i++) {
     for (const child of children.get(queue[i] as string) ?? []) {
       if (reached.has(child) || known.get(child)?.isElement) continue;
@@ -433,7 +452,7 @@ function layoutRanks(
   nodes: SchemaNode[],
   roads: SchemaEdge[],
   district: string,
-  kind: DistrictKind,
+  kind: DistrictKind
 ): Placement[] {
   if (nodes.length === 0) return [];
 
@@ -478,7 +497,7 @@ function layoutRanks(
   // A node whose parents are all further up, or absent, sorts to the right of every
   // node that has one in the rank the roads come from.
   const parentColumn = (id: string) => {
-    let leftmost = Infinity;
+    let leftmost = Number.POSITIVE_INFINITY;
     for (const parent of parents.get(id) ?? []) {
       const x = placedX.get(parent);
       if (x !== undefined && x < leftmost) leftmost = x;
@@ -495,15 +514,17 @@ function layoutRanks(
       (a, b) =>
         parentColumn(a.id) - parentColumn(b.id) ||
         at(a.id).x - at(b.id).x ||
-        compare(a.alias, b.alias),
+        compare(a.alias, b.alias)
     );
 
   const placements: Placement[] = [];
   let z = 0;
   let step = 0;
   for (const band of bandRanks(
-    [...ranks.keys()].sort((a, b) => a - b).map((y) => ranks.get(y) as SchemaNode[]),
-    roads,
+    [...ranks.keys()]
+      .sort((a, b) => a - b)
+      .map((y) => ranks.get(y) as SchemaNode[]),
+    roads
   )) {
     const members = band.flat();
     // One depth for the whole band, so a row of narrow buildings cannot slide under
@@ -517,7 +538,8 @@ function layoutRanks(
       for (let i = 0; i < sorted.length; i += ROW_LIMIT) {
         const row = sorted.slice(i, i + ROW_LIMIT);
         const width =
-          row.reduce((sum, node) => sum + footprintOf(node), 0) + GAP * (row.length - 1);
+          row.reduce((sum, node) => sum + footprintOf(node), 0) +
+          GAP * (row.length - 1);
         const rowZ = z + (i / ROW_LIMIT) * (depth + GAP) + depth / 2;
         let x = -width / 2;
         for (const node of row) {
@@ -574,7 +596,10 @@ function layoutRanks(
  * the rest ran left to right, and the band would stop reading as one generation
  * feeding the next.
  */
-function bandRanks(order: SchemaNode[][], roads: SchemaEdge[]): SchemaNode[][][] {
+function bandRanks(
+  order: SchemaNode[][],
+  roads: SchemaEdge[]
+): SchemaNode[][][] {
   const rankOf = new Map<string, number>();
   order.forEach((rank, i) => {
     for (const node of rank) rankOf.set(node.id, i);
@@ -584,7 +609,8 @@ function bandRanks(order: SchemaNode[][], roads: SchemaEdge[]): SchemaNode[][][]
   for (const road of roads) {
     const from = rankOf.get(road.from);
     const to = rankOf.get(road.to);
-    if (from !== undefined && to !== undefined && from > to) backwards.push([to, from]);
+    if (from !== undefined && to !== undefined && from > to)
+      backwards.push([to, from]);
   }
 
   const bands: SchemaNode[][][] = [];
@@ -610,7 +636,7 @@ function layoutGrid(
   kind: DistrictKind,
   originX: number,
   originZ: number,
-  firstStep: number,
+  firstStep: number
 ): Placement[] {
   if (nodes.length === 0) return [];
 
@@ -625,7 +651,7 @@ function layoutGrid(
       originZ + (row + 0.5) * pitch,
       district,
       kind,
-      firstStep + row,
+      firstStep + row
     );
   });
 }
@@ -636,7 +662,7 @@ function place(
   z: number,
   district: string,
   districtKind: DistrictKind,
-  step: number,
+  step: number
 ): Placement {
   const floors = floorsOf(node);
   return {
@@ -648,7 +674,9 @@ function place(
     district,
     districtKind,
     // A folder that is not the district's own is a folder nested inside it.
-    ...(node.folderId && node.folderId !== district ? { folder: node.folderId } : {}),
+    ...(node.folderId && node.folderId !== district
+      ? { folder: node.folderId }
+      : {}),
     introDelay: step * INTRO_STAGGER,
   };
 }
@@ -664,10 +692,10 @@ function boxOf(placements: Placement[]) {
       maxZ: Math.max(box.maxZ, position.z + footprint / 2),
     }),
     {
-      minX: Infinity,
-      maxX: -Infinity,
-      minZ: Infinity,
-      maxZ: -Infinity,
-    },
+      minX: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      minZ: Number.POSITIVE_INFINITY,
+      maxZ: Number.NEGATIVE_INFINITY,
+    }
   );
 }

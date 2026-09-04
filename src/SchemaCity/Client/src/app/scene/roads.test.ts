@@ -3,7 +3,12 @@ import mediumFixture from "../../../dev/fixtures/medium.json";
 import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import type { SchemaEdge, SchemaGraph } from "../../model/types";
 import { cityDistricts, type Placement } from "../layout/city";
-import { buildRoadGeometry, planRoads, roadFan, type RoadSegment } from "./roads";
+import {
+  buildRoadGeometry,
+  planRoads,
+  type RoadSegment,
+  roadFan,
+} from "./roads";
 
 const medium = mediumFixture as unknown as SchemaGraph;
 const pathological = pathologicalFixture as unknown as SchemaGraph;
@@ -27,14 +32,21 @@ const placements = new Map([
   ["b", placement("b", 6, 11)],
 ]);
 
-const road = (from: string, to: string): SchemaEdge => ({ kind: "allowedChild", from, to });
+const road = (from: string, to: string): SchemaEdge => ({
+  kind: "allowedChild",
+  from,
+  to,
+});
 
-const vertical = (segment: RoadSegment) => Math.abs(segment.x1 - segment.x0) < 1e-6;
-const horizontal = (segment: RoadSegment) => Math.abs(segment.z1 - segment.z0) < 1e-6;
+const vertical = (segment: RoadSegment) =>
+  Math.abs(segment.x1 - segment.x0) < 1e-6;
+const horizontal = (segment: RoadSegment) =>
+  Math.abs(segment.z1 - segment.z0) < 1e-6;
 
 /** How many pairs of segments cross, which is what a wiring mess measures as. */
 function crossings(segments: RoadSegment[]): number {
-  const span = (a: number, b: number) => [Math.min(a, b), Math.max(a, b)] as const;
+  const span = (a: number, b: number) =>
+    [Math.min(a, b), Math.max(a, b)] as const;
   let count = 0;
   for (const one of segments.filter(vertical)) {
     const [zLow, zHigh] = span(one.z0, one.z1);
@@ -59,7 +71,11 @@ describe("planRoads", () => {
     const segments = planRoads(placements, [road("a", "b")]);
     expect(segments).toHaveLength(3);
 
-    const [drop, run, rise] = segments as [RoadSegment, RoadSegment, RoadSegment];
+    const [drop, run, rise] = segments as [
+      RoadSegment,
+      RoadSegment,
+      RoadSegment,
+    ];
     expect(vertical(drop)).toBe(true);
     expect(horizontal(run)).toBe(true);
     expect(vertical(rise)).toBe(true);
@@ -101,13 +117,17 @@ describe("planRoads", () => {
     expect((runs[0] as RoadSegment).z0).toBeCloseTo(5.5, 6);
     // Then straight down the child's column, past the rank in between at the street
     // that crosses it, rather than cutting the corner diagonally.
-    const descent = segments.filter((segment) => vertical(segment) && segment.x0 === 12);
+    const descent = segments.filter(
+      (segment) => vertical(segment) && segment.x0 === 12
+    );
     expect(descent).toHaveLength(1);
     const [{ z0, z1 }] = descent as [RoadSegment];
     expect(Math.min(z0, z1)).toBeCloseTo(5.5, 6);
     expect(Math.max(z0, z1)).toBeCloseTo(21, 6);
     // Every run is north-south or east-west, whatever the road skips.
-    expect(segments.every((segment) => vertical(segment) || horizontal(segment))).toBe(true);
+    expect(
+      segments.every((segment) => vertical(segment) || horizontal(segment))
+    ).toBe(true);
   });
 
   it("merges two parents' runs into the same child instead of stacking them", () => {
@@ -117,7 +137,7 @@ describe("planRoads", () => {
 
     // Both roads end in the same rise into b's north face, so it is drawn once.
     const rises = segments.filter(
-      (segment) => vertical(segment) && Math.abs(segment.x0 - 6) < 1e-6,
+      (segment) => vertical(segment) && Math.abs(segment.x0 - 6) < 1e-6
     );
     expect(rises).toHaveLength(1);
     expect((rises[0] as RoadSegment).edges).toHaveLength(2);
@@ -127,9 +147,14 @@ describe("planRoads", () => {
     const two = new Map(placements);
     two.set("c", placement("c", 12, 0));
     two.set("d", placement("d", 18, 11));
-    const runs = planRoads(two, [road("a", "b"), road("c", "d")]).filter(horizontal);
+    const runs = planRoads(two, [road("a", "b"), road("c", "d")]).filter(
+      horizontal
+    );
     expect(runs).toHaveLength(2);
-    expect((runs[0] as RoadSegment).z0).not.toBeCloseTo((runs[1] as RoadSegment).z0, 6);
+    expect((runs[0] as RoadSegment).z0).not.toBeCloseTo(
+      (runs[1] as RoadSegment).z0,
+      6
+    );
   });
 
   it("crosses less than the straight ribbons it replaced", () => {
@@ -141,8 +166,8 @@ describe("planRoads", () => {
       grid.set(`p${i}`, placement(`p${i}`, i * 5, 0));
       grid.set(`c${i}`, placement(`c${i}`, (3 - i) * 5, 11));
     }
-    const edges = [...Array(4).keys()].flatMap((p) =>
-      [...Array(4).keys()].map((c) => road(`p${p}`, `c${c}`)),
+    const edges = [...new Array(4).keys()].flatMap((p) =>
+      [...new Array(4).keys()].map((c) => road(`p${p}`, `c${c}`))
     );
     // Sixteen straight ribbons over a reversed row cross 174 times by the same count.
     const straight = edges.map((edge) => ({
@@ -153,16 +178,24 @@ describe("planRoads", () => {
       edges: [edge],
       into: null,
     }));
-    expect(crossings(planRoads(grid, edges))).toBeLessThan(straightCrossings(straight));
+    expect(crossings(planRoads(grid, edges))).toBeLessThan(
+      straightCrossings(straight)
+    );
   });
 });
 
 /** Crossings between arbitrary straight ribbons, which are not axis aligned. */
 function straightCrossings(
-  segments: { x0: number; z0: number; x1: number; z1: number }[],
+  segments: { x0: number; z0: number; x1: number; z1: number }[]
 ): number {
-  const side = (ax: number, az: number, bx: number, bz: number, cx: number, cz: number) =>
-    Math.sign((bx - ax) * (cz - az) - (bz - az) * (cx - ax));
+  const side = (
+    ax: number,
+    az: number,
+    bx: number,
+    bz: number,
+    cx: number,
+    cz: number
+  ) => Math.sign((bx - ax) * (cz - az) - (bz - az) * (cx - ax));
   let count = 0;
   for (let i = 0; i < segments.length; i++) {
     for (let j = i + 1; j < segments.length; j++) {
@@ -172,7 +205,15 @@ function straightCrossings(
       const d2 = side(a.x0, a.z0, a.x1, a.z1, b.x1, b.z1);
       const d3 = side(b.x0, b.z0, b.x1, b.z1, a.x0, a.z0);
       const d4 = side(b.x0, b.z0, b.x1, b.z1, a.x1, a.z1);
-      if (d1 !== d2 && d3 !== d4 && d1 !== 0 && d2 !== 0 && d3 !== 0 && d4 !== 0) count++;
+      if (
+        d1 !== d2 &&
+        d3 !== d4 &&
+        d1 !== 0 &&
+        d2 !== 0 &&
+        d3 !== 0 &&
+        d4 !== 0
+      )
+        count++;
     }
   }
   return count;
@@ -188,14 +229,14 @@ describe("crossings on the fixtures", () => {
   ] as const) {
     it(`routes ${name}'s roads over fewer crossings than straight ribbons`, () => {
       const byId = new Map(
-        cityDistricts(graph).placements.map((p) => [p.id, p] as const),
+        cityDistricts(graph).placements.map((p) => [p.id, p] as const)
       );
       const edges = graph.edges.filter(
         (edge) =>
           edge.kind === "allowedChild" &&
           edge.from !== edge.to &&
           byId.has(edge.from) &&
-          byId.has(edge.to),
+          byId.has(edge.to)
       );
       const straight = edges.map((edge) => ({
         x0: (byId.get(edge.from) as Placement).position.x,
@@ -206,7 +247,9 @@ describe("crossings on the fixtures", () => {
 
       const ribbons = straightCrossings(straight);
       const routed = crossings(planRoads(byId, edges));
-      console.log(`${name}: ${edges.length} roads, ${ribbons} straight, ${routed} routed`);
+      console.log(
+        `${name}: ${edges.length} roads, ${ribbons} straight, ${routed} routed`
+      );
       // Measured at the time of writing: medium 64 roads, 282 straight, 168 routed;
       // pathological 246 roads, 1246 straight, 390 routed. The assertion is the rule
       // the routing exists for rather than either number, because both move whenever
@@ -217,9 +260,11 @@ describe("crossings on the fixtures", () => {
 });
 
 describe("roadFan", () => {
-  const wide = new Map<string, Placement>([["child", placement("child", 0, 11)]]);
+  const wide = new Map<string, Placement>([
+    ["child", placement("child", 0, 11)],
+  ]);
   for (let i = 0; i < 4; i++) wide.set(`p${i}`, placement(`p${i}`, i * 5, 0));
-  const fanEdges = [...Array(4).keys()].map((i) => road(`p${i}`, "child"));
+  const fanEdges = [...new Array(4).keys()].map((i) => road(`p${i}`, "child"));
 
   it("draws one road of a four-parent fan in the overview", () => {
     const fan = roadFan(wide, fanEdges, new Set());
@@ -248,7 +293,7 @@ describe("roadFan", () => {
   it("keeps a parent's own children, however many it has", () => {
     const hub = new Map<string, Placement>([["hub", placement("hub", 0, 0)]]);
     for (let i = 0; i < 6; i++) hub.set(`c${i}`, placement(`c${i}`, i * 5, 11));
-    const edges = [...Array(6).keys()].map((i) => road("hub", `c${i}`));
+    const edges = [...new Array(6).keys()].map((i) => road("hub", `c${i}`));
     expect(roadFan(hub, edges, new Set()).edges).toHaveLength(6);
   });
 });
@@ -269,14 +314,19 @@ describe("buildRoadGeometry", () => {
   });
 
   it("skips an edge whose end has no placement", () => {
-    const { positions, ranges } = buildRoadGeometry(placements, [road("a", "ghost")]);
+    const { positions, ranges } = buildRoadGeometry(placements, [
+      road("a", "ghost"),
+    ]);
     expect(positions.length).toBe(0);
     expect(ranges).toEqual([]);
   });
 
   it("points the chevrons at the child", () => {
     const { positions } = buildRoadGeometry(placements, [road("a", "b")]);
-    const at = (v: number) => ({ x: positions[v * 3] as number, z: positions[v * 3 + 2] as number });
+    const at = (v: number) => ({
+      x: positions[v * 3] as number,
+      z: positions[v * 3 + 2] as number,
+    });
 
     // Three ribbons of six vertices each, then one triangle per chevron, tip first.
     const chevrons = positions.length / 3 - 18;
@@ -290,7 +340,9 @@ describe("buildRoadGeometry", () => {
   });
 
   it("draws a self-loop as a ring instead of a ribbon", () => {
-    const { positions, ranges } = buildRoadGeometry(placements, [road("a", "a")]);
+    const { positions, ranges } = buildRoadGeometry(placements, [
+      road("a", "a"),
+    ]);
     expect(ranges).toHaveLength(1);
     // A ring sits beside the footprint, so every x is past its right edge.
     for (let i = 0; i < positions.length; i += 3) {
@@ -299,7 +351,9 @@ describe("buildRoadGeometry", () => {
   });
 
   it("gives every run a distinct, contiguous vertex range", () => {
-    const { ranges, positions } = buildRoadGeometry(placements, [road("a", "b")]);
+    const { ranges, positions } = buildRoadGeometry(placements, [
+      road("a", "b"),
+    ]);
     let next = 0;
     for (const range of ranges) {
       expect(range.start).toBe(next);

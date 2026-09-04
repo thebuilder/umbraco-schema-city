@@ -2,7 +2,7 @@
 // Pure: no three.js, no React, no DOM.
 import type { EdgeKind, SchemaGraph } from "../../model/types";
 
-export const LINK_EDGE_KINDS: ReadonlySet<EdgeKind> = new Set([
+const LINK_EDGE_KINDS: ReadonlySet<EdgeKind> = new Set([
   "allowedChild",
   "composition",
   "inherits",

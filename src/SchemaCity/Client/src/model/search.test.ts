@@ -49,7 +49,10 @@ describe("searchNodes", () => {
   });
 
   it("matches a property alias and reports which one matched", () => {
-    const hits = searchNodes([node("landingPage", ["seoTitle"]), node("article")], "seotitle");
+    const hits = searchNodes(
+      [node("landingPage", ["seoTitle"]), node("article")],
+      "seotitle"
+    );
 
     expect(hits).toHaveLength(1);
     expect(hits[0]?.node.alias).toBe("landingPage");
@@ -58,11 +61,19 @@ describe("searchNodes", () => {
 
   it("ranks an exact alias above a partial one and above a property match", () => {
     const hits = searchNodes(
-      [node("heroBanner", ["heroImage"]), node("carousel", ["hero"]), node("hero")],
-      "hero",
+      [
+        node("heroBanner", ["heroImage"]),
+        node("carousel", ["hero"]),
+        node("hero"),
+      ],
+      "hero"
     );
 
-    expect(hits.map((hit) => hit.node.alias)).toEqual(["hero", "heroBanner", "carousel"]);
+    expect(hits.map((hit) => hit.node.alias)).toEqual([
+      "hero",
+      "heroBanner",
+      "carousel",
+    ]);
     expect(hits[1]?.propertyAlias).toBeNull();
     expect(hits[2]?.propertyAlias).toBe("hero");
   });

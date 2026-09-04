@@ -46,7 +46,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         does: "Pan the view. In Free, turn it: swing the view up, left, down, right",
       },
       { keys: ["R", "F"], does: "Rise and descend, in Free" },
-      { keys: ["Shift"], does: "Hold alongside any of these to go twice as fast" },
+      {
+        keys: ["Shift"],
+        does: "Hold alongside any of these to go twice as fast",
+      },
       { keys: ["Home"], does: "Reframe the city" },
     ],
   },
@@ -101,7 +104,12 @@ export function Help({
       <DialogTrigger
         aria-label="Control reference"
         render={
-          <Button className="text-xs" data-trigger size="icon-sm" variant="outline" />
+          <Button
+            className="text-xs"
+            data-trigger
+            size="icon-sm"
+            variant="outline"
+          />
         }
       >
         ?
@@ -125,6 +133,7 @@ export function Help({
             too. Borrowed from fsn's help screen, along with the group rules. */}
         <div
           className="max-h-[60vh] overflow-y-auto bg-panel-sunken px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-phosphor-bright"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable pane has to be reachable by keyboard.
           tabIndex={0}
         >
           {GROUPS.map((group) => (

@@ -22,7 +22,9 @@ test("W pans the view up the screen, whichever way the camera is turned", () => 
     // Up the screen along the ground is the view direction flattened, so the camera
     // moving that way closes on the point it was looking at.
     const closing = { x: from.x + velocity.x, z: from.z + velocity.z };
-    expect(Math.hypot(closing.x, closing.z)).toBeLessThan(Math.hypot(from.x, from.z));
+    expect(Math.hypot(closing.x, closing.z)).toBeLessThan(
+      Math.hypot(from.x, from.z)
+    );
     expect(velocity.y).toBe(0);
   }
 });
@@ -44,25 +46,40 @@ test("the arrows pan in isometric and do nothing to movement in Explore", () => 
   const arrows = desiredVelocity(held("ArrowUp"), axes, 10, "pan");
   const keys = desiredVelocity(held("KeyW"), axes, 10, "pan");
   expect(arrows).toEqual(keys);
-  expect(desiredVelocity(held("ArrowUp"), axes, 10, "fly")).toEqual({ x: 0, y: 0, z: 0 });
-});
-
-test("a diagonal is no faster than one key, and holding both ways stands still", () => {
-  const axes = groundAxes(ISO.from, ISO.to);
-  const diagonal = desiredVelocity(held("KeyW", "KeyD"), axes, FLY_SPEED, "fly");
-  expect(Math.hypot(diagonal.x, diagonal.y, diagonal.z)).toBeCloseTo(FLY_SPEED);
-  expect(desiredVelocity(held("KeyW", "KeyS"), axes, FLY_SPEED, "fly")).toEqual({
+  expect(desiredVelocity(held("ArrowUp"), axes, 10, "fly")).toEqual({
     x: 0,
     y: 0,
     z: 0,
   });
 });
 
+test("a diagonal is no faster than one key, and holding both ways stands still", () => {
+  const axes = groundAxes(ISO.from, ISO.to);
+  const diagonal = desiredVelocity(
+    held("KeyW", "KeyD"),
+    axes,
+    FLY_SPEED,
+    "fly"
+  );
+  expect(Math.hypot(diagonal.x, diagonal.y, diagonal.z)).toBeCloseTo(FLY_SPEED);
+  expect(desiredVelocity(held("KeyW", "KeyS"), axes, FLY_SPEED, "fly")).toEqual(
+    {
+      x: 0,
+      y: 0,
+      z: 0,
+    }
+  );
+});
+
 test("R rises and F descends, in Explore only", () => {
   const axes = groundAxes(ISO.from, ISO.to);
   expect(desiredVelocity(held("KeyR"), axes, 10, "fly").y).toBeCloseTo(10);
   expect(desiredVelocity(held("KeyF"), axes, 10, "fly").y).toBeCloseTo(-10);
-  expect(desiredVelocity(held("KeyR"), axes, 10, "pan")).toEqual({ x: 0, y: 0, z: 0 });
+  expect(desiredVelocity(held("KeyR"), axes, 10, "pan")).toEqual({
+    x: 0,
+    y: 0,
+    z: 0,
+  });
 });
 
 test("a pan covers the same screen distance at any zoom", () => {
@@ -75,7 +92,8 @@ test("a pan covers the same screen distance at any zoom", () => {
 test("velocity eases in and out at the same rate whatever the frame rate", () => {
   const step = (frames: number, delta: number) => {
     let velocity = 0;
-    for (let frame = 0; frame < frames; frame++) velocity = approach(velocity, 20, delta);
+    for (let frame = 0; frame < frames; frame++)
+      velocity = approach(velocity, 20, delta);
     return velocity;
   };
   // Half a second of flight at 60 fps and at 20 fps.
@@ -87,14 +105,19 @@ test("velocity eases in and out at the same rate whatever the frame rate", () =>
 
 test("the arrows turn left, right, up and down", () => {
   expect(turnRates(held("ArrowLeft"))).toEqual({ yaw: 1, pitch: 0 });
-  expect(turnRates(held("ArrowRight", "ArrowDown"))).toEqual({ yaw: -1, pitch: -1 });
+  expect(turnRates(held("ArrowRight", "ArrowDown"))).toEqual({
+    yaw: -1,
+    pitch: -1,
+  });
   expect(turnRates(held("KeyW"))).toEqual({ yaw: 0, pitch: 0 });
 });
 
 test("a turn keeps the camera where it is and holds its distance", () => {
   const offset = { x: 0, y: 6, z: 10 };
   const turned = turnedOffset(offset, 0.3, 0.1, Math.PI / 2);
-  expect(Math.hypot(turned.x, turned.y, turned.z)).toBeCloseTo(Math.hypot(0, 6, 10));
+  expect(Math.hypot(turned.x, turned.y, turned.z)).toBeCloseTo(
+    Math.hypot(0, 6, 10)
+  );
   // Yawing left swings the target to the left of the view, which is the offset
   // rotating the other way about the camera.
   expect(turned.x).toBeGreaterThan(0);

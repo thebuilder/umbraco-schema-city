@@ -21,7 +21,9 @@ const ALL_LAYERS = "structure,compositions,blocks,references";
 const targets = await (await fetch(`${CDP}/json/list`)).json();
 const page = targets.find((t) => t.type === "page");
 const ws = new WebSocket(page.webSocketDebuggerUrl);
-await new Promise((resolve) => (ws.onopen = resolve));
+await new Promise((resolve) => {
+  ws.onopen = resolve;
+});
 
 let id = 0;
 const pending = new Map();
@@ -39,10 +41,16 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Evaluate in the page and throw on anything the expression reports as a miss. */
 async function run(expression) {
-  const result = await send("Runtime.evaluate", { expression, awaitPromise: true });
+  const result = await send("Runtime.evaluate", {
+    expression,
+    awaitPromise: true,
+  });
   const value = result.result?.value;
-  if (result.exceptionDetails) throw new Error(expression + ": " + JSON.stringify(result.exceptionDetails));
-  if (value === "miss") throw new Error("no element for: " + expression);
+  if (result.exceptionDetails)
+    throw new Error(
+      `${expression}: ${JSON.stringify(result.exceptionDetails)}`
+    );
+  if (value === "miss") throw new Error(`no element for: ${expression}`);
   return value;
 }
 
@@ -58,12 +66,20 @@ const clickButton = (pattern, nth = 1) =>
 /** Drag across the canvas, which turns the camera's azimuth and its elevation. */
 async function orbit(from, to) {
   const at = (type, [x, y]) =>
-    send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: 1, clickCount: 1 });
+    send("Input.dispatchMouseEvent", {
+      type,
+      x,
+      y,
+      button: "left",
+      buttons: 1,
+      clickCount: 1,
+    });
   const step = (i) => [
     from[0] + ((to[0] - from[0]) * i) / 12,
     from[1] + ((to[1] - from[1]) * i) / 12,
   ];
   await at("mousePressed", from);
+  // biome-ignore lint/performance/noAwaitInLoops: the drag is one ordered stream of moves.
   for (let i = 1; i <= 12; i++) await at("mouseMoved", step(i));
   await at("mouseReleased", to);
 }
@@ -128,6 +144,7 @@ await send("Emulation.setDeviceMetricsOverride", {
 
 for (const shot of shots) {
   if (only.length > 0 && !only.includes(shot.name)) continue;
+  // biome-ignore lint/performance/noAwaitInLoops: one browser, so the shots are taken one at a time.
   await send("Page.navigate", { url: HARNESS + shot.query });
   // The fixture fetch, the lazy scene chunk, layout, and the 700 ms establishing flight.
   await wait(7000);

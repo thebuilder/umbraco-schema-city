@@ -57,7 +57,7 @@ const LOOP_SEGMENTS = 14;
 const LANE_STEP = 0.35;
 const EPS = 1e-6;
 /** More allowed parents than this and the overview draws one road and a count. */
-export const FAN_LIMIT = 3;
+const FAN_LIMIT = 3;
 
 /**
  * `positions` is a flat xyz triangle list. `ranges` marks which vertices came from
@@ -67,7 +67,7 @@ export const FAN_LIMIT = 3;
  */
 export function buildRoadGeometry(
   placementsById: Map<string, Placement>,
-  edges: SchemaEdge[],
+  edges: SchemaEdge[]
 ): { positions: Float32Array; ranges: RoadRange[] } {
   const positions: number[] = [];
   const ranges: RoadRange[] = [];
@@ -75,7 +75,11 @@ export function buildRoadGeometry(
   for (const segment of planRoads(placementsById, edges)) {
     const start = positions.length / 3;
     pushSegment(positions, segment);
-    ranges.push({ edges: segment.edges, start, count: positions.length / 3 - start });
+    ranges.push({
+      edges: segment.edges,
+      start,
+      count: positions.length / 3 - start,
+    });
   }
 
   for (const edge of edges) {
@@ -94,7 +98,7 @@ export function buildRoadGeometry(
 /** Every road as axis-aligned runs, with runs that lie on top of each other merged. */
 export function planRoads(
   placementsById: Map<string, Placement>,
-  edges: SchemaEdge[],
+  edges: SchemaEdge[]
 ): RoadSegment[] {
   const grid = roadGrid(placementsById.values());
   const runs: RoadSegment[] = [];
@@ -109,7 +113,7 @@ export function planRoads(
     if (edge.kind !== "allowedChild" || edge.from === edge.to) continue;
     const from = placementsById.get(edge.from);
     const to = placementsById.get(edge.to);
-    if (!from || !to) continue;
+    if (!(from && to)) continue;
 
     const streets = streetsBetween(grid, from, to);
     const trunk = streets[0] as number;
@@ -121,7 +125,12 @@ export function planRoads(
       laneOf.set(key, lane);
     }
 
-    const points = routePoints(grid, from, to, laneOffset(lane, grid.halves[trunk] ?? 0));
+    const points = routePoints(
+      grid,
+      from,
+      to,
+      laneOffset(lane, grid.halves[trunk] ?? 0)
+    );
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1] as { x: number; z: number };
       const b = points[i] as { x: number; z: number };
@@ -132,7 +141,10 @@ export function planRoads(
         x1: b.x,
         z1: b.z,
         edges: [edge],
-        into: i === points.length - 1 ? { x: to.position.x, z: to.position.z } : null,
+        into:
+          i === points.length - 1
+            ? { x: to.position.x, z: to.position.z }
+            : null,
       });
     }
   }
@@ -171,7 +183,7 @@ export function roadGrid(placements: Iterable<Placement>): RoadGrid {
         ? (above[1] + below[0]) / 2
         : below
           ? below[0] - STREET / 2
-          : (above as [number, number])[1] + STREET / 2,
+          : (above as [number, number])[1] + STREET / 2
     );
     halves.push(Math.max(0, gap / 2 - ROAD_WIDTH));
   }
@@ -196,7 +208,7 @@ export function routePoints(
   grid: RoadGrid,
   from: Placement,
   to: Placement,
-  lane = 0,
+  lane = 0
 ): { x: number; z: number }[] {
   const streets = streetsBetween(grid, from, to);
   const down = grid.rowAt(to.position.z) > grid.rowAt(from.position.z);
@@ -204,7 +216,8 @@ export function routePoints(
   // A road leaves the face that points at the street it drops to, and enters the
   // face the street arrives at. Folding a rank onto rows puts some children north
   // of their parent, so both directions happen inside one district.
-  const exitZ = from.position.z + (down || sameRow ? 1 : -1) * (from.footprint / 2);
+  const exitZ =
+    from.position.z + (down || sameRow ? 1 : -1) * (from.footprint / 2);
   const enterZ = to.position.z + (down ? -1 : 1) * (to.footprint / 2);
 
   const points = [{ x: from.position.x, z: exitZ }];
@@ -236,7 +249,7 @@ export type RoadFan = {
 export function roadFan(
   placementsById: Map<string, Placement>,
   edges: SchemaEdge[],
-  expanded: ReadonlySet<string> | null,
+  expanded: ReadonlySet<string> | null
 ): RoadFan {
   if (expanded === null) return { edges, markers: [] };
 
@@ -244,7 +257,8 @@ export function roadFan(
   const fans = new Map<string, SchemaEdge[]>();
   for (const edge of edges) {
     if (edge.kind !== "allowedChild" || edge.from === edge.to) continue;
-    if (!placementsById.has(edge.from) || !placementsById.has(edge.to)) continue;
+    if (!(placementsById.has(edge.from) && placementsById.has(edge.to)))
+      continue;
     const fan = fans.get(edge.to);
     if (fan) fan.push(edge);
     else fans.set(edge.to, [edge]);
@@ -254,7 +268,9 @@ export function roadFan(
   const markers: { id: string; hidden: number }[] = [];
   for (const [child, fan] of fans) {
     if (fan.length <= FAN_LIMIT || expanded.has(child)) continue;
-    const childRow = grid.rowAt((placementsById.get(child) as Placement).position.z);
+    const childRow = grid.rowAt(
+      (placementsById.get(child) as Placement).position.z
+    );
     const parent = (id: string) => placementsById.get(id) as Placement;
     // The nearest parent is the one whose road crosses fewest streets, and the
     // leftmost of those, so the road that stays is the shortest and the answer does
@@ -263,7 +279,7 @@ export function roadFan(
       (a, b) =>
         Math.abs(grid.rowAt(parent(a.from).position.z) - childRow) -
           Math.abs(grid.rowAt(parent(b.from).position.z) - childRow) ||
-        parent(a.from).position.x - parent(b.from).position.x,
+        parent(a.from).position.x - parent(b.from).position.x
     )[0] as SchemaEdge;
     for (const edge of fan) if (edge !== nearest) dropped.add(edge);
     markers.push({ id: child, hidden: fan.length - 1 });
@@ -273,7 +289,11 @@ export function roadFan(
 }
 
 /** The streets a road crosses, in travel order. Never empty. */
-function streetsBetween(grid: RoadGrid, from: Placement, to: Placement): number[] {
+function streetsBetween(
+  grid: RoadGrid,
+  from: Placement,
+  to: Placement
+): number[] {
   const rowFrom = grid.rowAt(from.position.z);
   const rowTo = grid.rowAt(to.position.z);
   // Two buildings in one row still meet in the street below it, which draws as a
@@ -310,9 +330,13 @@ function mergeRuns(runs: RoadSegment[]): RoadSegment[] {
 
   const merged: RoadSegment[] = [];
   for (const bucket of buckets.values()) {
-    const vertical = Math.abs((bucket[0] as RoadSegment).x1 - (bucket[0] as RoadSegment).x0) < EPS;
-    const low = (run: RoadSegment) => (vertical ? Math.min(run.z0, run.z1) : Math.min(run.x0, run.x1));
-    const high = (run: RoadSegment) => (vertical ? Math.max(run.z0, run.z1) : Math.max(run.x0, run.x1));
+    const vertical =
+      Math.abs((bucket[0] as RoadSegment).x1 - (bucket[0] as RoadSegment).x0) <
+      EPS;
+    const low = (run: RoadSegment) =>
+      vertical ? Math.min(run.z0, run.z1) : Math.min(run.x0, run.x1);
+    const high = (run: RoadSegment) =>
+      vertical ? Math.max(run.z0, run.z1) : Math.max(run.x0, run.x1);
     let open: RoadSegment | null = null;
     let end = 0;
     for (const run of [...bucket].sort((a, b) => low(a) - low(b))) {
@@ -365,16 +389,30 @@ function pushSegment(positions: number[], segment: RoadSegment) {
 
   pushQuad(
     positions,
-    startX + perpX * half, ROAD_Y, startZ + perpZ * half,
-    startX - perpX * half, ROAD_Y, startZ - perpZ * half,
-    endX - perpX * half, ROAD_Y, endZ - perpZ * half,
-    endX + perpX * half, ROAD_Y, endZ + perpZ * half,
+    startX + perpX * half,
+    ROAD_Y,
+    startZ + perpZ * half,
+    startX - perpX * half,
+    ROAD_Y,
+    startZ - perpZ * half,
+    endX - perpX * half,
+    ROAD_Y,
+    endZ - perpZ * half,
+    endX + perpX * half,
+    ROAD_Y,
+    endZ + perpZ * half
   );
 
   if (!segment.into) return;
   // Chevrons ride the last run before the child, pointing the way the edge goes.
-  const toEnd = Math.hypot(segment.into.x - segment.x1, segment.into.z - segment.z1);
-  const toStart = Math.hypot(segment.into.x - segment.x0, segment.into.z - segment.z0);
+  const toEnd = Math.hypot(
+    segment.into.x - segment.x1,
+    segment.into.z - segment.z1
+  );
+  const toStart = Math.hypot(
+    segment.into.x - segment.x0,
+    segment.into.z - segment.z0
+  );
   const flip = toStart < toEnd ? -1 : 1;
   const run = Math.min(length, CHEVRON_RUN);
   const steps = Math.max(1, Math.floor(run / CHEVRON_SPACING));
@@ -390,7 +428,7 @@ function pushSegment(positions: number[], segment: RoadSegment) {
       dirX * flip,
       dirZ * flip,
       perpX * flip,
-      perpZ * flip,
+      perpZ * flip
     );
   }
 }
@@ -402,7 +440,7 @@ function pushChevron(
   dirX: number,
   dirZ: number,
   perpX: number,
-  perpZ: number,
+  perpZ: number
 ) {
   const tipX = px + dirX * (CHEVRON_LENGTH / 2);
   const tipZ = pz + dirZ * (CHEVRON_LENGTH / 2);
@@ -410,9 +448,15 @@ function pushChevron(
   const backZ = pz - dirZ * (CHEVRON_LENGTH / 2);
   pushTriangle(
     positions,
-    tipX, CHEVRON_Y, tipZ,
-    backX + perpX * CHEVRON_HALF_WIDTH, CHEVRON_Y, backZ + perpZ * CHEVRON_HALF_WIDTH,
-    backX - perpX * CHEVRON_HALF_WIDTH, CHEVRON_Y, backZ - perpZ * CHEVRON_HALF_WIDTH,
+    tipX,
+    CHEVRON_Y,
+    tipZ,
+    backX + perpX * CHEVRON_HALF_WIDTH,
+    CHEVRON_Y,
+    backZ + perpZ * CHEVRON_HALF_WIDTH,
+    backX - perpX * CHEVRON_HALF_WIDTH,
+    CHEVRON_Y,
+    backZ - perpZ * CHEVRON_HALF_WIDTH
   );
 }
 
@@ -427,19 +471,33 @@ function pushLoop(positions: number[], at: Placement) {
     const a1 = ((i + 1) / LOOP_SEGMENTS) * Math.PI * 2;
     pushQuad(
       positions,
-      cx + Math.cos(a0) * outer, ROAD_Y, cz + Math.sin(a0) * outer,
-      cx + Math.cos(a0) * inner, ROAD_Y, cz + Math.sin(a0) * inner,
-      cx + Math.cos(a1) * inner, ROAD_Y, cz + Math.sin(a1) * inner,
-      cx + Math.cos(a1) * outer, ROAD_Y, cz + Math.sin(a1) * outer,
+      cx + Math.cos(a0) * outer,
+      ROAD_Y,
+      cz + Math.sin(a0) * outer,
+      cx + Math.cos(a0) * inner,
+      ROAD_Y,
+      cz + Math.sin(a0) * inner,
+      cx + Math.cos(a1) * inner,
+      ROAD_Y,
+      cz + Math.sin(a1) * inner,
+      cx + Math.cos(a1) * outer,
+      ROAD_Y,
+      cz + Math.sin(a1) * outer
     );
   }
 }
 
 function pushTriangle(
   positions: number[],
-  ax: number, ay: number, az: number,
-  bx: number, by: number, bz: number,
-  cx: number, cy: number, cz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  cx: number,
+  cy: number,
+  cz: number
 ) {
   positions.push(ax, ay, az, bx, by, bz, cx, cy, cz);
 }
@@ -448,10 +506,18 @@ function pushTriangle(
 // road material double-sided instead, which costs nothing on this little geometry.
 function pushQuad(
   positions: number[],
-  ax: number, ay: number, az: number,
-  bx: number, by: number, bz: number,
-  cx: number, cy: number, cz: number,
-  dx: number, dy: number, dz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  cx: number,
+  cy: number,
+  cz: number,
+  dx: number,
+  dy: number,
+  dz: number
 ) {
   pushTriangle(positions, ax, ay, az, bx, by, bz, cx, cy, cz);
   pushTriangle(positions, ax, ay, az, cx, cy, cz, dx, dy, dz);

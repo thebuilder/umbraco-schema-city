@@ -72,7 +72,11 @@ export function panSpeed(pixelsPerUnit: number): number {
  * Frame-rate independent ease toward `desired`, in seconds. Lerping by a constant
  * per frame instead would tie the feel to the frame rate.
  */
-export function approach(current: number, desired: number, delta: number): number {
+export function approach(
+  current: number,
+  desired: number,
+  delta: number
+): number {
   return current + (desired - current) * (1 - EASE_REMAINING ** delta);
 }
 
@@ -84,11 +88,15 @@ export function approach(current: number, desired: number, delta: number): numbe
  *
  * Looking straight down leaves no heading, so the fallback is north.
  */
-export function groundAxes(from: Vec3, to: Vec3): { forward: Ground; right: Ground } {
+export function groundAxes(
+  from: Vec3,
+  to: Vec3
+): { forward: Ground; right: Ground } {
   const x = to.x - from.x;
   const z = to.z - from.z;
   const length = Math.hypot(x, z);
-  const forward = length < 1e-6 ? { x: 0, z: -1 } : { x: x / length, z: z / length };
+  const forward =
+    length < 1e-6 ? { x: 0, z: -1 } : { x: x / length, z: z / length };
   // right = forward × up, which for a ground vector is a quarter turn.
   return { forward, right: { x: -forward.z, z: forward.x } };
 }
@@ -105,13 +113,14 @@ export function desiredVelocity(
   held: ReadonlySet<string>,
   axes: { forward: Ground; right: Ground },
   speed: number,
-  mode: "pan" | "fly",
+  mode: "pan" | "fly"
 ): Vec3 {
   const on = (fly: string, arrow: string) =>
     held.has(fly) || (mode === "pan" && held.has(arrow)) ? 1 : 0;
   const forward = on("KeyW", "ArrowUp") - on("KeyS", "ArrowDown");
   const right = on("KeyD", "ArrowRight") - on("KeyA", "ArrowLeft");
-  const up = mode === "fly" ? Number(held.has("KeyR")) - Number(held.has("KeyF")) : 0;
+  const up =
+    mode === "fly" ? Number(held.has("KeyR")) - Number(held.has("KeyF")) : 0;
   const length = Math.hypot(forward, right, up);
   if (length === 0) return { x: 0, y: 0, z: 0 };
   const scale = speed / length;
@@ -123,7 +132,10 @@ export function desiredVelocity(
 }
 
 /** How hard the arrows are turning, from -1 to 1. Explore only. */
-export function turnRates(held: ReadonlySet<string>): { yaw: number; pitch: number } {
+export function turnRates(held: ReadonlySet<string>): {
+  yaw: number;
+  pitch: number;
+} {
   return {
     yaw: Number(held.has("ArrowLeft")) - Number(held.has("ArrowRight")),
     pitch: Number(held.has("ArrowUp")) - Number(held.has("ArrowDown")),
@@ -143,14 +155,14 @@ export function turnedOffset(
   offset: Vec3,
   yaw: number,
   pitch: number,
-  maxPolar: number,
+  maxPolar: number
 ): Vec3 {
   const radius = Math.hypot(offset.x, offset.y, offset.z);
   if (radius < 1e-6) return offset;
   const theta = Math.atan2(offset.x, offset.z) + yaw;
   const phi = Math.min(
     Math.max(Math.acos(offset.y / radius) + pitch, POLAR_MARGIN),
-    maxPolar - POLAR_MARGIN,
+    maxPolar - POLAR_MARGIN
   );
   return {
     x: radius * Math.sin(phi) * Math.sin(theta),

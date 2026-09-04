@@ -22,7 +22,7 @@ const node = (alias: string): SchemaNode => ({
 
 const graph = (
   aliases: string[],
-  edges: SchemaGraph["edges"],
+  edges: SchemaGraph["edges"]
 ): SchemaGraph => ({
   generatedAt: "2026-09-03T00:00:00Z",
   folders: [],
@@ -38,8 +38,8 @@ describe("neighbourhoods", () => {
         [
           { kind: "allowedChild", from: "home", to: "page" },
           { kind: "allowedChild", from: "home", to: "widget" },
-        ],
-      ),
+        ]
+      )
     );
 
     expect(map.get("home")?.allowedChildren).toEqual(["page", "widget"]);
@@ -55,8 +55,8 @@ describe("neighbourhoods", () => {
           { kind: "block", from: "page", to: "quote", propertyAlias: "body" },
           { kind: "block", from: "page", to: "card", propertyAlias: "body" },
           { kind: "block", from: "page", to: "card", propertyAlias: "aside" },
-        ],
-      ),
+        ]
+      )
     );
 
     expect(map.get("page")?.blockTargets).toEqual([
@@ -71,13 +71,21 @@ describe("neighbourhoods", () => {
       graph(
         ["page", "card"],
         [
-          { kind: "block", from: "page", to: "deleted-key", propertyAlias: "body" },
+          {
+            kind: "block",
+            from: "page",
+            to: "deleted-key",
+            propertyAlias: "body",
+          },
           { kind: "block", from: "page", to: "card", propertyAlias: "body" },
-        ],
-      ),
+        ]
+      )
     );
 
-    expect(map.get("page")?.blockTargets[0]?.ids).toEqual(["card", "deleted-key"]);
+    expect(map.get("page")?.blockTargets[0]?.ids).toEqual([
+      "card",
+      "deleted-key",
+    ]);
   });
 
   it("separates references out from references in, and compositions from inherits", () => {
@@ -85,11 +93,16 @@ describe("neighbourhoods", () => {
       graph(
         ["page", "article", "base"],
         [
-          { kind: "reference", from: "page", to: "article", propertyAlias: "related" },
+          {
+            kind: "reference",
+            from: "page",
+            to: "article",
+            propertyAlias: "related",
+          },
           { kind: "composition", from: "page", to: "base" },
           { kind: "inherits", from: "page", to: "base" },
-        ],
-      ),
+        ]
+      )
     );
 
     expect(map.get("page")?.referencesOut).toEqual([

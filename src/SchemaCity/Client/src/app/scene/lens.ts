@@ -59,7 +59,7 @@ export type LensScale = {
 export function lensScale(
   graph: SchemaGraph,
   usage: UsageReport | undefined,
-  lens: Lens,
+  lens: Lens
 ): LensScale | null {
   if (!usage || lens === "none") return null;
 
@@ -70,7 +70,7 @@ export function lensScale(
       graph.nodes.map((node) => [
         node.id,
         !node.isElement && (usage.byType[node.id]?.total ?? 0) === 0 ? 1 : 0,
-      ]),
+      ])
     );
     return { ramp: "binary", t, minLabel: "in use", maxLabel: "no content" };
   }
@@ -84,16 +84,24 @@ export function lensScale(
       if (node.isElement || !found || found.total === 0) continue;
       t.set(node.id, found.published / found.total);
     }
-    return { ramp: "diverging", t, minLabel: "0% published", maxLabel: "100% published" };
+    return {
+      ramp: "diverging",
+      t,
+      minLabel: "0% published",
+      maxLabel: "100% published",
+    };
   }
 
   const incoming = new Map<string, number>();
   if (lens === "references") {
     for (const reference of usage.references) {
-      incoming.set(reference.toType, (incoming.get(reference.toType) ?? 0) + reference.count);
+      incoming.set(
+        reference.toType,
+        (incoming.get(reference.toType) ?? 0) + reference.count
+      );
     }
   }
-  const valueOf = (id: string) => {
+  const valueFor = (id: string) => {
     const found = usage.byType[id];
     if (lens === "count") return found?.total ?? 0;
     if (lens === "cultures") return found?.cultures.length ?? 0;
@@ -103,7 +111,7 @@ export function lensScale(
   const values = new Map<string, number>();
   for (const node of graph.nodes) {
     if (node.isElement) continue;
-    values.set(node.id, valueOf(node.id));
+    values.set(node.id, valueFor(node.id));
   }
   if (values.size === 0) return null;
 
@@ -111,7 +119,8 @@ export function lensScale(
   const max = Math.max(...values.values());
   const span = max - min;
   const t = new Map<string, number>();
-  for (const [id, value] of values) t.set(id, span === 0 ? 0 : (value - min) / span);
+  for (const [id, value] of values)
+    t.set(id, span === 0 ? 0 : (value - min) / span);
 
   return {
     ramp: "sequential",
@@ -122,7 +131,10 @@ export function lensScale(
 }
 
 /** The badge over the selected building's roof, or null when usage has no row for it. */
-export function usageBadge(usage: UsageReport | undefined, id: string): string | null {
+export function usageBadge(
+  usage: UsageReport | undefined,
+  id: string
+): string | null {
   const found = usage?.byType[id];
   if (!found) return null;
   return `${found.total.toLocaleString()} · ${found.published.toLocaleString()} published`;

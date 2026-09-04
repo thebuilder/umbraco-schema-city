@@ -1,4 +1,12 @@
-import { lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -42,11 +50,20 @@ import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
-import { Inspector, INSPECTOR_WIDTH } from "./Inspector";
+import { INSPECTOR_WIDTH, Inspector } from "./Inspector";
+import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
+import {
+  LENS_LABEL,
+  LENSES,
+  type Lens,
+  lensScale,
+  type Ramp,
+} from "./scene/lens";
 import { TypeTable } from "./TypeTable";
-import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
-import { type Lens, LENS_LABEL, LENSES, lensScale, type Ramp } from "./scene/lens";
 import { parseUrl, type UrlState, urlToWrite, type View } from "./url";
+
+/** The tag names whose own keyboard handling wins over the shortcut keys. */
+const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
 
 const LAYER_LABEL: Record<Layer, string> = {
   structure: "Structure",
@@ -60,7 +77,9 @@ const LAYER_LABEL: Record<Layer, string> = {
  * the URL writes its layers in toolbar order however they were switched on.
  */
 const withLayer = (on: Layer[], layer: Layer): Layer[] =>
-  LAYERS.filter((name) => (name === layer ? !on.includes(name) : on.includes(name)));
+  LAYERS.filter((name) =>
+    name === layer ? !on.includes(name) : on.includes(name)
+  );
 
 /** One edge style, drawn the way the scene draws it. */
 function EdgeMark({
@@ -91,7 +110,13 @@ function EdgeMark({
   );
 }
 
-function LegendRow({ mark, children }: { mark: ReactNode; children: ReactNode }) {
+function LegendRow({
+  mark,
+  children,
+}: {
+  mark: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <li className="flex items-center gap-2.5">
       <span className="flex w-7 shrink-0 justify-center">{mark}</span>
@@ -118,16 +143,23 @@ function Legend() {
       <section>
         <LegendTitle>Buildings</LegendTitle>
         <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
-          <LegendRow mark={<Tint className="bg-phosphor" />}>Own property group</LegendRow>
-          <LegendRow mark={<Tint className="bg-phosphor/45" />}>Composed group</LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor" />}>
+            Own property group
+          </LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor/45" />}>
+            Composed group
+          </LegendRow>
           <LegendRow mark={<Tint className="bg-amber" />}>
             Element Type, until a lens is on
           </LegendRow>
-          <LegendRow mark={<Tint className="bg-phosphor-dim" />}>Root plaza</LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor-dim" />}>
+            Root plaza
+          </LegendRow>
           <LegendRow mark={<Tint className="bg-signal" />}>Selected</LegendRow>
         </ul>
         <p className="mt-2 text-muted-foreground text-xs">
-          One floor per property group, and a wider footprint for more own properties.
+          One floor per property group, and a wider footprint for more own
+          properties.
         </p>
       </section>
 
@@ -136,12 +168,17 @@ function Legend() {
         <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
           <LegendRow
             mark={
-              <EdgeMark className="text-phosphor-dim" d="M1 6 H25 M13 3 L17 6 L13 9" />
+              <EdgeMark
+                className="text-phosphor-dim"
+                d="M1 6 H25 M13 3 L17 6 L13 9"
+              />
             }
           >
             Allowed child, in the arrow's direction
           </LegendRow>
-          <LegendRow mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" />}>
+          <LegendRow
+            mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" />}
+          >
             Composition
           </LegendRow>
           <LegendRow
@@ -154,10 +191,14 @@ function Legend() {
           >
             Inheritance
           </LegendRow>
-          <LegendRow mark={<EdgeMark className="text-amber" d="M1 1 Q13 13 25 1" />}>
+          <LegendRow
+            mark={<EdgeMark className="text-amber" d="M1 1 Q13 13 25 1" />}
+          >
             Block target, dipping to the Element district
           </LegendRow>
-          <LegendRow mark={<EdgeMark className="text-violet" d="M1 6 H25" dashed />}>
+          <LegendRow
+            mark={<EdgeMark className="text-violet" d="M1 6 H25" dashed />}
+          >
             Picker reference
           </LegendRow>
         </ul>
@@ -211,12 +252,16 @@ export function App({
 }) {
   const [start] = useState(() => {
     const state =
-      initial ?? parseUrl(window.location.search, graph.nodes.map((node) => node.alias));
-    const node =
+      initial ??
+      parseUrl(
+        window.location.search,
+        graph.nodes.map((node) => node.alias)
+      );
+    const found =
       graph.nodes.find((candidate) => candidate.id === state.type) ??
       graph.nodes.find((candidate) => candidate.alias === state.type);
     return {
-      id: node?.id ?? null,
+      id: found?.id ?? null,
       focus: state.focus === true,
       layers: state.layers ?? [...DEFAULT_LAYERS],
       lens: state.lens ?? "none",
@@ -224,7 +269,9 @@ export function App({
     };
   });
   const [selected, setSelected] = useState<string | null>(start.id);
-  const [focus, setFocus] = useState<string | null>(start.focus ? start.id : null);
+  const [focus, setFocus] = useState<string | null>(
+    start.focus ? start.id : null
+  );
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
@@ -252,11 +299,11 @@ export function App({
       // The event that crossed a shadow boundary reports the host as its target, so
       // ask the path where it actually started. A field being typed into keeps every
       // letter below, and so does anything inside a dialog or a drawer.
-      const from = event.composedPath()[0];
+      const [from] = event.composedPath();
       if (
         from instanceof HTMLElement &&
         (from.isContentEditable ||
-          /^(INPUT|TEXTAREA|SELECT)$/.test(from.tagName) ||
+          FIELD.test(from.tagName) ||
           from.closest('[role="dialog"]'))
       ) {
         return;
@@ -300,15 +347,15 @@ export function App({
     return () => document.removeEventListener("keydown", onKey);
   }, [paletteOpen, helpOpen, selected, focus]);
 
-  const nodes = graph.nodes;
+  const { nodes } = graph;
   const nodesById = useMemo(
     () => new Map(nodes.map((node) => [node.id, node])),
-    [nodes],
+    [nodes]
   );
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
   const aliasById = useMemo(
     () => new Map(nodes.map((node) => [node.id, node.alias])),
-    [nodes],
+    [nodes]
   );
 
   // A host that placed the app somewhere, like the Relationships tab on the
@@ -330,7 +377,7 @@ export function App({
     // another. That selection is the one thing here a link cannot carry back.
     const at = focus ?? selected;
     const state: UrlState = {
-      type: at ? aliasById.get(at) ?? null : null,
+      type: at ? (aliasById.get(at) ?? null) : null,
       focus: focus !== null,
       layers,
       lens,
@@ -345,21 +392,23 @@ export function App({
   // list of every type that a query narrows, not as a box that waits to be fed.
   const byName = useMemo(
     () => [...nodes].sort((a, b) => a.name.localeCompare(b.name)),
-    [nodes],
+    [nodes]
   );
   const hits = useMemo(
     () =>
       query.trim() === ""
         ? byName.map((node) => ({ node, propertyAlias: null }))
         : searchNodes(nodes, query, nodes.length),
-    [byName, nodes, query],
+    [byName, nodes, query]
   );
   // The district each type would stand in, from the graph alone: the palette has no
   // placements, and this is the same three-way split the layout makes. A type nothing
   // can create and nothing points at is detached, which is the dim swatch.
   const swatchOf = useMemo(() => {
     const placeable = new Set(
-      (graph.edges ?? []).filter((edge) => edge.kind === "allowedChild").map((edge) => edge.to),
+      (graph.edges ?? [])
+        .filter((edge) => edge.kind === "allowedChild")
+        .map((edge) => edge.to)
     );
     return (node: (typeof nodes)[number]) =>
       node.isElement
@@ -369,7 +418,10 @@ export function App({
           : "bg-phosphor-dim";
   }, [graph.edges]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
-  const scale = useMemo(() => lensScale(graph, usage, lens), [graph, usage, lens]);
+  const scale = useMemo(
+    () => lensScale(graph, usage, lens),
+    [graph, usage, lens]
+  );
   const selectedNode = selected ? nodesById.get(selected) : undefined;
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
 
@@ -439,7 +491,9 @@ export function App({
                 <DropdownMenuCheckboxItem
                   checked={layers.includes(layer)}
                   key={layer}
-                  onCheckedChange={() => setLayers((on) => withLayer(on, layer))}
+                  onCheckedChange={() =>
+                    setLayers((on) => withLayer(on, layer))
+                  }
                 >
                   {LAYER_LABEL[layer]}
                   <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
@@ -488,13 +542,17 @@ export function App({
             <Tooltip>
               <TooltipTrigger
                 render={
+                  // biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads.
                   <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
                 }
               >
                 Lens
                 <Select
                   disabled={!usage}
-                  items={LENSES.map((name) => ({ label: LENS_LABEL[name], value: name }))}
+                  items={LENSES.map((name) => ({
+                    label: LENS_LABEL[name],
+                    value: name,
+                  }))}
                   onValueChange={(value) => setLens(value as Lens)}
                   value={lens}
                 >
@@ -519,11 +577,17 @@ export function App({
                 </Select>
               </TooltipTrigger>
               {usage ? null : (
-                <TooltipContent>The usage endpoint did not answer, so the lens is off.</TooltipContent>
+                <TooltipContent>
+                  The usage endpoint did not answer, so the lens is off.
+                </TooltipContent>
               )}
             </Tooltip>
 
-            <Findings findings={findings} nodesById={nodesById} onSelect={followLink} />
+            <Findings
+              findings={findings}
+              nodesById={nodesById}
+              onSelect={followLink}
+            />
 
             <Popover>
               <PopoverTrigger
@@ -559,9 +623,14 @@ export function App({
               nothing by lens, so it gets no legend over its first row. */}
           {scale && view !== "list" ? (
             <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
-              <span className="font-bold uppercase tracking-terminal">{LENS_LABEL[lens]}</span>
+              <span className="font-bold uppercase tracking-terminal">
+                {LENS_LABEL[lens]}
+              </span>
               <span>{scale.minLabel}</span>
-              <span aria-hidden className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`} />
+              <span
+                aria-hidden
+                className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`}
+              />
               <span>{scale.maxLabel}</span>
             </div>
           ) : null}
@@ -586,14 +655,17 @@ export function App({
                 No Document Types yet
               </p>
               <p className="text-muted-foreground text-xs">
-                Create one under Settings, Document Types, and it turns up here as a building.
+                Create one under Settings, Document Types, and it turns up here
+                as a building.
               </p>
             </div>
           ) : (
             <div className="absolute inset-0 z-0">
               <Suspense
                 fallback={
-                  <p className="p-4 text-phosphor-dim text-sm">Loading the scene…</p>
+                  <p className="p-4 text-phosphor-dim text-sm">
+                    Loading the scene…
+                  </p>
                 }
               >
                 <Scene
@@ -601,7 +673,9 @@ export function App({
                   focus={focus}
                   graph={graph}
                   icons={icons}
-                  inspectorWidth={selectedNode && neighbourhood ? INSPECTOR_WIDTH : 0}
+                  inspectorWidth={
+                    selectedNode && neighbourhood ? INSPECTOR_WIDTH : 0
+                  }
                   layers={layers}
                   onFocus={enterFocus}
                   onSelect={(id) => (id === null ? done() : setSelected(id))}
@@ -625,7 +699,9 @@ export function App({
               onOpenType={onOpenType}
               onSelect={followLink}
               onToggleFocus={() =>
-                focus === selectedNode.id ? setFocus(null) : enterFocus(selectedNode.id)
+                focus === selectedNode.id
+                  ? setFocus(null)
+                  : enterFocus(selectedNode.id)
               }
               usage={usage?.byType[selectedNode.id]}
             />
@@ -674,7 +750,9 @@ export function App({
                       className={`size-2.5 shrink-0 ${swatchOf(hit.node)}`}
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs">{hit.node.name}</span>
+                      <span className="block truncate text-xs">
+                        {hit.node.name}
+                      </span>
                       <span className="block truncate text-3xs text-phosphor-dim">
                         {hit.node.alias}
                       </span>

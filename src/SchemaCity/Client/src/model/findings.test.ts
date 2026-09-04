@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import mediumUsageFixture from "../../dev/fixtures/medium-usage.json";
 import mediumFixture from "../../dev/fixtures/medium.json";
-import pathologicalUsageFixture from "../../dev/fixtures/pathological-usage.json";
+import mediumUsageFixture from "../../dev/fixtures/medium-usage.json";
 import pathologicalFixture from "../../dev/fixtures/pathological.json";
+import pathologicalUsageFixture from "../../dev/fixtures/pathological-usage.json";
 import smallFixture from "../../dev/fixtures/small.json";
 import { type FindingKind, findFindings } from "./findings";
 import type {
@@ -40,7 +40,10 @@ function node(alias: string, extra: Partial<SchemaNode> = {}): SchemaNode {
   };
 }
 
-const property = (alias: string, fromCompositionId: string | null): SchemaProperty => ({
+const property = (
+  alias: string,
+  fromCompositionId: string | null
+): SchemaProperty => ({
   alias,
   name: alias,
   dataTypeId: "dt",
@@ -62,15 +65,28 @@ const group = (alias: string, properties: SchemaProperty[]) => ({
   properties,
 });
 
-const graphOf = (nodes: SchemaNode[], edges: SchemaEdge[] = []): SchemaGraph => ({
+const graphOf = (
+  nodes: SchemaNode[],
+  edges: SchemaEdge[] = []
+): SchemaGraph => ({
   generatedAt: "2026-09-03T00:00:00Z",
   folders: [],
   nodes,
   edges,
 });
 
-const edge = (kind: SchemaEdge["kind"], from: string, to: string, propertyAlias?: string) =>
-  ({ kind, from, to, ...(propertyAlias ? { propertyAlias } : {}) }) as SchemaEdge;
+const edge = (
+  kind: SchemaEdge["kind"],
+  from: string,
+  to: string,
+  propertyAlias?: string
+) =>
+  ({
+    kind,
+    from,
+    to,
+    ...(propertyAlias ? { propertyAlias } : {}),
+  }) as SchemaEdge;
 
 /** Every type has content, unless `zero` names it. */
 function usageOf(graph: SchemaGraph, zero: string[] = []): UsageReport {
@@ -91,12 +107,20 @@ function usageOf(graph: SchemaGraph, zero: string[] = []): UsageReport {
 }
 
 /** The kinds reported against one node, which is what each rule test asserts on. */
-const kindsFor = (graph: SchemaGraph, alias: string, usage?: UsageReport): FindingKind[] =>
+const kindsFor = (
+  graph: SchemaGraph,
+  alias: string,
+  usage?: UsageReport
+): FindingKind[] =>
   findFindings(graph, usage)
     .filter((finding) => finding.nodeId === alias)
     .map((finding) => finding.kind);
 
-const aliasesFor = (graph: SchemaGraph, kind: FindingKind, usage?: UsageReport) =>
+const aliasesFor = (
+  graph: SchemaGraph,
+  kind: FindingKind,
+  usage?: UsageReport
+) =>
   findFindings(graph, usage)
     .filter((finding) => finding.kind === kind)
     .map((finding) => finding.nodeId)
@@ -106,7 +130,9 @@ describe("findFindings, one rule at a time", () => {
   it("reports a type with no content, only when usage says so", () => {
     const graph = graphOf([node("home", { allowedAsRoot: true })]);
     expect(kindsFor(graph, "home")).not.toContain("unusedType");
-    expect(kindsFor(graph, "home", usageOf(graph, ["home"]))).toContain("unusedType");
+    expect(kindsFor(graph, "home", usageOf(graph, ["home"]))).toContain(
+      "unusedType"
+    );
     expect(kindsFor(graph, "home", usageOf(graph))).not.toContain("unusedType");
   });
 
@@ -117,7 +143,7 @@ describe("findFindings, one rule at a time", () => {
         node("used", { isElement: true }),
         node("spare", { isElement: true }),
       ],
-      [edge("block", "host", "used", "blocks")],
+      [edge("block", "host", "used", "blocks")]
     );
     expect(aliasesFor(graph, "unusedElementType")).toEqual(["spare"]);
   });
@@ -125,7 +151,7 @@ describe("findFindings, one rule at a time", () => {
   it("reports a type no editor can create and nothing composes", () => {
     const graph = graphOf(
       [node("home", { allowedAsRoot: true }), node("child"), node("orphan")],
-      [edge("allowedChild", "home", "child")],
+      [edge("allowedChild", "home", "child")]
     );
     expect(aliasesFor(graph, "deadEnd")).toEqual(["orphan"]);
   });
@@ -133,7 +159,7 @@ describe("findFindings, one rule at a time", () => {
   it("leaves a composed type off the dead ends, whatever usage says", () => {
     const graph = graphOf(
       [node("page", { allowedAsRoot: true }), node("seo"), node("lonely")],
-      [edge("composition", "page", "seo")],
+      [edge("composition", "page", "seo")]
     );
     expect(aliasesFor(graph, "deadEnd")).toEqual(["lonely"]);
     expect(aliasesFor(graph, "deadEnd", usageOf(graph))).toEqual(["lonely"]);
@@ -151,7 +177,9 @@ describe("findFindings, one rule at a time", () => {
         ],
       }),
     ]);
-    const [finding] = findFindings(graph).filter((f) => f.kind === "duplicateAlias");
+    const [finding] = findFindings(graph).filter(
+      (f) => f.kind === "duplicateAlias"
+    );
     expect(finding?.summary).toContain("seoTitle");
     expect(finding?.related).toEqual(["seoA", "seoB"]);
   });
@@ -161,7 +189,10 @@ describe("findFindings, one rule at a time", () => {
       node("page", {
         allowedAsRoot: true,
         groups: [
-          group("seo", [property("seoTitle", "seoA"), property("seoBody", "seoA")]),
+          group("seo", [
+            property("seoTitle", "seoA"),
+            property("seoBody", "seoA"),
+          ]),
         ],
       }),
     ]);
@@ -171,9 +202,11 @@ describe("findFindings, one rule at a time", () => {
   it("reports a block target that resolves to no type", () => {
     const graph = graphOf(
       [node("host", { allowedAsRoot: true })],
-      [edge("block", "host", "deleted-key", "blocks")],
+      [edge("block", "host", "deleted-key", "blocks")]
     );
-    const [finding] = findFindings(graph).filter((f) => f.kind === "brokenBlock");
+    const [finding] = findFindings(graph).filter(
+      (f) => f.kind === "brokenBlock"
+    );
     expect(finding?.nodeId).toBe("host");
     expect(finding?.related).toEqual(["deleted-key"]);
     expect(finding?.summary).toContain("blocks");
@@ -182,7 +215,11 @@ describe("findFindings, one rule at a time", () => {
   it("reports a type with no properties at all", () => {
     const graph = graphOf([
       node("empty", { allowedAsRoot: true, ownPropertyCount: 0 }),
-      node("full", { allowedAsRoot: true, composedPropertyCount: 3, ownPropertyCount: 0 }),
+      node("full", {
+        allowedAsRoot: true,
+        composedPropertyCount: 3,
+        ownPropertyCount: 0,
+      }),
     ]);
     expect(aliasesFor(graph, "noProperties")).toEqual(["empty"]);
   });
@@ -193,17 +230,21 @@ describe("findFindings, one rule at a time", () => {
       node("templated", { allowedAsRoot: true }),
       node("element", { isElement: true, templates: [] }),
     ]);
-    const [finding] = findFindings(graph).filter((f) => f.kind === "noTemplate");
+    const [finding] = findFindings(graph).filter(
+      (f) => f.kind === "noTemplate"
+    );
     expect(finding?.nodeId).toBe("bare");
     expect(finding?.severity).toBe("note");
   });
 
   it("says nothing about templates on a schema that has none, or about a mixin", () => {
-    const headless = graphOf([node("home", { allowedAsRoot: true, templates: [] })]);
+    const headless = graphOf([
+      node("home", { allowedAsRoot: true, templates: [] }),
+    ]);
     expect(aliasesFor(headless, "noTemplate")).toEqual([]);
     const mixin = graphOf(
       [node("page", { allowedAsRoot: true }), node("seo", { templates: [] })],
-      [edge("composition", "page", "seo")],
+      [edge("composition", "page", "seo")]
     );
     expect(aliasesFor(mixin, "noTemplate")).toEqual([]);
   });
@@ -211,7 +252,7 @@ describe("findFindings, one rule at a time", () => {
   it("reports a composition that is only ever composed", () => {
     const graph = graphOf(
       [node("page", { allowedAsRoot: true }), node("seo")],
-      [edge("composition", "page", "seo")],
+      [edge("composition", "page", "seo")]
     );
     const [finding] = findFindings(graph).filter((f) => f.kind === "pureMixin");
     expect(finding?.nodeId).toBe("seo");
@@ -229,7 +270,11 @@ describe("findFindings, one rule at a time", () => {
   it("counts compositions twice and block targets once in the score", () => {
     const graph = graphOf(
       [
-        node("page", { allowedAsRoot: true, ownPropertyCount: 1, composedPropertyCount: 2 }),
+        node("page", {
+          allowedAsRoot: true,
+          ownPropertyCount: 1,
+          composedPropertyCount: 2,
+        }),
         node("seo"),
         node("hero", { isElement: true }),
       ],
@@ -237,11 +282,12 @@ describe("findFindings, one rule at a time", () => {
         edge("composition", "page", "seo"),
         edge("block", "page", "hero", "blocks"),
         edge("block", "page", "hero", "extras"),
-      ],
+      ]
     );
     // 1 own + 2 composed + 2 * 1 composition + 1 distinct block target.
     const finding = findFindings(graph).find(
-      (candidate) => candidate.kind === "complexity" && candidate.nodeId === "page",
+      (candidate) =>
+        candidate.kind === "complexity" && candidate.nodeId === "page"
     );
     expect(finding?.summary).toContain("Complexity 6");
   });
@@ -249,12 +295,16 @@ describe("findFindings, one rule at a time", () => {
   it("gives every finding a stable id and keeps the order between runs", () => {
     const first = findFindings(medium);
     const second = findFindings(medium);
-    expect(first.map((finding) => finding.id)).toEqual(second.map((finding) => finding.id));
+    expect(first.map((finding) => finding.id)).toEqual(
+      second.map((finding) => finding.id)
+    );
     expect(new Set(first.map((finding) => finding.id)).size).toBe(first.length);
     expect(first[0]?.id).toBe(`${first[0]?.kind}:${first[0]?.nodeId}`);
     // Problems first, so the drawer's first group is the one worth reading.
     const firstNote = first.findIndex((finding) => finding.severity === "note");
-    expect(first.slice(firstNote).every((finding) => finding.severity === "note")).toBe(true);
+    expect(
+      first.slice(firstNote).every((finding) => finding.severity === "note")
+    ).toBe(true);
   });
 
   it("says nothing about an empty graph", () => {
@@ -281,7 +331,9 @@ describe("findFindings on small.json", () => {
 
   it("leaves the usage rules out until a report arrives", () => {
     expect(named("unusedType")).toEqual([]);
-    expect(named("unusedType", usageOf(small, ["legacyWidget"]))).toEqual(["legacyWidget"]);
+    expect(named("unusedType", usageOf(small, ["legacyWidget"]))).toEqual([
+      "legacyWidget",
+    ]);
   });
 });
 
@@ -290,7 +342,11 @@ describe("findFindings on the seeded medium.json", () => {
   // report, so it is given a hand-made one with that type at zero. The two
   // composition-shaped types are at zero as well, because nothing can create
   // content of a type no editor can reach.
-  const usage = usageOf(medium, ["unusedArticleLegacy", "unusedSeoComposition", "deadEndPromo"]);
+  const usage = usageOf(medium, [
+    "unusedArticleLegacy",
+    "unusedSeoComposition",
+    "deadEndPromo",
+  ]);
   const planted: [string, FindingKind][] = [
     ["unusedArticleLegacy", "unusedType"],
     ["unusedElementBanner", "unusedElementType"],
@@ -305,15 +361,17 @@ describe("findFindings on the seeded medium.json", () => {
   it.each(planted)("reports %s as %s", (alias, kind) => {
     const id = medium.nodes.find((candidate) => candidate.alias === alias)?.id;
     expect(findFindings(medium, usage)).toContainEqual(
-      expect.objectContaining({ kind, nodeId: id }),
+      expect.objectContaining({ kind, nodeId: id })
     );
   });
 
   it("reports the seeded site's own usage report the same way", () => {
     const legacy = medium.nodes.find(
-      (candidate) => candidate.alias === "unusedArticleLegacy",
+      (candidate) => candidate.alias === "unusedArticleLegacy"
     )?.id;
-    const article = medium.nodes.find((candidate) => candidate.alias === "article")?.id;
+    const article = medium.nodes.find(
+      (candidate) => candidate.alias === "article"
+    )?.id;
     const unused = findFindings(medium, mediumUsage)
       .filter((finding) => finding.kind === "unusedType")
       .map((finding) => finding.nodeId);
@@ -368,9 +426,16 @@ describe("findFindings on the pathological fixture", () => {
     const named = (kind: FindingKind) =>
       findFindings(pathological, pathologicalUsage)
         .filter((finding) => finding.kind === kind)
-        .map((finding) => pathological.nodes.find((n) => n.id === finding.nodeId)?.alias);
+        .map(
+          (finding) =>
+            pathological.nodes.find((n) => n.id === finding.nodeId)?.alias
+        );
 
-    expect(named("brokenBlock")).toEqual(["editorial27", "editorial28", "editorial29"]);
+    expect(named("brokenBlock")).toEqual([
+      "editorial27",
+      "editorial28",
+      "editorial29",
+    ]);
     expect(named("duplicateAlias")).toEqual([
       "editorial00",
       "editorial01",

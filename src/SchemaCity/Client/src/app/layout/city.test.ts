@@ -7,14 +7,14 @@ import { STAMP_BAND } from "../scene/stage";
 import {
   cityBounds,
   cityDistricts,
+  DISTRICT_GAP,
+  type District,
   ISLAND_PAD,
   layoutCity,
+  type Placement,
   ROW_LIMIT,
   SPARSE_RANK,
-  DISTRICT_GAP,
   STREET,
-  type District,
-  type Placement,
 } from "./city";
 
 const small = smallFixture as unknown as SchemaGraph;
@@ -51,7 +51,7 @@ function node(alias: string, extra: Partial<SchemaNode> = {}): SchemaNode {
 const graphOf = (
   nodes: SchemaNode[],
   edges: SchemaEdge[] = [],
-  folders: SchemaGraph["folders"] = [],
+  folders: SchemaGraph["folders"] = []
 ): SchemaGraph => ({
   generatedAt: "2026-09-03T00:00:00Z",
   folders,
@@ -84,8 +84,10 @@ function overlaps(placements: Placement[]) {
     for (let j = i + 1; j < placements.length; j++) {
       const a = placements[i] as Placement;
       const b = placements[j] as Placement;
-      const gapX = Math.abs(a.position.x - b.position.x) - (a.footprint + b.footprint) / 2;
-      const gapZ = Math.abs(a.position.z - b.position.z) - (a.footprint + b.footprint) / 2;
+      const gapX =
+        Math.abs(a.position.x - b.position.x) - (a.footprint + b.footprint) / 2;
+      const gapZ =
+        Math.abs(a.position.z - b.position.z) - (a.footprint + b.footprint) / 2;
       // A shared edge is not an overlap, so only a negative gap on both axes counts.
       if (gapX < -1e-9 && gapZ < -1e-9) found.push(`${a.id} over ${b.id}`);
     }
@@ -113,7 +115,8 @@ function rankedBlocks(graph: SchemaGraph): Map<string, Placement[][]> {
   const blocks = new Map<string, Map<number, Placement[]>>();
   for (const placement of placements) {
     if (!linked.has(placement.id)) continue;
-    const ranks = blocks.get(placement.district) ?? new Map<number, Placement[]>();
+    const ranks =
+      blocks.get(placement.district) ?? new Map<number, Placement[]>();
     blocks.set(placement.district, ranks);
     ranks.set(placement.introDelay, [
       ...(ranks.get(placement.introDelay) ?? []),
@@ -124,7 +127,7 @@ function rankedBlocks(graph: SchemaGraph): Map<string, Placement[][]> {
     [...blocks].map(([id, ranks]) => [
       id,
       [...ranks].sort((a, b) => a[0] - b[0]).map(([, members]) => members),
-    ]),
+    ])
   );
 }
 
@@ -142,7 +145,7 @@ function strandedRanks(graph: SchemaGraph): string[] {
     let held = 0;
     let band = Number.NaN;
     for (const rank of ranks) {
-      const z = (rank[0] as Placement).position.z;
+      const { z } = (rank[0] as Placement).position;
       const sparse = rank.length <= SPARSE_RANK;
       if (sparse && held > 0 && held + rank.length <= ROW_LIMIT && z !== band) {
         found.push(`${district} rank at ${z} left out of the band at ${band}`);
@@ -163,7 +166,8 @@ function crowded(list: District[], street: number) {
       const b = list[j] as District;
       const gapX = Math.max(a.minX - b.maxX, b.minX - a.maxX);
       const gapZ = Math.max(a.minZ - b.maxZ, b.minZ - a.maxZ);
-      if (Math.max(gapX, gapZ) < street - 1e-9) found.push(`${a.name} near ${b.name}`);
+      if (Math.max(gapX, gapZ) < street - 1e-9)
+        found.push(`${a.name} near ${b.name}`);
     }
   }
   return found;
@@ -171,7 +175,10 @@ function crowded(list: District[], street: number) {
 
 describe("cityDistricts", () => {
   it("returns nothing for a graph with no nodes", () => {
-    expect(cityDistricts(graphOf([]))).toEqual({ placements: [], districts: [] });
+    expect(cityDistricts(graphOf([]))).toEqual({
+      placements: [],
+      districts: [],
+    });
   });
 
   it("gives the medium fixture one district per top-level folder plus Unfiled", () => {
@@ -200,8 +207,8 @@ describe("cityDistricts", () => {
       graphOf(
         [node("a", { folderId: "outer" }), node("b", { folderId: "inner" })],
         [],
-        [outer, inner],
-      ),
+        [outer, inner]
+      )
     );
 
     expect(districts.map((d) => d.name)).toEqual(["Outer"]);
@@ -216,8 +223,8 @@ describe("cityDistricts", () => {
       graphOf(
         [node("a", { folderId: "kept" }), node("b", { folderId: "deleted" })],
         [],
-        [{ id: "kept", name: "Kept", parentId: null }],
-      ),
+        [{ id: "kept", name: "Kept", parentId: null }]
+      )
     );
 
     expect(districts.map((d) => d.name)).toEqual(["Kept", "Unfiled"]);
@@ -234,7 +241,8 @@ describe("cityDistricts", () => {
 
   it("puts compositions north of the structure districts and elements south", () => {
     const { districts } = cityDistricts(folderless);
-    const at = (name: string) => districts.find((d) => d.name === name) as District;
+    const at = (name: string) =>
+      districts.find((d) => d.name === name) as District;
 
     expect(at("Compositions").maxZ).toBeLessThan(at("Pages").minZ);
     expect(at("Elements").minZ).toBeGreaterThan(at("Pages").maxZ);
@@ -253,20 +261,22 @@ describe("cityDistricts", () => {
       [
         { id: "big", name: "Big", parentId: null },
         { id: "small", name: "Small", parentId: null },
-      ],
+      ]
     );
     const { districts } = cityDistricts(graph);
 
     expect(districts.map((d) => d.name)).toEqual(["Big", "Small"]);
     expect((districts[0] as District).maxX).toBeLessThan(
-      (districts[1] as District).minX,
+      (districts[1] as District).minX
     );
   });
 
   it("leaves a void of two streets between any two districts", () => {
     expect(DISTRICT_GAP).toBe(STREET * 2);
     expect(crowded(cityDistricts(medium).districts, DISTRICT_GAP)).toEqual([]);
-    expect(crowded(cityDistricts(folderless).districts, DISTRICT_GAP)).toEqual([]);
+    expect(crowded(cityDistricts(folderless).districts, DISTRICT_GAP)).toEqual(
+      []
+    );
   });
 
   it("holds a band clear along each island's north edge for the name", () => {
@@ -278,7 +288,7 @@ describe("cityDistricts", () => {
       for (const p of placements) {
         const island = (byId.get(p.district) as District).minZ - ISLAND_PAD;
         expect(p.position.z - p.footprint / 2).toBeGreaterThanOrEqual(
-          island + STAMP_BAND - 1e-9,
+          island + STAMP_BAND - 1e-9
         );
       }
     }
@@ -290,9 +300,13 @@ describe("cityDistricts", () => {
 
     for (const p of placements) {
       const d = byId.get(p.district) as District;
-      expect(p.position.x - p.footprint / 2).toBeGreaterThanOrEqual(d.minX - 1e-9);
+      expect(p.position.x - p.footprint / 2).toBeGreaterThanOrEqual(
+        d.minX - 1e-9
+      );
       expect(p.position.x + p.footprint / 2).toBeLessThanOrEqual(d.maxX + 1e-9);
-      expect(p.position.z - p.footprint / 2).toBeGreaterThanOrEqual(d.minZ - 1e-9);
+      expect(p.position.z - p.footprint / 2).toBeGreaterThanOrEqual(
+        d.minZ - 1e-9
+      );
       expect(p.position.z + p.footprint / 2).toBeLessThanOrEqual(d.maxZ + 1e-9);
     }
   });
@@ -311,7 +325,7 @@ describe("layoutCity", () => {
     const shuffled = graphOf(
       [...small.nodes].reverse(),
       [...small.edges].reverse(),
-      [...small.folders].reverse(),
+      [...small.folders].reverse()
     );
     expect(layoutCity(shuffled)).toEqual(layoutCity(small));
   });
@@ -319,7 +333,7 @@ describe("layoutCity", () => {
   it("places every node exactly once", () => {
     const placements = layoutCity(small);
     expect(placements.map((p) => p.id).sort()).toEqual(
-      small.nodes.map((n) => n.id).sort(),
+      small.nodes.map((n) => n.id).sort()
     );
   });
 
@@ -332,8 +346,8 @@ describe("layoutCity", () => {
           node("orphan"),
           node("block", { isElement: true }),
         ],
-        [road("root", "child")],
-      ),
+        [road("root", "child")]
+      )
     );
 
     expect(districts(placements)).toEqual({
@@ -347,9 +361,12 @@ describe("layoutCity", () => {
   it("keeps an element type out of the Pages district even when a root allows it", () => {
     const placements = layoutCity(
       graphOf(
-        [node("root", { allowedAsRoot: true }), node("block", { isElement: true })],
-        [road("root", "block")],
-      ),
+        [
+          node("root", { allowedAsRoot: true }),
+          node("block", { isElement: true }),
+        ],
+        [road("root", "block")]
+      )
     );
 
     expect(districts(placements)).toEqual({ root: "pages", block: "elements" });
@@ -365,7 +382,7 @@ describe("layoutCity", () => {
 
   it("packs a district with no allowed-child edge into one grid", () => {
     const placements = layoutCity(
-      graphOf([node("b"), node("a"), node("c")], [], []),
+      graphOf([node("b"), node("a"), node("c")], [], [])
     );
 
     expect(placements.map((p) => p.id)).toEqual(["a", "b", "c"]);
@@ -381,8 +398,8 @@ describe("layoutCity", () => {
           node("loner", { folderId: "f" }),
         ],
         [road("root", "child")],
-        [{ id: "f", name: "F", parentId: null }],
-      ),
+        [{ id: "f", name: "F", parentId: null }]
+      )
     );
     const at = (id: string) => placements.find((p) => p.id === id) as Placement;
 
@@ -391,12 +408,18 @@ describe("layoutCity", () => {
   });
 
   it("folds a rank of 30 onto four rows of at most eight", () => {
-    const children = Array.from({ length: 30 }, (_, i) => `child${String(i).padStart(2, "0")}`);
+    const children = Array.from(
+      { length: 30 },
+      (_, i) => `child${String(i).padStart(2, "0")}`
+    );
     const placements = layoutCity(
       graphOf(
-        [node("root", { allowedAsRoot: true }), ...children.map((alias) => node(alias))],
-        children.map((alias) => road("root", alias)),
-      ),
+        [
+          node("root", { allowedAsRoot: true }),
+          ...children.map((alias) => node(alias)),
+        ],
+        children.map((alias) => road("root", alias))
+      )
     );
 
     const rows = new Map<number, number>();
@@ -436,14 +459,17 @@ describe("layoutCity", () => {
         const rank = ranks.get(key) as Placement[];
         // Row-major order inside the rank: rows front to back, left to right in each.
         const inOrder = [...rank].sort(
-          (a, b) => a.position.z - b.position.z || a.position.x - b.position.x,
+          (a, b) => a.position.z - b.position.z || a.position.x - b.position.x
         );
         const column = (p: Placement) =>
           Math.min(
-            Infinity,
+            Number.POSITIVE_INFINITY,
             ...(parents.get(p.id) ?? [])
-              .filter((id) => placedBefore.has(id) && byId.get(id)?.district === district)
-              .map((id) => (byId.get(id) as Placement).position.x),
+              .filter(
+                (id) =>
+                  placedBefore.has(id) && byId.get(id)?.district === district
+              )
+              .map((id) => (byId.get(id) as Placement).position.x)
           );
         const columns = inOrder.map(column);
 
@@ -473,7 +499,7 @@ describe("layoutCity", () => {
         const mine = placements.filter((p) => p.district === district.id);
         const widest = Math.max(...mine.map((p) => p.footprint));
         expect(district.maxX - district.minX).toBeLessThanOrEqual(
-          ROW_LIMIT * widest + (ROW_LIMIT - 1) * STREET,
+          ROW_LIMIT * widest + (ROW_LIMIT - 1) * STREET
         );
       }
     }
@@ -491,7 +517,11 @@ describe("layoutCity", () => {
   it("keeps the rank a cycle runs back into out of the band", () => {
     // Dagre reverses the ring's back edge to rank it. Folding those three ranks side
     // by side would run that road right to left while the rest ran left to right.
-    const three = [node("ringA", { allowedAsRoot: true }), node("ringB"), node("ringC")];
+    const three = [
+      node("ringA", { allowedAsRoot: true }),
+      node("ringB"),
+      node("ringC"),
+    ];
     const chain = [road("ringA", "ringB"), road("ringB", "ringC")];
     const at = (placements: Placement[], id: string) =>
       placements.find((p) => p.id === id) as Placement;
@@ -500,16 +530,21 @@ describe("layoutCity", () => {
     expect(new Set(open.map((p) => p.position.z)).size).toBe(1);
 
     const ring = layoutCity(graphOf(three, [...chain, road("ringC", "ringA")]));
-    expect(at(ring, "ringC").position.z).toBeGreaterThan(at(ring, "ringA").position.z);
+    expect(at(ring, "ringC").position.z).toBeGreaterThan(
+      at(ring, "ringA").position.z
+    );
   });
 
   it("puts a chain of single types in one row, a street apart", () => {
     const chain = ["root", ...Array.from({ length: 6 }, (_, i) => `link${i}`)];
     const placements = layoutCity(
       graphOf(
-        [node("root", { allowedAsRoot: true }), ...chain.slice(1).map((alias) => node(alias))],
-        chain.slice(1).map((alias, i) => road(chain[i] as string, alias)),
-      ),
+        [
+          node("root", { allowedAsRoot: true }),
+          ...chain.slice(1).map((alias) => node(alias)),
+        ],
+        chain.slice(1).map((alias, i) => road(chain[i] as string, alias))
+      )
     ).sort((a, b) => a.position.x - b.position.x);
 
     // Seven ranks of one building, in one band, in the order the chain runs.
@@ -519,7 +554,7 @@ describe("layoutCity", () => {
       const near = placements[i - 1] as Placement;
       const far = placements[i] as Placement;
       expect(
-        far.position.x - near.position.x - (near.footprint + far.footprint) / 2,
+        far.position.x - near.position.x - (near.footprint + far.footprint) / 2
       ).toBeCloseTo(STREET);
     }
     expect(overlaps(placements)).toEqual([]);
@@ -532,9 +567,9 @@ describe("layoutCity", () => {
         graphOf(
           [...medium.nodes].reverse(),
           [...medium.edges].reverse(),
-          [...medium.folders].reverse(),
-        ),
-      ),
+          [...medium.folders].reverse()
+        )
+      )
     ).toEqual(layoutCity(medium));
   });
 
@@ -548,7 +583,10 @@ describe("layoutCity", () => {
   });
 
   it("survives a type that allows itself as a child", () => {
-    const graph = graphOf([node("page", { allowedAsRoot: true })], [road("page", "page")]);
+    const graph = graphOf(
+      [node("page", { allowedAsRoot: true })],
+      [road("page", "page")]
+    );
 
     expect(layoutCity(graph)).toHaveLength(1);
   });
@@ -556,7 +594,7 @@ describe("layoutCity", () => {
   it("survives a two-node cycle", () => {
     const graph = graphOf(
       [node("a", { allowedAsRoot: true }), node("b")],
-      [road("a", "b"), road("b", "a")],
+      [road("a", "b"), road("b", "a")]
     );
 
     expect(layoutCity(graph)).toHaveLength(2);
@@ -566,14 +604,17 @@ describe("layoutCity", () => {
     const graph = graphOf(
       [node("a", { folderId: "loop" })],
       [],
-      [{ id: "loop", name: "Loop", parentId: "loop" }],
+      [{ id: "loop", name: "Loop", parentId: "loop" }]
     );
 
     expect(layoutCity(graph)).toHaveLength(1);
   });
 
   it("drops an edge pointing at a type that no longer exists", () => {
-    const graph = graphOf([node("a", { allowedAsRoot: true })], [road("a", "ghost")]);
+    const graph = graphOf(
+      [node("a", { allowedAsRoot: true })],
+      [road("a", "ghost")]
+    );
 
     expect(layoutCity(graph)).toHaveLength(1);
   });
@@ -592,7 +633,7 @@ describe("layoutCity", () => {
       graphOf([
         node("a", { ownPropertyCount: 4, groups: [group, group] }),
         node("b", { ownPropertyCount: 40 }),
-      ]),
+      ])
     ) as [Placement, Placement];
 
     expect(wide.footprint).toBe(3);
@@ -606,14 +647,19 @@ describe("layoutCity", () => {
     const placements = layoutCity(
       graphOf(
         [node("root", { allowedAsRoot: true }), node("a"), node("b")],
-        [road("root", "a"), road("root", "b")],
-      ),
+        [road("root", "a"), road("root", "b")]
+      )
     );
     const [a, b] = placements
       .filter((p) => p.id !== "root")
-      .sort((one, other) => one.position.x - other.position.x) as [Placement, Placement];
+      .sort((one, other) => one.position.x - other.position.x) as [
+      Placement,
+      Placement,
+    ];
 
-    expect(b.position.x - a.position.x - (a.footprint + b.footprint) / 2).toBeCloseTo(3);
+    expect(
+      b.position.x - a.position.x - (a.footprint + b.footprint) / 2
+    ).toBeCloseTo(3);
   });
 
   it("leaves a street between a district's ranked block and its packed grid", () => {
@@ -625,8 +671,8 @@ describe("layoutCity", () => {
           node("loner", { folderId: "f" }),
         ],
         [road("root", "child")],
-        [{ id: "f", name: "F", parentId: null }],
-      ),
+        [{ id: "f", name: "F", parentId: null }]
+      )
     );
     const at = (id: string) => placements.find((p) => p.id === id) as Placement;
     const gap =
@@ -649,10 +695,10 @@ describe("layoutCity", () => {
     expect(bounds.depth).toBeGreaterThan(0);
     for (const p of placements) {
       expect(Math.abs(p.position.x - bounds.centre.x)).toBeLessThanOrEqual(
-        bounds.width / 2,
+        bounds.width / 2
       );
       expect(Math.abs(p.position.z - bounds.centre.z)).toBeLessThanOrEqual(
-        bounds.depth / 2,
+        bounds.depth / 2
       );
     }
   });
@@ -667,7 +713,7 @@ describe("layoutCity", () => {
           allowedAsRoot: i < 3,
           isElement: i >= 240 && i < 280,
           ownPropertyCount: i % 17,
-        }),
+        })
       );
     }
     // A wide tree over the first 240, so most of them reach a root, plus a handful of
@@ -676,9 +722,21 @@ describe("layoutCity", () => {
     // ~30ms at one per twenty), and a real allowed-child graph is never that tangled.
     for (let i = 0; i < 240; i++) {
       for (const child of [i * 3 + 3, i * 3 + 4, i * 3 + 5]) {
-        if (child < 240) edges.push(road(`type${String(i).padStart(3, "0")}`, `type${String(child).padStart(3, "0")}`));
+        if (child < 240)
+          edges.push(
+            road(
+              `type${String(i).padStart(3, "0")}`,
+              `type${String(child).padStart(3, "0")}`
+            )
+          );
       }
-      if (i > 20 && i % 20 === 0) edges.push(road(`type${String(i).padStart(3, "0")}`, `type${String(i - 20).padStart(3, "0")}`));
+      if (i > 20 && i % 20 === 0)
+        edges.push(
+          road(
+            `type${String(i).padStart(3, "0")}`,
+            `type${String(i - 20).padStart(3, "0")}`
+          )
+        );
     }
 
     const graph = graphOf(nodes, edges);
@@ -713,7 +771,7 @@ describe("layoutCity", () => {
     const depth = pages.maxZ - pages.minZ;
     expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(2);
     console.log(
-      `pathological: 300 nodes laid out in ${elapsed.toFixed(1)} ms, Pages ${width.toFixed(0)} by ${depth.toFixed(0)}`,
+      `pathological: 300 nodes laid out in ${elapsed.toFixed(1)} ms, Pages ${width.toFixed(0)} by ${depth.toFixed(0)}`
     );
   });
 });

@@ -4,7 +4,7 @@
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
-    "lib": [ "ES2020", "DOM", "DOM.Iterable" ],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -23,7 +23,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
-    "types": [ "@umbraco-cms/backoffice/extension-types", "vite/client" ]
+    "types": ["@umbraco-cms/backoffice/extension-types", "vite/client"]
   },
-  "include": [ "src", "dev" ]
+  "include": ["src", "dev"]
 }

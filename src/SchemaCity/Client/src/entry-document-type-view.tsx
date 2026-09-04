@@ -6,11 +6,11 @@ import {
   LitElement,
   unsafeCSS,
 } from "@umbraco-cms/backoffice/external/lit";
-import { UmbApiError, tryExecute } from "@umbraco-cms/backoffice/resources";
+import { tryExecute, UmbApiError } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
+import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
-import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
@@ -18,9 +18,7 @@ import type { SchemaGraph, UsageReport } from "./model/types.js";
  * same graph, opened on the type being edited. The key comes from the editor's own
  * workspace context, so the tab follows a save or a switch to another type.
  */
-export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
-  LitElement,
-) {
+class SchemaCityDocumentTypeViewElement extends UmbElementMixin(LitElement) {
   #root?: Root;
   #graph?: SchemaGraph;
   #usage?: UsageReport;
@@ -52,7 +50,7 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
   override firstUpdated() {
     // Created once and never again. Re-creating it would tear down the WebGL context.
     this.#root = createRoot(
-      this.renderRoot.querySelector("#app") as HTMLElement,
+      this.renderRoot.querySelector("#app") as HTMLElement
     );
     this.#draw();
   }
@@ -78,7 +76,9 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
     // which is what disables the lens picker, and says so once.
     const usage = await tryExecute(this, getUsage());
     if (usage.error) {
-      console.warn("Schema City: the usage endpoint did not answer, so the lens stays off.");
+      console.warn(
+        "Schema City: the usage endpoint did not answer, so the lens stays off."
+      );
       return;
     }
     this.#usage = usage.data ?? undefined;
@@ -86,7 +86,10 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
   }
 
   async #loadIcons(graph: SchemaGraph) {
-    this.#icons = await resolveIcons(this, graph.nodes.map((node) => node.icon));
+    this.#icons = await resolveIcons(
+      this,
+      graph.nodes.map((node) => node.icon)
+    );
     this.#draw();
   }
 
@@ -108,7 +111,7 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
         <p className="p-4 font-mono text-sm text-phosphor-dim">
           {this.#failed ?? "Loading…"}
         </p>
-      ),
+      )
     );
   }
 
@@ -136,7 +139,7 @@ export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
 if (!customElements.get("schema-city-document-type-view")) {
   customElements.define(
     "schema-city-document-type-view",
-    SchemaCityDocumentTypeViewElement,
+    SchemaCityDocumentTypeViewElement
   );
 }
 

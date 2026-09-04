@@ -71,19 +71,24 @@ const SEVERITY: Record<FindingKind, FindingSeverity> = {
 };
 
 /** Rules that say nothing without a usage report, and are skipped without one. */
-const NEEDS_USAGE: ReadonlySet<FindingKind> = new Set<FindingKind>(["unusedType"]);
+const NEEDS_USAGE: ReadonlySet<FindingKind> = new Set<FindingKind>([
+  "unusedType",
+]);
 
 /** How many complexity tiers the scores are cut into. Only the top one is a finding. */
 const COMPLEXITY_TIERS = 5;
 
 /** `own + composed properties + 2 * compositions + distinct block targets`. */
-export function complexityScore(
+function complexityScore(
   node: SchemaNode,
   compositions: number,
-  blockTargets: number,
+  blockTargets: number
 ): number {
   return (
-    node.ownPropertyCount + node.composedPropertyCount + 2 * compositions + blockTargets
+    node.ownPropertyCount +
+    node.composedPropertyCount +
+    2 * compositions +
+    blockTargets
   );
 }
 
@@ -101,8 +106,11 @@ const at = (map: Map<string, number>, key: string) => map.get(key) ?? 0;
  * than guessed at. `findFindings(graph)` is the set the city can show while the
  * usage endpoint is still in flight.
  */
-export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[] {
-  const nodes = graph.nodes;
+export function findFindings(
+  graph: SchemaGraph,
+  usage?: UsageReport
+): Finding[] {
+  const { nodes } = graph;
   const known = new Set(nodes.map((node) => node.id));
   const edges = graph.edges ?? [];
 
@@ -114,7 +122,10 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
   const composedBy = new Map<string, string[]>();
   // Host id to the Element Type keys its block editors name and the graph does not
   // have, with the property alias that names each one.
-  const missingBlocks = new Map<string, { propertyAlias: string; to: string }[]>();
+  const missingBlocks = new Map<
+    string,
+    { propertyAlias: string; to: string }[]
+  >();
 
   for (const edge of edges) {
     switch (edge.kind) {
@@ -124,7 +135,10 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
       case "composition":
         bump(inComposition, edge.to);
         bump(outComposition, edge.from);
-        composedBy.set(edge.to, [...(composedBy.get(edge.to) ?? []), edge.from]);
+        composedBy.set(edge.to, [
+          ...(composedBy.get(edge.to) ?? []),
+          edge.from,
+        ]);
         break;
       case "block": {
         if (!known.has(edge.to)) {
@@ -141,14 +155,20 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
         blockTargets.set(edge.from, targets);
         break;
       }
+      default:
+        break;
     }
   }
 
   const scores = new Map(
     nodes.map((node) => [
       node.id,
-      complexityScore(node, at(outComposition, node.id), blockTargets.get(node.id)?.size ?? 0),
-    ]),
+      complexityScore(
+        node,
+        at(outComposition, node.id),
+        blockTargets.get(node.id)?.size ?? 0
+      ),
+    ])
   );
   const topScore = Math.max(0, ...scores.values());
   // Tiers are cut from the graph's own busiest type, because "complex" only means
@@ -162,7 +182,7 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
     kind: FindingKind,
     node: SchemaNode,
     summary: string,
-    related?: string[],
+    related?: string[]
   ) => {
     if (!usage && NEEDS_USAGE.has(kind)) return;
     found.push({
@@ -191,11 +211,11 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
     // A type nothing composes and nothing can create is a structural dead end, and
     // this one row says so. A type something composes is a mixin doing its job, so
     // it is never a dead end; the pure mixin note below covers it instead.
-    if (!node.isElement && !creatable && composers === 0) {
+    if (!(node.isElement || creatable) && composers === 0) {
       add(
         "deadEnd",
         node,
-        "No root, no allowed parent, not an element, and nothing composes it",
+        "No root, no allowed parent, not an element, and nothing composes it"
       );
     }
 
@@ -205,18 +225,20 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
         "duplicateAlias",
         node,
         `${duplicates.map((duplicate) => duplicate.alias).join(", ")} arrives from more than one place, which breaks editing`,
-        duplicates.flatMap((duplicate) => duplicate.origins),
+        duplicates.flatMap((duplicate) => duplicate.origins)
       );
     }
 
     const broken = missingBlocks.get(node.id);
     if (broken) {
-      const aliases = [...new Set(broken.map((block) => block.propertyAlias))].join(", ");
+      const aliases = [
+        ...new Set(broken.map((block) => block.propertyAlias)),
+      ].join(", ");
       add(
         "brokenBlock",
         node,
         `${aliases || "A block editor"} points at ${broken.length} Element Type${broken.length === 1 ? "" : "s"} that no longer exist${broken.length === 1 ? "s" : ""}`,
-        broken.map((block) => block.to),
+        broken.map((block) => block.to)
       );
     }
 
@@ -227,7 +249,12 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
     // Only worth saying on a schema that uses templates at all, and only about a
     // type an editor can actually create. A headless site has no templates
     // anywhere, and a composition renders through its users, not on its own.
-    if (anyTemplates && creatable && !node.isElement && node.templates.length === 0) {
+    if (
+      anyTemplates &&
+      creatable &&
+      !node.isElement &&
+      node.templates.length === 0
+    ) {
       add("noTemplate", node, "No template is allowed, so it renders nothing");
     }
 
@@ -236,7 +263,7 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
         "pureMixin",
         node,
         `Composed by ${composers} type${composers === 1 ? "" : "s"}, and never created on its own`,
-        composedBy.get(node.id),
+        composedBy.get(node.id)
       );
     }
 
@@ -245,7 +272,7 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
       add(
         "complexity",
         node,
-        `Complexity ${score}, the top tier of ${COMPLEXITY_TIERS} in this schema`,
+        `Complexity ${score}, the top tier of ${COMPLEXITY_TIERS} in this schema`
       );
     }
   }
@@ -256,7 +283,7 @@ export function findFindings(graph: SchemaGraph, usage?: UsageReport): Finding[]
     (a, b) =>
       (a.severity === b.severity ? 0 : a.severity === "problem" ? -1 : 1) ||
       rank(a) - rank(b) ||
-      (aliasOf.get(a.nodeId) ?? "").localeCompare(aliasOf.get(b.nodeId) ?? ""),
+      (aliasOf.get(a.nodeId) ?? "").localeCompare(aliasOf.get(b.nodeId) ?? "")
   );
 }
 

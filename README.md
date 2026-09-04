@@ -97,7 +97,17 @@ cd src/SchemaCity/Client
 npm ci
 npm run build   # or npm run watch
 npm test        # vitest
+npm run lint    # ultracite
+npm run fallow  # fallow
 ```
+
+Two tools keep the client tidy. Ultracite is a preset over Biome that both formats and lints.
+`npm run lint` reports, `npm run format` rewrites. `biome.jsonc` extends the core, React and vitest
+presets and turns off the rules that fight this code base, each with its reason on the line above,
+and it skips the generated fixtures and the shadcn registry copy-in under `components/ui`. Fallow
+reads the module graph for dead code, duplication and cycles. `npm run fallow` audits what changed
+against the base commit, and `.fallowrc.jsonc` names the entry points it cannot infer. Neither tool
+touches `wwwroot`, which Vite writes.
 
 `npm run dev` runs the fixture harness on port 5173. It renders the same React app with no Umbraco
 in the page, against the JSON fixtures in `Client/dev/fixtures/`. Every Development boot of the demo
@@ -108,7 +118,8 @@ There is no generated API client. Umbraco 18 replaced Swashbuckle with the built
 OpenAPI stack, and the two extension APIs share nothing, so the package registers no OpenAPI
 document. `Client/src/api.ts` calls the endpoints by hand instead.
 
-`.github/workflows/ci.yml` runs on push and pull request. It builds the client with Node 24, then
+`.github/workflows/ci.yml` runs on push and pull request. It lints and builds the client with
+Node 24, and audits the changed client code on a pull request, then
 builds and tests the solution twice, once against Umbraco 17.6.2 and once against 18.1.1. Each leg
 boots the site and checks that the backoffice answers, that
 `/App_Plugins/SchemaCity/umbraco-package.json` is served, and that the graph and usage endpoints

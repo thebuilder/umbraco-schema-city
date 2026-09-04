@@ -24,7 +24,11 @@ function tier(haystack: string, query: string): number {
 /** A property match always ranks below any match on the type itself. */
 const PROPERTY_PENALTY = 3;
 
-export function searchNodes(nodes: SchemaNode[], query: string, limit = 50): SearchHit[] {
+export function searchNodes(
+  nodes: SchemaNode[],
+  query: string,
+  limit = 50
+): SearchHit[] {
   const needle = query.trim().toLowerCase();
   if (needle === "") return [];
 
@@ -48,9 +52,13 @@ export function searchNodes(nodes: SchemaNode[], query: string, limit = 50): Sea
       }
     }
 
-    if (score !== Number.POSITIVE_INFINITY) scored.push({ hit: { node, propertyAlias }, score });
+    if (score !== Number.POSITIVE_INFINITY)
+      scored.push({ hit: { node, propertyAlias }, score });
   }
 
-  scored.sort((a, b) => a.score - b.score || a.hit.node.name.localeCompare(b.hit.node.name));
+  scored.sort(
+    (a, b) =>
+      a.score - b.score || a.hit.node.name.localeCompare(b.hit.node.name)
+  );
   return scored.slice(0, limit).map((entry) => entry.hit);
 }
