@@ -3,7 +3,10 @@ import { UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN } from "@umbraco-cms/back
 import { filter, firstValueFrom } from "@umbraco-cms/backoffice/external/rxjs";
 import { loadManifestPlainJs } from "@umbraco-cms/backoffice/extension-api";
 import { umbHttpClient } from "@umbraco-cms/backoffice/http-client";
-import { UMB_ICON_REGISTRY_CONTEXT, type UmbIconModule } from "@umbraco-cms/backoffice/icon";
+import {
+  UMB_ICON_REGISTRY_CONTEXT,
+  type UmbIconModule,
+} from "@umbraco-cms/backoffice/icon";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
@@ -45,9 +48,11 @@ export const openTypeInEditor = (unique: string) =>
     null,
     "",
     new URL(
-      UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN.generateAbsolute({ unique }),
-      document.baseURI,
-    ),
+      UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN.generateAbsolute({
+        unique,
+      }),
+      document.baseURI
+    )
   );
 
 /**
@@ -64,13 +69,17 @@ export const openTypeInEditor = (unique: string) =>
  */
 export const resolveIcons = async (
   host: UmbClassInterface,
-  names: Iterable<string>,
+  names: Iterable<string>
 ): Promise<Record<string, string>> => {
-  const context = await host.getContext(UMB_ICON_REGISTRY_CONTEXT).catch(() => undefined);
+  const context = await host
+    .getContext(UMB_ICON_REGISTRY_CONTEXT)
+    .catch(() => undefined);
   if (!context) return {};
 
   // The list starts empty and fills when the backoffice icon manifest's JS loads.
-  const definitions = await firstValueFrom(context.icons.pipe(filter((icons) => icons.length > 0)));
+  const definitions = await firstValueFrom(
+    context.icons.pipe(filter((icons) => icons.length > 0))
+  );
 
   const entries = await Promise.all(
     [...new Set(names)].map(async (name) => {
@@ -78,7 +87,7 @@ export const resolveIcons = async (
       if (!definition) return undefined;
       const module = await loadManifestPlainJs<UmbIconModule>(definition.path);
       return module?.default ? ([name, module.default] as const) : undefined;
-    }),
+    })
   );
 
   return Object.fromEntries(entries.filter((entry) => entry !== undefined));

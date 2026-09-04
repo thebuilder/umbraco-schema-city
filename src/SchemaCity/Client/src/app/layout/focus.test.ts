@@ -3,7 +3,13 @@ import mediumFixture from "../../../dev/fixtures/medium.json";
 import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import { type Neighbourhood, neighbourhoods } from "../../model/neighbourhood";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
-import { ISLAND_PAD, layoutCity, ROW_LIMIT, STREET, type Placement } from "./city";
+import {
+  ISLAND_PAD,
+  layoutCity,
+  ROW_LIMIT,
+  STREET,
+  type Placement,
+} from "./city";
 import { focusAnchor, focusBounds, layoutFocus } from "./focus";
 
 const medium = mediumFixture as unknown as SchemaGraph;
@@ -30,7 +36,10 @@ function node(alias: string, extra: Partial<SchemaNode> = {}): SchemaNode {
   };
 }
 
-const graphOf = (nodes: SchemaNode[], edges: SchemaEdge[] = []): SchemaGraph => ({
+const graphOf = (
+  nodes: SchemaNode[],
+  edges: SchemaEdge[] = []
+): SchemaGraph => ({
   generatedAt: "2026-09-03T00:00:00Z",
   folders: [],
   nodes,
@@ -60,14 +69,29 @@ const hub = graphOf(
     { kind: "composition", from: "user", to: "hub" },
     { kind: "block", from: "hub", to: "blockTarget", propertyAlias: "blocks" },
     { kind: "block", from: "blockHost", to: "hub", propertyAlias: "blocks" },
-    { kind: "reference", from: "hub", to: "referenceTarget", propertyAlias: "picker" },
-    { kind: "reference", from: "referenceSource", to: "hub", propertyAlias: "picker" },
-  ],
+    {
+      kind: "reference",
+      from: "hub",
+      to: "referenceTarget",
+      propertyAlias: "picker",
+    },
+    {
+      kind: "reference",
+      from: "referenceSource",
+      to: "hub",
+      propertyAlias: "picker",
+    },
+  ]
 );
 
 function focusOn(graph: SchemaGraph, id: string) {
   const city = layoutCity(graph);
-  const focus = layoutFocus(graph, neighbourhoods(graph).get(id) as Neighbourhood, id, city);
+  const focus = layoutFocus(
+    graph,
+    neighbourhoods(graph).get(id) as Neighbourhood,
+    id,
+    city
+  );
   const moved = focus.filter((placement, i) => placement !== city[i]);
   return {
     city,
@@ -137,8 +161,16 @@ describe("layoutFocus", () => {
     expect(quarter(at("user"))).toEqual({ x: 1, z: -1, raised: false });
     expect(quarter(at("blockTarget"))).toEqual({ x: -1, z: 1, raised: false });
     expect(quarter(at("blockHost"))).toEqual({ x: 1, z: 1, raised: false });
-    expect(quarter(at("referenceTarget"))).toEqual({ x: 1, z: 0, raised: false });
-    expect(quarter(at("referenceSource"))).toEqual({ x: -1, z: 0, raised: false });
+    expect(quarter(at("referenceTarget"))).toEqual({
+      x: 1,
+      z: 0,
+      raised: false,
+    });
+    expect(quarter(at("referenceSource"))).toEqual({
+      x: -1,
+      z: 0,
+      raised: false,
+    });
   });
 
   it("keeps a neighbourhood of one each within three streets of the origin", () => {
@@ -153,13 +185,26 @@ describe("layoutFocus", () => {
   it("keeps a group that fits one row within three streets whatever another group does", () => {
     // Forty children fold onto five rows, which is the one reason to stand further
     // out than three streets. The parents to the north are not pushed with them.
-    const children = Array.from({ length: 40 }, (_, i) => `child${String(i).padStart(2, "0")}`);
+    const children = Array.from(
+      { length: 40 },
+      (_, i) => `child${String(i).padStart(2, "0")}`
+    );
     const graph = graphOf(
-      [node("home", { allowedAsRoot: true }), node("parent"), ...children.map((a) => node(a))],
+      [
+        node("home", { allowedAsRoot: true }),
+        node("parent"),
+        ...children.map((a) => node(a)),
+      ],
       [
         { kind: "allowedChild", from: "parent", to: "home" },
-        ...children.map((alias): SchemaEdge => ({ kind: "allowedChild", from: "home", to: alias })),
-      ],
+        ...children.map(
+          (alias): SchemaEdge => ({
+            kind: "allowedChild",
+            from: "home",
+            to: alias,
+          })
+        ),
+      ]
     );
     const { at } = focusOn(graph, "home");
 
@@ -167,10 +212,22 @@ describe("layoutFocus", () => {
   });
 
   it("folds forty children onto five rows to the south", () => {
-    const children = Array.from({ length: 40 }, (_, i) => `child${String(i).padStart(2, "0")}`);
+    const children = Array.from(
+      { length: 40 },
+      (_, i) => `child${String(i).padStart(2, "0")}`
+    );
     const graph = graphOf(
-      [node("home", { allowedAsRoot: true }), ...children.map((alias) => node(alias))],
-      children.map((alias): SchemaEdge => ({ kind: "allowedChild", from: "home", to: alias })),
+      [
+        node("home", { allowedAsRoot: true }),
+        ...children.map((alias) => node(alias)),
+      ],
+      children.map(
+        (alias): SchemaEdge => ({
+          kind: "allowedChild",
+          from: "home",
+          to: alias,
+        })
+      )
     );
     const { at } = focusOn(graph, "home");
 
@@ -181,7 +238,13 @@ describe("layoutFocus", () => {
       rows.set(position.z, (rows.get(position.z) ?? 0) + 1);
     }
 
-    expect([...rows.values()]).toEqual([ROW_LIMIT, ROW_LIMIT, ROW_LIMIT, ROW_LIMIT, ROW_LIMIT]);
+    expect([...rows.values()]).toEqual([
+      ROW_LIMIT,
+      ROW_LIMIT,
+      ROW_LIMIT,
+      ROW_LIMIT,
+      ROW_LIMIT,
+    ]);
   });
 
   it("leaves no two buildings standing on the same ground", () => {
@@ -191,20 +254,36 @@ describe("layoutFocus", () => {
     // with one neighbour are both covered, plus the stress fixture's worst hub, whose
     // sixty-two neighbours fill every group at once.
     for (const type of medium.nodes) {
-      expect([type.alias, overlap(focusOn(medium, type.id).moved)]).toEqual([type.alias, null]);
+      expect([type.alias, overlap(focusOn(medium, type.id).moved)]).toEqual([
+        type.alias,
+        null,
+      ]);
     }
-    const hubPage = pathological.nodes.find((type) => type.alias === "hubPage") as SchemaNode;
+    const hubPage = pathological.nodes.find(
+      (type) => type.alias === "hubPage"
+    ) as SchemaNode;
     expect(overlap(focusOn(pathological, hubPage.id).moved)).toBeNull();
   });
 
   it("covers every placed building plus the island's padding", () => {
-    const { moved, bounds } = focusOn(medium, medium.nodes.find((n) => n.alias === "home")?.id ?? "");
+    const { moved, bounds } = focusOn(
+      medium,
+      medium.nodes.find((n) => n.alias === "home")?.id ?? ""
+    );
 
     for (const placement of moved) {
-      expect(bounds.minX).toBeLessThanOrEqual(placement.position.x - placement.footprint / 2 - ISLAND_PAD);
-      expect(bounds.maxX).toBeGreaterThanOrEqual(placement.position.x + placement.footprint / 2 + ISLAND_PAD);
-      expect(bounds.minZ).toBeLessThanOrEqual(placement.position.z - placement.footprint / 2 - ISLAND_PAD);
-      expect(bounds.maxZ).toBeGreaterThanOrEqual(placement.position.z + placement.footprint / 2 + ISLAND_PAD);
+      expect(bounds.minX).toBeLessThanOrEqual(
+        placement.position.x - placement.footprint / 2 - ISLAND_PAD
+      );
+      expect(bounds.maxX).toBeGreaterThanOrEqual(
+        placement.position.x + placement.footprint / 2 + ISLAND_PAD
+      );
+      expect(bounds.minZ).toBeLessThanOrEqual(
+        placement.position.z - placement.footprint / 2 - ISLAND_PAD
+      );
+      expect(bounds.maxZ).toBeGreaterThanOrEqual(
+        placement.position.z + placement.footprint / 2 + ISLAND_PAD
+      );
     }
     expect(bounds.centre).toEqual({
       x: (bounds.minX + bounds.maxX) / 2,
@@ -213,7 +292,9 @@ describe("layoutFocus", () => {
   });
 
   it("fits the seeded Home and its forty-two neighbours into about sixty units square", () => {
-    const home = medium.nodes.find((type) => type.alias === "home") as SchemaNode;
+    const home = medium.nodes.find(
+      (type) => type.alias === "home"
+    ) as SchemaNode;
     const { moved, bounds } = focusOn(medium, home.id);
 
     expect(moved.length).toBe(43);
@@ -223,7 +304,10 @@ describe("layoutFocus", () => {
   });
 
   it("gives a node with no neighbours its own footprint plus padding", () => {
-    const graph = graphOf([node("lonely", { allowedAsRoot: true }), node("stranger")]);
+    const graph = graphOf([
+      node("lonely", { allowedAsRoot: true }),
+      node("stranger"),
+    ]);
     const { moved, at, bounds } = focusOn(graph, "lonely");
 
     expect(moved.map((p) => p.id)).toEqual(["lonely"]);
@@ -247,8 +331,12 @@ describe("layoutFocus", () => {
 
   it("leaves every node outside the neighbourhood exactly where the city put it", () => {
     const graph = graphOf(
-      [node("hub", { allowedAsRoot: true }), node("child"), node("stranger", { allowedAsRoot: true })],
-      [{ kind: "allowedChild", from: "hub", to: "child" }],
+      [
+        node("hub", { allowedAsRoot: true }),
+        node("child"),
+        node("stranger", { allowedAsRoot: true }),
+      ],
+      [{ kind: "allowedChild", from: "hub", to: "child" }]
     );
     const { city, focus } = focusOn(graph, "hub");
     const before = city.find((p) => p.id === "stranger");

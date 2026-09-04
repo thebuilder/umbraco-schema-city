@@ -2,7 +2,12 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   type Finding,
@@ -38,12 +43,16 @@ function Row({
       type="button"
     >
       <span className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate text-phosphor text-xs">{name}</span>
+        <span className="min-w-0 flex-1 truncate text-phosphor text-xs">
+          {name}
+        </span>
         <span className="shrink-0 text-3xs text-phosphor-dim uppercase tracking-terminal">
           {FINDING_LABEL[finding.kind]}
         </span>
       </span>
-      <span className="block text-muted-foreground text-3xs">{finding.summary}</span>
+      <span className="block text-muted-foreground text-3xs">
+        {finding.summary}
+      </span>
     </button>
   );
 }
@@ -72,7 +81,9 @@ export function Findings({
     kinds.length === 0
       ? findings
       : findings.filter((finding) => kinds.includes(finding.kind));
-  const problems = findings.filter((finding) => finding.severity === "problem").length;
+  const problems = findings.filter(
+    (finding) => finding.severity === "problem"
+  ).length;
 
   const pick = (id: string) => {
     onSelect(id);
@@ -81,13 +92,19 @@ export function Findings({
 
   return (
     <Sheet onOpenChange={setOpen} open={open}>
-      <SheetTrigger render={<Button data-trigger size="sm" variant="outline" />}>
+      <SheetTrigger
+        render={<Button data-trigger size="sm" variant="outline" />}
+      >
         Findings
-        <Badge variant={problems > 0 ? "signal" : "outline"}>{findings.length}</Badge>
+        <Badge variant={problems > 0 ? "signal" : "outline"}>
+          {findings.length}
+        </Badge>
       </SheetTrigger>
       <SheetContent className="w-full gap-0 p-0 sm:max-w-md">
         <div className="border-line border-b px-4 py-3">
-          <SheetTitle className="text-sm uppercase tracking-terminal-lg">Findings</SheetTitle>
+          <SheetTitle className="text-sm uppercase tracking-terminal-lg">
+            Findings
+          </SheetTitle>
           <p className="mt-1 text-muted-foreground text-xs">
             {matched.length} matched / {findings.length} total
           </p>
@@ -125,7 +142,9 @@ export function Findings({
               </p>
             ) : null}
             {(["problem", "note"] as const).map((severity) => {
-              const rows = matched.filter((finding) => finding.severity === severity);
+              const rows = matched.filter(
+                (finding) => finding.severity === severity
+              );
               if (rows.length === 0) return null;
               return (
                 <section key={severity}>
@@ -136,7 +155,9 @@ export function Findings({
                     <Row
                       finding={finding}
                       key={finding.id}
-                      name={nodesById.get(finding.nodeId)?.name ?? "a deleted type"}
+                      name={
+                        nodesById.get(finding.nodeId)?.name ?? "a deleted type"
+                      }
                       onSelect={pick}
                     />
                   ))}

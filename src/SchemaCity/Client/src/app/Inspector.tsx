@@ -79,7 +79,9 @@ function GroupedTypeList({
     <>
       {groups.map((group) => (
         <div className="mb-1.5 last:mb-0" key={group.propertyAlias}>
-          <p className="font-mono text-3xs text-phosphor-dim">{group.propertyAlias}</p>
+          <p className="font-mono text-3xs text-phosphor-dim">
+            {group.propertyAlias}
+          </p>
           <TypeList ids={group.ids} nodesById={nodesById} onSelect={onSelect} />
         </div>
       ))}
@@ -112,9 +114,12 @@ function Properties({
           </span>
           {/* A whole group can come from one composition, and then the group header
               already says so, so only a property that differs repeats it. */}
-          {property.fromCompositionId && property.fromCompositionId !== group.fromCompositionId ? (
+          {property.fromCompositionId &&
+          property.fromCompositionId !== group.fromCompositionId ? (
             <span className="block text-3xs text-phosphor-dim">
-              composed from {nodesById.get(property.fromCompositionId)?.name ?? "a deleted type"}
+              composed from{" "}
+              {nodesById.get(property.fromCompositionId)?.name ??
+                "a deleted type"}
             </span>
           ) : null}
         </li>
@@ -132,14 +137,15 @@ function Floors({ node, nodesById }: { node: SchemaNode; nodesById: Lookup }) {
   const top = groups.filter(
     (group) =>
       group.parentAlias === null ||
-      !groups.some((candidate) => candidate.alias === group.parentAlias),
+      !groups.some((candidate) => candidate.alias === group.parentAlias)
   );
 
   const origin = (group: PropertyGroup) =>
     group.fromCompositionId ? (
       <span className="text-3xs text-phosphor-dim">
         {" "}
-        composed from {nodesById.get(group.fromCompositionId)?.name ?? "a deleted type"}
+        composed from{" "}
+        {nodesById.get(group.fromCompositionId)?.name ?? "a deleted type"}
       </span>
     ) : null;
 
@@ -184,7 +190,10 @@ function Usage({ usage }: { usage: TypeUsage }) {
     ["Drafts", usage.drafts.toLocaleString()],
     ["Trashed", usage.trashed.toLocaleString()],
     ["Root instances", usage.rootInstances.toLocaleString()],
-    ["Cultures", usage.cultures.length > 0 ? usage.cultures.join(", ") : "none"],
+    [
+      "Cultures",
+      usage.cultures.length > 0 ? usage.cultures.join(", ") : "none",
+    ],
     // The date half of the timestamp, not a formatted local date, so the panel
     // reads the same on every machine the backoffice runs on.
     ["Last edited", usage.lastEdited ? usage.lastEdited.slice(0, 10) : "never"],
@@ -196,7 +205,9 @@ function Usage({ usage }: { usage: TypeUsage }) {
         {rows.map(([label, value]) => (
           <Fragment key={label}>
             <dt className="text-3xs text-phosphor-dim">{label}</dt>
-            <dd className="justify-self-end truncate text-phosphor text-xs">{value}</dd>
+            <dd className="justify-self-end truncate text-phosphor text-xs">
+              {value}
+            </dd>
           </Fragment>
         ))}
       </dl>
@@ -210,7 +221,10 @@ function Usage({ usage }: { usage: TypeUsage }) {
  * into the document can carry an event handler with it.
  */
 function TypeIcon({ svg }: { svg?: string }) {
-  if (!svg) return <span aria-hidden className="mt-0.5 size-4 shrink-0 border border-line" />;
+  if (!svg)
+    return (
+      <span aria-hidden className="mt-0.5 size-4 shrink-0 border border-line" />
+    );
   const mask = iconMask(svg);
   return (
     <span
@@ -265,7 +279,11 @@ export function Inspector({
     <TypeList ids={ids} nodesById={nodesById} onSelect={onSelect} />
   );
   const grouped = (groups: PropertyTargets[]) => (
-    <GroupedTypeList groups={groups} nodesById={nodesById} onSelect={onSelect} />
+    <GroupedTypeList
+      groups={groups}
+      nodesById={nodesById}
+      onSelect={onSelect}
+    />
   );
   const properties = node.ownPropertyCount + node.composedPropertyCount;
 
@@ -275,8 +293,12 @@ export function Inspector({
         {/* The roofs cull their icons by size; this one is here at any zoom. */}
         <TypeIcon svg={icons?.[node.icon]} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-bold text-phosphor-bright text-sm">{node.name}</p>
-          <p className="truncate font-mono text-2xs text-phosphor-dim">{node.alias}</p>
+          <p className="truncate font-bold text-phosphor-bright text-sm">
+            {node.name}
+          </p>
+          <p className="truncate font-mono text-2xs text-phosphor-dim">
+            {node.alias}
+          </p>
         </div>
         <Button
           onClick={onToggleFocus}
@@ -285,7 +307,12 @@ export function Inspector({
         >
           {focused ? "Leave focus" : "Focus"}
         </Button>
-        <Button aria-label="Close inspector" onClick={onClose} size="icon-sm" variant="ghost">
+        <Button
+          aria-label="Close inspector"
+          onClick={onClose}
+          size="icon-sm"
+          variant="ghost"
+        >
           <XIcon />
         </Button>
       </header>
@@ -293,10 +320,12 @@ export function Inspector({
       <div className="flex flex-wrap gap-1 border-line border-b px-3 py-2">
         {node.isElement ? <Badge variant="amber">Element</Badge> : null}
         {node.allowedAsRoot ? <Badge>Root</Badge> : null}
-        {node.variesByCulture ? <Badge variant="azure">Varies by culture</Badge> : null}
+        {node.variesByCulture ? (
+          <Badge variant="azure">Varies by culture</Badge>
+        ) : null}
         <Badge variant="outline">
-          {properties} properties ({node.ownPropertyCount} own · {node.composedPropertyCount}{" "}
-          composed)
+          {properties} properties ({node.ownPropertyCount} own ·{" "}
+          {node.composedPropertyCount} composed)
         </Badge>
       </div>
 
@@ -304,29 +333,42 @@ export function Inspector({
         <div className="space-y-3 px-3 py-3">
           {usage ? <Usage usage={usage} /> : null}
           {neighbourhood.compositions.length > 0 ? (
-            <Section title="Compositions">{list(neighbourhood.compositions)}</Section>
+            <Section title="Compositions">
+              {list(neighbourhood.compositions)}
+            </Section>
           ) : null}
           {neighbourhood.inherits.length > 0 ? (
             <Section title="Inherits">{list(neighbourhood.inherits)}</Section>
           ) : null}
           {neighbourhood.allowedParents.length > 0 ? (
-            <Section title="Allowed parents">{list(neighbourhood.allowedParents)}</Section>
+            <Section title="Allowed parents">
+              {list(neighbourhood.allowedParents)}
+            </Section>
           ) : null}
           {neighbourhood.allowedChildren.length > 0 ? (
-            <Section title="Allowed children">{list(neighbourhood.allowedChildren)}</Section>
+            <Section title="Allowed children">
+              {list(neighbourhood.allowedChildren)}
+            </Section>
           ) : null}
           {node.isElement && neighbourhood.blockHosts.length > 0 ? (
-            <Section title="Block hosts">{list(neighbourhood.blockHosts)}</Section>
+            <Section title="Block hosts">
+              {list(neighbourhood.blockHosts)}
+            </Section>
           ) : null}
           {neighbourhood.blockTargets.length > 0 ? (
-            <Section title="Block targets">{grouped(neighbourhood.blockTargets)}</Section>
+            <Section title="Block targets">
+              {grouped(neighbourhood.blockTargets)}
+            </Section>
           ) : null}
-          {neighbourhood.referencesOut.length > 0 || neighbourhood.referencesIn.length > 0 ? (
+          {neighbourhood.referencesOut.length > 0 ||
+          neighbourhood.referencesIn.length > 0 ? (
             <Section title="References">
               {grouped(neighbourhood.referencesOut)}
               {neighbourhood.referencesIn.length > 0 ? (
                 <>
-                  <p className="mt-1.5 text-3xs text-phosphor-dim">referenced by</p>
+                  <p className="mt-1.5 text-3xs text-phosphor-dim">
+                    referenced by
+                  </p>
                   {list(neighbourhood.referencesIn)}
                 </>
               ) : null}
@@ -339,19 +381,29 @@ export function Inspector({
                   <li className="text-phosphor text-xs" key={template.id}>
                     {template.name}
                     {template.isDefault ? (
-                      <span className="text-3xs text-phosphor-dim"> default</span>
+                      <span className="text-3xs text-phosphor-dim">
+                        {" "}
+                        default
+                      </span>
                     ) : null}
                   </li>
                 ))}
               </ul>
             </Section>
           ) : null}
-          {node.groups.length > 0 ? <Floors node={node} nodesById={nodesById} /> : null}
+          {node.groups.length > 0 ? (
+            <Floors node={node} nodesById={nodesById} />
+          ) : null}
         </div>
       </ScrollArea>
 
       <div className="border-line border-t p-3">
-        <Button className="w-full" onClick={() => onOpenType?.(node.id)} size="sm" variant="primary">
+        <Button
+          className="w-full"
+          onClick={() => onOpenType?.(node.id)}
+          size="sm"
+          variant="primary"
+        >
           Open in editor
         </Button>
       </div>

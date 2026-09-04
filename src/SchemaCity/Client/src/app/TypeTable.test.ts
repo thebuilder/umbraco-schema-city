@@ -58,7 +58,15 @@ test("usage is a count when the report is in, and absent when it is not", () => 
   const usage: UsageReport = {
     generatedAt: "",
     byType: {
-      home: { total: 12, published: 12, drafts: 0, trashed: 0, rootInstances: 1, cultures: [], lastEdited: null },
+      home: {
+        total: 12,
+        published: 12,
+        drafts: 0,
+        trashed: 0,
+        rootInstances: 1,
+        cultures: [],
+        lastEdited: null,
+      },
     },
     references: [],
   };

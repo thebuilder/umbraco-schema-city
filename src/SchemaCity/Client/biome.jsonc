@@ -5,6 +5,8 @@
     "ultracite/biome/react",
     "ultracite/biome/vitest"
   ],
+  // The repository's .gitignore sits at the solution root, three levels up.
+  "vcs": { "root": "../../.." },
   "files": {
     "includes": [
       "**",

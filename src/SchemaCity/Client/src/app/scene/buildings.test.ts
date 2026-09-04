@@ -72,7 +72,11 @@ describe("property windows", () => {
         node("a", {
           groups: [
             group({ properties: [property("one"), property("two", true)] }),
-            group({ alias: "b", fromCompositionId: "comp", properties: [property("three")] }),
+            group({
+              alias: "b",
+              fromCompositionId: "comp",
+              properties: [property("three")],
+            }),
           ],
         }),
       ],
@@ -95,7 +99,9 @@ describe("property windows", () => {
 
   it("stops a row of windows before it draws on itself", () => {
     const properties = Array.from({ length: 60 }, (_, i) => property(`p${i}`));
-    const nodes = new Map([["a", node("a", { groups: [group({ properties })] })]]);
+    const nodes = new Map([
+      ["a", node("a", { groups: [group({ properties })] })],
+    ]);
     const { windows } = buildFloorCells(nodes, [placement("a")]);
 
     // A 2-unit footprint has 8 units of wall, and windows sit 0.28 apart.
@@ -104,7 +110,13 @@ describe("property windows", () => {
 
   it("gives an Element Type no windows, because it has no floors", () => {
     const nodes = new Map([
-      ["a", node("a", { isElement: true, groups: [group({ properties: [property("one")] })] })],
+      [
+        "a",
+        node("a", {
+          isElement: true,
+          groups: [group({ properties: [property("one")] })],
+        }),
+      ],
     ]);
 
     expect(buildFloorCells(nodes, [placement("a")]).windows).toEqual([]);
@@ -196,7 +208,9 @@ describe("focus mode's flat plates", () => {
     expect(flat.heights.get("a")).toBeCloseTo(0.1);
     // Three floors still, stacked inside the plate rather than dropped.
     expect(flat.cells).toHaveLength(3);
-    expect(Math.max(...flat.cells.map((c) => c.cy + c.sy / 2))).toBeCloseTo(0.1);
+    expect(Math.max(...flat.cells.map((c) => c.cy + c.sy / 2))).toBeCloseTo(
+      0.1
+    );
 
     // Half way through the tween it is half way down, near enough.
     const half = buildFloorCells(nodes, [placement("a", { flatten: 0.5 })]);
@@ -206,8 +220,8 @@ describe("focus mode's flat plates", () => {
   it("flattens an Element Type's warehouse too", () => {
     const nodes = new Map([["a", node("a", { isElement: true })]]);
 
-    expect(buildFloorCells(nodes, [placement("a", { flatten: 1 })]).heights.get("a")).toBeCloseTo(
-      0.1,
-    );
+    expect(
+      buildFloorCells(nodes, [placement("a", { flatten: 1 })]).heights.get("a")
+    ).toBeCloseTo(0.1);
   });
 });

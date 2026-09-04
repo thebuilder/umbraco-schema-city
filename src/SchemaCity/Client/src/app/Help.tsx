@@ -46,7 +46,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         does: "Pan the view. In Free, turn it: swing the view up, left, down, right",
       },
       { keys: ["R", "F"], does: "Rise and descend, in Free" },
-      { keys: ["Shift"], does: "Hold alongside any of these to go twice as fast" },
+      {
+        keys: ["Shift"],
+        does: "Hold alongside any of these to go twice as fast",
+      },
       { keys: ["Home"], does: "Reframe the city" },
     ],
   },
@@ -101,7 +104,12 @@ export function Help({
       <DialogTrigger
         aria-label="Control reference"
         render={
-          <Button className="text-xs" data-trigger size="icon-sm" variant="outline" />
+          <Button
+            className="text-xs"
+            data-trigger
+            size="icon-sm"
+            variant="outline"
+          />
         }
       >
         ?

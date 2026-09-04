@@ -57,7 +57,7 @@ export function buildLinkGeometry(
   layer: Exclude<Layer, "structure">,
   edges: SchemaEdge[],
   anchors: Map<string, Anchor>,
-  placements: Map<string, Placement>,
+  placements: Map<string, Placement>
 ): { positions: Float32Array; ranges: LinkRange[] } {
   const positions: number[] = [];
   const ranges: LinkRange[] = [];
@@ -71,13 +71,17 @@ export function buildLinkGeometry(
       ? new Set(
           edges
             .filter((edge) => edge.kind === "inherits")
-            .map((edge) => `${edge.from}|${edge.to}`),
+            .map((edge) => `${edge.from}|${edge.to}`)
         )
       : null;
 
   for (const edge of edges) {
     if (LAYER_OF[edge.kind] !== layer) continue;
-    if (edge.kind === "composition" && inherited?.has(`${edge.from}|${edge.to}`)) continue;
+    if (
+      edge.kind === "composition" &&
+      inherited?.has(`${edge.from}|${edge.to}`)
+    )
+      continue;
     // Two block properties on one type pointing at the same Element Type are one
     // line, not two drawn on top of each other. That is 38 of the seeded schema's
     // 340 block edges, and the inspector is where the property aliases are read.
@@ -96,7 +100,7 @@ export function buildLinkGeometry(
         to,
         placements.get(edge.from),
         placements.get(edge.to),
-        layer === "references" ? REFERENCE_Y : BLOCK_Y,
+        layer === "references" ? REFERENCE_Y : BLOCK_Y
       );
       for (let i = 1; i < path.length; i++) {
         const a = path[i - 1] as Anchor;
@@ -132,7 +136,7 @@ function groundPath(
   to: Anchor,
   fromPlacement: Placement | undefined,
   toPlacement: Placement | undefined,
-  y: number,
+  y: number
 ): Anchor[] {
   if (!fromPlacement || !toPlacement) return [from, to];
   return [
@@ -181,7 +185,7 @@ function pushDashes(out: number[], from: Anchor, to: Anchor) {
       from.z + (to.z - from.z) * start,
       from.x + (to.x - from.x) * end,
       from.y + (to.y - from.y) * end,
-      from.z + (to.z - from.z) * end,
+      from.z + (to.z - from.z) * end
     );
   }
 }

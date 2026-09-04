@@ -70,7 +70,7 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
 export function urlToWrite(
   state: UrlState,
   mountedAt: string,
-  pathname: string,
+  pathname: string
 ): string | null {
   return pathname === mountedAt ? pathname + serialiseUrl(state) : null;
 }

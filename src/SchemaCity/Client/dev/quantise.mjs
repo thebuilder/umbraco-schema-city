@@ -51,8 +51,14 @@ function decode(png) {
   }
   const width = header.readUInt32BE(0);
   const height = header.readUInt32BE(4);
-  if (header[8] !== 8 || (header[9] !== 2 && header[9] !== 6) || header[12] !== 0) {
-    throw new Error(`unsupported PNG: depth ${header[8]}, colour ${header[9]}, interlace ${header[12]}`);
+  if (
+    header[8] !== 8 ||
+    (header[9] !== 2 && header[9] !== 6) ||
+    header[12] !== 0
+  ) {
+    throw new Error(
+      `unsupported PNG: depth ${header[8]}, colour ${header[9]}, interlace ${header[12]}`
+    );
   }
   const bpp = header[9] === 6 ? 4 : 3;
   const raw = zlib.inflateSync(Buffer.concat(parts));
@@ -77,7 +83,9 @@ function decode(png) {
 }
 
 const rgbOf = (bucket) =>
-  [(bucket >> 10) & 31, (bucket >> 5) & 31, bucket & 31].map((v) => Math.round((v * 255) / 31));
+  [(bucket >> 10) & 31, (bucket >> 5) & 31, bucket & 31].map((v) =>
+    Math.round((v * 255) / 31)
+  );
 
 /**
  * 256 colours for these pixels, from 5-bit buckets.
@@ -91,15 +99,24 @@ const rgbOf = (bucket) =>
 function palette(pixels, bpp) {
   const counts = new Map();
   for (let i = 0; i < pixels.length; i += bpp) {
-    const bucket = ((pixels[i] >> 3) << 10) | ((pixels[i + 1] >> 3) << 5) | (pixels[i + 2] >> 3);
+    const bucket =
+      ((pixels[i] >> 3) << 10) |
+      ((pixels[i + 1] >> 3) << 5) |
+      (pixels[i + 2] >> 3);
     counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
   }
   const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   const chosen = ranked.slice(0, 192).map(([bucket]) => rgbOf(bucket));
   // A bucket under 20 pixels is an antialiased edge, not a colour worth a slot.
-  const rest = ranked.slice(192).filter(([, n]) => n >= 20).map(([bucket]) => rgbOf(bucket));
-  const distance = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
-  const far = rest.map((colour) => Math.min(...chosen.map((c) => distance(c, colour))));
+  const rest = ranked
+    .slice(192)
+    .filter(([, n]) => n >= 20)
+    .map(([bucket]) => rgbOf(bucket));
+  const distance = (a, b) =>
+    (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+  const far = rest.map((colour) =>
+    Math.min(...chosen.map((c) => distance(c, colour)))
+  );
 
   while (chosen.length < 256 && rest.length > 0) {
     let pick = 0;
@@ -107,7 +124,8 @@ function palette(pixels, bpp) {
     const [colour] = rest.splice(pick, 1);
     far.splice(pick, 1);
     chosen.push(colour);
-    for (let i = 0; i < rest.length; i++) far[i] = Math.min(far[i], distance(colour, rest[i]));
+    for (let i = 0; i < rest.length; i++)
+      far[i] = Math.min(far[i], distance(colour, rest[i]));
   }
   return chosen;
 }
@@ -144,7 +162,11 @@ export function quantise(png) {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * bpp;
-      rows[y * (width + 1) + 1 + x] = indexOf(pixels[i], pixels[i + 1], pixels[i + 2]);
+      rows[y * (width + 1) + 1 + x] = indexOf(
+        pixels[i],
+        pixels[i + 1],
+        pixels[i + 2]
+      );
     }
   }
 

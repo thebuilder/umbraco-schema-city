@@ -17,7 +17,13 @@ export type Run = { x0: number; z0: number; x1: number; z1: number };
  * 0 reads east, a quarter turn reads north. Those are the only two of the four
  * quarter turns that are the right way up under the default camera.
  */
-export type Nameplate = { x: number; z: number; width: number; height: number; rotation: number };
+export type Nameplate = {
+  x: number;
+  z: number;
+  width: number;
+  height: number;
+  rotation: number;
+};
 
 /** Cap heights the search tries, largest first. */
 const CAPS = [4, 3.5, 3, 2.5];
@@ -47,7 +53,7 @@ const EDGE_RANK = 4;
  */
 export function groundRuns(
   placementsById: Map<string, Placement>,
-  edges: SchemaEdge[],
+  edges: SchemaEdge[]
 ): Run[] {
   const runs: Run[] = planRoads(placementsById, edges).map((segment) => ({
     x0: segment.x0,
@@ -80,13 +86,15 @@ function occupancy(island: Rect, buildings: Placement[], runs: Run[]) {
   const cols = Math.max(1, Math.ceil((island.maxX - island.minX) / CELL));
   const rows = Math.max(1, Math.ceil((island.maxZ - island.minZ) / CELL));
   const busy = new Uint8Array(cols * rows);
-  const cell = (value: number, origin: number) => Math.floor((value - origin) / CELL);
+  const cell = (value: number, origin: number) =>
+    Math.floor((value - origin) / CELL);
   const mark = (minX: number, maxX: number, minZ: number, maxZ: number) => {
     const i0 = Math.max(0, cell(minX, island.minX));
     const i1 = Math.min(cols - 1, cell(maxX, island.minX));
     const j0 = Math.max(0, cell(minZ, island.minZ));
     const j1 = Math.min(rows - 1, cell(maxZ, island.minZ));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) busy[j * cols + i] = 1;
+    for (let j = j0; j <= j1; j++)
+      for (let i = i0; i <= i1; i++) busy[j * cols + i] = 1;
   };
 
   for (const placement of buildings) {
@@ -97,13 +105,15 @@ function occupancy(island: Rect, buildings: Placement[], runs: Run[]) {
       placement.position.x - half,
       placement.position.x + half,
       placement.position.z - half - lean,
-      placement.position.z + half,
+      placement.position.z + half
     );
   }
   for (const run of runs) {
     // A ribbon and its chevrons are about a unit across, which is one cell, so the
     // centre line walked in half cells covers the ground the run reads on.
-    const steps = Math.ceil(Math.hypot(run.x1 - run.x0, run.z1 - run.z0) / (CELL / 2));
+    const steps = Math.ceil(
+      Math.hypot(run.x1 - run.x0, run.z1 - run.z0) / (CELL / 2)
+    );
     for (let step = 0; step <= steps; step++) {
       const t = steps === 0 ? 0 : step / steps;
       const x = run.x0 + (run.x1 - run.x0) * t;
@@ -126,9 +136,9 @@ function occupancy(island: Rect, buildings: Placement[], runs: Run[]) {
   }
   const clear = (i: number, j: number, w: number, h: number) =>
     (sums[(j + h) * stride + i + w] as number) -
-    (sums[j * stride + i + w] as number) -
-    (sums[(j + h) * stride + i] as number) +
-    (sums[j * stride + i] as number) ===
+      (sums[j * stride + i + w] as number) -
+      (sums[(j + h) * stride + i] as number) +
+      (sums[j * stride + i] as number) ===
     0;
   return { cols, rows, clear };
 }
@@ -172,7 +182,7 @@ export function findNameplate(
   island: Rect,
   buildings: Placement[],
   runs: Run[],
-  aspect: number,
+  aspect: number
 ): Nameplate {
   const { cols, rows, clear } = occupancy(island, buildings, runs);
 
@@ -200,7 +210,11 @@ export function findNameplate(
                     ? 3
                     : EDGE_RANK;
           const reach = i * i + j * j;
-          if (best && (best.rank < rank || (best.rank === rank && best.reach <= reach))) continue;
+          if (
+            best &&
+            (best.rank < rank || (best.rank === rank && best.reach <= reach))
+          )
+            continue;
           best = {
             rank,
             reach,

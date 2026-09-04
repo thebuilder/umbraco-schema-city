@@ -6,7 +6,11 @@ import { defineConfig } from "vite";
 const sceneOnlyCache = new Map<string, boolean>();
 
 /** True when every path back from `id` to an entry point passes through Scene.tsx. */
-function isSceneOnly(id: string, getModuleInfo: GetModuleInfo, stack = new Set<string>()): boolean {
+function isSceneOnly(
+  id: string,
+  getModuleInfo: GetModuleInfo,
+  stack = new Set<string>()
+): boolean {
   if (sceneOnlyCache.has(id)) return sceneOnlyCache.get(id) as boolean;
   if (id.endsWith("/Scene.tsx")) return true;
   if (stack.has(id)) return true; // a cycle with no outside importer found yet
@@ -15,7 +19,9 @@ function isSceneOnly(id: string, getModuleInfo: GetModuleInfo, stack = new Set<s
   const info = getModuleInfo(id);
   const importers = info ? [...info.importers, ...info.dynamicImporters] : [];
   // No importers means this id is an entry point itself, so it is never Scene-only.
-  const result = importers.length > 0 && importers.every((importer) => isSceneOnly(importer, getModuleInfo, stack));
+  const result =
+    importers.length > 0 &&
+    importers.every((importer) => isSceneOnly(importer, getModuleInfo, stack));
   sceneOnlyCache.set(id, result);
   return result;
 }
@@ -62,7 +68,8 @@ export default defineConfig({
         // define() threw. Splitting node_modules and app code into their own chunks means
         // the entry has nothing worth importing back, so Scene.js never points at it.
         manualChunks(id, { getModuleInfo }) {
-          if (id.includes("/src/app/") && !id.endsWith("/Scene.tsx")) return "app";
+          if (id.includes("/src/app/") && !id.endsWith("/Scene.tsx"))
+            return "app";
           if (!id.includes("node_modules")) return;
           // three, r3f and drei pull in a dozen unnamed helper packages (three-stdlib,
           // camera-controls, meshline...). Naming them here would miss the next one that

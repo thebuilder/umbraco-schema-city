@@ -25,13 +25,18 @@ const COMPOUND: Record<string, string> = {
  * trusted, both because it goes into an SVG attribute and because an unknown colour
  * would paint nothing at all.
  */
-export function iconColour(iconColor: string | null | undefined, fallback: string): string {
+export function iconColour(
+  iconColor: string | null | undefined,
+  fallback: string
+): string {
   const name = (iconColor ?? "").replace(/^color-/, "");
   const colour = COMPOUND[name] ?? name;
   if (!/^(?:[a-z]+|#[0-9a-f]{3,8})$/.test(colour)) return fallback;
   // CSS.supports is the browser's own list. Under vitest there is no CSS object and
   // the pattern above is the whole check.
-  return typeof CSS === "undefined" || CSS.supports("color", colour) ? colour : fallback;
+  return typeof CSS === "undefined" || CSS.supports("color", colour)
+    ? colour
+    : fallback;
 }
 
 /**
@@ -48,7 +53,10 @@ export function paintedSvg(svg: string, colour: string): string {
       const fill = /\sfill\s*=/i.test(root) ? "" : ` fill="${colour}"`;
       return root
         .replace(/\s(?:width|height)\s*=\s*"[^"]*"/gi, "")
-        .replace(/^<svg/i, `<svg width="${ICON_PX}" height="${ICON_PX}"${fill}`);
+        .replace(
+          /^<svg/i,
+          `<svg width="${ICON_PX}" height="${ICON_PX}"${fill}`
+        );
     })
     .replace(/currentColor/g, colour);
 }
@@ -60,7 +68,11 @@ const rasters = new Map<string, Promise<HTMLCanvasElement>>();
  * The icon rasterised to a square canvas, once per `key`. Rejects when the icon is
  * not something the browser can draw, which the scene turns into no icon at all.
  */
-export function rasteriseIcon(key: string, svg: string, colour: string): Promise<HTMLCanvasElement> {
+export function rasteriseIcon(
+  key: string,
+  svg: string,
+  colour: string
+): Promise<HTMLCanvasElement> {
   const found = rasters.get(key);
   if (found) return found;
 

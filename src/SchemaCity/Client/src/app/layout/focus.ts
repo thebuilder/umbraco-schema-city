@@ -3,7 +3,13 @@
 // placement to the one this returns, and back.
 import type { Neighbourhood, PropertyTargets } from "../../model/neighbourhood";
 import type { SchemaGraph } from "../../model/types";
-import { cityBounds, ISLAND_PAD, ROW_LIMIT, STREET, type Placement } from "./city";
+import {
+  cityBounds,
+  ISLAND_PAD,
+  ROW_LIMIT,
+  STREET,
+  type Placement,
+} from "./city";
 
 /** Ground between two buildings in a row, and between two rows, as the city uses. */
 const GAP = 3;
@@ -26,7 +32,12 @@ export type FocusBounds = {
 type Spot = { x: number; z: number; y: number };
 type Box = { minX: number; maxX: number; minZ: number; maxZ: number };
 /** A group packed into rows, in its own coordinates: centred on x, growing in z. */
-type Block = { ids: string[]; spots: Map<string, { x: number; z: number }>; width: number; depth: number };
+type Block = {
+  ids: string[];
+  spots: Map<string, { x: number; z: number }>;
+  width: number;
+  depth: number;
+};
 
 /**
  * Places the focused node at the origin and its neighbourhood around it by relation,
@@ -52,14 +63,17 @@ export function layoutFocus(
   graph: SchemaGraph,
   neighbourhood: Neighbourhood,
   focusId: string,
-  cityPlacements: Placement[],
+  cityPlacements: Placement[]
 ): Placement[] {
-  const inCity = new Map(cityPlacements.map((placement) => [placement.id, placement]));
+  const inCity = new Map(
+    cityPlacements.map((placement) => [placement.id, placement])
+  );
   const aliasOf = new Map(graph.nodes.map((node) => [node.id, node.alias]));
   // A block editor can still name an element type that was deleted, so an id with no
   // alias sorts last rather than crashing the comparison.
   const key = (id: string) => aliasOf.get(id) ?? `\uffff${id}`;
-  const byAlias = (a: string, b: string) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+  const byAlias = (a: string, b: string) =>
+    key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0;
   const sizeOf = (id: string) => inCity.get(id)?.footprint ?? FOOTPRINT;
 
   const taken = new Set<string>([focusId]);
@@ -70,7 +84,8 @@ export function layoutFocus(
     for (const id of fresh) taken.add(id);
     return fresh;
   };
-  const targetsOf = (groups: PropertyTargets[]) => groups.flatMap((group) => group.ids);
+  const targetsOf = (groups: PropertyTargets[]) =>
+    groups.flatMap((group) => group.ids);
   const composedBy = (graph.edges ?? [])
     .filter((edge) => edge.kind === "composition" && edge.to === focusId)
     .map((edge) => edge.from);
@@ -78,7 +93,10 @@ export function layoutFocus(
   // Claimed in this order, so a node in two groups lands in the first of them.
   const parents = claim(neighbourhood.allowedParents);
   const children = claim(neighbourhood.allowedChildren);
-  const compositions = claim([...neighbourhood.inherits, ...neighbourhood.compositions]);
+  const compositions = claim([
+    ...neighbourhood.inherits,
+    ...neighbourhood.compositions,
+  ]);
   const composers = claim(composedBy);
   const blockTargets = claim(targetsOf(neighbourhood.blockTargets));
   const blockHosts = claim(neighbourhood.blockHosts);
@@ -96,10 +114,18 @@ export function layoutFocus(
   const stack = { "-1": near, "1": near };
 
   const boxOf = (ids: string[]): Box => ({
-    minX: Math.min(...ids.map((id) => (spots.get(id) as Spot).x - sizeOf(id) / 2)),
-    maxX: Math.max(...ids.map((id) => (spots.get(id) as Spot).x + sizeOf(id) / 2)),
-    minZ: Math.min(...ids.map((id) => (spots.get(id) as Spot).z - sizeOf(id) / 2)),
-    maxZ: Math.max(...ids.map((id) => (spots.get(id) as Spot).z + sizeOf(id) / 2)),
+    minX: Math.min(
+      ...ids.map((id) => (spots.get(id) as Spot).x - sizeOf(id) / 2)
+    ),
+    maxX: Math.max(
+      ...ids.map((id) => (spots.get(id) as Spot).x + sizeOf(id) / 2)
+    ),
+    minZ: Math.min(
+      ...ids.map((id) => (spots.get(id) as Spot).z - sizeOf(id) / 2)
+    ),
+    maxZ: Math.max(
+      ...ids.map((id) => (spots.get(id) as Spot).z + sizeOf(id) / 2)
+    ),
   });
   const grow = (covered: Box) => {
     box.minX = Math.min(box.minX, covered.minX);
@@ -120,7 +146,8 @@ export function layoutFocus(
       // One depth for the whole row, so a narrow building cannot slide under the
       // row behind it.
       const depth = Math.max(...row.map(sizeOf));
-      const rowWidth = row.reduce((sum, id) => sum + sizeOf(id), 0) + GAP * (row.length - 1);
+      const rowWidth =
+        row.reduce((sum, id) => sum + sizeOf(id), 0) + GAP * (row.length - 1);
       let x = -rowWidth / 2;
       for (const id of row) {
         spread.set(id, { x: x + sizeOf(id) / 2, z: z + depth / 2 });
@@ -133,7 +160,13 @@ export function layoutFocus(
   };
 
   /** Puts a block down at `nearZ` on the given side and reserves the ground it takes. */
-  const band = (block: Block, sign: number, centreX: number, y: number, nearZ?: number) => {
+  const band = (
+    block: Block,
+    sign: number,
+    centreX: number,
+    y: number,
+    nearZ?: number
+  ) => {
     const at = Math.max(near, nearZ ?? stack[sign < 0 ? "-1" : "1"]);
     for (const [id, spot] of block.spots) {
       spots.set(id, { x: centreX + spot.x, z: sign * (at + spot.z), y });
@@ -148,15 +181,23 @@ export function layoutFocus(
     const pitch = Math.max(...ids.map(sizeOf)) + GAP;
     // A full ring spreads eight buildings over the same 120 degrees, so the radius
     // has to hold seven pitches of arc before they touch.
-    const first = Math.max(near + pitch / 2, ((ROW_LIMIT - 1) * pitch) / (2 * ARC_HALF));
+    const first = Math.max(
+      near + pitch / 2,
+      ((ROW_LIMIT - 1) * pitch) / (2 * ARC_HALF)
+    );
     let far = first;
     ids.forEach((id, index) => {
       const ring = Math.floor(index / ROW_LIMIT);
       const along = index % ROW_LIMIT;
       const width = Math.min(ROW_LIMIT, ids.length - ring * ROW_LIMIT);
       const radius = first + ring * pitch;
-      const angle = width === 1 ? 0 : -ARC_HALF + (along / (width - 1)) * ARC_HALF * 2;
-      spots.set(id, { x: radius * Math.sin(angle), z: -radius * Math.cos(angle), y: 0 });
+      const angle =
+        width === 1 ? 0 : -ARC_HALF + (along / (width - 1)) * ARC_HALF * 2;
+      spots.set(id, {
+        x: radius * Math.sin(angle),
+        z: -radius * Math.cos(angle),
+        y: 0,
+      });
       far = Math.max(far, radius + sizeOf(id) / 2);
     });
     stack["-1"] = Math.max(stack["-1"], far + GAP);
@@ -181,19 +222,35 @@ export function layoutFocus(
    * the neighbourhood to keep a whole row of buildings off the centre line costs more
    * ground than the compass reading is worth.
    */
-  const corner = (ids: string[], sideX: number, sign: number, y: number, beside: Box | null) => {
+  const corner = (
+    ids: string[],
+    sideX: number,
+    sign: number,
+    y: number,
+    beside: Box | null
+  ) => {
     if (ids.length === 0) return;
     const block = pack(ids);
     if (beside) {
       const inner = sideX < 0 ? beside.minX - GAP : beside.maxX + GAP;
       const outer = inner + sideX * block.width;
       if (affordable(outer, sideX)) {
-        band(block, sign, (inner + outer) / 2, y, sign < 0 ? -beside.maxZ : beside.minZ);
+        band(
+          block,
+          sign,
+          (inner + outer) / 2,
+          y,
+          sign < 0 ? -beside.maxZ : beside.minZ
+        );
         return;
       }
     }
     const aside = sideX * (GAP / 2 + block.width);
-    const edge = affordable(aside, sideX) ? aside : sideX < 0 ? box.minX : box.maxX;
+    const edge = affordable(aside, sideX)
+      ? aside
+      : sideX < 0
+        ? box.minX
+        : box.maxX;
     band(block, sign, edge - (sideX * block.width) / 2, y);
   };
 
@@ -213,7 +270,11 @@ export function layoutFocus(
         .map((covered) => (sideX < 0 ? -covered.minX : covered.maxX) + GAP);
       const at = Math.max(edge, ...clear);
       for (const [id, spot] of column.spots) {
-        spots.set(id, { x: sideX * (at + column.width / 2), z: top + spot.z, y: 0 });
+        spots.set(id, {
+          x: sideX * (at + column.width / 2),
+          z: top + spot.z,
+          y: 0,
+        });
       }
       grow(boxOf(column.ids));
       edge = at + column.width + GAP;
@@ -226,7 +287,8 @@ export function layoutFocus(
       : parents.length > ROW_LIMIT
         ? arc(parents)
         : band(pack(parents), -1, 0, 0);
-  const southBand = children.length === 0 ? null : band(pack(children), 1, 0, 0);
+  const southBand =
+    children.length === 0 ? null : band(pack(children), 1, 0, 0);
   corner(compositions, -1, -1, PLATFORM, northBand);
   corner(composers, 1, -1, 0, northBand);
   corner(blockTargets, -1, 1, 0, southBand);
@@ -238,7 +300,9 @@ export function layoutFocus(
 
   return cityPlacements.map((placement) => {
     const spot = spots.get(placement.id);
-    return spot ? { ...placement, position: { x: spot.x, z: spot.z }, y: spot.y } : placement;
+    return spot
+      ? { ...placement, position: { x: spot.x, z: spot.z }, y: spot.y }
+      : placement;
   });
 }
 
@@ -263,6 +327,14 @@ export function focusBounds(placements: Placement[]): FocusBounds {
  * measures the neighbourhood from there, so the scene adds this to stand the focus
  * island where the node was, over the city it came from.
  */
-export function focusAnchor(cityPlacements: Placement[], focusId: string): { x: number; z: number } {
-  return cityPlacements.find((placement) => placement.id === focusId)?.position ?? { x: 0, z: 0 };
+export function focusAnchor(
+  cityPlacements: Placement[],
+  focusId: string
+): { x: number; z: number } {
+  return (
+    cityPlacements.find((placement) => placement.id === focusId)?.position ?? {
+      x: 0,
+      z: 0,
+    }
+  );
 }

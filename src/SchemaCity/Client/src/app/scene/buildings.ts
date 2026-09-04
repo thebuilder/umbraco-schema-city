@@ -87,10 +87,13 @@ function pushWindows(
   footprint: number,
   x: number,
   y: number,
-  z: number,
+  z: number
 ) {
   const perimeter = footprint * 4;
-  const count = Math.min(group.properties?.length ?? 0, Math.floor(perimeter / WINDOW_PITCH));
+  const count = Math.min(
+    group.properties?.length ?? 0,
+    Math.floor(perimeter / WINDOW_PITCH)
+  );
   const half = footprint / 2 + WINDOW_STANDOFF;
 
   for (let i = 0; i < count; i++) {
@@ -126,7 +129,7 @@ function pushWindows(
  */
 export function buildFloorCells(
   nodesById: Map<string, SchemaNode>,
-  placements: Placement[],
+  placements: Placement[]
 ): { cells: FloorCell[]; windows: WindowCell[]; heights: Map<string, number> } {
   const cells: FloorCell[] = [];
   const windows: WindowCell[] = [];
@@ -195,7 +198,15 @@ export function buildFloorCells(
       });
       // A plate has no walls worth lighting, so its windows go with its height.
       if (squash > 0.5) {
-        pushWindows(windows, group, placement.id, footprint, x, base + (y + FLOOR_HEIGHT / 2) * squash, z);
+        pushWindows(
+          windows,
+          group,
+          placement.id,
+          footprint,
+          x,
+          base + (y + FLOOR_HEIGHT / 2) * squash,
+          z
+        );
       }
       y += FLOOR_HEIGHT;
     });
@@ -207,7 +218,9 @@ export function buildFloorCells(
 
 /** The mass a stack of groups comes to, separators included. */
 function massOf(groups: PropertyGroup[]): number {
-  const tabs = groups.filter((group, i) => i > 0 && group.type === "Tab").length;
+  const tabs = groups.filter(
+    (group, i) => i > 0 && group.type === "Tab"
+  ).length;
   return groups.length * FLOOR_HEIGHT + tabs * SEPARATOR_HEIGHT;
 }
 
@@ -220,7 +233,7 @@ function squashOf(flatten: number, height: number): number {
 /** A flat plaza disc under every root building that is not an Element Type. */
 export function buildPlazaCells(
   nodesById: Map<string, SchemaNode>,
-  placements: Placement[],
+  placements: Placement[]
 ): PlazaCell[] {
   const plazas: PlazaCell[] = [];
   for (const placement of placements) {

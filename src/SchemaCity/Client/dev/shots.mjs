@@ -39,9 +39,15 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Evaluate in the page and throw on anything the expression reports as a miss. */
 async function run(expression) {
-  const result = await send("Runtime.evaluate", { expression, awaitPromise: true });
+  const result = await send("Runtime.evaluate", {
+    expression,
+    awaitPromise: true,
+  });
   const value = result.result?.value;
-  if (result.exceptionDetails) throw new Error(expression + ": " + JSON.stringify(result.exceptionDetails));
+  if (result.exceptionDetails)
+    throw new Error(
+      expression + ": " + JSON.stringify(result.exceptionDetails)
+    );
   if (value === "miss") throw new Error("no element for: " + expression);
   return value;
 }
@@ -58,7 +64,14 @@ const clickButton = (pattern, nth = 1) =>
 /** Drag across the canvas, which turns the camera's azimuth and its elevation. */
 async function orbit(from, to) {
   const at = (type, [x, y]) =>
-    send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: 1, clickCount: 1 });
+    send("Input.dispatchMouseEvent", {
+      type,
+      x,
+      y,
+      button: "left",
+      buttons: 1,
+      clickCount: 1,
+    });
   const step = (i) => [
     from[0] + ((to[0] - from[0]) * i) / 12,
     from[1] + ((to[1] - from[1]) * i) / 12,

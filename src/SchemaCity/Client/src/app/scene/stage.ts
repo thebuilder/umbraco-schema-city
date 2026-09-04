@@ -28,7 +28,11 @@ const MIN_SPAN = 4;
  * inside `fadeNear` and draws at full strength. The plane is square and centred on
  * the target, so its half width has to clear `fadeFar` on the diagonal as well.
  */
-export function stageMetrics(span: number): { fadeNear: number; fadeFar: number; plane: number } {
+export function stageMetrics(span: number): {
+  fadeNear: number;
+  fadeFar: number;
+  plane: number;
+} {
   const fadeFar = span * 6;
   return { fadeNear: span * 1.2, fadeFar, plane: fadeFar * 2.2 };
 }
@@ -38,7 +42,10 @@ export function stageMetrics(span: number): { fadeNear: number; fadeFar: number;
  * per world unit, so it sees `width / zoom` by `height / zoom` world units, and the
  * isometric angle lays the vertical one over `sqrt(3)` times as much ground.
  */
-export function groundReach(zoom: number, size: { width: number; height: number }): number {
+export function groundReach(
+  zoom: number,
+  size: { width: number; height: number }
+): number {
   return Math.hypot(size.width, size.height * GROUND_STRETCH) / (2 * zoom);
 }
 
@@ -51,7 +58,7 @@ export function groundReach(zoom: number, size: { width: number; height: number 
  */
 export function zoomRange(
   span: number,
-  size: { width: number; height: number },
+  size: { width: number; height: number }
 ): { minZoom: number; maxZoom: number } {
   return {
     minZoom: groundReach(1, size) / stageMetrics(span).fadeFar,
@@ -84,10 +91,10 @@ export function fogRange(span: number): { near: number; far: number } {
 export function pixelsPerUnit(
   camera: { isOrthographicCamera?: boolean; zoom: number; fov?: number },
   viewportHeight: number,
-  distance: number,
+  distance: number
 ): number {
   if (camera.isOrthographicCamera) return camera.zoom;
-  const halfFov = (((camera.fov ?? 50) * Math.PI) / 180) / 2;
+  const halfFov = ((camera.fov ?? 50) * Math.PI) / 180 / 2;
   return viewportHeight / (2 * Math.max(distance, 1e-6) * Math.tan(halfFov));
 }
 
@@ -104,10 +111,11 @@ export function pixelsPerUnit(
  */
 export function framingAction<B, C>(
   last: { bounds: B; controls: C; reframe: number } | null,
-  next: { bounds: B; controls: C; reframe: number },
+  next: { bounds: B; controls: C; reframe: number }
 ): "none" | "snap" | "fly" {
   if (last === null) return "snap";
-  if (last.bounds !== next.bounds || last.reframe !== next.reframe) return "fly";
+  if (last.bounds !== next.bounds || last.reframe !== next.reframe)
+    return "fly";
   // The orbit controls arrive one render after the first framing, and the target
   // they were created with is the origin, so that framing has to be applied again.
   return last.controls === next.controls ? "none" : "snap";
@@ -178,7 +186,7 @@ export const STAMP_BAND =
 export function districtStamp(
   island: { minX: number; maxX: number; minZ: number; maxZ: number },
   aspect: number,
-  cap = STAMP_CAP,
+  cap = STAMP_CAP
 ): { x: number; z: number; width: number; height: number } {
   const across = island.maxX - island.minX - STAMP_INSET * 2;
   let height = cap;

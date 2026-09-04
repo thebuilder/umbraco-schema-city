@@ -46,7 +46,9 @@ test("no part of the city is in fog, at any zoom", () => {
   // target, which the camera holds `span` units away, and ortho zoom moves no camera.
   // A square city is the deepest one that frames at a given span, so both sides are it.
   for (const span of [4, 12, 87, 400]) {
-    expect(fogRange(span).near).toBeGreaterThan(span + (span + span) / (2 * Math.sqrt(3)));
+    expect(fogRange(span).near).toBeGreaterThan(
+      span + (span + span) / (2 * Math.sqrt(3))
+    );
   }
 });
 
@@ -74,12 +76,18 @@ test("a world unit measures the same on screen through either camera", () => {
   // the orthographic one was showing, so at the point it is aimed at the two agree.
   const worldHeight = size.height / zoom;
   const fov = 45;
-  const distance = worldHeight / (2 * Math.tan(((fov * Math.PI) / 180) / 2));
+  const distance = worldHeight / (2 * Math.tan((fov * Math.PI) / 180 / 2));
 
-  expect(pixelsPerUnit({ isOrthographicCamera: true, zoom }, size.height, 999)).toBe(zoom);
-  expect(pixelsPerUnit({ zoom: 1, fov }, size.height, distance)).toBeCloseTo(zoom);
+  expect(
+    pixelsPerUnit({ isOrthographicCamera: true, zoom }, size.height, 999)
+  ).toBe(zoom);
+  expect(pixelsPerUnit({ zoom: 1, fov }, size.height, distance)).toBeCloseTo(
+    zoom
+  );
   // Twice as far away is half the size.
-  expect(pixelsPerUnit({ zoom: 1, fov }, size.height, distance * 2)).toBeCloseTo(zoom / 2);
+  expect(
+    pixelsPerUnit({ zoom: 1, fov }, size.height, distance * 2)
+  ).toBeCloseTo(zoom / 2);
 });
 test("a district's name prints in the band along the north edge of its island", () => {
   // "PAGES" tracked out, rasterised: about seven cap heights wide.
@@ -93,7 +101,9 @@ test("a district's name prints in the band along the north edge of its island", 
   expect(stamp.x - stamp.width / 2).toBeCloseTo(island.minX + 0.5);
   expect(stamp.z - stamp.height / 2).toBeCloseTo(island.minZ + 0.5);
   // And the whole of it inside the band, so no row can ever stand over a letter.
-  expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(island.minZ + STAMP_BAND);
+  expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(
+    island.minZ + STAMP_BAND
+  );
 });
 
 test("the band clears a first row of four floors at the isometric angle", () => {
@@ -108,7 +118,9 @@ test("the band clears a first row of four floors at the isometric angle", () => 
   const stamp = districtStamp(island, 7);
   const roof = island.minZ + STAMP_BAND;
 
-  expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(roof - Math.SQRT2 * floors);
+  expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(
+    roof - Math.SQRT2 * floors
+  );
 });
 
 test("a name too wide for its island shrinks instead of hanging over the void", () => {
@@ -117,7 +129,9 @@ test("a name too wide for its island shrinks instead of hanging over the void", 
 
   expect(stamp.height).toBeLessThan(STAMP_CAP);
   expect(stamp.x + stamp.width / 2).toBeCloseTo(island.maxX - 0.5);
-  expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(island.minZ + STAMP_BAND);
+  expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(
+    island.minZ + STAMP_BAND
+  );
   // Cap height and width shrink together, so the letters keep their shape.
   expect(stamp.width / stamp.height).toBeCloseTo(7);
 });

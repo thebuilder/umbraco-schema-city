@@ -1,9 +1,19 @@
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import { Canvas, type ThreeEvent, useFrame, useThree } from "@react-three/fiber";
+import {
+  Canvas,
+  type ThreeEvent,
+  useFrame,
+  useThree,
+} from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { neighbourhoods } from "../model/neighbourhood";
-import type { SchemaEdge, SchemaGraph, SchemaNode, UsageReport } from "../model/types";
+import type {
+  SchemaEdge,
+  SchemaGraph,
+  SchemaNode,
+  UsageReport,
+} from "../model/types";
 import {
   cityBounds,
   cityDistricts,
@@ -13,7 +23,12 @@ import {
   type DistrictKind,
   type Placement,
 } from "./layout/city";
-import { focusAnchor, focusBounds, type FocusBounds, layoutFocus } from "./layout/focus";
+import {
+  focusAnchor,
+  focusBounds,
+  type FocusBounds,
+  layoutFocus,
+} from "./layout/focus";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -27,7 +42,12 @@ import {
 } from "./scene/buildings";
 import { neighboursOf } from "./scene/graph-links";
 import { iconColour, rasteriseIcon } from "./scene/icons";
-import { CHAR_PX, LABEL_CAP, LABEL_HEIGHT_PX, pickLabels } from "./scene/labels";
+import {
+  CHAR_PX,
+  LABEL_CAP,
+  LABEL_HEIGHT_PX,
+  pickLabels,
+} from "./scene/labels";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
 import {
@@ -87,9 +107,15 @@ const INHERITS_MIX = 0.4;
 function rampColour(
   ramp: Ramp,
   t: number,
-  colors: { amber: THREE.Color; azure: THREE.Color; dim: THREE.Color; signal: THREE.Color },
+  colors: {
+    amber: THREE.Color;
+    azure: THREE.Color;
+    dim: THREE.Color;
+    signal: THREE.Color;
+  }
 ): THREE.Color {
-  if (ramp === "binary") return t >= 0.5 ? colors.signal.clone() : colors.dim.clone();
+  if (ramp === "binary")
+    return t >= 0.5 ? colors.signal.clone() : colors.dim.clone();
   if (ramp === "diverging") {
     return t < 0.5
       ? colors.amber.clone().lerp(colors.dim, t * 2)
@@ -155,24 +181,29 @@ function Buildings({
   const introDone = useRef(reducedMotion);
 
   const meshRefs = useMemo(
-    () => ({ own: ownRef, composed: composedRef, separator: separatorRef, element: elementRef }),
-    [],
+    () => ({
+      own: ownRef,
+      composed: composedRef,
+      separator: separatorRef,
+      element: elementRef,
+    }),
+    []
   );
   const introDelayById = useMemo(
     () => new Map(placements.map((p) => [p.id, p.introDelay])),
-    [placements],
+    [placements]
   );
   const flatById = useMemo(
     () => new Map(placements.map((p) => [p.id, p.flatten ?? 0])),
-    [placements],
+    [placements]
   );
   const districtById = useMemo(
     () => new Map(placements.map((p) => [p.id, p.districtKind])),
-    [placements],
+    [placements]
   );
   const introEnd = useMemo(
     () => Math.max(0, ...placements.map((p) => p.introDelay)) + INTRO_DURATION,
-    [placements],
+    [placements]
   );
 
   const colors = useMemo(() => {
@@ -191,7 +222,12 @@ function Buildings({
     };
   }, [palette]);
 
-  function applyCell(mesh: THREE.InstancedMesh, index: number, cell: FloorCell, progress: number) {
+  function applyCell(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    cell: FloorCell,
+    progress: number
+  ) {
     scratch.position.set(cell.cx, cell.cy * progress, cell.cz);
     scratch.scale.set(cell.sx, Math.max(cell.sy * progress, 0.0001), cell.sz);
     scratch.updateMatrix();
@@ -199,10 +235,19 @@ function Buildings({
   }
 
   /** A window rises with the floor it is cut into, on the same progress. */
-  function applyWindow(mesh: THREE.InstancedMesh, index: number, cell: WindowCell, progress: number) {
+  function applyWindow(
+    mesh: THREE.InstancedMesh,
+    index: number,
+    cell: WindowCell,
+    progress: number
+  ) {
     turned.position.set(cell.cx, cell.cy * progress, cell.cz);
     turned.rotation.set(0, cell.rotY, 0);
-    turned.scale.set(WINDOW_WIDTH, Math.max(WINDOW_HEIGHT * progress, 0.0001), 1);
+    turned.scale.set(
+      WINDOW_WIDTH,
+      Math.max(WINDOW_HEIGHT * progress, 0.0001),
+      1
+    );
     turned.updateMatrix();
     mesh.setMatrixAt(index, turned.matrix);
   }
@@ -218,7 +263,9 @@ function Buildings({
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
       const mesh = meshRefs[kind].current;
       if (!mesh) continue;
-      cellsByKind[kind].forEach((cell, i) => applyCell(mesh, i, cell, startProgress));
+      cellsByKind[kind].forEach((cell, i) =>
+        applyCell(mesh, i, cell, startProgress)
+      );
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
     }
@@ -253,12 +300,12 @@ function Buildings({
         scratch.position.set(
           placement.position.x,
           (placement.y ?? 0) + height / 2,
-          placement.position.z,
+          placement.position.z
         );
         scratch.scale.set(
           pickable ? placement.footprint : 0,
           pickable ? height : 0,
-          pickable ? placement.footprint : 0,
+          pickable ? placement.footprint : 0
         );
         scratch.updateMatrix();
         hit.setMatrixAt(i, scratch.matrix);
@@ -278,7 +325,12 @@ function Buildings({
       if (!mesh) continue;
       cellsByKind[kind].forEach((cell, i) => {
         const delay = introDelayById.get(cell.buildingId) ?? 0;
-        applyCell(mesh, i, cell, smootherstep((elapsed - delay) / INTRO_DURATION));
+        applyCell(
+          mesh,
+          i,
+          cell,
+          smootherstep((elapsed - delay) / INTRO_DURATION)
+        );
       });
       mesh.instanceMatrix.needsUpdate = true;
     }
@@ -289,8 +341,11 @@ function Buildings({
           window,
           i,
           cell,
-          smootherstep((elapsed - (introDelayById.get(cell.buildingId) ?? 0)) / INTRO_DURATION),
-        ),
+          smootherstep(
+            (elapsed - (introDelayById.get(cell.buildingId) ?? 0)) /
+              INTRO_DURATION
+          )
+        )
       );
       window.instanceMatrix.needsUpdate = true;
     }
@@ -309,7 +364,9 @@ function Buildings({
     // sitting next to it reads as the emptiest place in the city.
     const lensColour = (buildingId: string) => {
       const t = scale?.t.get(buildingId);
-      return t === undefined || !scale ? null : rampColour(scale.ramp, t, colors);
+      return t === undefined || !scale
+        ? null
+        : rampColour(scale.ramp, t, colors);
     };
     // A building takes its colour from the district it stands in, not from what it
     // is: a structure district is phosphor, an element district amber, and a
@@ -334,15 +391,22 @@ function Buildings({
       const base =
         buildingId === selected
           ? colors.signal
-          : lensColour(buildingId) ?? unlit;
-      const bright = buildingId === hovered ? base.clone().multiplyScalar(HOVER_BRIGHTEN) : base;
-      return lit(buildingId) ? bright : bright.clone().lerp(colors.fade, fadeOf(buildingId));
+          : (lensColour(buildingId) ?? unlit);
+      const bright =
+        buildingId === hovered
+          ? base.clone().multiplyScalar(HOVER_BRIGHTEN)
+          : base;
+      return lit(buildingId)
+        ? bright
+        : bright.clone().lerp(colors.fade, fadeOf(buildingId));
     };
 
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
       const mesh = meshRefs[kind].current;
       if (!mesh) continue;
-      cellsByKind[kind].forEach((cell, i) => mesh.setColorAt(i, colourFor(cell.kind, cell.buildingId)));
+      cellsByKind[kind].forEach((cell, i) =>
+        mesh.setColorAt(i, colourFor(cell.kind, cell.buildingId))
+      );
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
 
@@ -356,8 +420,8 @@ function Buildings({
           i,
           colourFor(cell.kind, cell.buildingId)
             .clone()
-            .multiplyScalar(cell.mandatory ? 1.9 : 1.45),
-        ),
+            .multiplyScalar(cell.mandatory ? 1.9 : 1.45)
+        )
       );
       if (window.instanceColor) window.instanceColor.needsUpdate = true;
     }
@@ -365,11 +429,17 @@ function Buildings({
     const plaza = plazaRef.current;
     if (plaza) {
       plazas.forEach((cell, i) => {
-        const base = cell.buildingId === selected ? colors.signal : colors.plaza;
-        const bright = cell.buildingId === hovered ? base.clone().multiplyScalar(HOVER_BRIGHTEN) : base;
+        const base =
+          cell.buildingId === selected ? colors.signal : colors.plaza;
+        const bright =
+          cell.buildingId === hovered
+            ? base.clone().multiplyScalar(HOVER_BRIGHTEN)
+            : base;
         plaza.setColorAt(
           i,
-          lit(cell.buildingId) ? bright : bright.clone().lerp(colors.fade, fadeOf(cell.buildingId)),
+          lit(cell.buildingId)
+            ? bright
+            : bright.clone().lerp(colors.fade, fadeOf(cell.buildingId))
         );
       });
       if (plaza.instanceColor) plaza.instanceColor.needsUpdate = true;
@@ -389,42 +459,61 @@ function Buildings({
     districtById,
   ]);
 
-  const pick = (event: ThreeEvent<MouseEvent | PointerEvent>) => placements[event.instanceId ?? -1];
+  const pick = (event: ThreeEvent<MouseEvent | PointerEvent>) =>
+    placements[event.instanceId ?? -1];
 
   return (
     <>
       {cellsByKind.own.length > 0 && (
-        <instancedMesh args={[undefined, undefined, cellsByKind.own.length]} ref={ownRef}>
+        <instancedMesh
+          args={[undefined, undefined, cellsByKind.own.length]}
+          ref={ownRef}
+        >
           <boxGeometry />
           <meshStandardMaterial metalness={0.1} roughness={0.45} />
         </instancedMesh>
       )}
       {cellsByKind.composed.length > 0 && (
-        <instancedMesh args={[undefined, undefined, cellsByKind.composed.length]} ref={composedRef}>
+        <instancedMesh
+          args={[undefined, undefined, cellsByKind.composed.length]}
+          ref={composedRef}
+        >
           <boxGeometry />
           <meshStandardMaterial metalness={0.1} roughness={0.45} />
         </instancedMesh>
       )}
       {cellsByKind.separator.length > 0 && (
-        <instancedMesh args={[undefined, undefined, cellsByKind.separator.length]} ref={separatorRef}>
+        <instancedMesh
+          args={[undefined, undefined, cellsByKind.separator.length]}
+          ref={separatorRef}
+        >
           <boxGeometry />
           <meshStandardMaterial metalness={0.1} roughness={0.6} />
         </instancedMesh>
       )}
       {cellsByKind.element.length > 0 && (
-        <instancedMesh args={[undefined, undefined, cellsByKind.element.length]} ref={elementRef}>
+        <instancedMesh
+          args={[undefined, undefined, cellsByKind.element.length]}
+          ref={elementRef}
+        >
           <boxGeometry />
           <meshStandardMaterial metalness={0.05} roughness={0.7} />
         </instancedMesh>
       )}
       {windows.length > 0 && (
-        <instancedMesh args={[undefined, undefined, windows.length]} ref={windowRef}>
+        <instancedMesh
+          args={[undefined, undefined, windows.length]}
+          ref={windowRef}
+        >
           <planeGeometry />
           <meshBasicMaterial toneMapped={false} />
         </instancedMesh>
       )}
       {plazas.length > 0 && (
-        <instancedMesh args={[undefined, undefined, plazas.length]} ref={plazaRef}>
+        <instancedMesh
+          args={[undefined, undefined, plazas.length]}
+          ref={plazaRef}
+        >
           <cylinderGeometry args={[1, 1, 1, 24]} />
           <meshStandardMaterial metalness={0} roughness={0.9} />
         </instancedMesh>
@@ -471,7 +560,12 @@ const CAP_FOOTPRINT = 0.88;
 const ICON_MIN_PX = 24;
 
 /** One rasterised icon, the buildings that wear it, and where its caps start. */
-type IconGroup = { key: string; texture: THREE.Texture; ids: string[]; offset: number };
+type IconGroup = {
+  key: string;
+  texture: THREE.Texture;
+  ids: string[];
+  offset: number;
+};
 
 /**
  * The icons, rasterised once per name and colour and kept until the graph changes.
@@ -481,15 +575,20 @@ type IconGroup = { key: string; texture: THREE.Texture; ids: string[]; offset: n
 function useIconGroups(
   icons: Record<string, string> | undefined,
   nodesById: Map<string, SchemaNode>,
-  phosphor: string,
+  phosphor: string
 ): IconGroup[] {
   const wanted = useMemo(() => {
-    const byKey = new Map<string, { svg: string; colour: string; ids: string[] }>();
+    const byKey = new Map<
+      string,
+      { svg: string; colour: string; ids: string[] }
+    >();
     // The palette arrives one render in, and rasterising against a colour that is
     // not the theme's yet would do every icon twice.
     if (!icons || !phosphor) return byKey;
     // Sorted, so the draw order of the icon meshes is the same city to city.
-    for (const node of [...nodesById.values()].sort((a, b) => a.alias.localeCompare(b.alias))) {
+    for (const node of [...nodesById.values()].sort((a, b) =>
+      a.alias.localeCompare(b.alias)
+    )) {
       const svg = icons[node.icon];
       if (!svg) continue;
       const colour = iconColour(node.iconColor, phosphor);
@@ -514,7 +613,7 @@ function useIconGroups(
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         made.push({ key, texture, ids, offset: 0 });
-      }),
+      })
     ).then(() => {
       if (!live) return;
       // The caps are one mesh across every group, so each group is told where its
@@ -581,7 +680,10 @@ function RoofIcons({
       const mesh = meshes.current.get(group.key);
       if (!mesh) continue;
       group.ids.forEach((id, index) =>
-        mesh.setColorAt(index, neighbours === null || neighbours.has(id) ? lit : faded),
+        mesh.setColorAt(
+          index,
+          neighbours === null || neighbours.has(id) ? lit : faded
+        )
       );
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
@@ -598,16 +700,19 @@ function RoofIcons({
         const roof = placement
           ? (placement.y ?? 0) + (heights.get(id) ?? placement.height)
           : 0;
-        if (placement) anchor.set(placement.position.x, roof, placement.position.z);
+        if (placement)
+          anchor.set(placement.position.x, roof, placement.position.z);
         const px = placement
           ? placement.footprint *
             pixelsPerUnit(
               camera as THREE.OrthographicCamera & { fov?: number },
               size.height,
-              camera.position.distanceTo(anchor),
+              camera.position.distanceTo(anchor)
             )
           : 0;
-        const shown = placement !== undefined && (px >= ICON_MIN_PX || id === selected || id === hovered);
+        const shown =
+          placement !== undefined &&
+          (px >= ICON_MIN_PX || id === selected || id === hovered);
 
         scratch.position.set(anchor.x, roof + 0.03, anchor.z);
         scratch.rotation.set(-Math.PI / 2, 0, 0);
@@ -616,9 +721,15 @@ function RoofIcons({
         mesh.setMatrixAt(index, scratch.matrix);
 
         if (!plate) return;
-        cap.position.set(placement?.position.x ?? 0, roof + 0.02, placement?.position.z ?? 0);
+        cap.position.set(
+          placement?.position.x ?? 0,
+          roof + 0.02,
+          placement?.position.z ?? 0
+        );
         cap.rotation.set(-Math.PI / 2, 0, 0);
-        cap.scale.setScalar(shown ? (placement?.footprint ?? 0) * CAP_FOOTPRINT : 0);
+        cap.scale.setScalar(
+          shown ? (placement?.footprint ?? 0) * CAP_FOOTPRINT : 0
+        );
         cap.updateMatrix();
         plate.setMatrixAt(group.offset + index, cap.matrix);
       });
@@ -630,7 +741,11 @@ function RoofIcons({
   return (
     <>
       {caps > 0 && (
-        <instancedMesh args={[undefined, undefined, caps]} frustumCulled={false} ref={capRef}>
+        <instancedMesh
+          args={[undefined, undefined, caps]}
+          frustumCulled={false}
+          ref={capRef}
+        >
           <planeGeometry />
           <meshBasicMaterial
             color={palette.background}
@@ -680,7 +795,7 @@ function fadeColors(
   paint: (edges: SchemaEdge[]) => Paint,
   background: string,
   selected: string | null,
-  focus: string | null,
+  focus: string | null
 ): Float32Array {
   const voidColour = new THREE.Color(background);
   const array = new Float32Array(vertices * 4);
@@ -688,7 +803,9 @@ function fadeColors(
     const lit =
       focus !== null ||
       selected === null ||
-      range.edges.some((edge) => edge.from === selected || edge.to === selected);
+      range.edges.some(
+        (edge) => edge.from === selected || edge.to === selected
+      );
     const { colour, alpha } = paint(range.edges);
     const shown = lit ? colour : colour.clone().lerp(voidColour, FADE_MIX);
     for (let i = range.start; i < range.start + range.count; i++) {
@@ -724,7 +841,7 @@ function Roads({
 }) {
   const { positions, ranges } = useMemo(
     () => buildRoadGeometry(placementsById, edges),
-    [placementsById, edges],
+    [placementsById, edges]
   );
   const colors = useMemo(() => {
     const paint = {
@@ -737,7 +854,7 @@ function Roads({
       () => paint,
       palette.background,
       selected,
-      focus,
+      focus
     );
   }, [positions, ranges, selected, focus, palette]);
 
@@ -786,21 +903,24 @@ function Links({
 }) {
   const { positions, ranges } = useMemo(
     () => buildLinkGeometry(layer, edges, anchors, placementsById),
-    [layer, edges, anchors, placementsById],
+    [layer, edges, anchors, placementsById]
   );
   const colors = useMemo(() => {
     const layerPaint = { colour: new THREE.Color(colour), alpha: opacity };
     // Inheritance is the stronger fact between two types, so it takes the layer's
     // azure mixed toward white and draws solid. It used to be two arcs a hair apart
     // faking a thicker line, which read as two lines.
-    const inheritsPaint = { colour: tint(colour, WHITE, INHERITS_MIX), alpha: 1 };
+    const inheritsPaint = {
+      colour: tint(colour, WHITE, INHERITS_MIX),
+      alpha: 1,
+    };
     return fadeColors(
       ranges,
       positions.length / 3,
       (edges) => (edges[0]?.kind === "inherits" ? inheritsPaint : layerPaint),
       palette.background,
       selected,
-      focus,
+      focus
     );
   }, [positions, ranges, colour, opacity, palette, selected, focus]);
 
@@ -817,7 +937,8 @@ function Links({
   );
 }
 
-const touches = (edge: SchemaEdge, id: string) => edge.from === id || edge.to === id;
+const touches = (edge: SchemaEdge, id: string) =>
+  edge.from === id || edge.to === id;
 
 /**
  * The three layers drawn as lines: the theme token each is coloured with, and how
@@ -836,7 +957,6 @@ const LINK_LAYERS = [
   token: keyof Palette;
   opacity: number;
 }[];
-
 
 /** How many neighbours of the selected node still get a label each. */
 const MAX_NEIGHBOUR_LABELS = 8;
@@ -880,7 +1000,9 @@ function Labels({
   /** Buildings whose road fan is cut, and how many roads are not drawn. */
   fanMarkers: { id: string; hidden: number }[];
 }) {
-  const camera = useThree((state) => state.camera) as THREE.OrthographicCamera & {
+  const camera = useThree(
+    (state) => state.camera
+  ) as THREE.OrthographicCamera & {
     fov?: number;
   };
   const gl = useThree((state) => state.gl);
@@ -897,7 +1019,8 @@ function Labels({
   const candidates = useMemo(() => {
     const ids = new Set<string>();
     // A faded building gets no label, not even under the cursor.
-    if (hovered && (neighbours === null || neighbours.has(hovered))) ids.add(hovered);
+    if (hovered && (neighbours === null || neighbours.has(hovered)))
+      ids.add(hovered);
     // The focus layout spreads the whole neighbourhood over its own compass, so
     // every placed building is a candidate there.
     if (focusNeighbours) for (const id of focusNeighbours) ids.add(id);
@@ -906,7 +1029,8 @@ function Labels({
       const direct = [...(neighbours ?? [])].filter((id) => id !== selected);
       // Past this many the scene stops offering the neighbours at all, so a hub
       // does not spend the whole screen budget on one selection.
-      if (direct.length <= MAX_NEIGHBOUR_LABELS) for (const id of direct) ids.add(id);
+      if (direct.length <= MAX_NEIGHBOUR_LABELS)
+        for (const id of direct) ids.add(id);
     }
 
     const built: {
@@ -924,7 +1048,8 @@ function Labels({
       const node = nodesById.get(id);
       const placement = placementsById.get(id);
       if (!node || !placement) continue;
-      const anchorY = (placement.y ?? 0) + (heights.get(id) ?? placement.height) + LABEL_LIFT;
+      const anchorY =
+        (placement.y ?? 0) + (heights.get(id) ?? placement.height) + LABEL_LIFT;
       built.push({
         id,
         text: node.name,
@@ -962,7 +1087,10 @@ function Labels({
         rank: FAN_MARKER_RANK,
         footprint: placement.footprint,
         x: placement.position.x,
-        y: (placement.y ?? 0) + (heights.get(marker.id) ?? placement.height) + LABEL_LIFT,
+        y:
+          (placement.y ?? 0) +
+          (heights.get(marker.id) ?? placement.height) +
+          LABEL_LIFT,
         z: placement.position.z,
         lift: 0,
       });
@@ -1035,7 +1163,11 @@ function Labels({
         // How big the building is on screen, through whichever camera is on: the
         // orthographic zoom is its pixels per world unit, and the Explore camera's
         // answer depends on how far away this particular building is.
-        const perUnit = pixelsPerUnit(camera, size.height, camera.position.distanceTo(anchor));
+        const perUnit = pixelsPerUnit(
+          camera,
+          size.height,
+          camera.position.distanceTo(anchor)
+        );
         anchor.project(camera);
         return {
           id: candidate.id,
@@ -1047,7 +1179,7 @@ function Labels({
           buildingPx: anchor.z > 1 ? 0 : candidate.footprint * perUnit,
         };
       }),
-      { charPx: charPx.current, width: size.width, height: size.height },
+      { charPx: charPx.current, width: size.width, height: size.height }
     );
 
     spans.current.forEach((span, index) => {
@@ -1183,7 +1315,10 @@ function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
 
 /** The lip of land around an island, the same for every district and for the focus one. */
 function rimColour(palette: Palette): THREE.Color {
-  return new THREE.Color(palette.land).lerp(new THREE.Color(palette.background), 0.6);
+  return new THREE.Color(palette.land).lerp(
+    new THREE.Color(palette.background),
+    0.6
+  );
 }
 
 /**
@@ -1211,7 +1346,9 @@ function FocusIsland({
   palette,
   reducedMotion,
 }: {
-  island: (FocusBounds & { anchor: { x: number; z: number }; kind: DistrictKind }) | null;
+  island:
+    | (FocusBounds & { anchor: { x: number; z: number }; kind: DistrictKind })
+    | null;
   palette: Palette;
   reducedMotion: boolean;
 }) {
@@ -1224,7 +1361,10 @@ function FocusIsland({
   useFrame((_, delta) => {
     const to = island ? 1 : 0;
     const step = reducedMotion ? 1 : (delta * 1000) / TWEEN_MS;
-    grown.current = Math.min(1, Math.max(0, grown.current + Math.sign(to - grown.current) * step));
+    grown.current = Math.min(
+      1,
+      Math.max(0, grown.current + Math.sign(to - grown.current) * step)
+    );
     if (!group.current) return;
     group.current.visible = grown.current > 0;
     // A group at the anchor scales about it, so the island opens out of the focused
@@ -1239,14 +1379,24 @@ function FocusIsland({
   const rim = RIM_OVERHANG * 2;
   return (
     <group position={[at.anchor.x, FOCUS_ISLAND_Y, at.anchor.z]} ref={group}>
-      <group position={[at.centre.x - at.anchor.x, 0, at.centre.z - at.anchor.z]}>
+      <group
+        position={[at.centre.x - at.anchor.x, 0, at.centre.z - at.anchor.z]}
+      >
         <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
           <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
-          <meshStandardMaterial color={slabColour(at.kind, palette)} metalness={0} roughness={1} />
+          <meshStandardMaterial
+            color={slabColour(at.kind, palette)}
+            metalness={0}
+            roughness={1}
+          />
         </mesh>
         <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
           <boxGeometry args={[width + rim, RIM_HEIGHT, depth + rim]} />
-          <meshStandardMaterial color={rimColour(palette)} metalness={0} roughness={1} />
+          <meshStandardMaterial
+            color={rimColour(palette)}
+            metalness={0}
+            roughness={1}
+          />
         </mesh>
       </group>
     </group>
@@ -1284,13 +1434,19 @@ function Stage({
   const camera = useThree((state) => state.camera);
   const grid = useRef<THREE.Mesh>(null);
   const ray = useMemo(() => new THREE.Raycaster(), []);
-  const ground = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
+  const ground = useMemo(
+    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
+    []
+  );
   const screenCentre = useMemo(() => new THREE.Vector2(0, 0), []);
   const centre = useMemo(() => new THREE.Vector3(), []);
   const { fadeNear, fadeFar, plane } = stageMetrics(span);
   const fog = fogRange(span);
   const rim = useMemo(() => rimColour(palette), [palette]);
-  const folderColour = useMemo(() => tint(palette.land, WHITE, 0.15), [palette]);
+  const folderColour = useMemo(
+    () => tint(palette.land, WHITE, 0.15),
+    [palette]
+  );
 
   const uniforms = useMemo(
     () => ({
@@ -1298,13 +1454,16 @@ function Stage({
       // The minor lines are the same phosphor-dim mixed back toward the void, so the
       // grid reads as one thing at two strengths rather than as two colours.
       uMinorColour: {
-        value: new THREE.Color(palette.dim).lerp(new THREE.Color(palette.background), 0.5),
+        value: new THREE.Color(palette.dim).lerp(
+          new THREE.Color(palette.background),
+          0.5
+        ),
       },
       uMajorColour: { value: new THREE.Color(palette.dim) },
       uFadeNear: { value: fadeNear },
       uFadeFar: { value: fadeFar },
     }),
-    [palette, fadeNear, fadeFar],
+    [palette, fadeNear, fadeFar]
   );
 
   // One rasterised name per district, with the quad it prints on. The name is fixed
@@ -1322,11 +1481,11 @@ function Stage({
           },
           buildings,
           runs,
-          texture.image.width / texture.image.height,
+          texture.image.width / texture.image.height
         );
         return { id: district.id, texture, stamp };
       }),
-    [buildings, districts, palette.mono, runs],
+    [buildings, districts, palette.mono, runs]
   );
 
   useFrame(() => {
@@ -1339,7 +1498,11 @@ function Stage({
     // Looking at the horizon puts that point most of a mile away, where re-centring
     // the plane on it would take the grid out from under the city. Past the fade it
     // makes no difference to what is drawn, so the grid stays where it was.
-    if (Math.hypot(centre.x - camera.position.x, centre.z - camera.position.z) > fadeFar) return;
+    if (
+      Math.hypot(centre.x - camera.position.x, centre.z - camera.position.z) >
+      fadeFar
+    )
+      return;
     grid.current.position.set(centre.x, GRID_Y, centre.z);
     uniforms.uCentre.value.set(centre.x, centre.z);
   });
@@ -1350,7 +1513,12 @@ function Stage({
       {/* Fog and background have to be the exact same colour or the far ground ends
           in a horizon ring instead of dissolving. */}
       <fog args={[palette.background, fog.near, fog.far]} attach="fog" />
-      <mesh frustumCulled={false} ref={grid} renderOrder={-1} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh
+        frustumCulled={false}
+        ref={grid}
+        renderOrder={-1}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
         <planeGeometry args={[plane, plane]} />
         <shaderMaterial
           depthWrite={false}
@@ -1366,7 +1534,10 @@ function Stage({
         const depth = district.maxZ - district.minZ + ISLAND_PAD * 2;
         const overhang = RIM_OVERHANG * 2;
         return (
-          <group key={district.id} position={[district.centre.x, 0, district.centre.z]}>
+          <group
+            key={district.id}
+            position={[district.centre.x, 0, district.centre.z]}
+          >
             <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
               <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
               <meshStandardMaterial
@@ -1376,7 +1547,9 @@ function Stage({
               />
             </mesh>
             <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
-              <boxGeometry args={[width + overhang, RIM_HEIGHT, depth + overhang]} />
+              <boxGeometry
+                args={[width + overhang, RIM_HEIGHT, depth + overhang]}
+              />
               <meshStandardMaterial color={rim} metalness={0} roughness={1} />
             </mesh>
           </group>
@@ -1393,8 +1566,18 @@ function Stage({
             folder.centre.z,
           ]}
         >
-          <boxGeometry args={[folder.width, SLAB_HEIGHT + FOLDER_TINT_HEIGHT, folder.depth]} />
-          <meshStandardMaterial color={folderColour} metalness={0} roughness={1} />
+          <boxGeometry
+            args={[
+              folder.width,
+              SLAB_HEIGHT + FOLDER_TINT_HEIGHT,
+              folder.depth,
+            ]}
+          />
+          <meshStandardMaterial
+            color={folderColour}
+            metalness={0}
+            roughness={1}
+          />
         </mesh>
       ))}
       {/* The district's name printed flat on its island, in the band the layout held
@@ -1479,15 +1662,16 @@ const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 function viewOf(
   bounds: CityBounds,
   size: { width: number; height: number },
-  shift = 0,
+  shift = 0
 ): View {
   const span = citySpan(bounds);
   const zoom = Math.min(size.width, size.height) / span;
   const direction = new THREE.Vector3(1, 1, 1).normalize();
-  const target = new THREE.Vector3(bounds.centre.x, 0, bounds.centre.z).addScaledVector(
-    SCREEN_RIGHT,
-    shift / zoom,
-  );
+  const target = new THREE.Vector3(
+    bounds.centre.x,
+    0,
+    bounds.centre.z
+  ).addScaledVector(SCREEN_RIGHT, shift / zoom);
   return {
     position: target.clone().addScaledVector(direction, span),
     target,
@@ -1539,7 +1723,7 @@ function CameraRig({
   // the middle of the whole of it.
   const view = useMemo(
     () => viewOf(bounds, size, inspectorWidth / 2),
-    [bounds, inspectorWidth, size],
+    [bounds, inspectorWidth, size]
   );
 
   useEffect(() => {
@@ -1604,7 +1788,9 @@ function CameraRig({
   useFrame(() => {
     const moving = flight.current;
     if (!moving) return;
-    const t = moving.ease(Math.min(1, (performance.now() - moving.started) / moving.ms));
+    const t = moving.ease(
+      Math.min(1, (performance.now() - moving.started) / moving.ms)
+    );
     const span = moving.from.span + (moving.to.span - moving.from.span) * t;
 
     camera.position.lerpVectors(moving.from.position, moving.to.position, t);
@@ -1751,19 +1937,19 @@ function Flight({ explore }: { explore: boolean }) {
           pixelsPerUnit(
             camera as THREE.OrthographicCamera & { fov?: number },
             size.height,
-            distance,
-          ),
+            distance
+          )
         ) * boost;
     const wanted = desiredVelocity(
       held,
       groundAxes(camera.position, controls.target),
       speed,
-      explore ? "fly" : "pan",
+      explore ? "fly" : "pan"
     );
     const moving = velocity.current.set(
       approach(velocity.current.x, wanted.x, step),
       approach(velocity.current.y, wanted.y, step),
-      approach(velocity.current.z, wanted.z, step),
+      approach(velocity.current.z, wanted.z, step)
     );
     // A hundredth of a world unit a second is a stop, and rounding it to one keeps
     // the controls from being updated on every idle frame for ever.
@@ -1772,7 +1958,7 @@ function Flight({ explore }: { explore: boolean }) {
     const rates = explore ? turnRates(held) : { yaw: 0, pitch: 0 };
     const turn = turning.current.set(
       approach(turning.current.x, rates.yaw * TURN_SPEED * boost, step),
-      approach(turning.current.y, rates.pitch * TURN_SPEED * boost, step),
+      approach(turning.current.y, rates.pitch * TURN_SPEED * boost, step)
     );
     if (turn.lengthSq() < 1e-6) turn.set(0, 0);
     if (moving.lengthSq() === 0 && turn.lengthSq() === 0) return;
@@ -1785,12 +1971,12 @@ function Flight({ explore }: { explore: boolean }) {
         // ponytail: the same clamp `Controls` gives Explore, written twice. Reading
         // it back off the live controls means typing them wider than the two fields
         // this rig uses them through.
-        Math.PI / 2,
+        Math.PI / 2
       );
       controls.target.set(
         camera.position.x - offset.x,
         camera.position.y - offset.y,
-        camera.position.z - offset.z,
+        camera.position.z - offset.z
       );
     }
     if (moving.lengthSq() > 0) {
@@ -1805,7 +1991,11 @@ function Flight({ explore }: { explore: boolean }) {
 }
 
 /** Where the camera stands and what it is looking at, as of the last frame. */
-type Pose = { position: THREE.Vector3; target: THREE.Vector3; worldHeight: number };
+type Pose = {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  worldHeight: number;
+};
 
 /**
  * Remembers the isometric camera's pose every frame, so the Explore camera can be
@@ -1816,7 +2006,9 @@ type Pose = { position: THREE.Vector3; target: THREE.Vector3; worldHeight: numbe
  */
 function PoseTracker({ pose }: { pose: React.RefObject<Pose | null> }) {
   const camera = useThree((state) => state.camera);
-  const controls = useThree((state) => state.controls) as { target: THREE.Vector3 } | null;
+  const controls = useThree((state) => state.controls) as {
+    target: THREE.Vector3;
+  } | null;
   const size = useThree((state) => state.size);
 
   useFrame(() => {
@@ -1830,7 +2022,7 @@ function PoseTracker({ pose }: { pose: React.RefObject<Pose | null> }) {
     const perUnit = pixelsPerUnit(
       camera as THREE.OrthographicCamera & { fov?: number },
       size.height,
-      camera.position.distanceTo(at.target),
+      camera.position.distanceTo(at.target)
     );
     at.worldHeight = size.height / perUnit;
     pose.current = at;
@@ -1877,7 +2069,12 @@ function ExploreCamera({
     // first run of this effect is still the orthographic one. A viewport of nothing
     // is the canvas before it has been measured, which a link straight into Explore
     // arrives at: framing against it puts the camera a NaN away from the city.
-    if (!perspective.isPerspectiveCamera || size.width === 0 || size.height === 0) return;
+    if (
+      !perspective.isPerspectiveCamera ||
+      size.width === 0 ||
+      size.height === 0
+    )
+      return;
     // A link straight into Explore has no isometric camera to copy, so the framing
     // that one would have taken is worked out here instead.
     const framing = viewOf(bounds, size);
@@ -1887,9 +2084,12 @@ function ExploreCamera({
       worldHeight: size.height / framing.zoom,
     };
     if (!placed.current) {
-      const distance = from.worldHeight / (2 * Math.tan((EXPLORE_FOV * Math.PI) / 360));
+      const distance =
+        from.worldHeight / (2 * Math.tan((EXPLORE_FOV * Math.PI) / 360));
       const direction = from.position.clone().sub(from.target).normalize();
-      perspective.position.copy(from.target).addScaledVector(direction, distance);
+      perspective.position
+        .copy(from.target)
+        .addScaledVector(direction, distance);
       // The controls are what aim the camera, on their first update, and they are
       // rebuilt for the new camera a render after this one. Until then the camera
       // keeps the rotation it was made with and looks down -z from above the city,
@@ -1907,7 +2107,14 @@ function ExploreCamera({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, controls, invalidate, pose, size]);
 
-  return <PerspectiveCamera far={span * 40} fov={EXPLORE_FOV} makeDefault near={0.5} />;
+  return (
+    <PerspectiveCamera
+      far={span * 40}
+      fov={EXPLORE_FOV}
+      makeDefault
+      near={0.5}
+    />
+  );
 }
 
 /** Milliseconds a building takes to move between its city spot and its focus spot. */
@@ -1961,7 +2168,7 @@ export default function Scene({
   const pose = useRef<Pose | null>(null);
   const reducedMotion = useMemo(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    [],
+    []
   );
   const city = useMemo(() => cityDistricts(graph), [graph]);
   // The ground a nested folder's members cover, which tints that patch of its island.
@@ -1974,18 +2181,25 @@ export default function Scene({
       if (held) held.push(placement);
       else members.set(placement.folder, [placement]);
     }
-    return [...members].map(([id, held]) => ({ id, ...cityBounds(held, FOLDER_PAD) }));
+    return [...members].map(([id, held]) => ({
+      id,
+      ...cityBounds(held, FOLDER_PAD),
+    }));
   }, [city]);
   // The roads and ground links of the whole city, for the name search. The city's
   // own, not what focus mode draws, because the names are fixed to their islands.
   const groundRunsOfCity = useMemo(
-    () => groundRuns(new Map(city.placements.map((p) => [p.id, p])), graph.edges ?? []),
-    [city, graph.edges],
+    () =>
+      groundRuns(
+        new Map(city.placements.map((p) => [p.id, p])),
+        graph.edges ?? []
+      ),
+    [city, graph.edges]
   );
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
   const focusNeighbours = useMemo(
     () => (focus ? neighboursOf(graph, focus) : null),
-    [graph, focus],
+    [graph, focus]
   );
   const focusLayout = useMemo(() => {
     const neighbourhood = focus ? neighbourhoodById.get(focus) : undefined;
@@ -2003,16 +2217,23 @@ export default function Scene({
     // the layout returned unchanged is one it did not place.
     const placements = laid.map((placement, index) => {
       if (placement === city.placements[index]) {
-        return inFocus.has(placement.id) ? placement : { ...placement, flatten: 1 };
+        return inFocus.has(placement.id)
+          ? placement
+          : { ...placement, flatten: 1 };
       }
       const at = {
         ...placement,
-        position: { x: placement.position.x + anchor.x, z: placement.position.z + anchor.z },
+        position: {
+          x: placement.position.x + anchor.x,
+          z: placement.position.z + anchor.z,
+        },
       };
       moved.push(at);
       return at;
     });
-    const kind = city.placements.find((placement) => placement.id === focus)?.districtKind;
+    const kind = city.placements.find(
+      (placement) => placement.id === focus
+    )?.districtKind;
     return { anchor, kind: kind ?? "mixed", moved, placements };
   }, [focus, focusNeighbours, graph, neighbourhoodById, city]);
   const target = focusLayout?.placements ?? city.placements;
@@ -2021,9 +2242,12 @@ export default function Scene({
   // what focus mode is about.
   const focusIsland = useMemo(
     () =>
-      focusLayout &&
-      { ...focusBounds(focusLayout.moved), anchor: focusLayout.anchor, kind: focusLayout.kind },
-    [focusLayout],
+      focusLayout && {
+        ...focusBounds(focusLayout.moved),
+        anchor: focusLayout.anchor,
+        kind: focusLayout.kind,
+      },
+    [focusLayout]
   );
 
   // The placements on screen right now. They are the city's or the focus layout's
@@ -2041,7 +2265,9 @@ export default function Scene({
 
     // Tweening from what is on screen, not from the city, is what lets a second
     // focus interrupt the first halfway and carry on from there.
-    const from = new Map(shown.current.map((placement) => [placement.id, placement]));
+    const from = new Map(
+      shown.current.map((placement) => [placement.id, placement])
+    );
     const started = performance.now();
     let frame = requestAnimationFrame(function step() {
       const t = smootherstep((performance.now() - started) / TWEEN_MS);
@@ -2052,7 +2278,8 @@ export default function Scene({
               const at = from.get(to.id);
               // Nothing to tween when the placement is the same object and neither
               // end is flattened, which is most of the city on the way in.
-              if (!at || (at === to && (at.flatten ?? 0) === (to.flatten ?? 0))) return to;
+              if (!at || (at === to && (at.flatten ?? 0) === (to.flatten ?? 0)))
+                return to;
               return {
                 ...to,
                 position: {
@@ -2086,13 +2313,19 @@ export default function Scene({
             centre: focusIsland.centre,
           }
         : ground,
-    [focusIsland, ground],
+    [focusIsland, ground]
   );
-  const nodesById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph]);
-  const placementsById = useMemo(() => new Map(placements.map((p) => [p.id, p])), [placements]);
+  const nodesById = useMemo(
+    () => new Map(graph.nodes.map((node) => [node.id, node])),
+    [graph]
+  );
+  const placementsById = useMemo(
+    () => new Map(placements.map((p) => [p.id, p])),
+    [placements]
+  );
   const selectionNeighbours = useMemo(
     () => (selected ? neighboursOf(graph, selected) : null),
-    [graph, selected],
+    [graph, selected]
   );
   // In focus mode the lit set is the focused node's, so clicking through the
   // neighbourhood does not dim the layout you are standing in.
@@ -2105,19 +2338,25 @@ export default function Scene({
       heights: built.heights,
     };
   }, [nodesById, placements]);
-  const plazas = useMemo(() => buildPlazaCells(nodesById, placements), [nodesById, placements]);
+  const plazas = useMemo(
+    () => buildPlazaCells(nodesById, placements),
+    [nodesById, placements]
+  );
   const iconGroups = useIconGroups(icons, nodesById, palette?.phosphor ?? "");
 
   // In focus mode the city's other edges are noise around a layout that is about
   // one node, so only the edges that touch it are built at all. Structure is on
   // there whatever the toolbar says, because a hub without its roads is a list.
   const drawnEdges = useMemo(
-    () => (focus ? (graph.edges ?? []).filter((edge) => touches(edge, focus)) : graph.edges ?? []),
-    [graph.edges, focus],
+    () =>
+      focus
+        ? (graph.edges ?? []).filter((edge) => touches(edge, focus))
+        : (graph.edges ?? []),
+    [graph.edges, focus]
   );
   const active = useMemo(
     () => new Set<Layer>(focus ? [...layers, "structure"] : layers),
-    [layers, focus],
+    [layers, focus]
   );
   // Twenty roads landing on one roof is the wiring mess the overview is meant to
   // avoid, so a building with more allowed parents than the fan limit keeps the
@@ -2128,9 +2367,13 @@ export default function Scene({
       roadFan(
         placementsById,
         drawnEdges,
-        focus ? null : new Set([hovered, selected].filter((id): id is string => id !== null)),
+        focus
+          ? null
+          : new Set(
+              [hovered, selected].filter((id): id is string => id !== null)
+            )
       ),
-    [placementsById, drawnEdges, focus, hovered, selected],
+    [placementsById, drawnEdges, focus, hovered, selected]
   );
   // A link leaves from the roof of the building it belongs to, so it stays visible
   // over a tall neighbour and moves with the focus tween.
@@ -2139,7 +2382,9 @@ export default function Scene({
     for (const placement of placements) {
       map.set(placement.id, {
         x: placement.position.x,
-        y: (placement.y ?? 0) + (heights.get(placement.id) ?? placement.height) * 0.8,
+        y:
+          (placement.y ?? 0) +
+          (heights.get(placement.id) ?? placement.height) * 0.8,
         z: placement.position.z,
       });
     }
@@ -2184,7 +2429,11 @@ export default function Scene({
             runs={groundRunsOfCity}
             span={span}
           />
-          <FocusIsland island={focusIsland} palette={palette} reducedMotion={reducedMotion} />
+          <FocusIsland
+            island={focusIsland}
+            palette={palette}
+            reducedMotion={reducedMotion}
+          />
           <Buildings
             cellsByKind={cellsByKind}
             heights={heights}
@@ -2235,7 +2484,7 @@ export default function Scene({
                 palette={palette}
                 selected={selected}
               />
-            ) : null,
+            ) : null
           )}
           <Labels
             badge={selected ? usageBadge(usage, selected) : null}

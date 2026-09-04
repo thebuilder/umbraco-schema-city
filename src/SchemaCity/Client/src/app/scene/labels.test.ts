@@ -8,7 +8,12 @@ import {
   pickLabels,
 } from "./labels";
 
-function candidate(id: string, x: number, y: number, over: Partial<LabelCandidate> = {}) {
+function candidate(
+  id: string,
+  x: number,
+  y: number,
+  over: Partial<LabelCandidate> = {}
+) {
   return { id, text: id, rank: 2, x, y, buildingPx: 20, ...over };
 }
 
@@ -17,7 +22,10 @@ const idsOf = (boxes: { id: string }[]) => boxes.map((box) => box.id);
 describe("pickLabels", () => {
   it("keeps both labels when their boxes miss each other", () => {
     const apart = labelWidth("a") + 10;
-    const kept = pickLabels([candidate("a", 100, 100), candidate("b", 100 + apart, 100)]);
+    const kept = pickLabels([
+      candidate("a", 100, 100),
+      candidate("b", 100 + apart, 100),
+    ]);
     expect(idsOf(kept)).toEqual(["a", "b"]);
   });
 
@@ -39,7 +47,7 @@ describe("pickLabels", () => {
 
   it("stops at the cap even when every label fits", () => {
     const many = Array.from({ length: LABEL_CAP + 12 }, (_, i) =>
-      candidate(`n${i}`, 100, i * (LABEL_HEIGHT_PX + 2)),
+      candidate(`n${i}`, 100, i * (LABEL_HEIGHT_PX + 2))
     );
     expect(pickLabels(many)).toHaveLength(LABEL_CAP);
   });
@@ -50,13 +58,16 @@ describe("pickLabels", () => {
   });
 
   it("drops a label anchored off screen", () => {
-    const kept = pickLabels([candidate("away", 900, 100)], { width: 800, height: 600 });
+    const kept = pickLabels([candidate("away", 900, 100)], {
+      width: 800,
+      height: 600,
+    });
     expect(kept).toEqual([]);
   });
 
   it("keeps the selected label past the cap, the pile and a tiny building", () => {
     const crowd = Array.from({ length: LABEL_CAP + 20 }, (_, i) =>
-      candidate(`n${i}`, 100 + i * 0.5, 100),
+      candidate(`n${i}`, 100 + i * 0.5, 100)
     );
     const kept = pickLabels([
       ...crowd,

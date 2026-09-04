@@ -21,7 +21,10 @@
         "menus": ["Umb.Menu.AdvancedSettings"]
       },
       "conditions": [
-        { "alias": "Umb.Condition.SectionAlias", "match": "Umb.Section.Settings" }
+        {
+          "alias": "Umb.Condition.SectionAlias",
+          "match": "Umb.Section.Settings"
+        }
       ]
     },
     {
@@ -36,7 +39,10 @@
         "icon": "icon-map-alt"
       },
       "conditions": [
-        { "alias": "Umb.Condition.WorkspaceAlias", "match": "Umb.Workspace.DocumentType" }
+        {
+          "alias": "Umb.Condition.WorkspaceAlias",
+          "match": "Umb.Workspace.DocumentType"
+        }
       ]
     }
   ]

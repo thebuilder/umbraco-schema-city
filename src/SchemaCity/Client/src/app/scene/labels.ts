@@ -71,7 +71,7 @@ export function pickLabels(
     /** Viewport in CSS pixels. Anchors outside it are dropped. */
     width?: number;
     height?: number;
-  } = {},
+  } = {}
 ): LabelBox[] {
   const {
     charPx = CHAR_PX,

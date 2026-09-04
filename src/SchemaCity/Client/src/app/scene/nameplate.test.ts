@@ -13,7 +13,7 @@ function block(
   maxX: number,
   minZ: number,
   maxZ: number,
-  height = 0,
+  height = 0
 ): Placement[] {
   const lots: Placement[] = [];
   for (let z = minZ + 1; z <= maxZ - 1; z += 2) {
@@ -33,7 +33,12 @@ function block(
   return lots;
 }
 
-const fence = (x0: number, z0: number, x1: number, z1: number): Run => ({ x0, z0, x1, z1 });
+const fence = (x0: number, z0: number, x1: number, z1: number): Run => ({
+  x0,
+  z0,
+  x1,
+  z1,
+});
 
 test("a name goes in the strip along the edge that is clear", () => {
   // Everything but the southern eight units is built on.

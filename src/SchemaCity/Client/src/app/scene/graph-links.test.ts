@@ -33,7 +33,11 @@ describe("neighboursOf", () => {
     // "kind" is widened past EdgeKind on purpose: a future kind should stay
     // excluded until this set is deliberately updated for it.
     const graph = graphOf([
-      { kind: "future" as SchemaGraph["edges"][number]["kind"], from: "a", to: "b" },
+      {
+        kind: "future" as SchemaGraph["edges"][number]["kind"],
+        from: "a",
+        to: "b",
+      },
     ]);
 
     expect(neighboursOf(graph, "a")).toEqual(new Set(["a"]));

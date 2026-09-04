@@ -16,7 +16,8 @@ document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 const fixtures = import.meta.glob<unknown>("./fixtures/*.json", {
   import: "default",
 });
-const usageOf = (path: string) => fixtures[path.replace(/\.json$/, "-usage.json")];
+const usageOf = (path: string) =>
+  fixtures[path.replace(/\.json$/, "-usage.json")];
 
 // Two hand-drawn stand-ins for the backoffice icon registry, which is where the
 // wrappers read the real ones. Two is enough to see roof icons work: the seeded
@@ -51,7 +52,7 @@ async function show(path: string) {
       icons={icons}
       onOpenType={(id) => console.log("schema-city: open type", id)}
       usage={usage ? ((await usage()) as UsageReport) : undefined}
-    />,
+    />
   );
 }
 
