@@ -120,16 +120,23 @@ describe("buildLinkGeometry", () => {
     expect(ranges).toHaveLength(1);
   });
 
-  it("draws inheritance thicker than a composition, and only once", () => {
-    const thin = buildLinkGeometry("compositions", [edge("composition", "a", "b")], anchors, placements);
-    const thick = buildLinkGeometry(
-      "compositions",
+  it("draws one arc for an inherited parent, and it is the inherits edge", () => {
+    const composed = buildLinkGeometry("compositions", [edge("composition", "a", "b")], anchors, placements);
+    expect(composed.ranges).toHaveLength(1);
+    expect(composed.ranges[0]?.edges[0]?.kind).toBe("composition");
+
+    // The backend emits the composition twin of an inherited parent as well, and
+    // both orderings of the two have to come out as the one inheritance arc that
+    // the scene tints brighter.
+    for (const pair of [
       [edge("composition", "a", "b"), edge("inherits", "a", "b")],
-      anchors,
-      placements,
-    );
-    expect(thick.ranges).toHaveLength(1);
-    expect(thick.positions.length).toBe(thin.positions.length * 2);
+      [edge("inherits", "a", "b"), edge("composition", "a", "b")],
+    ]) {
+      const inherited = buildLinkGeometry("compositions", pair, anchors, placements);
+      expect(inherited.ranges).toHaveLength(1);
+      expect(inherited.ranges[0]?.edges[0]?.kind).toBe("inherits");
+      expect(inherited.positions.length).toBe(composed.positions.length);
+    }
   });
 
   it("gives every edge a distinct, contiguous vertex range", () => {
