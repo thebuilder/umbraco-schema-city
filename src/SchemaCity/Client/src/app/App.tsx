@@ -42,7 +42,7 @@ import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
-import { Inspector } from "./Inspector";
+import { Inspector, INSPECTOR_WIDTH } from "./Inspector";
 import { TypeTable } from "./TypeTable";
 import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
 import { type Lens, LENS_LABEL, LENSES, lensScale, type Ramp } from "./scene/lens";
@@ -380,6 +380,17 @@ export function App({
     setFocus(id);
   };
 
+  /**
+   * Done with this node: closing the inspector and clicking bare ground both leave
+   * focus and clear the selection in one step, because either one is the reader
+   * putting the type down. Escape keeps its two steps, which is how you leave focus
+   * and go on reading the type you were focused on.
+   */
+  const done = () => {
+    setFocus(null);
+    setSelected(null);
+  };
+
   // Following a link, from the inspector or the palette, while focused moves the
   // whole layout with it. The lists you are reading are what you fly between.
   const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
@@ -534,16 +545,23 @@ export function App({
           </div>
         </div>
 
-        {scale ? (
-          <div className="relative z-10 flex shrink-0 items-center gap-2 border-line border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
-            <span className="font-bold uppercase tracking-terminal">{LENS_LABEL[lens]}</span>
-            <span>{scale.minLabel}</span>
-            <span aria-hidden className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`} />
-            <span>{scale.maxLabel}</span>
-          </div>
-        ) : null}
-
         <div className="relative min-h-0 flex-1">
+          {/* The legend is an overlay in the corner of the canvas rather than a row
+              above it. As a row it took its height out of the canvas the moment a
+              lens was picked, and the scene dropped and re-fitted itself around the
+              new viewport, which reads as the city flinching at a colour change.
+              Anything else that only appears sometimes belongs over the canvas for
+              the same reason. It covers its own box and nothing else, so the ground
+              under it is the only pick the canvas loses. The list view colours
+              nothing by lens, so it gets no legend over its first row. */}
+          {scale && view !== "list" ? (
+            <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
+              <span className="font-bold uppercase tracking-terminal">{LENS_LABEL[lens]}</span>
+              <span>{scale.minLabel}</span>
+              <span aria-hidden className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`} />
+              <span>{scale.maxLabel}</span>
+            </div>
+          ) : null}
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
           {view === "list" ? (
@@ -580,9 +598,10 @@ export function App({
                   focus={focus}
                   graph={graph}
                   icons={icons}
+                  inspectorWidth={selectedNode && neighbourhood ? INSPECTOR_WIDTH : 0}
                   layers={layers}
                   onFocus={enterFocus}
-                  onSelect={setSelected}
+                  onSelect={(id) => (id === null ? done() : setSelected(id))}
                   reframe={reframe}
                   scale={scale}
                   selected={selected}
@@ -599,7 +618,7 @@ export function App({
               neighbourhood={neighbourhood}
               node={selectedNode}
               nodesById={nodesById}
-              onClose={() => setSelected(null)}
+              onClose={done}
               onOpenType={onOpenType}
               onSelect={followLink}
               onToggleFocus={() =>

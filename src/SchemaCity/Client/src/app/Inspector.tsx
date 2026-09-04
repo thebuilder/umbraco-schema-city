@@ -230,6 +230,13 @@ function TypeIcon({ svg }: { svg?: string }) {
   );
 }
 
+/**
+ * How much of the canvas the open panel covers, in CSS pixels. It is `w-80` below and
+ * the `pr-80` the list view is inset by; the camera frames the city in the part of
+ * the canvas this leaves, so the number has to be readable outside the stylesheet.
+ */
+export const INSPECTOR_WIDTH = 320;
+
 export function Inspector({
   focused,
   icons,

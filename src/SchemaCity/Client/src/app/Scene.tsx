@@ -13,7 +13,7 @@ import {
   type DistrictKind,
   type Placement,
 } from "./layout/city";
-import { layoutFocus } from "./layout/focus";
+import { focusAnchor, focusBounds, type FocusBounds, layoutFocus } from "./layout/focus";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -43,12 +43,12 @@ import {
   turnRates,
 } from "./scene/flight";
 import { buildRoadGeometry, roadFan } from "./scene/roads";
+import { findNameplate, groundRuns, type Run } from "./scene/nameplate";
 import {
   fogRange,
   framingAction,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
-  districtStamp,
   pixelsPerUnit,
   stageMetrics,
   zoomRange,
@@ -1070,8 +1070,8 @@ const WHITE = "#ffffff";
 
 /**
  * Font size a district's name is rasterised at. Its cap height comes out around 72 px,
- * and the stamp is at most 3 world units tall, so the print carries about 24 px of
- * texture per world unit. The ground needs 2 to stay crisp at the framing zoom, and
+ * and the stamp is at most four world units tall, so the print carries about
+ * 18 px of texture per world unit. The ground needs 2 to stay crisp at the framing zoom, and
  * the rest is what Explore leans on when the camera comes down to street level.
  */
 const STAMP_FONT_PX = 100;
@@ -1087,7 +1087,7 @@ const STAMP_TRACKING = "0.32em";
  * How solid the print reads against the island under it. Phosphor-dim at 0.8 comes
  * out around #3f6b60 over the panel colour, which is still darker than any building
  * and half the strength of a road. Lower than this and the letters go, because the
- * whole city framed shrinks a 100 px raster to a 17 px cap and the mipmap averages a
+ * whole city framed shrinks a 100 px raster to a 22 px cap and the mipmap averages a
  * thin stroke into the slab.
  */
 const STAMP_OPACITY = 0.8;
@@ -1157,6 +1157,78 @@ function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
   return tint(palette.land, WHITE, 0.07);
 }
 
+/** The lip of land around an island, the same for every district and for the focus one. */
+function rimColour(palette: Palette): THREE.Color {
+  return new THREE.Color(palette.land).lerp(new THREE.Color(palette.background), 0.6);
+}
+
+/**
+ * How high the focus island's top face sits. Above the district slabs at 0 and the
+ * names printed on them at 0.01, so neither z-fights it, and under the roads at
+ * 0.015, so the focused node's roads still run over the island it stands on.
+ *
+ * ponytail: that leaves it under the sunk city plates as well, which stand 0.1 up,
+ * so the flattened city still reads through the island as ghost footprints. Hiding
+ * them means the buildings pass would have to know about the island; sinking the
+ * plates under it is the upgrade if that ever reads as debris rather than as a map.
+ */
+const FOCUS_ISLAND_Y = 0.012;
+
+/**
+ * The island under a focused neighbourhood: the slab and rim a district stands on, in
+ * the focused node's district colour, over the city the neighbourhood came from.
+ *
+ * It grows out of the focused node's own ground over the same 400 ms the buildings
+ * take to gather around it, and shrinks back into it on the way out, which is why the
+ * island it last drew is held after `island` goes null.
+ */
+function FocusIsland({
+  island,
+  palette,
+  reducedMotion,
+}: {
+  island: (FocusBounds & { anchor: { x: number; z: number }; kind: DistrictKind }) | null;
+  palette: Palette;
+  reducedMotion: boolean;
+}) {
+  const group = useRef<THREE.Group>(null);
+  const grown = useRef(island ? 1 : 0);
+  const shown = useRef(island);
+  if (island) shown.current = island;
+  const at = shown.current;
+
+  useFrame((_, delta) => {
+    const to = island ? 1 : 0;
+    const step = reducedMotion ? 1 : (delta * 1000) / TWEEN_MS;
+    grown.current = Math.min(1, Math.max(0, grown.current + Math.sign(to - grown.current) * step));
+    if (!group.current) return;
+    group.current.visible = grown.current > 0;
+    // A group at the anchor scales about it, so the island opens out of the focused
+    // node rather than appearing whole. Never exactly zero: a zero scale has no
+    // normal matrix and three warns about it.
+    group.current.scale.setScalar(Math.max(smootherstep(grown.current), 1e-4));
+  });
+
+  if (!at) return null;
+  const width = at.maxX - at.minX;
+  const depth = at.maxZ - at.minZ;
+  const rim = RIM_OVERHANG * 2;
+  return (
+    <group position={[at.anchor.x, FOCUS_ISLAND_Y, at.anchor.z]} ref={group}>
+      <group position={[at.centre.x - at.anchor.x, 0, at.centre.z - at.anchor.z]}>
+        <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
+          <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
+          <meshStandardMaterial color={slabColour(at.kind, palette)} metalness={0} roughness={1} />
+        </mesh>
+        <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
+          <boxGeometry args={[width + rim, RIM_HEIGHT, depth + rim]} />
+          <meshStandardMaterial color={rimColour(palette)} metalness={0} roughness={1} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 /**
  * The world stage, borrowed from fsn: a void-coloured background and fog, one grid
  * plane that follows the camera so the ground never runs out, and an island of land
@@ -1168,14 +1240,20 @@ function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
  * folder. Nothing here animates.
  */
 function Stage({
+  buildings,
   districts,
   folders,
+  runs,
   span,
   palette,
 }: {
+  /** Every building in the city, which is what the names have to find a gap in. */
+  buildings: Placement[];
   districts: District[];
   /** The ground a nested folder's members cover, for the tint on the island. */
   folders: (CityBounds & { id: string })[];
+  /** Every road and ground link, the other thing a name may not be printed under. */
+  runs: Run[];
   span: number;
   palette: Palette;
 }) {
@@ -1187,10 +1265,7 @@ function Stage({
   const centre = useMemo(() => new THREE.Vector3(), []);
   const { fadeNear, fadeFar, plane } = stageMetrics(span);
   const fog = fogRange(span);
-  const rimColour = useMemo(
-    () => new THREE.Color(palette.land).lerp(new THREE.Color(palette.background), 0.6),
-    [palette],
-  );
+  const rim = useMemo(() => rimColour(palette), [palette]);
   const folderColour = useMemo(() => tint(palette.land, WHITE, 0.15), [palette]);
 
   const uniforms = useMemo(
@@ -1209,23 +1284,25 @@ function Stage({
   );
 
   // One rasterised name per district, with the quad it prints on. The name is fixed
-  // to its island, so this is worked out once rather than followed every frame.
+  // to its island, so the search for its spot runs once rather than every frame.
   const stampsOf = useMemo(
     () =>
       districts.map((district) => {
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
-        const stamp = districtStamp(
+        const stamp = findNameplate(
           {
             minX: district.minX - ISLAND_PAD,
             maxX: district.maxX + ISLAND_PAD,
             minZ: district.minZ - ISLAND_PAD,
             maxZ: district.maxZ + ISLAND_PAD,
           },
+          buildings,
+          runs,
           texture.image.width / texture.image.height,
         );
         return { id: district.id, texture, stamp };
       }),
-    [districts, palette.mono],
+    [buildings, districts, palette.mono, runs],
   );
 
   useFrame(() => {
@@ -1263,7 +1340,7 @@ function Stage({
       {districts.map((district) => {
         const width = district.maxX - district.minX + ISLAND_PAD * 2;
         const depth = district.maxZ - district.minZ + ISLAND_PAD * 2;
-        const rim = RIM_OVERHANG * 2;
+        const overhang = RIM_OVERHANG * 2;
         return (
           <group key={district.id} position={[district.centre.x, 0, district.centre.z]}>
             <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
@@ -1275,8 +1352,8 @@ function Stage({
               />
             </mesh>
             <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
-              <boxGeometry args={[width + rim, RIM_HEIGHT, depth + rim]} />
-              <meshStandardMaterial color={rimColour} metalness={0} roughness={1} />
+              <boxGeometry args={[width + overhang, RIM_HEIGHT, depth + overhang]} />
+              <meshStandardMaterial color={rim} metalness={0} roughness={1} />
             </mesh>
           </group>
         );
@@ -1296,9 +1373,9 @@ function Stage({
           <meshStandardMaterial color={folderColour} metalness={0} roughness={1} />
         </mesh>
       ))}
-      {/* The district's name printed flat on its island, in the margin along the north
-          edge. It writes no depth, so the buildings, the roads and every link stand
-          over it.
+      {/* The district's name printed flat on its island, in the band the layout held
+          clear along the quietest of its four edges. It writes no depth, so the
+          buildings, the roads and every link stand over it.
 
           ponytail: the print holds its strength through a selection and through focus
           mode, where the buildings around it fade. Fading it too means telling the
@@ -1310,7 +1387,7 @@ function Stage({
         <mesh
           key={id}
           position={[stamp.x, STAMP_Y, stamp.z]}
-          rotation={[-Math.PI / 2, 0, 0]}
+          rotation={[-Math.PI / 2, 0, stamp.rotation]}
         >
           <planeGeometry args={[stamp.width, stamp.height]} />
           <meshBasicMaterial
@@ -1360,18 +1437,37 @@ const REFRAME_MS = 400;
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
-/** Where the ortho camera stands to frame `bounds` at a true isometric angle. */
-function viewOf(bounds: CityBounds, size: { width: number; height: number }): View {
+/**
+ * Screen-right on the ground at the isometric angle, which is the camera's own x
+ * axis: `cross(up, position - target)` normalised, for a camera on (1, 1, 1).
+ */
+const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
+
+/**
+ * Where the ortho camera stands to frame `bounds` at a true isometric angle.
+ *
+ * `shift` is how many CSS pixels the framed centre moves left on screen, which is
+ * half the inspector's width when it is open. The camera moves the other way, along
+ * its own right, by that many pixels over the framing zoom: an orthographic camera's
+ * zoom is its pixels per world unit, so that is the whole conversion. The framed
+ * centre then lands in the middle of the canvas the panel does not cover.
+ */
+function viewOf(
+  bounds: CityBounds,
+  size: { width: number; height: number },
+  shift = 0,
+): View {
   const span = citySpan(bounds);
+  const zoom = Math.min(size.width, size.height) / span;
   const direction = new THREE.Vector3(1, 1, 1).normalize();
+  const target = new THREE.Vector3(bounds.centre.x, 0, bounds.centre.z).addScaledVector(
+    SCREEN_RIGHT,
+    shift / zoom,
+  );
   return {
-    position: new THREE.Vector3(
-      bounds.centre.x + direction.x * span,
-      direction.y * span,
-      bounds.centre.z + direction.z * span,
-    ),
-    target: new THREE.Vector3(bounds.centre.x, 0, bounds.centre.z),
-    zoom: Math.min(size.width, size.height) / span,
+    position: target.clone().addScaledVector(direction, span),
+    target,
+    zoom,
     span,
   };
 }
@@ -1384,10 +1480,13 @@ function viewOf(bounds: CityBounds, size: { width: number; height: number }): Vi
  */
 function CameraRig({
   bounds,
+  inspectorWidth,
   reframe,
   reducedMotion,
 }: {
   bounds: CityBounds;
+  /** CSS pixels of canvas the inspector covers on the right, 0 when it is closed. */
+  inspectorWidth: number;
   /** Bumped by Home to ask for the same city to be framed again. */
   reframe: number;
   reducedMotion: boolean;
@@ -1412,7 +1511,12 @@ function CameraRig({
     reframe: number;
   } | null>(null);
 
-  const view = useMemo(() => viewOf(bounds, size), [bounds, size]);
+  // Half the panel, because the middle of the uncovered canvas is that far left of
+  // the middle of the whole of it.
+  const view = useMemo(
+    () => viewOf(bounds, size, inspectorWidth / 2),
+    [bounds, inspectorWidth, size],
+  );
 
   useEffect(() => {
     const cancel = () => {
@@ -1471,7 +1575,7 @@ function CameraRig({
       ease: asked ? smootherstep : easeInOutCubic,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, bounds, controls, reframe, reducedMotion]);
+  }, [view, bounds, controls, inspectorWidth, reframe, reducedMotion]);
 
   useFrame(() => {
     const moving = flight.current;
@@ -1796,6 +1900,7 @@ export default function Scene({
   layers,
   icons,
   explore,
+  inspectorWidth = 0,
   reframe = 0,
   onSelect,
   onFocus,
@@ -1811,6 +1916,12 @@ export default function Scene({
   layers: readonly Layer[];
   /** The Explore toggle: a free perspective camera instead of the isometric one. */
   explore?: boolean;
+  /**
+   * CSS pixels of the canvas the inspector covers on the right, 0 when it is closed.
+   * Every framing flight aims at the middle of what it leaves rather than at the
+   * middle of the canvas, so a focused neighbourhood is not half behind the panel.
+   */
+  inspectorWidth?: number;
   /**
    * Bumped to frame the whole city again. It is a count rather than a flag because
    * the camera has to answer Home a second time from wherever the reader took it.
@@ -1841,23 +1952,55 @@ export default function Scene({
     }
     return [...members].map(([id, held]) => ({ id, ...cityBounds(held, FOLDER_PAD) }));
   }, [city]);
+  // The roads and ground links of the whole city, for the name search. The city's
+  // own, not what focus mode draws, because the names are fixed to their islands.
+  const groundRunsOfCity = useMemo(
+    () => groundRuns(new Map(city.placements.map((p) => [p.id, p])), graph.edges ?? []),
+    [city, graph.edges],
+  );
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
   const focusNeighbours = useMemo(
     () => (focus ? neighboursOf(graph, focus) : null),
     [graph, focus],
   );
-  const target = useMemo(() => {
+  const focusLayout = useMemo(() => {
     const neighbourhood = focus ? neighbourhoodById.get(focus) : undefined;
-    if (!focus || !neighbourhood) return city.placements;
+    if (!focus || !neighbourhood) return null;
     const laid = layoutFocus(graph, neighbourhood, focus, city.placements);
+    // The layout keeps the neighbourhood around the origin, so the anchor is what
+    // stands it back on the focused node's own ground: that node holds still and
+    // everything it is joined to gathers around it.
+    const anchor = focusAnchor(city.placements, focus);
     const inFocus = focusNeighbours ?? new Set<string>();
+    const moved: Placement[] = [];
     // Everything the focused node has nothing to do with becomes ground: the
     // neighbourhood is laid out over the city it came from, and a city still standing
-    // at full height under it reads as two layouts on top of each other.
-    return laid.map((placement) =>
-      inFocus.has(placement.id) ? placement : { ...placement, flatten: 1 },
-    );
+    // at full height under it reads as two layouts on top of each other. A placement
+    // the layout returned unchanged is one it did not place.
+    const placements = laid.map((placement, index) => {
+      if (placement === city.placements[index]) {
+        return inFocus.has(placement.id) ? placement : { ...placement, flatten: 1 };
+      }
+      const at = {
+        ...placement,
+        position: { x: placement.position.x + anchor.x, z: placement.position.z + anchor.z },
+      };
+      moved.push(at);
+      return at;
+    });
+    const kind = city.placements.find((placement) => placement.id === focus)?.districtKind;
+    return { anchor, kind: kind ?? "mixed", moved, placements };
   }, [focus, focusNeighbours, graph, neighbourhoodById, city]);
+  const target = focusLayout?.placements ?? city.placements;
+  // The ground the neighbourhood covers, which the island is drawn on and the camera
+  // frames. The moved placements only: the flattened city around them is not part of
+  // what focus mode is about.
+  const focusIsland = useMemo(
+    () =>
+      focusLayout &&
+      { ...focusBounds(focusLayout.moved), anchor: focusLayout.anchor, kind: focusLayout.kind },
+    [focusLayout],
+  );
 
   // The placements on screen right now. They are the city's or the focus layout's
   // everywhere except during the 400 ms between the two.
@@ -1912,10 +2055,14 @@ export default function Scene({
   // everything moved around it, not the whole city behind them.
   const bounds = useMemo(
     () =>
-      focusNeighbours
-        ? cityBounds(target.filter((placement) => focusNeighbours.has(placement.id)))
+      focusIsland
+        ? {
+            width: focusIsland.maxX - focusIsland.minX,
+            depth: focusIsland.maxZ - focusIsland.minZ,
+            centre: focusIsland.centre,
+          }
         : ground,
-    [focusNeighbours, target, ground],
+    [focusIsland, ground],
   );
   const nodesById = useMemo(() => new Map(graph.nodes.map((node) => [node.id, node])), [graph]);
   const placementsById = useMemo(() => new Map(placements.map((p) => [p.id, p])), [placements]);
@@ -2006,11 +2153,14 @@ export default function Scene({
           <ambientLight intensity={1.2} />
           <directionalLight intensity={2.4} position={[8, 16, 6]} />
           <Stage
+            buildings={city.placements}
             districts={city.districts}
             folders={folderTints}
             palette={palette}
+            runs={groundRunsOfCity}
             span={span}
           />
+          <FocusIsland island={focusIsland} palette={palette} reducedMotion={reducedMotion} />
           <Buildings
             cellsByKind={cellsByKind}
             heights={heights}
@@ -2078,7 +2228,12 @@ export default function Scene({
             <ExploreCamera bounds={bounds} pose={pose} span={span} />
           ) : (
             <>
-              <CameraRig bounds={bounds} reducedMotion={reducedMotion} reframe={reframe} />
+              <CameraRig
+                bounds={bounds}
+                inspectorWidth={inspectorWidth}
+                reducedMotion={reducedMotion}
+                reframe={reframe}
+              />
               <PoseTracker pose={pose} />
             </>
           )}

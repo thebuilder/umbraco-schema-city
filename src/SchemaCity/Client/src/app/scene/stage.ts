@@ -6,6 +6,7 @@
 // far ground dissolves instead of ending in a horizon ring, and the grid comes from
 // world position rather than from the geometry, so one plane can be re-centred on the
 // camera every frame without the lines appearing to slide.
+import { FLOOR_HEIGHT } from "./buildings";
 
 /**
  * One grid square is six world units. It read as the street the layout left between
@@ -112,22 +113,47 @@ export function framingAction<B, C>(
   return last.controls === next.controls ? "none" : "snap";
 }
 
-/** Cap height of a district's name printed on its island, in world units. */
-export const STAMP_CAP = 3;
+/**
+ * Cap height of a district's name printed on its island, in world units. At three it
+ * rasterised to a 17 pixel cap once the whole city was framed, which is where a mono
+ * face at this tracking starts to average into the slab.
+ */
+export const STAMP_CAP = 4;
 
 /**
- * Ground between the name and the three island edges it sits near: the west edge it
- * is aligned to, the north edge above it, and the first row of buildings below it.
+ * Ground between the name and the two island edges it sits near: the west edge it is
+ * aligned to and the north edge above it.
  */
 const STAMP_INSET = 0.5;
 
 /**
- * The ground an island keeps clear along its north edge for the name: a cap height
- * with an inset above it and another below. The name lies flat and never turns, so
- * this band holds the whole of it at every camera angle and the layout leaves it
- * empty rather than the scene printing over a row.
+ * Floors in the first row the band is cut to clear. Four covers every first row in
+ * both fixtures; a taller building in that row still leans over the letters.
  */
-export const STAMP_BAND = STAMP_CAP + STAMP_INSET * 2;
+const FIRST_ROW_FLOORS = 4;
+
+/**
+ * How much ground a building of height 1 hides behind itself. At the isometric angle
+ * the point (0, 1, 0) draws where the ground point (-1, 0, -1) does, so a roof leans
+ * sqrt(2) units up the island's diagonal, and the city orbits, so the whole of that
+ * can fall along z.
+ */
+const LEAN_PER_UNIT = Math.SQRT2;
+
+/**
+ * The ground an island keeps clear along its north edge for the name: an inset, the
+ * cap height, and enough room under the letters that a first row of four floors
+ * leans past them rather than over them. The name lies flat and never turns, so this
+ * band holds the whole of it at every camera angle, and the layout leaves the band
+ * empty rather than the scene printing over a row.
+ *
+ * ponytail: one number for every district, cut for the tallest first row worth
+ * planning for rather than for the row each district actually has. A band measured
+ * per district would give a two-floor first row its three units back, and no fixture
+ * has an island where that reads as wasted ground.
+ */
+export const STAMP_BAND =
+  STAMP_INSET + STAMP_CAP + LEAN_PER_UNIT * FIRST_ROW_FLOORS * FLOOR_HEIGHT;
 
 /**
  * Where a district's name lies on its island and how big it is, in world units.
