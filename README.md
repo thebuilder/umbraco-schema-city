@@ -10,7 +10,7 @@ around. One building per Document Type, roads for the relationships between them
   type's properties, compositions, allowed children and block targets. Its Open in editor button
   goes to that type's editor. `⌘K` searches every type and property alias.
 
-  ![78 Document Types as buildings on four island districts, named Pages, Elements, Compositions and Unfiled, with all four kinds of road drawn between them.](docs/screenshots/city.png)
+  ![78 Document Types as buildings on four island districts, named Pages, Elements, Compositions and Unfiled, with the structure roads running between them.](docs/screenshots/city.png)
 
 - **Editor tab.** The Relationships tab on a Document Type editor opens the same map, focused on
   the type being edited.
