@@ -535,7 +535,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 ### M4, Polish and release (medium)
 
 - World stage from fsn: far ground and grid, distance fog into the void colour, sky treatment, no visible grid edge at any allowed zoom. Done 2026-09-03; the single city slab later became one island per district.
-- NuGet packaging with the client build wired into `dotnet pack`, README for the package, marketplace metadata. Done 2026-09-03; screenshots still missing.
+- NuGet packaging with the client build wired into `dotnet pack`, README for the package, marketplace metadata. Done 2026-09-03; screenshots done 2026-09-04 (six, from the harness, quantised).
 - Roof icons on the roof caps. Done 2026-09-03; one instanced quad mesh per icon-and-colour pair from a cached canvas texture, 15 meshes on the seeded schema, drawn flat over a darker cap from about 40 px of footprint width and always on the selected and hovered buildings.
 - Property "windows" on floors. Done 2026-09-03; one instanced quad per property walked around the floor's four walls, 616 on the seeded schema, each one its floor's colour turned up and brighter again when the property is mandatory.
 - Explore perspective toggle. Done 2026-09-03; a perspective camera stood on the isometric camera's direction and target, free orbit above the horizon, the grid on the camera's centre ray, labels measured through a per-camera pixels-per-unit, `view=explore` in the URL, and turning it off restores the isometric framing.
@@ -562,9 +562,11 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - List filter placeholder "Filter types", with a minimum width on the input. Done 2026-09-04.
 - Focus mode: packed layout, focus island, inspector-aware framing, exit on deselect. Done 2026-09-04 (204 tests).
 - Lens legend as an overlay, no canvas resize. Done 2026-09-04; the canvas frames are byte-identical with a lens on and off.
+- Screenshots: `docs/screenshots/` six views from `dev/shots.mjs`, in the README and the marketplace entry; the marketplace URLs and the packed README's image paths carry a placeholder owner until the repo has a remote.
+- Shot polish: structure-only city shot, brighter focus roads, the findings chip box (in progress).
 - Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03. The wrapped row spilling over the canvas was paint order (the absolutely positioned scene painted over the in-flow toolbar) plus a Toggle that could shrink under its label; fixed the same day with a stacking layer and `shrink-0`, measured from 1400 to 600 px.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
-- Exit: `SchemaCity 1.0.0` on NuGet.
+- Exit: `SchemaCity 1.0.0` on NuGet once the repo has a remote (owner in the marketplace URLs and the README images, the old commit reworded). Everything else in M4 is done as of 2026-09-04 apart from the shot polish.
 
 ### Later, explicitly not v1
 
@@ -606,7 +608,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Graph builder, block inspector, usage aggregation | 17 xUnit tests on hand-built `ContentType` / `DataType` instances; one integration test on the seeded site per milestone |
 | `model/`, `app/` | 204 vitest tests across 17 files on fixtures: determinism (same input twice), cycle handling, empty graph, 300-node timing under 200 ms with realistic back edges, findings rules |
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
-| End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-03 after the road routing: green on both majors, nupkg 629 KB. On 18 the manifest is served before seeding ends, so the boot gate there proves less than on 17; the seeder line check covers it. CI also packs and checks the nupkg |
+| End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-04 after the focus pass, green on both majors, nupkg 642 KB. On 18 the manifest is served before seeding ends, so the boot gate there proves less than on 17; the seeder line check covers it. CI also packs and checks the nupkg |
 | Performance | The seeded schema in the dev harness with the browser's own frame profiler; the stress fixture lays out in about 24 ms and a synthetic 300-node graph in 35 ms |
 
 ---
@@ -618,7 +620,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. The focus island, inspector-aware framing, exit on deselect, the name search and the legend overlay. Done. Next: screenshots for the README and the marketplace, then a final verification on both majors.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. The focus island, inspector-aware framing, exit on deselect, the name search and the legend overlay. Done. Next: shot polish, then the remote (owner in the URLs, commit reword, first push, `dotnet pack` for 1.0.0).
 
 ## 13. Resolved questions
 
