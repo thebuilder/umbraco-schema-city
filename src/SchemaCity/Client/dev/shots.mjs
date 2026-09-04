@@ -69,8 +69,11 @@ async function orbit(from, to) {
 }
 
 const shots = [
-  // The whole city, every road layer on, nothing selected.
-  { name: "city", query: `?layers=${ALL_LAYERS}` },
+  // The whole city on the default layer, nothing selected. All four layers at once
+  // is a hairball at this width: the compositions fan alone crosses the frame a
+  // hundred times and the districts under it stop reading. free-camera is the shot
+  // that shows the other three.
+  { name: "city", query: "?layers=structure" },
   // Home focused: its neighbourhood is rebuilt in place and the inspector is open.
   { name: "focus", query: "?type=home&focus=1&layers=structure" },
   // The findings drawer over the default city.
