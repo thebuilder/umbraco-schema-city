@@ -133,6 +133,7 @@ export function Help({
             too. Borrowed from fsn's help screen, along with the group rules. */}
         <div
           className="max-h-[60vh] overflow-y-auto bg-panel-sunken px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-phosphor-bright"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable pane has to be reachable by keyboard.
           tabIndex={0}
         >
           {GROUPS.map((group) => (

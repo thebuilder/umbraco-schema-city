@@ -5,11 +5,11 @@ import {
   LitElement,
   unsafeCSS,
 } from "@umbraco-cms/backoffice/external/lit";
-import { UmbApiError, tryExecute } from "@umbraco-cms/backoffice/resources";
+import { tryExecute, UmbApiError } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
+import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
-import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
@@ -17,7 +17,7 @@ import type { SchemaGraph, UsageReport } from "./model/types.js";
  * app as a property, and takes the app's callbacks back. Everything under app/ is
  * plain React and runs unchanged in the fixture harness.
  */
-export class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
+class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
   #root?: Root;
   #graph?: SchemaGraph;
   #usage?: UsageReport;

@@ -7,14 +7,14 @@ import { STAMP_BAND } from "../scene/stage";
 import {
   cityBounds,
   cityDistricts,
+  DISTRICT_GAP,
+  type District,
   ISLAND_PAD,
   layoutCity,
+  type Placement,
   ROW_LIMIT,
   SPARSE_RANK,
-  DISTRICT_GAP,
   STREET,
-  type District,
-  type Placement,
 } from "./city";
 
 const small = smallFixture as unknown as SchemaGraph;
@@ -145,7 +145,7 @@ function strandedRanks(graph: SchemaGraph): string[] {
     let held = 0;
     let band = Number.NaN;
     for (const rank of ranks) {
-      const z = (rank[0] as Placement).position.z;
+      const { z } = (rank[0] as Placement).position;
       const sparse = rank.length <= SPARSE_RANK;
       if (sparse && held > 0 && held + rank.length <= ROW_LIMIT && z !== band) {
         found.push(`${district} rank at ${z} left out of the band at ${band}`);
@@ -463,7 +463,7 @@ describe("layoutCity", () => {
         );
         const column = (p: Placement) =>
           Math.min(
-            Infinity,
+            Number.POSITIVE_INFINITY,
             ...(parents.get(p.id) ?? [])
               .filter(
                 (id) =>

@@ -1,4 +1,4 @@
-import { createContext, useContext, type RefObject } from "react";
+import { createContext, type RefObject, useContext } from "react";
 
 /**
  * Base UI portals default to document.body, which is outside the shadow root the

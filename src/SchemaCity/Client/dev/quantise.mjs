@@ -9,14 +9,14 @@ import zlib from "node:zlib";
 
 const CRC = Array.from({ length: 256 }, (_, n) => {
   let c = n;
-  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xed_b8_83_20 ^ (c >>> 1) : c >>> 1;
   return c >>> 0;
 });
 
 function crc32(buf) {
-  let c = 0xffffffff;
+  let c = 0xff_ff_ff_ff;
   for (const byte of buf) c = CRC[(c ^ byte) & 255] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
+  return (c ^ 0xff_ff_ff_ff) >>> 0;
 }
 
 function chunk(type, data) {
@@ -142,7 +142,7 @@ export function quantise(png) {
     let hit = cache.get(bucket);
     if (hit === undefined) {
       let best = 0;
-      let least = Infinity;
+      let least = Number.POSITIVE_INFINITY;
       for (let i = 0; i < colours.length; i++) {
         const [cr, cg, cb] = colours[i];
         const d = (cr - r) ** 2 + (cg - g) ** 2 + (cb - b) ** 2;
@@ -151,7 +151,8 @@ export function quantise(png) {
           best = i;
         }
       }
-      cache.set(bucket, (hit = best));
+      hit = best;
+      cache.set(bucket, hit);
     }
     return hit;
   };

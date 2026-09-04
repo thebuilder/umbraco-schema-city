@@ -110,7 +110,7 @@ export function findFindings(
   graph: SchemaGraph,
   usage?: UsageReport
 ): Finding[] {
-  const nodes = graph.nodes;
+  const { nodes } = graph;
   const known = new Set(nodes.map((node) => node.id));
   const edges = graph.edges ?? [];
 
@@ -155,6 +155,8 @@ export function findFindings(
         blockTargets.set(edge.from, targets);
         break;
       }
+      default:
+        break;
     }
   }
 
@@ -209,7 +211,7 @@ export function findFindings(
     // A type nothing composes and nothing can create is a structural dead end, and
     // this one row says so. A type something composes is a mixin doing its job, so
     // it is never a dead end; the pure mixin note below covers it instead.
-    if (!node.isElement && !creatable && composers === 0) {
+    if (!(node.isElement || creatable) && composers === 0) {
       add(
         "deadEnd",
         node,

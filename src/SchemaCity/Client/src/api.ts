@@ -1,7 +1,7 @@
 import type { UmbClassInterface } from "@umbraco-cms/backoffice/class-api";
 import { UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN } from "@umbraco-cms/backoffice/document-type";
-import { filter, firstValueFrom } from "@umbraco-cms/backoffice/external/rxjs";
 import { loadManifestPlainJs } from "@umbraco-cms/backoffice/extension-api";
+import { filter, firstValueFrom } from "@umbraco-cms/backoffice/external/rxjs";
 import { umbHttpClient } from "@umbraco-cms/backoffice/http-client";
 import {
   UMB_ICON_REGISTRY_CONTEXT,
@@ -84,7 +84,7 @@ export const resolveIcons = async (
   const entries = await Promise.all(
     [...new Set(names)].map(async (name) => {
       const definition = definitions.find((icon) => icon.name === name);
-      if (!definition) return undefined;
+      if (!definition) return;
       const module = await loadManifestPlainJs<UmbIconModule>(definition.path);
       return module?.default ? ([name, module.default] as const) : undefined;
     })

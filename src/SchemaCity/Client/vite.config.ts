@@ -1,5 +1,5 @@
-import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import type { GetModuleInfo } from "rollup";
 import { defineConfig } from "vite";
 

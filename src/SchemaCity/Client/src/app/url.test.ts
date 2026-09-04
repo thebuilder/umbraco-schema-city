@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LAYERS } from "./scene/layers";
-import { parseUrl, type UrlState, serialiseUrl, urlToWrite } from "./url";
+import { parseUrl, serialiseUrl, type UrlState, urlToWrite } from "./url";
 
 const aliases = ["article", "blogPost", "home"];
 
@@ -65,6 +65,7 @@ describe("parseUrl", () => {
 
 describe("serialiseUrl", () => {
   const roundTrips = (state: UrlState) =>
+    // biome-ignore lint/suspicious/noMisplacedAssertion: the helper runs inside every it() below.
     expect(parseUrl(serialiseUrl(state), aliases)).toEqual(state);
 
   it("round-trips the default state", () => {

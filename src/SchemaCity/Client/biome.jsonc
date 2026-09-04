@@ -9,15 +9,80 @@
   "vcs": { "root": "../../.." },
   "files": {
     "includes": [
-      "**",
-      // Vite writes the built client into the Razor Class Library's wwwroot.
-      "!../wwwroot/**",
       // Fixture graphs, rewritten from the seeded site on every Development boot.
-      "!dev/fixtures/**",
+      "!dev/fixtures",
       // Registry copy-in from the afterglow shadcn registry. `npx shadcn add` overwrites
       // these files wholesale, so any fix made here is lost on the next component pull.
-      "!src/app/components/ui/**",
+      "!src/app/components/ui",
       "!package-lock.json"
     ]
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        // Scene.tsx, the layout and the findings are long on purpose; fallow reports complexity.
+        "noExcessiveCognitiveComplexity": "off",
+        // void marks the promises the custom elements deliberately do not await.
+        "noVoid": "off"
+      },
+      "correctness": {
+        // The R3F effects read refs and scratch objects on purpose; listing them would re-run per frame.
+        "useExhaustiveDependencies": "off"
+      },
+      "nursery": {
+        // Would rewrite every Tailwind class string in the panels.
+        "useSortedClasses": "off"
+      },
+      "performance": {
+        // Inline handlers are how the panels pass callbacks; hoisting them all buys nothing here.
+        "noJsxPropsBind": "off",
+        // import * as THREE is the shape three.js documents.
+        "noNamespaceImport": "off"
+      },
+      "style": {
+        // i++ in the layout and scene loops.
+        "noIncrementDecrement": "off",
+        // The scene picks colours and sizes with chained ternaries.
+        "noNestedTernary": "off",
+        // The client targets ES2020, where Array.prototype.at does not exist.
+        "useAtIndex": "off",
+        // The client writes one-line guard returns throughout.
+        "useBlockStatements": "off",
+        // The model and scene types are type aliases, not interfaces.
+        "useConsistentTypeDefinitions": "off",
+        // :where() zeroes specificity on purpose, which is what the rule reads as descending.
+        "noDescendingSpecificity": "off",
+        // React component files are PascalCase.
+        "useFilenamingConvention": "off"
+      },
+      "suspicious": {
+        // The deterministic hashes and the colour packing in the scene need them.
+        "noBitwiseOperators": "off",
+        // The graph types describe what the C# serializer promises, and the tsconfig has no
+        // noUncheckedIndexedAccess, so the ?? and if guards it calls dead are load-bearing.
+        "noUnnecessaryConditions": "off",
+        // position, args and intensity are React Three Fiber props, not DOM attributes.
+        "noUnknownAttribute": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.test.ts"],
+      "linter": {
+        // A test's callback parameter shadowing the fixture builder above it reads fine.
+        "rules": { "suspicious": { "noShadow": "off" } }
+      }
+    }
+  ],
+  "assist": {
+    "actions": {
+      "source": {
+        // Object literal order carries meaning here (theme tokens, layer definitions).
+        "useSortedKeys": "off",
+        // Keeps package.json in npm's own field order.
+        "useSortedPackageJson": "off"
+      }
+    }
   }
 }

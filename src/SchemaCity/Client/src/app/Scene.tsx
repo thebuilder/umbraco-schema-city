@@ -15,18 +15,18 @@ import type {
   UsageReport,
 } from "../model/types";
 import {
+  type CityBounds,
   cityBounds,
   cityDistricts,
-  ISLAND_PAD,
-  type CityBounds,
   type District,
   type DistrictKind,
+  ISLAND_PAD,
   type Placement,
 } from "./layout/city";
 import {
+  type FocusBounds,
   focusAnchor,
   focusBounds,
-  type FocusBounds,
   layoutFocus,
 } from "./layout/focus";
 import {
@@ -40,16 +40,6 @@ import {
   WINDOW_WIDTH,
   type WindowCell,
 } from "./scene/buildings";
-import { neighboursOf } from "./scene/graph-links";
-import { iconColour, rasteriseIcon } from "./scene/icons";
-import {
-  CHAR_PX,
-  LABEL_CAP,
-  LABEL_HEIGHT_PX,
-  pickLabels,
-} from "./scene/labels";
-import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
-import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
 import {
   approach,
   BOOST,
@@ -62,8 +52,18 @@ import {
   turnedOffset,
   turnRates,
 } from "./scene/flight";
-import { buildRoadGeometry, roadFan } from "./scene/roads";
+import { neighboursOf } from "./scene/graph-links";
+import { iconColour, rasteriseIcon } from "./scene/icons";
+import {
+  CHAR_PX,
+  LABEL_CAP,
+  LABEL_HEIGHT_PX,
+  pickLabels,
+} from "./scene/labels";
+import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
+import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { findNameplate, groundRuns, type Run } from "./scene/nameplate";
+import { buildRoadGeometry, roadFan } from "./scene/roads";
 import {
   fogRange,
   framingAction,
@@ -263,16 +263,18 @@ function Buildings({
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
       const mesh = meshRefs[kind].current;
       if (!mesh) continue;
-      cellsByKind[kind].forEach((cell, i) =>
-        applyCell(mesh, i, cell, startProgress)
-      );
+      cellsByKind[kind].forEach((cell, i) => {
+        applyCell(mesh, i, cell, startProgress);
+      });
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
     }
 
     const window = windowRef.current;
     if (window) {
-      windows.forEach((cell, i) => applyWindow(window, i, cell, startProgress));
+      windows.forEach((cell, i) => {
+        applyWindow(window, i, cell, startProgress);
+      });
       window.instanceMatrix.needsUpdate = true;
       window.computeBoundingSphere();
     }
@@ -336,7 +338,7 @@ function Buildings({
     }
     const window = windowRef.current;
     if (window) {
-      windows.forEach((cell, i) =>
+      windows.forEach((cell, i) => {
         applyWindow(
           window,
           i,
@@ -345,8 +347,8 @@ function Buildings({
             (elapsed - (introDelayById.get(cell.buildingId) ?? 0)) /
               INTRO_DURATION
           )
-        )
-      );
+        );
+      });
       window.instanceMatrix.needsUpdate = true;
     }
     if (elapsed >= introEnd) introDone.current = true;
@@ -404,9 +406,9 @@ function Buildings({
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
       const mesh = meshRefs[kind].current;
       if (!mesh) continue;
-      cellsByKind[kind].forEach((cell, i) =>
-        mesh.setColorAt(i, colourFor(cell.kind, cell.buildingId))
-      );
+      cellsByKind[kind].forEach((cell, i) => {
+        mesh.setColorAt(i, colourFor(cell.kind, cell.buildingId));
+      });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
 
@@ -415,14 +417,14 @@ function Buildings({
     // are turned up further, which is the one thing the wall does not already say.
     const window = windowRef.current;
     if (window) {
-      windows.forEach((cell, i) =>
+      windows.forEach((cell, i) => {
         window.setColorAt(
           i,
           colourFor(cell.kind, cell.buildingId)
             .clone()
             .multiplyScalar(cell.mandatory ? 1.9 : 1.45)
-        )
-      );
+        );
+      });
       if (window.instanceColor) window.instanceColor.needsUpdate = true;
     }
 
@@ -519,6 +521,7 @@ function Buildings({
         </instancedMesh>
       )}
       {placements.length > 0 && (
+        // biome-ignore lint/a11y/noStaticElementInteractions: instancedMesh is a three.js object, not a DOM element; the keyboard path is the command palette.
         <instancedMesh
           args={[undefined, undefined, placements.length]}
           onClick={(event) => {
@@ -584,7 +587,7 @@ function useIconGroups(
     >();
     // The palette arrives one render in, and rasterising against a colour that is
     // not the theme's yet would do every icon twice.
-    if (!icons || !phosphor) return byKey;
+    if (!(icons && phosphor)) return byKey;
     // Sorted, so the draw order of the icon meshes is the same city to city.
     for (const node of [...nodesById.values()].sort((a, b) =>
       a.alias.localeCompare(b.alias)
@@ -679,12 +682,12 @@ function RoofIcons({
     for (const group of groups) {
       const mesh = meshes.current.get(group.key);
       if (!mesh) continue;
-      group.ids.forEach((id, index) =>
+      group.ids.forEach((id, index) => {
         mesh.setColorAt(
           index,
           neighbours === null || neighbours.has(id) ? lit : faded
-        )
-      );
+        );
+      });
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
   }, [groups, neighbours, palette]);
@@ -917,7 +920,7 @@ function Links({
     return fadeColors(
       ranges,
       positions.length / 3,
-      (edges) => (edges[0]?.kind === "inherits" ? inheritsPaint : layerPaint),
+      (range) => (range[0]?.kind === "inherits" ? inheritsPaint : layerPaint),
       palette.background,
       selected,
       focus
@@ -1047,7 +1050,7 @@ function Labels({
     for (const id of ids) {
       const node = nodesById.get(id);
       const placement = placementsById.get(id);
-      if (!node || !placement) continue;
+      if (!(node && placement)) continue;
       const anchorY =
         (placement.y ?? 0) + (heights.get(id) ?? placement.height) + LABEL_LIFT;
       built.push({
@@ -1852,14 +1855,17 @@ function Controls({ span, explore }: { span: number; explore: boolean }) {
  * or anything inside a dialog keeps its letters. A modifier other than Shift means
  * the key belongs to the browser or to the backoffice around us.
  */
+/** The tag names whose own keyboard handling wins over the shortcut keys. */
+const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
+
 function flownBy(event: KeyboardEvent): boolean {
   if (!FLIGHT_CODES.has(event.code)) return false;
   if (event.metaKey || event.ctrlKey || event.altKey) return false;
-  const from = event.composedPath()[0];
+  const [from] = event.composedPath();
   return !(
     from instanceof HTMLElement &&
     (from.isContentEditable ||
-      /^(INPUT|TEXTAREA|SELECT)$/.test(from.tagName) ||
+      FIELD.test(from.tagName) ||
       from.closest('[role="dialog"]'))
   );
 }
@@ -2203,7 +2209,7 @@ export default function Scene({
   );
   const focusLayout = useMemo(() => {
     const neighbourhood = focus ? neighbourhoodById.get(focus) : undefined;
-    if (!focus || !neighbourhood) return null;
+    if (!(focus && neighbourhood)) return null;
     const laid = layoutFocus(graph, neighbourhood, focus, city.placements);
     // The layout keeps the neighbourhood around the origin, so the anchor is what
     // stands it back on the focused node's own ground: that node holds still and
@@ -2475,13 +2481,13 @@ export default function Scene({
               <Links
                 anchors={anchors}
                 colour={palette[token]}
-                placementsById={placementsById}
                 edges={drawnEdges}
                 focus={focus}
                 key={layer}
                 layer={layer}
                 opacity={opacity}
                 palette={palette}
+                placementsById={placementsById}
                 selected={selected}
               />
             ) : null

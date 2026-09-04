@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import mediumUsageFixture from "../../../dev/fixtures/medium-usage.json";
 import mediumFixture from "../../../dev/fixtures/medium.json";
+import mediumUsageFixture from "../../../dev/fixtures/medium-usage.json";
 import type {
   SchemaGraph,
   SchemaNode,

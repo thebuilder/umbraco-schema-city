@@ -35,14 +35,14 @@ const edge = (
 ) => ({ kind, from, to, propertyAlias }) as SchemaEdge;
 
 const highest = (positions: Float32Array) => {
-  let top = -Infinity;
+  let top = Number.NEGATIVE_INFINITY;
   for (let i = 1; i < positions.length; i += 3)
     top = Math.max(top, positions[i] as number);
   return top;
 };
 
 const lowest = (positions: Float32Array) => {
-  let bottom = Infinity;
+  let bottom = Number.POSITIVE_INFINITY;
   for (let i = 1; i < positions.length; i += 3)
     bottom = Math.min(bottom, positions[i] as number);
   return bottom;

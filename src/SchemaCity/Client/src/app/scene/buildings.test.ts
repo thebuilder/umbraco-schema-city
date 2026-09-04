@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { PropertyGroup, SchemaNode } from "../../model/types";
+import type {
+  PropertyGroup,
+  SchemaNode,
+  SchemaProperty,
+} from "../../model/types";
 import type { Placement } from "../layout/city";
-import type { SchemaProperty } from "../../model/types";
 import { buildFloorCells, buildPlazaCells, smootherstep } from "./buildings";
 
 function node(id: string, extra: Partial<SchemaNode> = {}): SchemaNode {

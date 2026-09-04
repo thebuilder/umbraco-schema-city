@@ -113,7 +113,7 @@ export function planRoads(
     if (edge.kind !== "allowedChild" || edge.from === edge.to) continue;
     const from = placementsById.get(edge.from);
     const to = placementsById.get(edge.to);
-    if (!from || !to) continue;
+    if (!(from && to)) continue;
 
     const streets = streetsBetween(grid, from, to);
     const trunk = streets[0] as number;
@@ -257,7 +257,7 @@ export function roadFan(
   const fans = new Map<string, SchemaEdge[]>();
   for (const edge of edges) {
     if (edge.kind !== "allowedChild" || edge.from === edge.to) continue;
-    if (!placementsById.has(edge.from) || !placementsById.has(edge.to))
+    if (!(placementsById.has(edge.from) && placementsById.has(edge.to)))
       continue;
     const fan = fans.get(edge.to);
     if (fan) fan.push(edge);

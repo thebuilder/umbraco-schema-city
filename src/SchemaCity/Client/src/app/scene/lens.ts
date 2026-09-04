@@ -101,7 +101,7 @@ export function lensScale(
       );
     }
   }
-  const valueOf = (id: string) => {
+  const valueFor = (id: string) => {
     const found = usage.byType[id];
     if (lens === "count") return found?.total ?? 0;
     if (lens === "cultures") return found?.cultures.length ?? 0;
@@ -111,7 +111,7 @@ export function lensScale(
   const values = new Map<string, number>();
   for (const node of graph.nodes) {
     if (node.isElement) continue;
-    values.set(node.id, valueOf(node.id));
+    values.set(node.id, valueFor(node.id));
   }
   if (values.size === 0) return null;
 

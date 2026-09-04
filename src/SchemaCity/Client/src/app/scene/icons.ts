@@ -19,6 +19,13 @@ const COMPOUND: Record<string, string> = {
   "light-green": "#8bc34a",
 };
 
+const COLOUR_PREFIX = /^color-/;
+const COLOUR_VALUE = /^(?:[a-z]+|#[0-9a-f]{3,8})$/;
+const SVG_ROOT = /<svg\b[^>]*>/i;
+const HAS_FILL = /\sfill\s*=/i;
+const SIZE_ATTRS = /\s(?:width|height)\s*=\s*"[^"]*"/gi;
+const SVG_OPEN = /^<svg/i;
+
 /**
  * The colour to paint an icon in: the type's own `color-…` suffix when it has one
  * that a browser knows, and the fallback otherwise. The name is checked rather than
@@ -29,9 +36,9 @@ export function iconColour(
   iconColor: string | null | undefined,
   fallback: string
 ): string {
-  const name = (iconColor ?? "").replace(/^color-/, "");
+  const name = (iconColor ?? "").replace(COLOUR_PREFIX, "");
   const colour = COMPOUND[name] ?? name;
-  if (!/^(?:[a-z]+|#[0-9a-f]{3,8})$/.test(colour)) return fallback;
+  if (!COLOUR_VALUE.test(colour)) return fallback;
   // CSS.supports is the browser's own list. Under vitest there is no CSS object and
   // the pattern above is the whole check.
   return typeof CSS === "undefined" || CSS.supports("color", colour)
@@ -47,14 +54,14 @@ export function iconColour(
  */
 export function paintedSvg(svg: string, colour: string): string {
   return svg
-    .replace(/<svg\b[^>]*>/i, (root) => {
+    .replace(SVG_ROOT, (root) => {
       // A root that already names a fill keeps it, because an outline icon says
       // fill="none" there and filling it in would paint a solid blob.
-      const fill = /\sfill\s*=/i.test(root) ? "" : ` fill="${colour}"`;
+      const fill = HAS_FILL.test(root) ? "" : ` fill="${colour}"`;
       return root
-        .replace(/\s(?:width|height)\s*=\s*"[^"]*"/gi, "")
+        .replace(SIZE_ATTRS, "")
         .replace(
-          /^<svg/i,
+          SVG_OPEN,
           `<svg width="${ICON_PX}" height="${ICON_PX}"${fill}`
         );
     })

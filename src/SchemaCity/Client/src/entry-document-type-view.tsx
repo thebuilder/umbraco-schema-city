@@ -6,11 +6,11 @@ import {
   LitElement,
   unsafeCSS,
 } from "@umbraco-cms/backoffice/external/lit";
-import { UmbApiError, tryExecute } from "@umbraco-cms/backoffice/resources";
+import { tryExecute, UmbApiError } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
+import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
-import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
@@ -18,9 +18,7 @@ import type { SchemaGraph, UsageReport } from "./model/types.js";
  * same graph, opened on the type being edited. The key comes from the editor's own
  * workspace context, so the tab follows a save or a switch to another type.
  */
-export class SchemaCityDocumentTypeViewElement extends UmbElementMixin(
-  LitElement
-) {
+class SchemaCityDocumentTypeViewElement extends UmbElementMixin(LitElement) {
   #root?: Root;
   #graph?: SchemaGraph;
   #usage?: UsageReport;

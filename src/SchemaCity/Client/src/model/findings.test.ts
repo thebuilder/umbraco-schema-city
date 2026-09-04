@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import mediumUsageFixture from "../../dev/fixtures/medium-usage.json";
 import mediumFixture from "../../dev/fixtures/medium.json";
-import pathologicalUsageFixture from "../../dev/fixtures/pathological-usage.json";
+import mediumUsageFixture from "../../dev/fixtures/medium-usage.json";
 import pathologicalFixture from "../../dev/fixtures/pathological.json";
+import pathologicalUsageFixture from "../../dev/fixtures/pathological-usage.json";
 import smallFixture from "../../dev/fixtures/small.json";
 import { type FindingKind, findFindings } from "./findings";
 import type {

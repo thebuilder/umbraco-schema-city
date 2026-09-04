@@ -6,9 +6,9 @@ import type { SchemaGraph } from "../../model/types";
 import {
   cityBounds,
   ISLAND_PAD,
+  type Placement,
   ROW_LIMIT,
   STREET,
-  type Placement,
 } from "./city";
 
 /** Ground between two buildings in a row, and between two rows, as the city uses. */

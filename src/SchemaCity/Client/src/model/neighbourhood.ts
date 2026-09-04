@@ -80,6 +80,8 @@ export function neighbourhoods(graph: SchemaGraph): Map<string, Neighbourhood> {
         into(at(edge.from).referencesOut, edge.propertyAlias ?? "", edge.to);
         at(edge.to).referencesIn.push(edge.from);
         break;
+      default:
+        break;
     }
   }
 

@@ -1,11 +1,11 @@
 // Turns a SchemaGraph into ground positions. Pure: no three.js, no React, no DOM.
 // The scene reads the output and owns everything visual.
 import {
-  Graph,
   type EdgeLabel,
+  Graph,
   type GraphLabel,
-  type NodeLabel,
   layout,
+  type NodeLabel,
 } from "@dagrejs/dagre";
 import type {
   SchemaEdge,
@@ -232,8 +232,9 @@ function byFolder(nodes: SchemaNode[], folders: SchemaFolder[]): Group[] {
   const topOf = (id: string) => {
     let at = id;
     // Bounded by the folder count, so a parent cycle cannot spin here.
-    for (let i = 0; i < folders.length; i++) {
+    for (let hops = folders.length; hops > 0; hops--) {
       const parent = parentOf.get(at);
+      // biome-ignore lint/suspicious/noEqualsToNull: parentOf holds null for a top-level folder, so this has to catch null and undefined alike.
       if (parent == null) break;
       at = parent;
     }
@@ -245,7 +246,7 @@ function byFolder(nodes: SchemaNode[], folders: SchemaFolder[]): Group[] {
     // A folderId the folder list does not contain is a deleted container, so the type
     // reads as unfiled rather than inventing a nameless district for it.
     const top =
-      node.folderId != null && nameOf.has(node.folderId)
+      node.folderId !== null && nameOf.has(node.folderId)
         ? topOf(node.folderId)
         : UNFILED;
     const group = groups.get(top);
@@ -363,23 +364,23 @@ function arrange(laid: Laid[]): District[] {
   // The district's box starts at (x, z) and its buildings a stamp margin south of
   // that, so the ground the name stands on is inside the district rather than in the
   // street, and two islands stay a void apart however deep the margin grows.
-  const moveTo = (district: Laid, x: number, z: number) => {
-    const box = boxOf(district.placements);
-    for (const placement of district.placements) {
-      placement.position.x += x - box.minX;
-      placement.position.z += z + STAMP_MARGIN - box.minZ;
+  const moveTo = (island: Laid, toX: number, toZ: number) => {
+    const box = boxOf(island.placements);
+    for (const placement of island.placements) {
+      placement.position.x += toX - box.minX;
+      placement.position.z += toZ + STAMP_MARGIN - box.minZ;
     }
     const width = box.maxX - box.minX;
     const depth = box.maxZ - box.minZ + STAMP_MARGIN;
     districts.push({
-      id: district.id,
-      name: district.name,
-      kind: district.kind,
-      minX: x,
-      maxX: x + width,
-      minZ: z,
-      maxZ: z + depth,
-      centre: { x: x + width / 2, z: z + depth / 2 },
+      id: island.id,
+      name: island.name,
+      kind: island.kind,
+      minX: toX,
+      maxX: toX + width,
+      minZ: toZ,
+      maxZ: toZ + depth,
+      centre: { x: toX + width / 2, z: toZ + depth / 2 },
     });
     return { width, depth };
   };
@@ -436,6 +437,7 @@ function reachableFromRoots(
     }
   }
   // Breadth first over the queue as it grows. The reached check ends a cycle.
+  // biome-ignore lint/style/useForOf: the loop re-reads the length the body appends to.
   for (let i = 0; i < queue.length; i++) {
     for (const child of children.get(queue[i] as string) ?? []) {
       if (reached.has(child) || known.get(child)?.isElement) continue;
@@ -495,7 +497,7 @@ function layoutRanks(
   // A node whose parents are all further up, or absent, sorts to the right of every
   // node that has one in the rank the roads come from.
   const parentColumn = (id: string) => {
-    let leftmost = Infinity;
+    let leftmost = Number.POSITIVE_INFINITY;
     for (const parent of parents.get(id) ?? []) {
       const x = placedX.get(parent);
       if (x !== undefined && x < leftmost) leftmost = x;
@@ -690,10 +692,10 @@ function boxOf(placements: Placement[]) {
       maxZ: Math.max(box.maxZ, position.z + footprint / 2),
     }),
     {
-      minX: Infinity,
-      maxX: -Infinity,
-      minZ: Infinity,
-      maxZ: -Infinity,
+      minX: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      minZ: Number.POSITIVE_INFINITY,
+      maxZ: Number.NEGATIVE_INFINITY,
     }
   );
 }

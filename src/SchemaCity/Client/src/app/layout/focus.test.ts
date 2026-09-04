@@ -6,9 +6,9 @@ import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
 import {
   ISLAND_PAD,
   layoutCity,
+  type Placement,
   ROW_LIMIT,
   STREET,
-  type Placement,
 } from "./city";
 import { focusAnchor, focusBounds, layoutFocus } from "./focus";
 
@@ -114,7 +114,7 @@ function overlap(placements: Placement[]): string[] | null {
       const apart = (a.footprint + b.footprint) / 2;
       const clearX = Math.abs(a.position.x - b.position.x) >= apart;
       const clearZ = Math.abs(a.position.z - b.position.z) >= apart;
-      if (!clearX && !clearZ) return [a.id, b.id];
+      if (!(clearX || clearZ)) return [a.id, b.id];
     }
   }
   return null;

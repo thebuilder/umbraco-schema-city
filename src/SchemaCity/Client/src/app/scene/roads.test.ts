@@ -6,8 +6,8 @@ import { cityDistricts, type Placement } from "../layout/city";
 import {
   buildRoadGeometry,
   planRoads,
-  roadFan,
   type RoadSegment,
+  roadFan,
 } from "./roads";
 
 const medium = mediumFixture as unknown as SchemaGraph;
@@ -166,8 +166,8 @@ describe("planRoads", () => {
       grid.set(`p${i}`, placement(`p${i}`, i * 5, 0));
       grid.set(`c${i}`, placement(`c${i}`, (3 - i) * 5, 11));
     }
-    const edges = [...Array(4).keys()].flatMap((p) =>
-      [...Array(4).keys()].map((c) => road(`p${p}`, `c${c}`))
+    const edges = [...new Array(4).keys()].flatMap((p) =>
+      [...new Array(4).keys()].map((c) => road(`p${p}`, `c${c}`))
     );
     // Sixteen straight ribbons over a reversed row cross 174 times by the same count.
     const straight = edges.map((edge) => ({
@@ -264,7 +264,7 @@ describe("roadFan", () => {
     ["child", placement("child", 0, 11)],
   ]);
   for (let i = 0; i < 4; i++) wide.set(`p${i}`, placement(`p${i}`, i * 5, 0));
-  const fanEdges = [...Array(4).keys()].map((i) => road(`p${i}`, "child"));
+  const fanEdges = [...new Array(4).keys()].map((i) => road(`p${i}`, "child"));
 
   it("draws one road of a four-parent fan in the overview", () => {
     const fan = roadFan(wide, fanEdges, new Set());
@@ -293,7 +293,7 @@ describe("roadFan", () => {
   it("keeps a parent's own children, however many it has", () => {
     const hub = new Map<string, Placement>([["hub", placement("hub", 0, 0)]]);
     for (let i = 0; i < 6; i++) hub.set(`c${i}`, placement(`c${i}`, i * 5, 11));
-    const edges = [...Array(6).keys()].map((i) => road("hub", `c${i}`));
+    const edges = [...new Array(6).keys()].map((i) => road("hub", `c${i}`));
     expect(roadFan(hub, edges, new Set()).edges).toHaveLength(6);
   });
 });

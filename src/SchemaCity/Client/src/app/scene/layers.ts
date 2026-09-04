@@ -89,7 +89,7 @@ export function buildLinkGeometry(
     if (drawn.has(pair) || edge.from === edge.to) continue;
     const from = anchors.get(edge.from);
     const to = anchors.get(edge.to);
-    if (!from || !to) continue;
+    if (!(from && to)) continue;
     drawn.add(pair);
 
     const start = positions.length / 3;
@@ -138,7 +138,7 @@ function groundPath(
   toPlacement: Placement | undefined,
   y: number
 ): Anchor[] {
-  if (!fromPlacement || !toPlacement) return [from, to];
+  if (!(fromPlacement && toPlacement)) return [from, to];
   return [
     from,
     ...routePoints(grid, fromPlacement, toPlacement).map((point) => ({

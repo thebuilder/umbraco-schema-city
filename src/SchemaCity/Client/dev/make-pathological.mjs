@@ -41,16 +41,19 @@ function guid(name) {
 }
 
 /** Numeric Recipes' LCG. Seeded, so the usage counts are the same on every run. */
-let seed = 20260903;
-const random = () =>
-  (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+let seed = 20_260_903;
+const random = () => {
+  seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
+  return seed / 2 ** 32;
+};
 const between = (low, high) => low + Math.floor(random() * (high - low + 1));
 
+const CAPITAL = /([A-Z])/g;
+const FIRST = /^./;
 const titleOf = (alias) =>
-  alias.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
-const pad = (n, width = 2) => String(n).padStart(width, "0");
-const range = (count, from = 0) =>
-  Array.from({ length: count }, (_, i) => i + from);
+  alias.replace(CAPITAL, " $1").replace(FIRST, (c) => c.toUpperCase());
+const pad = (value, width = 2) => String(value).padStart(width, "0");
+const range = (length, from = 0) => Array.from({ length }, (_, i) => i + from);
 
 const ICONS = [
   "icon-document",

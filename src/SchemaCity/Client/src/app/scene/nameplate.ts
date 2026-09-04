@@ -69,7 +69,7 @@ export function groundRuns(
     if (edge.from === edge.to || drawn.has(pair)) continue;
     const from = placementsById.get(edge.from);
     const to = placementsById.get(edge.to);
-    if (!from || !to) continue;
+    if (!(from && to)) continue;
     drawn.add(pair);
     const points = routePoints(grid, from, to);
     for (let i = 1; i < points.length; i++) {

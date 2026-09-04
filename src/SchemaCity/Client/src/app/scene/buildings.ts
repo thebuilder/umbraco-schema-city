@@ -139,7 +139,7 @@ export function buildFloorCells(
     const node = nodesById.get(placement.id);
     if (!node) continue;
     const { x, z } = placement.position;
-    const footprint = placement.footprint;
+    const { footprint } = placement;
     // Every floor of a flattened building is squashed by the same factor, so the
     // stack keeps its proportions on the way down to a plate.
     const flatten = placement.flatten ?? 0;
@@ -238,7 +238,7 @@ export function buildPlazaCells(
   const plazas: PlazaCell[] = [];
   for (const placement of placements) {
     const node = nodesById.get(placement.id);
-    if (!node || !node.allowedAsRoot || node.isElement) continue;
+    if (!node?.allowedAsRoot || node.isElement) continue;
     plazas.push({
       buildingId: placement.id,
       cx: placement.position.x,

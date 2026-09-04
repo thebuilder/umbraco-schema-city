@@ -133,6 +133,7 @@ export function TypeTable({
   return (
     <div className="flex h-full flex-col bg-background">
       <div className="flex items-center gap-3 border-line border-b px-4 py-2">
+        {/* biome-ignore lint/a11y/noLabelWithoutControl: the Input is inside this label; the rule does not follow the component. */}
         <label className="flex items-center gap-2 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
           Filter
           {/* type="text" and our own clear button, because a search field draws the

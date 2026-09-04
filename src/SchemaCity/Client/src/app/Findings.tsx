@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  type Finding,
   FINDING_KINDS,
   FINDING_LABEL,
+  type Finding,
   type FindingKind,
   type FindingSeverity,
 } from "../model/findings";

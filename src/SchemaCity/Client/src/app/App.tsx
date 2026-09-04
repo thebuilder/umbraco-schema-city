@@ -50,17 +50,20 @@ import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
-import { Inspector, INSPECTOR_WIDTH } from "./Inspector";
-import { TypeTable } from "./TypeTable";
-import { DEFAULT_LAYERS, type Layer, LAYERS } from "./scene/layers";
+import { INSPECTOR_WIDTH, Inspector } from "./Inspector";
+import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
-  type Lens,
   LENS_LABEL,
   LENSES,
+  type Lens,
   lensScale,
   type Ramp,
 } from "./scene/lens";
+import { TypeTable } from "./TypeTable";
 import { parseUrl, type UrlState, urlToWrite, type View } from "./url";
+
+/** The tag names whose own keyboard handling wins over the shortcut keys. */
+const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
 
 const LAYER_LABEL: Record<Layer, string> = {
   structure: "Structure",
@@ -254,11 +257,11 @@ export function App({
         window.location.search,
         graph.nodes.map((node) => node.alias)
       );
-    const node =
+    const found =
       graph.nodes.find((candidate) => candidate.id === state.type) ??
       graph.nodes.find((candidate) => candidate.alias === state.type);
     return {
-      id: node?.id ?? null,
+      id: found?.id ?? null,
       focus: state.focus === true,
       layers: state.layers ?? [...DEFAULT_LAYERS],
       lens: state.lens ?? "none",
@@ -296,11 +299,11 @@ export function App({
       // The event that crossed a shadow boundary reports the host as its target, so
       // ask the path where it actually started. A field being typed into keeps every
       // letter below, and so does anything inside a dialog or a drawer.
-      const from = event.composedPath()[0];
+      const [from] = event.composedPath();
       if (
         from instanceof HTMLElement &&
         (from.isContentEditable ||
-          /^(INPUT|TEXTAREA|SELECT)$/.test(from.tagName) ||
+          FIELD.test(from.tagName) ||
           from.closest('[role="dialog"]'))
       ) {
         return;
@@ -344,7 +347,7 @@ export function App({
     return () => document.removeEventListener("keydown", onKey);
   }, [paletteOpen, helpOpen, selected, focus]);
 
-  const nodes = graph.nodes;
+  const { nodes } = graph;
   const nodesById = useMemo(
     () => new Map(nodes.map((node) => [node.id, node])),
     [nodes]
@@ -539,6 +542,7 @@ export function App({
             <Tooltip>
               <TooltipTrigger
                 render={
+                  // biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads.
                   <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
                 }
               >

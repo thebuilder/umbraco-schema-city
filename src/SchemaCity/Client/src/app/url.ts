@@ -5,8 +5,9 @@
 // The host owns the address bar. The harness lets the app write its own query
 // string, and the workspace wrapper takes the same state through onStateChange
 // and mirrors it into the backoffice route instead.
-import { type Lens, LENSES } from "./scene/lens";
+
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
+import { LENSES, type Lens } from "./scene/lens";
 
 /**
  * Which view is on screen. `city` is the isometric map, `explore` is the same city
