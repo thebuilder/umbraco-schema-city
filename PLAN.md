@@ -51,7 +51,7 @@ These apply to every commit, every file and every generated sentence.
 
 7. **Support Umbraco 17 LTS and 18+.** NuGet dependency `Umbraco.Cms.Web.BackOffice` in the range `[17.0.0, 19.0.0)`, one code base, CI builds and runs the seeded site on both majors from M0. The three Umbraco-specific frontend imports live in one file so a breaking change in 18 or 19 is a one-file fix.
 
-8. **MIT licence, public repository from M1.**
+8. **MIT licence, public repository from M1.** The repository is `github.com/thebuilder/umbraco-schema-city`, remote added 2026-09-04.
 
 9. **Settings tool only, gated by Umbraco's own permissions.** The menu item is conditioned on the Settings section and both endpoints require `SectionAccessSettings`, so administrators control access per user group through the normal Users area. No custom permission or editor-facing view in v1.
 
@@ -562,12 +562,12 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - List filter placeholder "Filter types", with a minimum width on the input. Done 2026-09-04.
 - Focus mode: packed layout, focus island, inspector-aware framing, exit on deselect. Done 2026-09-04 (204 tests).
 - Lens legend as an overlay, no canvas resize. Done 2026-09-04; the canvas frames are byte-identical with a lens on and off.
-- Screenshots: `docs/screenshots/` six views from `dev/shots.mjs`, in the README and the marketplace entry; the marketplace URLs and the packed README's image paths carry a placeholder owner until the repo has a remote.
+- Screenshots: `docs/screenshots/` six views from `dev/shots.mjs`, in the README and the marketplace entry; the marketplace URLs and the packed README's image paths point at `thebuilder/umbraco-schema-city` (filled in 2026-09-04).
 - Shot polish: structure-only city shot, focus roads at full phosphor, the findings chip box (the toggle group painted its divider background behind a wrapped row). Done 2026-09-04.
 - Inheritance drawn once, as a single brighter arc; the composition twin is skipped for that pair. Done 2026-09-04.
 - Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03. The wrapped row spilling over the canvas was paint order (the absolutely positioned scene painted over the in-flow toolbar) plus a Toggle that could shrink under its label; fixed the same day with a stacking layer and `shrink-0`, measured from 1400 to 600 px.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
-- Exit: `SchemaCity 1.0.0` on NuGet once the repo has a remote (owner in the marketplace URLs and the README images, the old commit reworded). Everything else in M4 is done as of 2026-09-04.
+- Exit: `SchemaCity 1.0.0` on NuGet. The remote exists as of 2026-09-04; the URLs are filled in and the old commit reworded; what remains is the first push and the pack.
 
 ### Later, explicitly not v1
 
@@ -621,7 +621,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. The focus island, inspector-aware framing, exit on deselect, the name search and the legend overlay. Done. Shot polish. Done. Next: the remote (owner in the URLs, commit reword, first push, `dotnet pack` for 1.0.0).
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. The focus island, inspector-aware framing, exit on deselect, the name search and the legend overlay. Done. Shot polish. Done. Next: first push, `dotnet pack` for 1.0.0, then the marketplace listing.
 
 ## 13. Resolved questions
 
