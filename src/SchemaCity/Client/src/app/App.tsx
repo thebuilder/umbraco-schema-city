@@ -67,12 +67,10 @@ function EdgeMark({
   className,
   d,
   dashed = false,
-  width = 1.25,
 }: {
   className: string;
   d: string;
   dashed?: boolean;
-  width?: number;
 }) {
   return (
     <svg
@@ -87,7 +85,7 @@ function EdgeMark({
         d={d}
         stroke="currentColor"
         strokeDasharray={dashed ? "2 3" : undefined}
-        strokeWidth={width}
+        strokeWidth={1.25}
       />
     </svg>
   );
@@ -147,7 +145,12 @@ function Legend() {
             Composition
           </LegendRow>
           <LegendRow
-            mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" width={3} />}
+            mark={
+              <EdgeMark
+                className="text-[color-mix(in_srgb,var(--azure)_60%,#ffffff)]"
+                d="M1 11 Q13 -1 25 11"
+              />
+            }
           >
             Inheritance
           </LegendRow>
