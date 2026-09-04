@@ -96,7 +96,12 @@ export function Findings({
         {present.length > 0 ? (
           <ToggleGroup
             aria-label="Filter findings by kind"
-            className="m-3 flex-wrap"
+            // The group primitive paints bg-line under a 1px padding, so the gaps
+            // between chips read as hairlines. That only works while the chips cover
+            // the box: these wrap, and the short last line left the bare bg-line
+            // showing as a lit rectangle. Transparent here, so the chips are the only
+            // thing with a background and the gaps show the panel behind them.
+            className="m-3 flex-wrap bg-transparent"
             multiple
             onValueChange={(value) => setKinds(value as FindingKind[])}
             size="sm"
