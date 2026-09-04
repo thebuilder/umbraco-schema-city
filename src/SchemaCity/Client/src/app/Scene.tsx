@@ -43,12 +43,12 @@ import {
   turnRates,
 } from "./scene/flight";
 import { buildRoadGeometry, roadFan } from "./scene/roads";
+import { findNameplate, groundRuns, type Run } from "./scene/nameplate";
 import {
   fogRange,
   framingAction,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
-  districtStamp,
   pixelsPerUnit,
   stageMetrics,
   zoomRange,
@@ -1070,8 +1070,8 @@ const WHITE = "#ffffff";
 
 /**
  * Font size a district's name is rasterised at. Its cap height comes out around 72 px,
- * and the stamp is at most 4 world units tall, so the print carries about 18 px of
- * texture per world unit. The ground needs 2 to stay crisp at the framing zoom, and
+ * and the stamp is at most four world units tall, so the print carries about
+ * 18 px of texture per world unit. The ground needs 2 to stay crisp at the framing zoom, and
  * the rest is what Explore leans on when the camera comes down to street level.
  */
 const STAMP_FONT_PX = 100;
@@ -1240,14 +1240,20 @@ function FocusIsland({
  * folder. Nothing here animates.
  */
 function Stage({
+  buildings,
   districts,
   folders,
+  runs,
   span,
   palette,
 }: {
+  /** Every building in the city, which is what the names have to find a gap in. */
+  buildings: Placement[];
   districts: District[];
   /** The ground a nested folder's members cover, for the tint on the island. */
   folders: (CityBounds & { id: string })[];
+  /** Every road and ground link, the other thing a name may not be printed under. */
+  runs: Run[];
   span: number;
   palette: Palette;
 }) {
@@ -1278,23 +1284,25 @@ function Stage({
   );
 
   // One rasterised name per district, with the quad it prints on. The name is fixed
-  // to its island, so this is worked out once rather than followed every frame.
+  // to its island, so the search for its spot runs once rather than every frame.
   const stampsOf = useMemo(
     () =>
       districts.map((district) => {
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
-        const stamp = districtStamp(
+        const stamp = findNameplate(
           {
             minX: district.minX - ISLAND_PAD,
             maxX: district.maxX + ISLAND_PAD,
             minZ: district.minZ - ISLAND_PAD,
             maxZ: district.maxZ + ISLAND_PAD,
           },
+          buildings,
+          runs,
           texture.image.width / texture.image.height,
         );
         return { id: district.id, texture, stamp };
       }),
-    [districts, palette.mono],
+    [buildings, districts, palette.mono, runs],
   );
 
   useFrame(() => {
@@ -1365,9 +1373,9 @@ function Stage({
           <meshStandardMaterial color={folderColour} metalness={0} roughness={1} />
         </mesh>
       ))}
-      {/* The district's name printed flat on its island, in the margin along the north
-          edge. It writes no depth, so the buildings, the roads and every link stand
-          over it.
+      {/* The district's name printed flat on its island, in the band the layout held
+          clear along the quietest of its four edges. It writes no depth, so the
+          buildings, the roads and every link stand over it.
 
           ponytail: the print holds its strength through a selection and through focus
           mode, where the buildings around it fade. Fading it too means telling the
@@ -1379,7 +1387,7 @@ function Stage({
         <mesh
           key={id}
           position={[stamp.x, STAMP_Y, stamp.z]}
-          rotation={[-Math.PI / 2, 0, 0]}
+          rotation={[-Math.PI / 2, 0, stamp.rotation]}
         >
           <planeGeometry args={[stamp.width, stamp.height]} />
           <meshBasicMaterial
@@ -1944,6 +1952,12 @@ export default function Scene({
     }
     return [...members].map(([id, held]) => ({ id, ...cityBounds(held, FOLDER_PAD) }));
   }, [city]);
+  // The roads and ground links of the whole city, for the name search. The city's
+  // own, not what focus mode draws, because the names are fixed to their islands.
+  const groundRunsOfCity = useMemo(
+    () => groundRuns(new Map(city.placements.map((p) => [p.id, p])), graph.edges ?? []),
+    [city, graph.edges],
+  );
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
   const focusNeighbours = useMemo(
     () => (focus ? neighboursOf(graph, focus) : null),
@@ -2139,9 +2153,11 @@ export default function Scene({
           <ambientLight intensity={1.2} />
           <directionalLight intensity={2.4} position={[8, 16, 6]} />
           <Stage
+            buildings={city.placements}
             districts={city.districts}
             folders={folderTints}
             palette={palette}
+            runs={groundRunsOfCity}
             span={span}
           />
           <FocusIsland island={focusIsland} palette={palette} reducedMotion={reducedMotion} />
