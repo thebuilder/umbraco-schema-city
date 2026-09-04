@@ -18,7 +18,7 @@ These apply to every commit, every file and every generated sentence.
 - **Ponytail governs the code.** Climb the ladder before writing anything: does it need to exist, is it already in the repo, does the stdlib or the platform do it, does an installed dependency do it, can it be one line. No interface with one implementation, no config for a value that never changes, no scaffolding for later. A deliberate corner gets a `ponytail:` comment naming the ceiling and the upgrade path. Non-trivial logic leaves one runnable check behind.
 - **Unslop governs the words.** Code comments, README, UI copy, error messages, commit messages and this plan. No em dashes, no "not just X but Y", no rule of three, no colons as connectors, no puffery, no filler. Say what the thing does, in plain words, with the number when there is one.
 - fsn's conventions carry over where they do not conflict: why-comments in full sentences, colocated behaviour tests, no snapshot tests, lowercase conventional commit prefixes.
-- The client is linted and formatted by ultracite (Biome) and checked by fallow for dead code, duplicates and cycles; both run in CI. Client changes pass both before they merge (in progress).
+- The client is linted and formatted by ultracite (Biome) and checked by fallow for dead code, duplicates and cycles; both run in CI. Client changes pass both before they merge. Registry copy-in under `components/ui` is exempt from both, because the shadcn CLI overwrites it.
 
 ---
 
@@ -91,6 +91,8 @@ schema-city/
       wwwroot/App_Plugins/SchemaCity/   Vite output, generated and gitignored; the BuildClient target fills it for dotnet pack
       Client/
         package.json  vite.config.ts  tsconfig.json  components.json
+        biome.jsonc                  ultracite preset and the rules turned off
+        .fallowrc.jsonc              fallow entries and exemptions
         public/umbraco-package.json
         src/
           api.ts                  endpoint calls, the editor link and icon resolution for the wrappers
@@ -342,6 +344,10 @@ Library mode does not define `process.env.NODE_ENV`, so `define: { "process.env.
 
 `dotnet pack src/SchemaCity/SchemaCity.csproj -c Release` from a clean clone produces `SchemaCity.1.0.0.nupkg`. It carries the built client as static web assets under `staticwebassets/App_Plugins/SchemaCity/`, which a host serves at `/App_Plugins/SchemaCity/` because `StaticWebAssetBasePath` is `/`, plus the README, the MIT licence, the author and the four Umbraco dependencies at `[17.0.0, 19.0.0)`. A `BuildClient` MSBuild target runs `npm ci` (only when `node_modules` is missing) and `npm run build`, with `BeforeTargets="ResolveProjectStaticWebAssets"`, and only when `wwwroot/App_Plugins/SchemaCity/workspace.js` is missing. The target then adds `wwwroot/**` back as `Content` itself, because the SDK globs `Content` at evaluation time, before Vite has written anything. `-p:SkipClientBuild=true` skips the target, and CI passes it after running its own npm build. The package measured 9.5 MB with 6.9 MB of `.js.map` in it, so the packaged build is being changed to ship no source maps. CI packs on the 17.6.2 leg and asserts the nupkg carries `workspace.js`, ships no `.map` files and is under 1 MB; it measured 599 KB at first, 642 KB after the focus pass and 643 KB at the first push.
 
+### Tooling
+
+The client is linted and formatted by ultracite ^7.10.8 on Biome ^2.5.12. `biome.jsonc` extends ultracite's core, react and vitest presets, points `vcs.root` at the solution root, and ignores `dev/fixtures`, the lockfile and `src/app/components/ui`, the registry copy-in that `npx shadcn add` overwrites, so it is neither linted nor formatted. Nineteen rules are off, each with a one-line reason, among them the R3F prop rules, Tailwind class sorting, object key sorting, block statements, the unnecessary-condition checks, `Array.at` and file naming. The scripts are `npm run lint` and `npm run format`; `check` stays `tsc --noEmit`. The formatter rewrote 52 of 58 files in one commit, whitespace only, and lint went from 1097 findings to 0 with nine suppressions, each carrying a reason. fallow 3.22.0 is pinned exact and reads `.fallowrc.jsonc`, which names the harness entries and exempts `components/ui`; `npm run fallow` runs its `--gate new-only`. It went from 44 issues to 0: seven exports became file-local, a duplicated constant was renamed, one duplicated alias comparator is now `byAliasOf`, and the two entry classes lost a redundant named export. No unused files, no cycles. Duplication is 1.6 percent over four small groups and stays as it is; the two Lit wrappers share 64 lines, which would want a shared base element. CI runs `npm run lint` on every push and fallow's gate on pull requests with `--base` and GitHub annotations, so the checkout there takes full depth. The conventions come from `thebuilder/web-analytics`; neither reference repo uses ultracite, so the Biome side follows ultracite's defaults. The checkout, setup-dotnet and setup-node actions run at v5. Bundle sizes moved within noise. The library build does not minify, so formatting reaches the output.
+
 ### API client
 
 `src/api.ts` is the wrappers' Umbraco helper module: one typed call per endpoint (`getGraph()`, `getUsage(refresh = false)`), the editor link (`openTypeInEditor`) and icon resolution (`resolveIcons`). The endpoint calls are hand-written, each calling `umbHttpClient.get<{ 200: SchemaGraph }>({ security: [{ type: "http", scheme: "bearer" }], url })` and wrapped in `tryExecute` by the caller. The `security` entry is required; without it the backoffice client sends no token. The type parameter is the status map, not the payload, because the client unwraps `Record` types by value. No Swagger document and no generated client: Umbraco 18 replaced Swashbuckle's document generation with Microsoft.AspNetCore.OpenApi, the 17 extension types no longer exist, and a composer deriving from them stops the whole assembly loading at boot on 18.
@@ -567,6 +573,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Shot polish: structure-only city shot, focus roads at full phosphor, the findings chip box (the toggle group painted its divider background behind a wrapped row). Done 2026-09-04.
 - Inheritance drawn once, as a single brighter arc; the composition twin is skipped for that pair. Done 2026-09-04.
 - Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03. The wrapped row spilling over the canvas was paint order (the absolutely positioned scene painted over the in-flow toolbar) plus a Toggle that could shrink under its label; fixed the same day with a stacking layer and `shrink-0`, measured from 1400 to 600 px.
+- Ultracite and fallow for the client, both in CI, actions at v5. Done 2026-09-04; lint 1097 to 0, fallow 44 to 0, formatter over 52 files in one commit.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` packed from main at 550d92e (643 KB) and pushed 2026-09-04; CI green on GitHub for both majors. Publishing to NuGet and the marketplace listing are the remaining steps, in Daniel's hands.
 
@@ -600,7 +607,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements, and let the CI boot step on both majors be the detector. |
 | Shadow DOM and WebGL canvas sizing | `ResizeObserver` on the host element, `devicePixelRatio` cap at 2. |
 | Untrusted names and aliases in the inspector | Rendered as text by React, never through `dangerouslySetInnerHTML`; the wrapper never builds HTML from names either. |
-| GitHub Actions v4 actions target the deprecated Node 20 runtime | Move checkout, setup-dotnet and setup-node to v5 (queued with the tooling branch). |
+| GitHub Actions v4 actions target the deprecated Node 20 runtime | Move checkout, setup-dotnet and setup-node to v5 (queued with the tooling branch). Done 2026-09-04. |
 
 ---
 
@@ -613,6 +620,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 | Scene | vitest with jsdom for layout to placements; scene behaviour checked in the harness by eye |
 | End to end | CI boots the seeded site on both majors and checks the manifest, the backoffice and the graph and usage endpoints' 401. Interactions are checked by hand in the harness and in the backoffice at each milestone exit; no browser automation until a regression justifies it. Last full run 2026-09-04 after the focus pass, green on both majors, nupkg 643 KB. On 18 the manifest is served before seeding ends, so the boot gate there proves less than on 17; the seeder line check covers it. CI also packs and checks the nupkg. First GitHub Actions run 2026-09-04: green on both majors |
 | Performance | The seeded schema in the dev harness with the browser's own frame profiler; the stress fixture lays out in about 24 ms and a synthetic 300-node graph in 35 ms |
+| Lint and dead code | ultracite (Biome) on every push; fallow's new-only gate on pull requests, annotated in the PR |
 
 ---
 
@@ -623,7 +631,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. The focus island, inspector-aware framing, exit on deselect, the name search and the legend overlay. Done. Shot polish. Done. First push and the 1.0.0 pack. Done 2026-09-04. In progress: ultracite and fallow for the client, action versions to v5. Next: publish to NuGet, submit the marketplace listing.
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. The focus island, inspector-aware framing, exit on deselect, the name search and the legend overlay. Done. Shot polish. Done. First push and the 1.0.0 pack. Done 2026-09-04. Ultracite, fallow and the v5 actions. Done 2026-09-04. Next: publish to NuGet, submit the marketplace listing.
 
 ## 13. Resolved questions
 
