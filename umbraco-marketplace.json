@@ -6,29 +6,35 @@
   "LicenseTypes": [
     "Free"
   ],
+  "AuthorDetails": {
+    "Name": "Daniel Schmidt",
+    "Url": "https://github.com/thebuilder"
+  },
+  "DocumentationUrl": "https://github.com/thebuilder/umbraco-schema-city#readme",
+  "IssueTrackerUrl": "https://github.com/thebuilder/umbraco-schema-city/issues",
   "Screenshots": [
     {
-      "ImageUrl": "https://raw.githubusercontent.com/OWNER/schema-city/main/docs/screenshots/city.png",
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png",
       "Caption": "One building per Document Type, on an island per folder, with roads for allowed children, compositions, block targets and picker references."
     },
     {
-      "ImageUrl": "https://raw.githubusercontent.com/OWNER/schema-city/main/docs/screenshots/focus.png",
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png",
       "Caption": "Focus mode rebuilds the layout around one type and its neighbours, and the inspector reads out its properties, compositions, parents, children and block targets."
     },
     {
-      "ImageUrl": "https://raw.githubusercontent.com/OWNER/schema-city/main/docs/screenshots/findings.png",
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png",
       "Caption": "The findings drawer: unused types, dead ends, duplicate aliases, broken block configurations and more, each row selecting the type it is about."
     },
     {
-      "ImageUrl": "https://raw.githubusercontent.com/OWNER/schema-city/main/docs/screenshots/lens.png",
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png",
       "Caption": "The usage lens recolours the city by content count, published share, cultures, incoming references or unused."
     },
     {
-      "ImageUrl": "https://raw.githubusercontent.com/OWNER/schema-city/main/docs/screenshots/free-camera.png",
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/free-camera.png",
       "Caption": "The free camera stands a perspective camera on the isometric angle, to orbit and fly over the city."
     },
     {
-      "ImageUrl": "https://raw.githubusercontent.com/OWNER/schema-city/main/docs/screenshots/list.png",
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png",
       "Caption": "The list view is the same schema as a sortable table, with no canvas in it."
     }
   ],
