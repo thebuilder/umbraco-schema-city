@@ -7,9 +7,13 @@
     "dev": "vite dev dev -c vite.config.ts",
     "watch": "tsc && vite build --watch",
     "build": "tsc && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "ultracite check",
+    "format": "ultracite fix",
+    "check": "tsc --noEmit"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.12",
     "@tailwindcss/vite": "4.3.3",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
@@ -17,6 +21,7 @@
     "@umbraco-cms/backoffice": "^17.6.2",
     "tailwindcss": "4.3.3",
     "typescript": "^5.9.3",
+    "ultracite": "^7.10.8",
     "vite": "^7.3.1",
     "vitest": "5.0.0"
   },

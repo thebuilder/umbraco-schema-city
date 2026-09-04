@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/react",
+    "ultracite/biome/vitest"
+  ],
+  "files": {
+    "includes": [
+      "**",
+      // Vite writes the built client into the Razor Class Library's wwwroot.
+      "!../wwwroot/**",
+      // Fixture graphs, rewritten from the seeded site on every Development boot.
+      "!dev/fixtures/**",
+      // Registry copy-in from the afterglow shadcn registry. `npx shadcn add` overwrites
+      // these files wholesale, so any fix made here is lost on the next component pull.
+      "!src/app/components/ui/**",
+      "!package-lock.json"
+    ]
+  }
+}
