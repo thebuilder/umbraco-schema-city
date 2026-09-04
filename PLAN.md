@@ -563,10 +563,10 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Focus mode: packed layout, focus island, inspector-aware framing, exit on deselect. Done 2026-09-04 (204 tests).
 - Lens legend as an overlay, no canvas resize. Done 2026-09-04; the canvas frames are byte-identical with a lens on and off.
 - Screenshots: `docs/screenshots/` six views from `dev/shots.mjs`, in the README and the marketplace entry; the marketplace URLs and the packed README's image paths carry a placeholder owner until the repo has a remote.
-- Shot polish: structure-only city shot, brighter focus roads, the findings chip box (in progress).
+- Shot polish: structure-only city shot, focus roads at full phosphor, the findings chip box (the toggle group painted its divider background behind a wrapped row). Done 2026-09-04.
 - Toolbar polish: filter input border highlight and own clear button, Layers menu (base-ui menu, 6.9 kB more vendor), Help icon, no type badge, wrapping toolbar below 848 px. Done 2026-09-03. The wrapped row spilling over the canvas was paint order (the absolutely positioned scene painted over the in-flow toolbar) plus a Toggle that could shrink under its label; fixed the same day with a stacking layer and `shrink-0`, measured from 1400 to 600 px.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
-- Exit: `SchemaCity 1.0.0` on NuGet once the repo has a remote (owner in the marketplace URLs and the README images, the old commit reworded). Everything else in M4 is done as of 2026-09-04 apart from the shot polish.
+- Exit: `SchemaCity 1.0.0` on NuGet once the repo has a remote (owner in the marketplace URLs and the README images, the old commit reworded). Everything else in M4 is done as of 2026-09-04.
 
 ### Later, explicitly not v1
 
@@ -620,7 +620,7 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 3. Write `SchemaSeeder` and export `medium.json` from it. Done.
 4. Build `app/layout/city.ts` with tests and view the result as flat coloured squares in the dev harness before touching buildings. Done.
 5. Then buildings, then roads, then the inspector. Done.
-6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. The focus island, inspector-aware framing, exit on deselect, the name search and the legend overlay. Done. Next: shot polish, then the remote (owner in the URLs, commit reword, first push, `dotnet pack` for 1.0.0).
+6. M3 tidy-up, usage in the wrappers. Done. Backoffice check of the editor tab, drawer and lens. Done. Editor link fixed and rechecked. Then M4: packaging and states. Done. World stage. Done. Roof icons, windows, Explore camera, list view, palette, focus plates, camera fix, the controls page. Done. Districts as islands with labels. Done. Road routing along streets. Done. Toolbar polish. Done. Stamped district names. Done. Toolbar wrap fix. Done. Keyboard flight and the stamp orientation. Done. Sparse rank bands and the stamp band. Done. Stamp containment, the island gap, the icon gate, the free camera fov and its black first frame. Done. The camera switch, no hover lift on triggers and the list filter placeholder. Done 2026-09-04. The packed focus layout. Done. The focus island, inspector-aware framing, exit on deselect, the name search and the legend overlay. Done. Shot polish. Done. Next: the remote (owner in the URLs, commit reword, first push, `dotnet pack` for 1.0.0).
 
 ## 13. Resolved questions
 
