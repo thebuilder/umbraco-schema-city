@@ -44,10 +44,6 @@ const REFERENCE_Y = 0.4;
 const SEGMENTS = 10;
 const DASH_ON = 0.55;
 const DASH_OFF = 0.4;
-// ponytail: WebGL ignores a line width above 1 on every desktop driver, so the
-// thicker inheritance arc is two arcs a hair apart instead. drei's Line2 would give
-// real width, at the cost of a fat triangle geometry per layer.
-const THICK_OFFSET = 0.09;
 
 /**
  * One flat xyz line-segment list for every edge in `layer`, plus the vertex range
@@ -68,8 +64,8 @@ export function buildLinkGeometry(
   const drawn = new Set<string>();
   const grid = layer === "compositions" ? null : roadGrid(placements.values());
   // An inherited parent arrives as both an inherits and a composition edge. The
-  // thicker arc is the one worth drawing, so the composition twin is dropped
-  // whichever order the two came in.
+  // inheritance is the stronger fact, and the scene draws it brighter, so the
+  // composition twin is dropped whichever order the two came in.
   const inherited =
     layer === "compositions"
       ? new Set(
@@ -117,9 +113,7 @@ export function buildLinkGeometry(
         y: apex(Math.max(from.y, to.y) + ARCH),
         z: (from.z + to.z) / 2,
       };
-      for (const offset of edge.kind === "inherits" ? [-THICK_OFFSET, THICK_OFFSET] : [0]) {
-        pushCurve(positions, from, control, to, offset);
-      }
+      pushCurve(positions, from, control, to);
     }
     ranges.push({ edges: [edge], start, count: positions.length / 3 - start });
   }
@@ -152,29 +146,17 @@ function groundPath(
   ];
 }
 
-/** A quadratic curve as `SEGMENTS` joined segments, shifted sideways by `offset`. */
-function pushCurve(
-  out: number[],
-  from: Anchor,
-  control: Anchor,
-  to: Anchor,
-  offset: number,
-) {
-  const span = Math.hypot(to.x - from.x, to.z - from.z) || 1;
-  const offsetX = (-(to.z - from.z) / span) * offset;
-  const offsetZ = ((to.x - from.x) / span) * offset;
-
-  let px = from.x + offsetX;
+/** A quadratic curve as `SEGMENTS` joined segments. */
+function pushCurve(out: number[], from: Anchor, control: Anchor, to: Anchor) {
+  let px = from.x;
   let py = from.y;
-  let pz = from.z + offsetZ;
+  let pz = from.z;
   for (let step = 1; step <= SEGMENTS; step++) {
     const t = step / SEGMENTS;
     const u = 1 - t;
-    const qx =
-      u * u * (from.x + offsetX) + 2 * u * t * (control.x + offsetX) + t * t * (to.x + offsetX);
+    const qx = u * u * from.x + 2 * u * t * control.x + t * t * to.x;
     const qy = u * u * from.y + 2 * u * t * control.y + t * t * to.y;
-    const qz =
-      u * u * (from.z + offsetZ) + 2 * u * t * (control.z + offsetZ) + t * t * (to.z + offsetZ);
+    const qz = u * u * from.z + 2 * u * t * control.z + t * t * to.z;
     out.push(px, py, pz, qx, qy, qz);
     px = qx;
     py = qy;

@@ -76,6 +76,8 @@ const HOVER_BRIGHTEN = 1.4;
 const FADE_MIX = 0.8;
 /** The same, for a building focus mode has pressed flat: about 12% opacity. */
 const PLATE_MIX = 0.88;
+/** How far an inherits arc is mixed toward white, off the composition azure. */
+const INHERITS_MIX = 0.4;
 
 /**
  * Where one building lands on the lens's ramp. Amber to azure both ways, with
@@ -663,31 +665,37 @@ function RoofIcons({
   );
 }
 
+/** Colour and strength for one edge's vertices. */
+type Paint = { colour: THREE.Color; alpha: number };
+
 /**
- * One colour per vertex, so selecting a node fades every edge it does not touch
- * without the geometry being rebuilt. In focus mode nothing is faded, because
- * every edge drawn there already belongs to the focused node.
+ * One rgba colour per vertex, so selecting a node fades every edge it does not touch
+ * without the geometry being rebuilt, and one edge can draw at its own colour and
+ * strength inside a merged geometry. In focus mode nothing is faded, because every
+ * edge drawn there already belongs to the focused node.
  */
 function fadeColors(
   ranges: readonly { edges: SchemaEdge[]; start: number; count: number }[],
   vertices: number,
-  colour: THREE.Color,
+  paint: (edges: SchemaEdge[]) => Paint,
   background: string,
   selected: string | null,
   focus: string | null,
 ): Float32Array {
-  const faded = colour.clone().lerp(new THREE.Color(background), FADE_MIX);
-  const array = new Float32Array(vertices);
+  const voidColour = new THREE.Color(background);
+  const array = new Float32Array(vertices * 4);
   for (const range of ranges) {
     const lit =
       focus !== null ||
       selected === null ||
       range.edges.some((edge) => edge.from === selected || edge.to === selected);
-    const shown = lit ? colour : faded;
+    const { colour, alpha } = paint(range.edges);
+    const shown = lit ? colour : colour.clone().lerp(voidColour, FADE_MIX);
     for (let i = range.start; i < range.start + range.count; i++) {
-      array[i * 3] = shown.r;
-      array[i * 3 + 1] = shown.g;
-      array[i * 3 + 2] = shown.b;
+      array[i * 4] = shown.r;
+      array[i * 4 + 1] = shown.g;
+      array[i * 4 + 2] = shown.b;
+      array[i * 4 + 3] = alpha;
     }
   }
   return array;
@@ -718,18 +726,20 @@ function Roads({
     () => buildRoadGeometry(placementsById, edges),
     [placementsById, edges],
   );
-  const colors = useMemo(
-    () =>
-      fadeColors(
-        ranges,
-        positions.length,
-        new THREE.Color(focus ? palette.phosphor : palette.dim),
-        palette.background,
-        selected,
-        focus,
-      ),
-    [positions, ranges, selected, focus, palette],
-  );
+  const colors = useMemo(() => {
+    const paint = {
+      colour: new THREE.Color(focus ? palette.phosphor : palette.dim),
+      alpha: 1,
+    };
+    return fadeColors(
+      ranges,
+      positions.length / 3,
+      () => paint,
+      palette.background,
+      selected,
+      focus,
+    );
+  }, [positions, ranges, selected, focus, palette]);
 
   if (positions.length === 0) return null;
 
@@ -737,7 +747,7 @@ function Roads({
     <mesh frustumCulled={false}>
       <bufferGeometry>
         <bufferAttribute args={[positions, 3]} attach="attributes-position" />
-        <bufferAttribute args={[colors, 3]} attach="attributes-color" />
+        <bufferAttribute args={[colors, 4]} attach="attributes-color" />
       </bufferGeometry>
       <meshBasicMaterial side={THREE.DoubleSide} vertexColors />
     </mesh>
@@ -748,6 +758,10 @@ function Roads({
  * One of the three link layers, merged into a single line geometry. The geometry is
  * rebuilt when the graph, the layout or the layer set changes, and never for a
  * selection: that only rewrites the colour attribute.
+ *
+ * The layer's strength rides in the vertex alpha rather than on the material, so an
+ * inherits arc draws solid in its own brighter azure while the compositions around
+ * it stay at the layer's opacity, out of the one geometry.
  */
 function Links({
   layer,
@@ -774,18 +788,21 @@ function Links({
     () => buildLinkGeometry(layer, edges, anchors, placementsById),
     [layer, edges, anchors, placementsById],
   );
-  const colors = useMemo(
-    () =>
-      fadeColors(
-        ranges,
-        positions.length,
-        new THREE.Color(colour),
-        palette.background,
-        selected,
-        focus,
-      ),
-    [positions, ranges, colour, palette, selected, focus],
-  );
+  const colors = useMemo(() => {
+    const layerPaint = { colour: new THREE.Color(colour), alpha: opacity };
+    // Inheritance is the stronger fact between two types, so it takes the layer's
+    // azure mixed toward white and draws solid. It used to be two arcs a hair apart
+    // faking a thicker line, which read as two lines.
+    const inheritsPaint = { colour: tint(colour, WHITE, INHERITS_MIX), alpha: 1 };
+    return fadeColors(
+      ranges,
+      positions.length / 3,
+      (edges) => (edges[0]?.kind === "inherits" ? inheritsPaint : layerPaint),
+      palette.background,
+      selected,
+      focus,
+    );
+  }, [positions, ranges, colour, opacity, palette, selected, focus]);
 
   if (positions.length === 0) return null;
 
@@ -793,9 +810,9 @@ function Links({
     <lineSegments frustumCulled={false}>
       <bufferGeometry>
         <bufferAttribute args={[positions, 3]} attach="attributes-position" />
-        <bufferAttribute args={[colors, 3]} attach="attributes-color" />
+        <bufferAttribute args={[colors, 4]} attach="attributes-color" />
       </bufferGeometry>
-      <lineBasicMaterial opacity={opacity} transparent vertexColors />
+      <lineBasicMaterial transparent vertexColors />
     </lineSegments>
   );
 }
