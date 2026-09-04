@@ -17,7 +17,10 @@
     <Description>Renders the Umbraco content model as an isometric city in the backoffice.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>umbraco umbraco-marketplace backoffice document-types visualisation</PackageTags>
+    <PackageTags>umbraco umbraco-marketplace backoffice document-types visualisation three.js</PackageTags>
+    <PackageProjectUrl>https://github.com/thebuilder/umbraco-schema-city</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/thebuilder/umbraco-schema-city</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <!-- One package for Umbraco 17 and 18. NuGet resolves the lowest version in the range here and
