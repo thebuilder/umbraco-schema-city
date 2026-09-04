@@ -545,16 +545,23 @@ export function App({
           </div>
         </div>
 
-        {scale ? (
-          <div className="relative z-10 flex shrink-0 items-center gap-2 border-line border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
-            <span className="font-bold uppercase tracking-terminal">{LENS_LABEL[lens]}</span>
-            <span>{scale.minLabel}</span>
-            <span aria-hidden className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`} />
-            <span>{scale.maxLabel}</span>
-          </div>
-        ) : null}
-
         <div className="relative min-h-0 flex-1">
+          {/* The legend is an overlay in the corner of the canvas rather than a row
+              above it. As a row it took its height out of the canvas the moment a
+              lens was picked, and the scene dropped and re-fitted itself around the
+              new viewport, which reads as the city flinching at a colour change.
+              Anything else that only appears sometimes belongs over the canvas for
+              the same reason. It covers its own box and nothing else, so the ground
+              under it is the only pick the canvas loses. The list view colours
+              nothing by lens, so it gets no legend over its first row. */}
+          {scale && view !== "list" ? (
+            <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
+              <span className="font-bold uppercase tracking-terminal">{LENS_LABEL[lens]}</span>
+              <span>{scale.minLabel}</span>
+              <span aria-hidden className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`} />
+              <span>{scale.maxLabel}</span>
+            </div>
+          ) : null}
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
           {view === "list" ? (
