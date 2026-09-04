@@ -3,6 +3,9 @@
 An Umbraco backoffice extension that draws the content model as an isometric city you can walk
 around. One building per Document Type, roads for the relationships between them.
 
+Source and issues live at
+[github.com/thebuilder/umbraco-schema-city](https://github.com/thebuilder/umbraco-schema-city).
+
 ## What it does
 
 - **Sidebar workspace.** Schema City sits in the Settings sidebar under Advanced, next to
@@ -10,7 +13,7 @@ around. One building per Document Type, roads for the relationships between them
   type's properties, compositions, allowed children and block targets. Its Open in editor button
   goes to that type's editor. `⌘K` searches every type and property alias.
 
-  ![78 Document Types as buildings on four island districts, named Pages, Elements, Compositions and Unfiled, with the structure roads running between them.](docs/screenshots/city.png)
+  ![78 Document Types as buildings on four island districts, named Pages, Elements, Compositions and Unfiled, with the structure roads running between them.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png)
 
 - **Editor tab.** The Relationships tab on a Document Type editor opens the same map, focused on
   the type being edited.
@@ -20,30 +23,30 @@ around. One building per Document Type, roads for the relationships between them
 - **Focus mode.** Enter, or the inspector's button, rebuilds the layout around one type and its
   neighbours and draws only its edges. Escape leaves focus, Escape again clears the selection.
 
-  ![The Home type focused, with its compositions, its one allowed parent and its allowed children named around it and the inspector open on the right.](docs/screenshots/focus.png)
+  ![The Home type focused, with its compositions, its one allowed parent and its allowed children named around it and the inspector open on the right.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png)
 
 - **Findings.** A drawer listing what looks wrong: unused types, unused Element Types, dead ends,
   duplicate aliases, broken block configurations, types with no properties, types with no
   template, pure mixins, and types complex enough to be worth a second look. Each row selects the
   type it is about.
 
-  ![The findings drawer over the city, listing 115 findings with a row of filter chips above them.](docs/screenshots/findings.png)
+  ![The findings drawer over the city, listing 115 findings with a row of filter chips above them.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
 
 - **Usage lens.** Recolours the city by content count, published share, cultures, incoming
   references, or unused. Usage is a second call and the city never waits for it, so the lens
   picker stays disabled until it lands.
 
-  ![The Content count lens on, buildings coloured along an amber to azure bar from 0 to 162, with Article selected and its 162 items on the badge above it.](docs/screenshots/lens.png)
+  ![The Content count lens on, buildings coloured along an amber to azure bar from 0 to 162, with Article selected and its 162 items on the badge above it.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png)
 
 - **Two cameras.** Iso is the fixed isometric angle; Free stands a perspective camera on it and
   lets you orbit and fly. `E` switches between them.
 
-  ![The city under the free camera, seen from a lower angle after a short orbit.](docs/screenshots/free-camera.png)
+  ![The city under the free camera, seen from a lower angle after a short orbit.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/free-camera.png)
 
 - **List view.** The same schema as a sortable table, with no canvas in it. Every column sorts, the
   filter is the same search the palette runs, and a row opens the inspector.
 
-  ![The list view, every type in a table sorted by own property count with the largest first.](docs/screenshots/list.png)
+  ![The list view, every type in a table sorted by own property count with the largest first.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png)
 
 Adding a type can move buildings. The layout is deterministic for a given set of types, so it only
 moves what it must, but there is no pinning yet.
