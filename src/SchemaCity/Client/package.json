@@ -10,7 +10,8 @@
     "test": "vitest run",
     "lint": "ultracite check",
     "format": "ultracite fix",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "fallow": "fallow audit --gate new-only"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
@@ -19,6 +20,7 @@
     "@types/react-dom": "19.2.7",
     "@types/three": "0.185.4",
     "@umbraco-cms/backoffice": "^17.6.2",
+    "fallow": "3.22.0",
     "tailwindcss": "4.3.3",
     "typescript": "^5.9.3",
     "ultracite": "^7.10.8",

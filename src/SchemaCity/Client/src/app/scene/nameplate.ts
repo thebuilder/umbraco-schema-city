@@ -28,7 +28,7 @@ export type Nameplate = {
 /** Cap heights the search tries, largest first. */
 const CAPS = [4, 3.5, 3, 2.5];
 /** Cap height a name is printed at when the island has room for it. */
-export const STAMP_CAP = CAPS[0] as number;
+export const NAMEPLATE_CAP = CAPS[0] as number;
 /** Clear ground kept around the letters on every side. */
 const MARGIN = 0.5;
 /**
@@ -145,7 +145,7 @@ function occupancy(island: Rect, buildings: Placement[], runs: Run[]) {
 
 /** The name against the island's north edge, shrunk to fit, when nothing else fits. */
 function northBand(island: Rect, aspect: number): Nameplate {
-  let height = STAMP_CAP;
+  let height = NAMEPLATE_CAP;
   let width = height * aspect;
   const fit = Math.min(1, (island.maxX - island.minX - MARGIN * 2) / width);
   width *= fit;

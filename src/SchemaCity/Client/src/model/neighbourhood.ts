@@ -6,6 +6,19 @@
 // and it includes directions this file has no section for.
 import type { SchemaGraph } from "./types";
 
+/**
+ * Sorts ids by the alias of the type they name. An id no node claims sorts after
+ * every real alias, because no alias starts with U+FFFF, and a block editor can
+ * still name a type that was deleted.
+ */
+export function byAliasOf(
+  graph: SchemaGraph
+): (a: string, b: string) => number {
+  const aliasOf = new Map(graph.nodes.map((node) => [node.id, node.alias]));
+  const key = (id: string) => aliasOf.get(id) ?? `\uffff${id}`;
+  return (a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0);
+}
+
 /** The nodes one property points at, for block and reference edges. */
 export type PropertyTargets = { propertyAlias: string; ids: string[] };
 
@@ -85,11 +98,7 @@ export function neighbourhoods(graph: SchemaGraph): Map<string, Neighbourhood> {
     }
   }
 
-  const aliasOf = new Map(graph.nodes.map((node) => [node.id, node.alias]));
-  // A missing id sorts after every real alias, because no alias starts with U+FFFF.
-  const key = (id: string) => aliasOf.get(id) ?? `\uffff${id}`;
-  const byAlias = (a: string, b: string) =>
-    key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0;
+  const byAlias = byAliasOf(graph);
   const byPropertyAlias = (a: PropertyTargets, b: PropertyTargets) =>
     a.propertyAlias < b.propertyAlias
       ? -1

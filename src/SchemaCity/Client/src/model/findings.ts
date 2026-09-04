@@ -79,7 +79,7 @@ const NEEDS_USAGE: ReadonlySet<FindingKind> = new Set<FindingKind>([
 const COMPLEXITY_TIERS = 5;
 
 /** `own + composed properties + 2 * compositions + distinct block targets`. */
-export function complexityScore(
+function complexityScore(
   node: SchemaNode,
   compositions: number,
   blockTargets: number

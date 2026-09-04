@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  // The two Lit wrappers Umbraco loads, the fixture harness and its scripts, and the tests.
+  "entry": [
+    "src/entry-workspace.tsx",
+    "src/entry-document-type-view.tsx",
+    "dev/main.tsx",
+    "dev/*.mjs",
+    "**/*.test.ts"
+  ],
+  "ignoreDependencies": [
+    // Vite ships rollup, and vite.config.ts imports one type from it.
+    "rollup",
+    // The host serves the backoffice at runtime; the build marks it external.
+    "@umbraco-cms/backoffice"
+  ],
+  // Registry copy-in from the afterglow shadcn registry. The unused half of a
+  // component's API is upstream's, and npx shadcn add writes it back anyway.
+  "ignoreExports": [{ "file": "src/app/components/ui/*.tsx", "exports": ["*"] }]
+}

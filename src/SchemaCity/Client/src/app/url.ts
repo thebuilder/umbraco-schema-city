@@ -17,7 +17,7 @@ import { LENSES, type Lens } from "./scene/lens";
  */
 export type View = "city" | "explore" | "list";
 
-export const VIEWS: readonly View[] = ["city", "explore", "list"];
+const VIEWS: readonly View[] = ["city", "explore", "list"];
 
 export type UrlState = {
   /** Alias of the type the view is about, or null when nothing is selected. */

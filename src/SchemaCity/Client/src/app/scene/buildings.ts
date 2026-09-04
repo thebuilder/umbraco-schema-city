@@ -51,7 +51,7 @@ const SEPARATOR_HEIGHT = 0.06;
 const ELEMENT_HEIGHT = FLOOR_HEIGHT;
 const PLAZA_MARGIN = 0.6;
 /** What a building's whole mass comes to once focus mode has pressed it flat. */
-export const PLATE_HEIGHT = 0.1;
+const PLATE_HEIGHT = 0.1;
 
 // A node with no groups still gets one floor, coloured as its own.
 const UNGROUPED: PropertyGroup = {

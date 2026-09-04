@@ -1,7 +1,11 @@
 // Where the neighbourhood of one node goes while that node is focused. Pure: no
 // three.js, no React, no DOM. The scene tweens each building from its city
 // placement to the one this returns, and back.
-import type { Neighbourhood, PropertyTargets } from "../../model/neighbourhood";
+import {
+  byAliasOf,
+  type Neighbourhood,
+  type PropertyTargets,
+} from "../../model/neighbourhood";
 import type { SchemaGraph } from "../../model/types";
 import {
   cityBounds,
@@ -68,12 +72,7 @@ export function layoutFocus(
   const inCity = new Map(
     cityPlacements.map((placement) => [placement.id, placement])
   );
-  const aliasOf = new Map(graph.nodes.map((node) => [node.id, node.alias]));
-  // A block editor can still name an element type that was deleted, so an id with no
-  // alias sorts last rather than crashing the comparison.
-  const key = (id: string) => aliasOf.get(id) ?? `\uffff${id}`;
-  const byAlias = (a: string, b: string) =>
-    key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0;
+  const byAlias = byAliasOf(graph);
   const sizeOf = (id: string) => inCity.get(id)?.footprint ?? FOOTPRINT;
 
   const taken = new Set<string>([focusId]);

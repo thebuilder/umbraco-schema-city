@@ -18,7 +18,7 @@ export const LAYERS: readonly Layer[] = [
 /** Structure alone. The other three are noise until you ask for them. */
 export const DEFAULT_LAYERS: readonly Layer[] = ["structure"];
 
-export const LAYER_OF: Record<EdgeKind, Layer> = {
+const LAYER_OF: Record<EdgeKind, Layer> = {
   allowedChild: "structure",
   block: "blocks",
   composition: "compositions",

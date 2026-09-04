@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { Placement } from "../layout/city";
-import { findNameplate, type Rect, type Run, STAMP_CAP } from "./nameplate";
+import { findNameplate, NAMEPLATE_CAP, type Rect, type Run } from "./nameplate";
 
 /** A plate wide enough for a seven-cap name at the full cap height. */
 const island: Rect = { minX: 0, maxX: 60, minZ: 0, maxZ: 40 };
@@ -44,7 +44,7 @@ test("a name goes in the strip along the edge that is clear", () => {
   // Everything but the southern eight units is built on.
   const spot = findNameplate(island, block(0, 60, 0, 32), [], ASPECT);
 
-  expect(spot.height).toBeCloseTo(STAMP_CAP);
+  expect(spot.height).toBeCloseTo(NAMEPLATE_CAP);
   expect(spot.rotation).toBe(0);
   // Against the south edge, clear of the buildings, and reading east.
   expect(spot.z + spot.height / 2).toBeGreaterThan(island.maxZ - 6);
@@ -62,7 +62,7 @@ test("a name goes inside the island when every edge is busy", () => {
   ];
   const spot = findNameplate(island, [], runs, ASPECT);
 
-  expect(spot.height).toBeCloseTo(STAMP_CAP);
+  expect(spot.height).toBeCloseTo(NAMEPLATE_CAP);
   expect(spot.rotation).toBe(0);
   // Clear of all four runs.
   expect(spot.z - spot.height / 2).toBeGreaterThan(1);
@@ -84,7 +84,7 @@ test("a name falls back to the north band when nothing is clear", () => {
 
   // The band the layout holds clear along the north edge, tucked into its corner.
   expect(spot.rotation).toBe(0);
-  expect(spot.height).toBeCloseTo(STAMP_CAP);
+  expect(spot.height).toBeCloseTo(NAMEPLATE_CAP);
   expect(spot.x - spot.width / 2).toBeCloseTo(island.minX + 0.5);
   expect(spot.z - spot.height / 2).toBeCloseTo(island.minZ + 0.5);
 });
@@ -93,7 +93,7 @@ test("a name too long for its island shrinks to fit the fallback band", () => {
   const narrow: Rect = { minX: 0, maxX: 14, minZ: 0, maxZ: 14 };
   const spot = findNameplate(narrow, block(0, 14, 0, 14), [], ASPECT);
 
-  expect(spot.height).toBeLessThan(STAMP_CAP);
+  expect(spot.height).toBeLessThan(NAMEPLATE_CAP);
   expect(spot.x + spot.width / 2).toBeCloseTo(narrow.maxX - 0.5);
   // Cap height and width shrink together, so the letters keep their shape.
   expect(spot.width / spot.height).toBeCloseTo(ASPECT);

@@ -10,7 +10,7 @@
 /** Most labels on screen at once, however much room there is. */
 export const LABEL_CAP = 40;
 /** A building smaller than this on screen is too small to hang a name on. */
-export const MIN_BUILDING_PX = 6;
+const MIN_BUILDING_PX = 6;
 /** Width of one character, when the scene has not measured the real font yet. */
 export const CHAR_PX = 6.6;
 /** Border, padding and the gap that keeps two kept labels from touching. */

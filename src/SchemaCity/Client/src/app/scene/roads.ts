@@ -57,7 +57,7 @@ const LOOP_SEGMENTS = 14;
 const LANE_STEP = 0.35;
 const EPS = 1e-6;
 /** More allowed parents than this and the overview draws one road and a count. */
-export const FAN_LIMIT = 3;
+const FAN_LIMIT = 3;
 
 /**
  * `positions` is a flat xyz triangle list. `ranges` marks which vertices came from
