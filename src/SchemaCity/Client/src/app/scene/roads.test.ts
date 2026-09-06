@@ -65,6 +65,49 @@ function crossings(segments: RoadSegment[]): number {
 }
 
 describe("planRoads", () => {
+  it("separates overlapping bridge trunks across streets and travel directions", () => {
+    const island = new Map<string, Placement>([
+      ["p0", placement("p0", 0, 0)],
+      ["p1", placement("p1", 0, 11)],
+      ["q0", { ...placement("q0", 20, 22), district: "other" }],
+      ["q1", { ...placement("q1", 20, 33), district: "other" }],
+    ]);
+    const edges = [
+      road("p0", "q0"),
+      road("p1", "q1"),
+      road("q0", "p0"),
+      road("q1", "p1"),
+    ];
+    const segments = planRoads(island, edges);
+    expect(planRoads(island, [...edges].reverse())).toEqual(segments);
+    for (const edge of edges) {
+      expect(
+        hasConnectedRoute(
+          segments,
+          edge,
+          island.get(edge.from) as Placement,
+          island.get(edge.to) as Placement
+        )
+      ).toBe(true);
+    }
+    const bridges = segments
+      .filter(
+        (segment) => vertical(segment) && segment.x0 > 1 && segment.x0 < 19
+      )
+      .sort((a, b) => a.x0 - b.x0);
+    expect(bridges).toHaveLength(4);
+    for (const [index, bridge] of bridges.entries()) {
+      expect(bridge.edges).toHaveLength(1);
+      expect(bridge.x0 - (bridge.width ?? 0) / 2).toBeGreaterThan(4);
+      expect(bridge.x0 + (bridge.width ?? 0) / 2).toBeLessThan(16);
+      const previous = bridges[index - 1];
+      if (previous)
+        expect(bridge.x0 - (bridge.width ?? 0) / 2).toBeGreaterThan(
+          previous.x0 + (previous.width ?? 0) / 2
+        );
+    }
+  });
+
   it("keeps medium fixture structure road widths positive", () => {
     const city = cityDistricts(medium).placements;
     const byId = new Map(city.map((placement) => [placement.id, placement]));

@@ -67,7 +67,6 @@ import {
 } from "./scene/labels";
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
-import { findNameplate, groundRuns, type Run } from "./scene/nameplate";
 import {
   buildOutlinePositions,
   revealAt,
@@ -75,6 +74,7 @@ import {
 } from "./scene/reveal";
 import { buildRoadGeometry, roadFan } from "./scene/roads";
 import {
+  districtStamp,
   FOLDER_TINT_HEIGHT,
   fogRange,
   framingAction,
@@ -1724,21 +1724,15 @@ function WorldGrid({ palette, span }: { palette: Palette; span: number }) {
 }
 
 function Stage({
-  buildings,
   districts,
   folders,
-  runs,
   span,
   palette,
   reducedMotion,
 }: {
-  /** Every building in the city, which is what the names have to find a gap in. */
-  buildings: Placement[];
   districts: District[];
   /** The ground a nested folder's members cover, for the tint on the island. */
   folders: (CityBounds & { id: string })[];
-  /** Every road and ground link, the other thing a name may not be printed under. */
-  runs: Run[];
   span: number;
   palette: Palette;
   reducedMotion: boolean;
@@ -1758,20 +1752,18 @@ function Stage({
     () =>
       districts.map((district) => {
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
-        const stamp = findNameplate(
+        const stamp = districtStamp(
           {
             minX: district.minX - ISLAND_PAD,
             maxX: district.maxX + ISLAND_PAD,
             minZ: district.minZ - ISLAND_PAD,
             maxZ: district.maxZ + ISLAND_PAD,
           },
-          buildings,
-          runs,
           texture.image.width / texture.image.height
         );
         return { id: district.id, texture, stamp };
       }),
-    [buildings, districts, palette.mono, runs]
+    [districts, palette.mono]
   );
 
   useFrame((state) => {
@@ -1841,7 +1833,7 @@ function Stage({
           key={id}
           position={[stamp.x, STAMP_Y, stamp.z]}
           renderOrder={1}
-          rotation={[-Math.PI / 2, 0, stamp.rotation]}
+          rotation={[-Math.PI / 2, 0, 0]}
         >
           <planeGeometry args={[stamp.width, stamp.height]} />
           <meshBasicMaterial
@@ -2451,16 +2443,6 @@ export default function Scene({
       ...cityBounds(held, FOLDER_PAD),
     }));
   }, [city]);
-  // The roads and ground links of the whole city, for the name search. The city's
-  // own, not what focus mode draws, because the names are fixed to their islands.
-  const groundRunsOfCity = useMemo(
-    () =>
-      groundRuns(
-        new Map(city.placements.map((p) => [p.id, p])),
-        graph.edges ?? []
-      ),
-    [city, graph.edges]
-  );
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
   const focusNeighbours = useMemo(
     () => (focus ? neighboursOf(graph, focus) : null),
@@ -2687,12 +2669,10 @@ export default function Scene({
           <ambientLight intensity={1.2} />
           <directionalLight intensity={2.4} position={[8, 16, 6]} />
           <Stage
-            buildings={city.placements}
             districts={city.districts}
             folders={folderTints}
             palette={palette}
             reducedMotion={reducedMotion}
-            runs={groundRunsOfCity}
             span={span}
           />
           <FocusIsland
