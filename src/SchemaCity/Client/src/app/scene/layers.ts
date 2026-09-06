@@ -3,7 +3,14 @@
 // Pure: no three.js, no React, no DOM.
 import type { EdgeKind, SchemaEdge } from "../../model/types";
 import type { Placement } from "../layout/city";
-import { type RoadGrid, roadGrid, routePoints } from "./roads";
+import {
+  linkLaneKey,
+  linkLanes,
+  type RoadGrid,
+  roadGrid,
+  routeLaneOffset,
+  routePoints,
+} from "./roads";
 
 export type Layer = "structure" | "compositions" | "blocks" | "references";
 
@@ -61,6 +68,7 @@ export function buildLinkGeometry(
 ): { positions: Float32Array; ranges: LinkRange[] } {
   const positions: number[] = [];
   const ranges: LinkRange[] = [];
+  const lanes = linkLanes(edges);
   const drawn = new Set<string>();
   const grid = layer === "compositions" ? null : roadGrid(placements.values());
   // An inherited parent arrives as both an inherits and a composition edge. The
@@ -75,7 +83,11 @@ export function buildLinkGeometry(
         )
       : null;
 
-  for (const edge of edges) {
+  for (const edge of [...edges].sort(
+    (a, b) =>
+      linkLaneKey(a).localeCompare(linkLaneKey(b)) ||
+      (a.propertyAlias ?? "").localeCompare(b.propertyAlias ?? "")
+  )) {
     if (LAYER_OF[edge.kind] !== layer) continue;
     if (
       edge.kind === "composition" &&
@@ -100,7 +112,8 @@ export function buildLinkGeometry(
         to,
         placements.get(edge.from),
         placements.get(edge.to),
-        layer === "references" ? REFERENCE_Y : BLOCK_Y
+        layer === "references" ? REFERENCE_Y : BLOCK_Y,
+        lanes.get(linkLaneKey(edge)) ?? 0
       );
       for (let i = 1; i < path.length; i++) {
         const a = path[i - 1] as Anchor;
@@ -112,10 +125,11 @@ export function buildLinkGeometry(
       // A quadratic curve only travels half way to its control point, so the
       // control is put twice as far out as the height the curve should reach.
       const apex = (height: number) => 2 * height - (from.y + to.y) / 2;
+      const length = Math.max(1, Math.hypot(to.x - from.x, to.z - from.z));
       const control = {
-        x: (from.x + to.x) / 2,
+        x: (from.x + to.x) / 2 + ((to.z - from.z) / length) * 1.1,
         y: apex(Math.max(from.y, to.y) + ARCH),
-        z: (from.z + to.z) / 2,
+        z: (from.z + to.z) / 2 + ((from.x - to.x) / length) * 1.1,
       };
       pushCurve(positions, from, control, to);
     }
@@ -136,12 +150,18 @@ function groundPath(
   to: Anchor,
   fromPlacement: Placement | undefined,
   toPlacement: Placement | undefined,
-  y: number
+  y: number,
+  lane: number
 ): Anchor[] {
   if (!(fromPlacement && toPlacement)) return [from, to];
   return [
     from,
-    ...routePoints(grid, fromPlacement, toPlacement).map((point) => ({
+    ...routePoints(
+      grid,
+      fromPlacement,
+      toPlacement,
+      routeLaneOffset(grid, fromPlacement, toPlacement, lane)
+    ).map((point) => ({
       x: point.x,
       y,
       z: point.z,

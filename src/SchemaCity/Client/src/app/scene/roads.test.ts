@@ -130,6 +130,22 @@ describe("planRoads", () => {
     ).toBe(true);
   });
 
+  it("detours a rank-skipping run around an intermediate building", () => {
+    const skipped = new Map(placements);
+    skipped.set("blocker", placement("blocker", 12, 11));
+    skipped.set("child", placement("child", 12, 22));
+    const segments = planRoads(skipped, [road("a", "child")]);
+    expect(
+      segments.some(
+        (segment) =>
+          vertical(segment) &&
+          segment.x0 === 12 &&
+          Math.min(segment.z0, segment.z1) < 11 &&
+          Math.max(segment.z0, segment.z1) > 11
+      )
+    ).toBe(false);
+  });
+
   it("merges two parents' runs into the same child instead of stacking them", () => {
     const shared = new Map(placements);
     shared.set("c", placement("c", 12, 0));
@@ -145,8 +161,8 @@ describe("planRoads", () => {
 
   it("keeps two parents on one street in separate lanes", () => {
     const two = new Map(placements);
-    two.set("c", placement("c", 12, 0));
-    two.set("d", placement("d", 18, 11));
+    two.set("c", placement("c", 4, 0));
+    two.set("d", placement("d", 10, 11));
     const runs = planRoads(two, [road("a", "b"), road("c", "d")]).filter(
       horizontal
     );
@@ -155,6 +171,66 @@ describe("planRoads", () => {
       (runs[1] as RoadSegment).z0,
       6
     );
+  });
+
+  it("allocates dense channels deterministically without collapsing spans", () => {
+    const dense = new Map<string, Placement>();
+    for (let i = 0; i < 40; i++) {
+      dense.set(`p${i}`, placement(`p${i}`, i * 3, 0));
+      dense.set(`c${i}`, placement(`c${i}`, 120 + i * 3, 5));
+    }
+    const edges = [...new Array(40).keys()].map((i) => road(`p${i}`, `c${i}`));
+    const shuffled = [...edges].reverse();
+    const routed = planRoads(dense, edges);
+    const rerouted = planRoads(dense, shuffled);
+    expect(rerouted).toEqual(routed);
+
+    const lanes = routed
+      .filter(horizontal)
+      .map((segment) => segment.z0.toFixed(6));
+    expect(new Set(lanes).size).toBe(40);
+    const traces = routed.filter(horizontal).sort((a, b) => a.z0 - b.z0);
+    for (const [index, trace] of traces.entries()) {
+      const halfWidth = (trace.width ?? 0.3) / 2;
+      expect(trace.z0 - halfWidth).toBeGreaterThan(1);
+      expect(trace.z0 + halfWidth).toBeLessThan(4);
+      const previous = traces[index - 1];
+      if (previous)
+        expect(trace.z0 - halfWidth).toBeGreaterThan(
+          previous.z0 + (previous.width ?? 0.3) / 2
+        );
+    }
+  });
+
+  it("clears wide obstacles across every skipped row", () => {
+    const wide = { ...placement("wide", 12, 22), footprint: 8 };
+    const obstacles = [
+      placement("first", 30, 11),
+      wide,
+      placement("last", 12, 33),
+    ];
+    const route = new Map([
+      ["a", placement("a", 0, 0)],
+      ["child", placement("child", 12, 44)],
+      ...obstacles.map((item) => [item.id, item] as const),
+    ]);
+    for (const segment of planRoads(route, [road("a", "child")])) {
+      for (const obstacle of obstacles) {
+        const radius = obstacle.footprint / 2;
+        const margin = (segment.width ?? 0.3) / 2;
+        const crossesX =
+          Math.max(segment.x0, segment.x1) + margin >
+            obstacle.position.x - radius &&
+          Math.min(segment.x0, segment.x1) - margin <
+            obstacle.position.x + radius;
+        const crossesZ =
+          Math.max(segment.z0, segment.z1) + margin >
+            obstacle.position.z - radius &&
+          Math.min(segment.z0, segment.z1) - margin <
+            obstacle.position.z + radius;
+        expect(crossesX && crossesZ).toBe(false);
+      }
+    }
   });
 
   it("crosses less than the straight ribbons it replaced", () => {

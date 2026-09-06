@@ -7,7 +7,14 @@
 // what is taken, and the name goes in the largest clear rectangle that holds it.
 import type { SchemaEdge } from "../../model/types";
 import type { Placement } from "../layout/city";
-import { planRoads, roadGrid, routePoints } from "./roads";
+import {
+  linkLaneKey,
+  linkLanes,
+  planRoads,
+  roadGrid,
+  routeLaneOffset,
+  routePoints,
+} from "./roads";
 
 export type Rect = { minX: number; maxX: number; minZ: number; maxZ: number };
 /** A straight run of a road or a ground link, in world units. */
@@ -62,21 +69,26 @@ export function groundRuns(
     z1: segment.z1,
   }));
   const grid = roadGrid(placementsById.values());
+  const lanes = linkLanes(edges);
   const drawn = new Set<string>();
   for (const edge of edges) {
     if (edge.kind !== "block" && edge.kind !== "reference") continue;
-    const pair = `${edge.from}|${edge.to}`;
+    const pair = linkLaneKey(edge);
     if (edge.from === edge.to || drawn.has(pair)) continue;
     const from = placementsById.get(edge.from);
     const to = placementsById.get(edge.to);
     if (!(from && to)) continue;
     drawn.add(pair);
-    const points = routePoints(grid, from, to);
-    for (let i = 1; i < points.length; i++) {
-      const a = points[i - 1] as { x: number; z: number };
-      const b = points[i] as { x: number; z: number };
-      runs.push({ x0: a.x, z0: a.z, x1: b.x, z1: b.z });
-    }
+    const points = routePoints(
+      grid,
+      from,
+      to,
+      routeLaneOffset(grid, from, to, lanes.get(linkLaneKey(edge)) ?? 0)
+    );
+    points.slice(1).forEach((end, index) => {
+      const start = points[index];
+      runs.push({ x0: start.x, z0: start.z, x1: end.x, z1: end.z });
+    });
   }
   return runs;
 }

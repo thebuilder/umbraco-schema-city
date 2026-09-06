@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SchemaEdge } from "../../model/types";
 import type { Placement } from "../layout/city";
 import { type Anchor, buildLinkGeometry } from "./layers";
+import { linkLanes } from "./roads";
 
 // Two rows nine units apart, so there is one street between them at z = 5.5.
 const placements = new Map<string, Placement>([
@@ -49,6 +50,60 @@ const lowest = (positions: Float32Array) => {
 };
 
 describe("buildLinkGeometry", () => {
+  it("separates inverse composition arcs and preserves geometry across API order", () => {
+    const edges = [
+      edge("composition", "a", "b"),
+      edge("composition", "b", "a"),
+    ];
+    const forward = buildLinkGeometry(
+      "compositions",
+      [edges[0]],
+      anchors,
+      placements
+    ).positions;
+    const reverse = buildLinkGeometry(
+      "compositions",
+      [edges[1]],
+      anchors,
+      placements
+    ).positions;
+    const xCentre = (values: Float32Array) => {
+      let sum = 0;
+      for (let i = 0; i < values.length; i += 3) sum += values[i];
+      return sum / (values.length / 3);
+    };
+    expect(Math.abs(xCentre(forward) - xCentre(reverse))).toBeGreaterThan(0.1);
+    expect(
+      buildLinkGeometry("compositions", edges, anchors, placements)
+    ).toEqual(
+      buildLinkGeometry(
+        "compositions",
+        [...edges].reverse(),
+        anchors,
+        placements
+      )
+    );
+  });
+
+  it("keeps dense ground-link channels distinct and independent of duplicate property order", () => {
+    const edges = Array.from({ length: 200 }, (_, index) =>
+      edge("block", `p${index}`, "target")
+    );
+    const lanes = linkLanes(edges);
+    expect(new Set(lanes.values()).size).toBe(200);
+    expect([...lanes.values()].every((lane) => lane > -1 && lane < 0)).toBe(
+      true
+    );
+    const duplicate = [
+      edge("block", "a", "b", "first"),
+      edge("block", "a", "b", "second"),
+    ];
+    expect(buildLinkGeometry("blocks", duplicate, anchors, placements)).toEqual(
+      buildLinkGeometry("blocks", [...duplicate].reverse(), anchors, placements)
+    );
+    expect(linkLanes([...edges, edges[0]])).toEqual(lanes);
+  });
+
   it("draws nothing for an empty edge list", () => {
     const { positions, ranges } = buildLinkGeometry(
       "blocks",
@@ -146,7 +201,11 @@ describe("buildLinkGeometry", () => {
     // it to b's column, then rises, so the same corners the road turns show up here.
     const street: number[] = [];
     for (let i = 0; i < positions.length; i += 3) {
-      if (Math.abs((positions[i + 2] as number) - 5.5) < 1e-6)
+      // Blocks use their own side of the street, clear of the central road.
+      if (
+        (positions[i + 2] as number) > 1.1 &&
+        (positions[i + 2] as number) < 5.5
+      )
         street.push(positions[i] as number);
     }
     expect(Math.min(...street)).toBeCloseTo(0, 6);

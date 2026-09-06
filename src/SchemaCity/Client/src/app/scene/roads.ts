@@ -18,6 +18,7 @@ export type RoadSegment = {
   edges: SchemaEdge[];
   /** The building this run ends at, when it is the last run before a child. */
   into: { x: number; z: number } | null;
+  width?: number;
 };
 
 /**
@@ -35,9 +36,10 @@ export type RoadGrid = {
   halves: number[];
   /** The row a z sits in, or the nearest one when it sits in a street. */
   rowAt: (z: number) => number;
+  placements: Placement[];
 };
 
-const ROAD_WIDTH = 0.3;
+const ROAD_WIDTH = 0.08;
 const ROAD_Y = 0.015;
 const CHEVRON_Y = 0.02;
 const CHEVRON_SPACING = 1.4;
@@ -53,8 +55,6 @@ const LOOP_GAP = 0.5;
 const LOOP_RADIUS = 0.35;
 const LOOP_THICKNESS = 0.12;
 const LOOP_SEGMENTS = 14;
-/** Sideways step between two parents' runs on one street. */
-const LANE_STEP = 0.35;
 const EPS = 1e-6;
 /** More allowed parents than this and the overview draws one road and a count. */
 const FAN_LIMIT = 3;
@@ -102,35 +102,77 @@ export function planRoads(
 ): RoadSegment[] {
   const grid = roadGrid(placementsById.values());
   const runs: RoadSegment[] = [];
-  // ponytail: a lane is the order a parent first reached this street, not a channel
-  // a router picked. Two parents whose runs never overlap still take two lanes, and
-  // past what the street holds the lanes clamp and overlap again. A real channel
-  // router, sorting runs by x span and reusing free lanes, is the upgrade.
   const laneOf = new Map<string, number>();
-  const taken = new Map<number, number>();
-
-  for (const edge of edges) {
-    if (edge.kind !== "allowedChild" || edge.from === edge.to) continue;
-    const from = placementsById.get(edge.from);
-    const to = placementsById.get(edge.to);
-    if (!(from && to)) continue;
-
-    const streets = streetsBetween(grid, from, to);
-    const trunk = streets[0] as number;
-    const key = `${trunk}|${edge.from}`;
-    let lane = laneOf.get(key);
-    if (lane === undefined) {
-      lane = taken.get(trunk) ?? 0;
-      taken.set(trunk, lane + 1);
-      laneOf.set(key, lane);
-    }
-
-    const points = routePoints(
-      grid,
-      from,
-      to,
-      laneOffset(lane, grid.halves[trunk] ?? 0)
+  const channels = new Map<number, { low: number; high: number }[][]>();
+  const candidates = edges
+    .filter((edge) => edge.kind === "allowedChild" && edge.from !== edge.to)
+    .map((edge) => {
+      const from = placementsById.get(edge.from);
+      const to = placementsById.get(edge.to);
+      if (!(from && to)) return null;
+      return {
+        edge,
+        from,
+        to,
+        trunk: streetsBetween(grid, from, to)[0] as number,
+      };
+    })
+    .filter(
+      (candidate): candidate is NonNullable<typeof candidate> =>
+        candidate !== null
+    )
+    .sort(
+      (a, b) =>
+        a.trunk - b.trunk ||
+        a.from.position.x - b.from.position.x ||
+        a.to.position.x - b.to.position.x ||
+        a.edge.from.localeCompare(b.edge.from) ||
+        a.edge.to.localeCompare(b.edge.to)
     );
+  const parentSpans = new Map<
+    string,
+    { trunk: number; parent: string; low: number; high: number }
+  >();
+  for (const { edge, from, to, trunk } of candidates) {
+    const key = `${trunk}|${edge.from}`;
+    const span = parentSpans.get(key);
+    const low = Math.min(from.position.x, to.position.x);
+    const high = Math.max(from.position.x, to.position.x);
+    if (span) {
+      span.low = Math.min(span.low, low);
+      span.high = Math.max(span.high, high);
+    } else {
+      parentSpans.set(key, { trunk, parent: edge.from, low, high });
+    }
+  }
+  for (const { trunk, parent, low, high } of [...parentSpans.values()].sort(
+    (a, b) =>
+      a.trunk - b.trunk ||
+      a.low - b.low ||
+      a.high - b.high ||
+      a.parent.localeCompare(b.parent)
+  )) {
+    const key = `${trunk}|${parent}`;
+    const used = channels.get(trunk) ?? [];
+    let lane = 0;
+    while (
+      used[lane]?.some((span) => span.low < high - EPS && span.high > low + EPS)
+    )
+      lane++;
+    used[lane] ??= [];
+    used[lane].push({ low, high });
+    channels.set(trunk, used);
+    laneOf.set(key, lane);
+  }
+  for (const { edge, from, to, trunk } of candidates) {
+    const key = `${trunk}|${edge.from}`;
+    const lane = laneOf.get(key) ?? 0;
+    const count = channels.get(trunk)?.length ?? 1;
+    const half = grid.halves[trunk] ?? 0;
+    const spacing = (half * 2) / (count + 1);
+    const offset = -half + spacing * (lane + 1);
+
+    const points = routePoints(grid, from, to, offset);
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1] as { x: number; z: number };
       const b = points[i] as { x: number; z: number };
@@ -141,6 +183,7 @@ export function planRoads(
         x1: b.x,
         z1: b.z,
         edges: [edge],
+        width: Math.min(ROAD_WIDTH, spacing * 0.8),
         into:
           i === points.length - 1
             ? { x: to.position.x, z: to.position.z }
@@ -153,8 +196,9 @@ export function planRoads(
 }
 
 export function roadGrid(placements: Iterable<Placement>): RoadGrid {
+  const allPlacements = [...placements];
   const bands: [number, number][] = [];
-  for (const placement of placements) {
+  for (const placement of allPlacements) {
     bands.push([
       placement.position.z - placement.footprint / 2,
       placement.position.z + placement.footprint / 2,
@@ -168,7 +212,8 @@ export function roadGrid(placements: Iterable<Placement>): RoadGrid {
     if (last && band[0] <= last[1]) last[1] = Math.max(last[1], band[1]);
     else rows.push([band[0], band[1]]);
   }
-  if (rows.length === 0) return { streets: [], halves: [], rowAt: () => 0 };
+  if (rows.length === 0)
+    return { streets: [], halves: [], rowAt: () => 0, placements: [] };
 
   const streets: number[] = [];
   const halves: number[] = [];
@@ -197,7 +242,41 @@ export function roadGrid(placements: Iterable<Placement>): RoadGrid {
     }
     return row;
   };
-  return { streets, halves, rowAt };
+  return { streets, halves, rowAt, placements: allPlacements };
+}
+
+/** Normalized side channels, shared by rendering and label occupancy. */
+export function linkLanes(edges: SchemaEdge[]): Map<string, number> {
+  const lanes = new Map<string, number>();
+  for (const kind of ["block", "reference"] as const) {
+    // Properties targeting the same pair draw one link, irrespective of API order.
+    const keys = [
+      ...new Set(
+        edges
+          .filter((item) => item.kind === kind && item.from !== item.to)
+          .map(linkLaneKey)
+      ),
+    ].sort();
+    const side = kind === "block" ? -1 : 1;
+    keys.forEach((key, index) => {
+      lanes.set(key, (side * (index + 1)) / (keys.length + 1));
+    });
+  }
+  return lanes;
+}
+
+export const linkLaneKey = (edge: SchemaEdge) =>
+  `${edge.kind}|${edge.from}|${edge.to}`;
+
+/** Scale the normalized channel to the available street width. */
+export function routeLaneOffset(
+  grid: RoadGrid,
+  from: Placement,
+  to: Placement,
+  lane: number
+): number {
+  const street = streetsBetween(grid, from, to)[0] as number;
+  return lane * (grid.halves[street] ?? 0);
 }
 
 /**
@@ -221,17 +300,78 @@ export function routePoints(
   const enterZ = to.position.z + (down ? -1 : 1) * (to.footprint / 2);
 
   const points = [{ x: from.position.x, z: exitZ }];
+  let corridor = to.position.x;
   streets.forEach((street, i) => {
     const z = (grid.streets[street] as number) + (i === 0 ? lane : 0);
     if (i === 0) {
       points.push({ x: from.position.x, z });
-      points.push({ x: to.position.x, z });
+      if (streets.length > 1) {
+        corridor = clearColumn(
+          grid,
+          to.position.x,
+          z,
+          grid.streets[streets[streets.length - 1]] as number,
+          to.id
+        );
+        points.push({ x: corridor, z });
+      } else points.push({ x: to.position.x, z });
     } else {
-      points.push({ x: to.position.x, z });
+      points.push({ x: corridor, z });
+      if (i === streets.length - 1 && corridor !== to.position.x)
+        points.push({ x: to.position.x, z });
     }
   });
   points.push({ x: to.position.x, z: enterZ });
   return points;
+}
+
+function clearColumn(
+  grid: RoadGrid,
+  targetX: number,
+  z0: number,
+  z1: number,
+  targetId: string
+): number {
+  const blockers = grid.placements.filter((placement) => {
+    const low = Math.min(z0, z1);
+    const high = Math.max(z0, z1);
+    return (
+      placement.id !== targetId &&
+      placement.position.z - placement.footprint / 2 < high &&
+      placement.position.z + placement.footprint / 2 > low
+    );
+  });
+  const candidates = [
+    targetX,
+    ...blockers.flatMap((placement) => [
+      placement.position.x - placement.footprint / 2 - 0.25,
+      placement.position.x + placement.footprint / 2 + 0.25,
+    ]),
+  ].sort((a, b) => Math.abs(a - targetX) - Math.abs(b - targetX) || a - b);
+  const clear = candidates.find((x) =>
+    grid.placements.every((placement) => {
+      if (placement.id === targetId) return true;
+      const inZ =
+        Math.max(
+          Math.min(z0, z1),
+          placement.position.z - placement.footprint / 2
+        ) <
+        Math.min(
+          Math.max(z0, z1),
+          placement.position.z + placement.footprint / 2
+        );
+      return (
+        !inZ ||
+        Math.abs(x - placement.position.x) >= placement.footprint / 2 + 0.2
+      );
+    })
+  );
+  if (clear !== undefined) return clear;
+  return blockers.reduce(
+    (edge, placement) =>
+      Math.max(edge, placement.position.x + placement.footprint / 2 + 0.25),
+    targetX
+  );
 }
 
 export type RoadFan = {
@@ -304,12 +444,6 @@ function streetsBetween(
     : Array.from({ length: rowFrom - rowTo }, (_, i) => rowFrom - i);
 }
 
-/** Lanes alternate around the street's mid-line, so adding a parent moves none. */
-function laneOffset(lane: number, half: number): number {
-  const step = Math.ceil(lane / 2) * LANE_STEP * (lane % 2 === 1 ? 1 : -1);
-  return Math.max(-half, Math.min(half, step));
-}
-
 /**
  * Runs that lie on top of each other become one. Two children of one parent leave it
  * by the same drop and share the street until they fork, and two parents of one child
@@ -318,9 +452,7 @@ function laneOffset(lane: number, half: number): number {
  */
 function mergeRuns(runs: RoadSegment[]): RoadSegment[] {
   const key = (run: RoadSegment) =>
-    Math.abs(run.x1 - run.x0) < EPS
-      ? `v${run.x0.toFixed(3)}`
-      : `h${run.z0.toFixed(3)}`;
+    Math.abs(run.x1 - run.x0) < EPS ? `v${run.x0}` : `h${run.z0}`;
   const buckets = new Map<string, RoadSegment[]>();
   for (const run of runs) {
     const bucket = buckets.get(key(run));
@@ -346,6 +478,10 @@ function mergeRuns(runs: RoadSegment[]): RoadSegment[] {
       if (open && low(run) <= end + EPS) {
         end = Math.max(end, high(run));
         open.edges.push(...run.edges);
+        open.width = Math.min(
+          open.width ?? ROAD_WIDTH,
+          run.width ?? ROAD_WIDTH
+        );
         open.into = open.into ?? run.into;
       } else {
         if (open) {
@@ -381,7 +517,7 @@ function pushSegment(positions: number[], segment: RoadSegment) {
   const dirZ = dz / length;
   const perpX = -dirZ;
   const perpZ = dirX;
-  const half = ROAD_WIDTH / 2;
+  const half = (segment.width ?? ROAD_WIDTH) / 2;
   const startX = segment.x0 - dirX * half;
   const startZ = segment.z0 - dirZ * half;
   const endX = segment.x1 + dirX * half;
