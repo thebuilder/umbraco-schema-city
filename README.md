@@ -13,8 +13,10 @@ Start with **Findings** to investigate configuration checks, **Search** to find 
 property alias, or **List** to work without a 3D canvas. Select a building to inspect its
 properties and direct connections. Focus its neighbourhood when the whole city gets crowded.
 
-The stage reveals its wireframe before its solid districts and circuits. Reduced motion skips
-the opening animation. Structure is the initial connection layer; add other relationships as
+The stage traces its wireframe before materialising solid districts and buildings, then briefly
+draws the relationship circuits before settling into a quiet overview. Hovering or selecting a
+type brings back its direct links; focusing a type keeps the local paths readable. Reduced motion
+skips the opening animation. Structure is the initial connection layer; add other relationships as
 you investigate them.
 
 - **Sidebar workspace.** Schema City sits in the Settings sidebar under Advanced, next to
@@ -30,7 +32,9 @@ you investigate them.
   block targets, and picker references. Structure alone is on by default; the rest are noise until
   you ask for them.
 - **Focus mode.** Enter, or the inspector's button, rebuilds the layout around one type and its
-  neighbours and draws only its edges. Escape leaves focus, Escape again clears the selection.
+  neighbours. Expand one step brings in the next connected types, preserving the positions already
+  in focus. Click a connection for its meaning, or expand the inspector’s connection explanations.
+  Escape leaves focus, Escape again clears the selection.
 
   ![The Home type focused, with its compositions, its one allowed parent and its allowed children named around it and the inspector open on the right.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png)
 
@@ -49,17 +53,23 @@ you investigate them.
 
   ![The Content count lens on, buildings coloured along an amber to azure bar from 0 to 162, with Article selected and its 162 items on the badge above it.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png)
 
-- **Two cameras.** Iso is the fixed isometric angle; Free stands a perspective camera on it and
-  lets you orbit and fly. `E` switches between them.
-
-  ![The city under the free camera, seen from a lower angle after a short orbit.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/free-camera.png)
+- **Two cameras.** Iso is the fixed isometric angle; Top down is an orthographic board view. Both
+  keep the same city coordinates, with pan and zoom available in either mode. Use the camera
+  toggle or `E` to switch between them.
 
 - **List view.** The same schema as a sortable table, with no canvas in it. Every column sorts, the
   filter is the same search the palette runs, and a row opens the inspector.
 
   ![The list view, every type in a table sorted by own property count with the largest first.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png)
 
-Adding a type can move buildings. The layout is deterministic for a given set of types, so it only
+- **Schema comparison.** Export the current schema as a versioned JSON snapshot, then import a
+  snapshot from another environment or revision. Compare added and removed types, property groups,
+  properties, compositions, allowed targets, and relationship changes. Matched buildings use the
+  baseline positions; new types appear on added boards alongside them. The comparison is schema
+  configuration only; usage data and custom code are
+  separate concerns.
+
+Outside comparison mode, adding a type can move buildings. The layout is deterministic for a given set of types, so it only
 moves what it must, but there is no pinning yet.
 
 Findings are review prompts. An unused Document Type has no counted content in the usage snapshot;
@@ -68,7 +78,7 @@ it is safe to delete. Schema connections and observed content references are dif
 and neither includes every possible dependency in custom code or external systems.
 
 [Product direction](docs/product-direction.md) records the review, the intended developer
-workflows, and the next features: schema comparison, transitive dependency review, and root
+workflows, and the next features: directional dependency paths, property investigation, and root
 reachability checks.
 
 ## Install

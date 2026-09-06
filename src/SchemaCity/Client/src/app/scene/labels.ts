@@ -122,8 +122,7 @@ export function visibleLabelIds({
   focusNeighbours: Set<string> | null;
 }): Set<string> {
   const ids = new Set<string>();
-  if (hovered && (neighbours === null || neighbours.has(hovered)))
-    ids.add(hovered);
+  if (hovered) ids.add(hovered);
   if (focusNeighbours) {
     for (const id of focusNeighbours) ids.add(id);
   } else if (selected) {
@@ -145,7 +144,15 @@ export function labelAnchors(
     hovered,
     badge,
   }: {
-    nodesById: Map<string, { name: string }>;
+    nodesById: Map<
+      string,
+      {
+        name: string;
+        ownPropertyCount?: number;
+        composedPropertyCount?: number;
+        groups?: unknown[];
+      }
+    >;
     placementsById: Map<string, Placement>;
     heights: Map<string, number>;
     selected: string | null;
@@ -167,24 +174,70 @@ export function labelAnchors(
     const node = nodesById.get(id);
     const placement = placementsById.get(id);
     if (!(node && placement)) continue;
-    const anchor = {
-      id,
-      text: node.name,
-      rank: id === selected ? 0 : id === hovered ? 1 : 2,
-      footprint: placement.footprint,
-      x: placement.position.x,
-      y: (placement.y ?? 0) + (heights.get(id) ?? placement.height) + 0.35,
-      z: placement.position.z,
-      lift: 0,
-    };
-    built.push(anchor);
-    if (id === selected && badge)
-      built.push({
-        ...anchor,
-        id: `${id}:usage`,
-        text: badge,
-        lift: LABEL_HEIGHT_PX + 4,
-      });
+    built.push(
+      ...anchorsForNode(id, node, placement, heights, selected, hovered, badge)
+    );
   }
   return built;
+}
+
+function anchorsForNode(
+  id: string,
+  node: {
+    name: string;
+    ownPropertyCount?: number;
+    composedPropertyCount?: number;
+    groups?: unknown[];
+  },
+  placement: Placement,
+  heights: Map<string, number>,
+  selected: string | null,
+  hovered: string | null,
+  badge: string | null
+) {
+  const anchor = {
+    id,
+    text: node.name,
+    rank: labelRank(id, selected, hovered),
+    footprint: placement.footprint,
+    x: placement.position.x,
+    y: (placement.y ?? 0) + (heights.get(id) ?? placement.height) + 0.35,
+    z: placement.position.z,
+    lift: 0,
+  };
+  const anchors = [anchor];
+  const density = propertyDensity(node);
+  if (id === hovered && density)
+    anchors.push({
+      ...anchor,
+      id: `${id}:properties`,
+      text: density,
+      lift: LABEL_HEIGHT_PX + 4,
+    });
+  if (id === selected && badge)
+    anchors.push({
+      ...anchor,
+      id: `${id}:usage`,
+      text: badge,
+      lift: (LABEL_HEIGHT_PX + 4) * (id === hovered ? 2 : 1),
+    });
+  return anchors;
+}
+
+function propertyDensity(node: {
+  ownPropertyCount?: number;
+  composedPropertyCount?: number;
+  groups?: unknown[];
+}): string | null {
+  if (node.ownPropertyCount === undefined) return null;
+  return `${node.ownPropertyCount} own + ${node.composedPropertyCount ?? 0} composed properties · ${node.groups?.length ?? 0} groups`;
+}
+
+function labelRank(
+  id: string,
+  selected: string | null,
+  hovered: string | null
+) {
+  if (id === selected) return 0;
+  return id === hovered ? 1 : 2;
 }

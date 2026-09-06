@@ -1,4 +1,4 @@
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { Html, OrbitControls } from "@react-three/drei";
 import {
   Canvas,
   type ThreeEvent,
@@ -11,6 +11,8 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { neighbourhoods } from "../model/neighbourhood";
+import { reachableWithin } from "../model/reach";
+import type { SchemaComparison } from "../model/snapshots";
 import type {
   SchemaEdge,
   SchemaGraph,
@@ -26,12 +28,15 @@ import {
   ISLAND_PAD,
   type Placement,
 } from "./layout/city";
+import { comparisonCity } from "./layout/comparison";
+import { expandFocusLayout } from "./layout/expanded-focus";
 import {
   type FocusBounds,
   focusAnchor,
   focusBounds,
   layoutFocus,
 } from "./layout/focus";
+import { describeRelationship, uniqueConnections } from "./relationship";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -44,16 +49,17 @@ import {
   type WindowCell,
 } from "./scene/buildings";
 import {
+  type BootPhase,
+  connectionBootAt,
+  visibleConnections,
+} from "./scene/connection-visibility";
+import {
   approach,
   BOOST,
   desiredVelocity,
   FLIGHT_CODES,
-  FLY_SPEED,
   groundAxes,
   panSpeed,
-  TURN_SPEED,
-  turnedOffset,
-  turnRates,
 } from "./scene/flight";
 import { isometricZoom } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
@@ -72,7 +78,7 @@ import {
   revealAt,
   transitionToward,
 } from "./scene/reveal";
-import { buildRoadGeometry, roadFan } from "./scene/roads";
+import { buildRoadGeometry } from "./scene/roads";
 import {
   districtStamp,
   FOLDER_TINT_HEIGHT,
@@ -90,17 +96,76 @@ function useLayerReveal(
   material: RefObject<THREE.Material | null>,
   object: RefObject<THREE.Object3D | null>,
   visible: boolean,
-  reducedMotion: boolean
+  reducedMotion: boolean,
+  geometry?: THREE.BufferGeometry | RefObject<THREE.BufferGeometry | null>,
+  segmentCount?: number
 ) {
   const opacity = useRef(0);
   useFrame((state, delta) => {
-    const target =
-      revealAt(state.clock.elapsedTime, reducedMotion).links * Number(visible);
+    const progress = revealAt(state.clock.elapsedTime, reducedMotion);
+    const boot = connectionBootAt(state.clock.elapsedTime, reducedMotion);
+    const target = progress.links * Number(visible);
     opacity.current = reducedMotion
       ? target
       : transitionToward(opacity.current, target, Math.min(delta, 0.1));
+    const drawGeometry =
+      geometry && "current" in geometry ? geometry.current : geometry;
+    if (drawGeometry) {
+      const drawProgress = boot.trace;
+      const drawCount = Math.floor((segmentCount ?? 0) * drawProgress);
+      const instanced = drawGeometry as THREE.BufferGeometry & {
+        instanceCount?: number;
+        isInstancedBufferGeometry?: boolean;
+      };
+      if (instanced.isInstancedBufferGeometry && segmentCount !== undefined) {
+        instanced.instanceCount = drawCount;
+      } else {
+        drawGeometry.setDrawRange(0, Math.floor(drawCount / 3) * 3);
+      }
+    }
     if (material.current) material.current.opacity = opacity.current;
     if (object.current) object.current.visible = opacity.current > 0.001;
+  });
+}
+
+function BootProgress({
+  reducedMotion,
+  onPhase,
+}: {
+  reducedMotion: boolean;
+  onPhase: (phase: BootPhase) => void;
+}) {
+  const last = useRef<BootPhase>(reducedMotion ? "done" : "trace");
+  useFrame((state) => {
+    const { phase } = connectionBootAt(state.clock.elapsedTime, reducedMotion);
+    if (phase !== last.current) {
+      last.current = phase;
+      onPhase(phase);
+    }
+  });
+  return null;
+}
+
+type ConnectionPick = {
+  edges: SchemaEdge[];
+  position: [number, number, number];
+};
+type PickConnection = (pick: ConnectionPick) => void;
+
+function pickConnectionRange(
+  event: ThreeEvent<MouseEvent>,
+  vertex: number,
+  ranges: readonly { start: number; count: number; edges: SchemaEdge[] }[],
+  onPick: PickConnection
+) {
+  const range = ranges.find(
+    (item) => vertex >= item.start && vertex < item.start + item.count
+  );
+  if (!range) return;
+  event.stopPropagation();
+  onPick({
+    edges: uniqueConnections(range.edges),
+    position: event.point.toArray(),
   });
 }
 
@@ -875,31 +940,16 @@ type Paint = { colour: THREE.Color; alpha: number };
  * strength inside a merged geometry. In focus mode nothing is faded, because every
  * edge drawn there already belongs to the focused node.
  */
-function fadeColors(
+function edgeColors(
   ranges: readonly { edges: SchemaEdge[]; start: number; count: number }[],
   vertices: number,
-  paint: (edges: SchemaEdge[]) => Paint,
-  background: string,
-  selected: string | null,
-  focus: string | null
+  paint: (edges: SchemaEdge[]) => Paint
 ): Float32Array {
-  const voidColour = new THREE.Color(background);
   const array = new Float32Array(vertices * 4);
   for (const range of ranges) {
-    const lit =
-      focus !== null ||
-      selected === null ||
-      range.edges.some(
-        (edge) => edge.from === selected || edge.to === selected
-      );
     const { colour, alpha } = paint(range.edges);
-    const shown = lit ? colour : colour.clone().lerp(voidColour, FADE_MIX);
-    for (let i = range.start; i < range.start + range.count; i++) {
-      array[i * 4] = shown.r;
-      array[i * 4 + 1] = shown.g;
-      array[i * 4 + 2] = shown.b;
-      array[i * 4 + 3] = alpha;
-    }
+    for (let i = range.start; i < range.start + range.count; i++)
+      array.set([colour.r, colour.g, colour.b, alpha], i * 4);
   }
   return array;
 }
@@ -915,47 +965,62 @@ function fadeColors(
 function Roads({
   placementsById,
   edges,
-  selected,
   focus,
   palette,
   reducedMotion,
   visible,
+  onPick,
 }: {
   placementsById: Map<string, Placement>;
   edges: SchemaEdge[];
-  selected: string | null;
   focus: string | null;
   palette: Palette;
   reducedMotion: boolean;
   visible: boolean;
+  onPick: PickConnection;
 }) {
   const material = useRef<THREE.MeshBasicMaterial>(null);
   const mesh = useRef<THREE.Mesh>(null);
-  useLayerReveal(material, mesh, visible, reducedMotion);
+  const geometry = useRef<THREE.BufferGeometry>(null);
   const { positions, ranges } = useMemo(
     () => buildRoadGeometry(placementsById, edges),
     [placementsById, edges]
   );
+  useLayerReveal(
+    material,
+    mesh,
+    visible,
+    reducedMotion,
+    geometry,
+    positions.length / 3
+  );
   const colors = useMemo(() => {
     const paint = {
-      colour: new THREE.Color(focus ? palette.phosphor : palette.dim),
+      colour: new THREE.Color(palette.phosphor),
       alpha: 1,
     };
-    return fadeColors(
-      ranges,
-      positions.length / 3,
-      () => paint,
-      palette.background,
-      selected,
-      focus
-    );
-  }, [positions, ranges, selected, focus, palette]);
+    return edgeColors(ranges, positions.length / 3, () => paint);
+  }, [positions, ranges, focus, palette]);
 
   if (positions.length === 0) return null;
 
   return (
-    <mesh frustumCulled={false} ref={mesh}>
-      <bufferGeometry>
+    // biome-ignore lint/a11y/noStaticElementInteractions: Three mesh; keyboard users inspect the same connections in the inspector.
+    <mesh
+      frustumCulled={false}
+      onClick={(event) => {
+        if (
+          !visible ||
+          (material.current?.opacity ?? 0) < 0.1 ||
+          event.faceIndex === null ||
+          event.faceIndex === undefined
+        )
+          return;
+        pickConnectionRange(event, event.faceIndex * 3, ranges, onPick);
+      }}
+      ref={mesh}
+    >
+      <bufferGeometry ref={geometry}>
         <bufferAttribute args={[positions, 3]} attach="attributes-position" />
         <bufferAttribute args={[colors, 4]} attach="attributes-color" />
       </bufferGeometry>
@@ -1018,11 +1083,9 @@ function Links({
   placementsById,
   colour,
   opacity,
-  palette,
-  selected,
-  focus,
   reducedMotion,
   visible,
+  onPick,
 }: {
   layer: Exclude<Layer, "structure">;
   edges: SchemaEdge[];
@@ -1030,11 +1093,9 @@ function Links({
   placementsById: Map<string, Placement>;
   colour: string;
   opacity: number;
-  palette: Palette;
-  selected: string | null;
-  focus: string | null;
   reducedMotion: boolean;
   visible: boolean;
+  onPick: PickConnection;
 }) {
   const { positions, ranges } = useMemo(
     () => buildLinkGeometry(layer, edges, anchors, placementsById),
@@ -1049,20 +1110,17 @@ function Links({
       colour: tint(colour, WHITE, INHERITS_MIX),
       alpha: 1,
     };
-    return fadeColors(
-      ranges,
-      positions.length / 3,
-      (range) => (range[0]?.kind === "inherits" ? inheritsPaint : layerPaint),
-      palette.background,
-      selected,
-      focus
+    return edgeColors(ranges, positions.length / 3, (range) =>
+      range[0]?.kind === "inherits" ? inheritsPaint : layerPaint
     );
-  }, [positions, ranges, colour, opacity, palette, selected, focus]);
+  }, [positions, ranges, colour, opacity]);
 
   return (
     <LinkStrokes
       colors={colors}
+      onPick={onPick}
       positions={positions}
+      ranges={ranges}
       reducedMotion={reducedMotion}
       visible={visible}
     />
@@ -1072,14 +1130,18 @@ function Links({
 /** Own the GPU resources independently of graph selection and layer styling. */
 function LinkStrokes({
   colors,
+  ranges,
   positions,
   reducedMotion,
   visible,
+  onPick,
 }: {
   colors: Float32Array;
+  ranges: { edges: SchemaEdge[]; start: number; count: number }[];
   positions: Float32Array;
   reducedMotion: boolean;
   visible: boolean;
+  onPick: PickConnection;
 }) {
   const geometry = useMemo(() => {
     const next = new LineSegmentsGeometry();
@@ -1093,7 +1155,14 @@ function LinkStrokes({
   );
   const materialRef = useRef<LineMaterial>(material);
   const linesRef = useRef<LineSegments2>(null);
-  useLayerReveal(materialRef, linesRef, visible, reducedMotion);
+  useLayerReveal(
+    materialRef,
+    linesRef,
+    visible,
+    reducedMotion,
+    geometry,
+    positions.length / 6
+  );
   useEffect(() => {
     const rgb: number[] = [];
     const alpha: number[] = [];
@@ -1120,11 +1189,24 @@ function LinkStrokes({
 
   if (positions.length === 0) return null;
 
-  return <primitive object={lines} ref={linesRef} />;
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Three lines; keyboard users inspect the same connections in the inspector.
+    <primitive
+      object={lines}
+      onClick={(event: ThreeEvent<MouseEvent>) => {
+        if (
+          !visible ||
+          material.opacity < 0.1 ||
+          event.faceIndex === null ||
+          event.faceIndex === undefined
+        )
+          return;
+        pickConnectionRange(event, event.faceIndex * 2, ranges, onPick);
+      }}
+      ref={linesRef}
+    />
+  );
 }
-
-const touches = (edge: SchemaEdge, id: string) =>
-  edge.from === id || edge.to === id;
 
 /**
  * The three layers drawn as lines: the theme token each is coloured with, and how
@@ -1136,7 +1218,7 @@ const touches = (edge: SchemaEdge, id: string) =>
  */
 const LINK_LAYERS = [
   { layer: "compositions", token: "azure", opacity: 0.85 },
-  { layer: "blocks", token: "amber", opacity: 0.3 },
+  { layer: "blocks", token: "amber", opacity: 0.85 },
   { layer: "references", token: "violet", opacity: 0.85 },
 ] as const satisfies readonly {
   layer: Exclude<Layer, "structure">;
@@ -1850,9 +1932,6 @@ function Stage({
   );
 }
 
-/** A (1,1,1) view direction is a true isometric angle: 45° azimuth, ~35.26° elevation. */
-const ISO_POLAR_ANGLE = Math.acos(1 / Math.sqrt(3));
-
 /**
  * The camera's framing distance, in world units, and the height of what it sees.
  * The grid reuses it too, so the ground always reaches past whatever the camera
@@ -1904,23 +1983,62 @@ function viewOf(
   size: { width: number; height: number },
   shift = 0,
   fill = 0.88,
-  buildingHeight = 4
+  buildingHeight = 4,
+  topDown = false
 ): View {
   const span = citySpan(bounds);
   // Fit the projected ground rectangle rather than its longest world axis.
-  const zoom = isometricZoom(bounds, size, buildingHeight, shift * 2, fill);
-  const direction = new THREE.Vector3(1, 1, 1).normalize();
+  const availableWidth = Math.max(1, size.width - shift * 2);
+  const frame = topDown
+    ? {
+        zoom:
+          Math.min(
+            availableWidth / Math.max(1, bounds.width),
+            size.height / Math.max(1, bounds.depth)
+          ) * fill,
+        direction: new THREE.Vector3(0, 1, 0),
+        right: new THREE.Vector3(1, 0, 0),
+        height: 0,
+      }
+    : {
+        zoom: isometricZoom(bounds, size, buildingHeight, shift * 2, fill),
+        direction: new THREE.Vector3(1, 1, 1).normalize(),
+        right: SCREEN_RIGHT,
+        height: buildingHeight / 2,
+      };
   const target = new THREE.Vector3(
     bounds.centre.x,
-    buildingHeight / 2,
+    frame.height,
     bounds.centre.z
-  ).addScaledVector(SCREEN_RIGHT, shift / zoom);
+  ).addScaledVector(frame.right, shift / frame.zoom);
   return {
-    position: target.clone().addScaledVector(direction, span),
+    position: target.clone().addScaledVector(frame.direction, span),
     target,
-    zoom,
+    zoom: frame.zoom,
     span,
   };
+}
+
+function applyCameraView(
+  camera: THREE.OrthographicCamera,
+  controls: { target: THREE.Vector3; update: () => void } | null,
+  view: View,
+  topDown: boolean
+) {
+  camera.position.copy(view.position);
+  camera.zoom = view.zoom;
+  camera.up.copy(cameraUp(topDown));
+  camera.near = -view.span * 2;
+  camera.far = view.span * 3;
+  camera.updateProjectionMatrix();
+  if (controls) {
+    controls.target.copy(view.target);
+    controls.update();
+  } else camera.lookAt(view.target);
+}
+
+function cameraUp(topDown: boolean) {
+  return topDown ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
 }
 
 /**
@@ -1936,6 +2054,7 @@ function CameraRig({
   reframe,
   reducedMotion,
   overview,
+  topDown,
 }: {
   bounds: CityBounds;
   buildingHeight: number;
@@ -1945,6 +2064,7 @@ function CameraRig({
   reframe: number;
   reducedMotion: boolean;
   overview: boolean;
+  topDown: boolean;
 }) {
   const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
   const controls = useThree((state) => state.controls) as {
@@ -1959,11 +2079,15 @@ function CameraRig({
     started: number;
     ms: number;
     ease: (t: number) => number;
+    fromUp: THREE.Vector3;
+    toUp: THREE.Vector3;
   } | null>(null);
   const framed = useRef<{
     bounds: CityBounds;
     controls: unknown;
     reframe: number;
+    topDown: boolean;
+    fitZoom: number;
   } | null>(null);
 
   // Half the panel, because the middle of the uncovered canvas is that far left of
@@ -1975,9 +2099,10 @@ function CameraRig({
         size,
         inspectorWidth / 2,
         overview ? 0.9 : 0.84,
-        buildingHeight
+        buildingHeight,
+        topDown
       ),
-    [bounds, buildingHeight, inspectorWidth, overview, size]
+    [bounds, buildingHeight, inspectorWidth, overview, size, topDown]
   );
 
   useEffect(() => {
@@ -1997,31 +2122,41 @@ function CameraRig({
   }, [gl]);
 
   useEffect(() => {
-    const apply = (to: View) => {
-      camera.position.copy(to.position);
-      camera.zoom = to.zoom;
-      // The camera sits `span` units from its target, so a fixed clip range (the
-      // spike's original 500) clips the whole city once a real schema's bounds
-      // grow past that. Scale it with the city instead.
-      camera.near = -to.span * 2;
-      camera.far = to.span * 3;
-      camera.updateProjectionMatrix();
-      if (controls) {
-        controls.target.copy(to.target);
-        controls.update();
-      } else camera.lookAt(to.target);
-    };
-
     // This effect runs again every time the viewport is measured, which a resize
     // does a dozen times over, and hover, selection and lens changes all re-render
     // the scene around it. Framing again on any of those puts the camera back where
     // it started, so only a new set of bounds is allowed to move it.
     const asked = framed.current !== null && framed.current.reframe !== reframe;
-    const action = framingAction(framed.current, { bounds, controls, reframe });
-    framed.current = { bounds, controls, reframe };
+    const modeChanged =
+      framed.current !== null && framed.current.topDown !== topDown;
+    const action = modeChanged
+      ? "fly"
+      : framingAction(framed.current, { bounds, controls, reframe });
+    const currentTarget = controls ? controls.target : view.target;
+    const distance = camera.position.distanceTo(currentTarget);
+    const destination =
+      modeChanged && !flight.current
+        ? {
+            position: currentTarget
+              .clone()
+              .addScaledVector(
+                topDown
+                  ? new THREE.Vector3(0, 1, 0)
+                  : new THREE.Vector3(1, 1, 1).normalize(),
+                distance
+              ),
+            target: currentTarget.clone(),
+            zoom:
+              (camera.zoom * view.zoom) /
+              (framed.current?.fitZoom ?? view.zoom),
+            span: distance,
+          }
+        : view;
+    framed.current = { bounds, controls, reframe, topDown, fitZoom: view.zoom };
     if (action === "none") return;
     if (action === "snap" || reducedMotion) {
-      apply(view);
+      flight.current = null;
+      applyCameraView(camera, controls, destination, topDown);
       return;
     }
     flight.current = {
@@ -2031,7 +2166,9 @@ function CameraRig({
         zoom: camera.zoom,
         span: -camera.near / 2,
       },
-      to: view,
+      to: destination,
+      fromUp: camera.up.clone(),
+      toUp: cameraUp(topDown),
       started: performance.now(),
       ms: asked ? REFRAME_MS : FLIGHT_MS,
       ease: asked ? smootherstep : easeInOutCubic,
@@ -2047,6 +2184,7 @@ function CameraRig({
     );
     const span = moving.from.span + (moving.to.span - moving.from.span) * t;
 
+    camera.up.lerpVectors(moving.fromUp, moving.toUp, t).normalize();
     camera.position.lerpVectors(moving.from.position, moving.to.position, t);
     camera.zoom = moving.from.zoom + (moving.to.zoom - moving.from.zoom) * t;
     camera.near = -span * 2;
@@ -2063,38 +2201,27 @@ function CameraRig({
 }
 
 /**
- * Orbit at the fixed isometric angle, inside the zoom range the stage can cover, or
- * free orbit in Explore. The pan is in the ground plane rather than in the screen
- * plane, which is what a city wants either way.
- *
- * Explore keeps one clamp, the ground: the elevation stops at the horizon rather
- * than carrying on under the slab, and the distance stops where the grid's fade
- * ends, which is the same edge the isometric zoom stops at.
+ * Orbit at the fixed isometric angle or directly above the board. The pan stays in
+ * the ground plane in either view, while the camera rig owns the smooth transition.
  */
-function Controls({ span, explore }: { span: number; explore: boolean }) {
+function Controls({ span }: { span: number }) {
   const size = useThree((state) => state.size);
   const { minZoom, maxZoom } = zoomRange(span, size);
 
-  if (explore) {
-    return (
-      <OrbitControls
-        makeDefault
-        maxDistance={stageMetrics(span).fadeFar}
-        maxPolarAngle={Math.PI / 2}
-        minDistance={1}
-        screenSpacePanning={false}
-      />
-    );
-  }
-
   return (
     <OrbitControls
+      enableRotate={false}
       makeDefault
-      maxPolarAngle={ISO_POLAR_ANGLE}
+      maxPolarAngle={Math.PI}
       maxZoom={maxZoom}
-      minPolarAngle={ISO_POLAR_ANGLE}
+      minPolarAngle={0}
       minZoom={minZoom}
-      screenSpacePanning={false}
+      mouseButtons={{
+        LEFT: THREE.MOUSE.PAN,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN,
+      }}
+      screenSpacePanning
     />
   );
 }
@@ -2125,15 +2252,14 @@ function flownBy(event: KeyboardEvent): boolean {
 const FLIGHT_STEP = new THREE.Vector3();
 
 /**
- * Keyboard flight, the rig that owns the keys. Held keys become a velocity that eases
+ * Keyboard pan, the rig that owns the keys. Held keys become a velocity that eases
  * in and out, which moves the camera and its orbit target together, so the controls
  * pick the pose back up unchanged the moment a hand goes back to the mouse.
  *
- * The isometric camera pans the ground along the screen, at a speed derived from its
- * zoom so a key covers the same screen distance however far in it is. Explore flies
- * along its heading, the arrows turn it and R and F change its height.
+ * The camera pans the ground along the screen, at a speed derived from its zoom so a
+ * key covers the same screen distance however far in it is.
  */
-function Flight({ explore }: { explore: boolean }) {
+function Flight() {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as {
     target: THREE.Vector3;
@@ -2143,7 +2269,6 @@ function Flight({ explore }: { explore: boolean }) {
   const held = useMemo(() => new Set<string>(), []);
   const boosting = useRef(false);
   const velocity = useRef(new THREE.Vector3());
-  const turning = useRef(new THREE.Vector2());
 
   useEffect(() => {
     const release = () => {
@@ -2188,20 +2313,19 @@ function Flight({ explore }: { explore: boolean }) {
     const step = Math.min(delta, 0.05);
     const boost = boosting.current ? BOOST : 1;
     const distance = camera.position.distanceTo(controls.target);
-    const speed = explore
-      ? FLY_SPEED * boost
-      : panSpeed(
-          pixelsPerUnit(
-            camera as THREE.OrthographicCamera & { fov?: number },
-            size.height,
-            distance
-          )
-        ) * boost;
+    const speed =
+      panSpeed(
+        pixelsPerUnit(
+          camera as THREE.OrthographicCamera & { fov?: number },
+          size.height,
+          distance
+        )
+      ) * boost;
     const wanted = desiredVelocity(
       held,
       groundAxes(camera.position, controls.target),
       speed,
-      explore ? "fly" : "pan"
+      "pan"
     );
     const moving = velocity.current.set(
       approach(velocity.current.x, wanted.x, step),
@@ -2212,30 +2336,7 @@ function Flight({ explore }: { explore: boolean }) {
     // the controls from being updated on every idle frame for ever.
     if (moving.lengthSq() < 1e-4) moving.set(0, 0, 0);
 
-    const rates = explore ? turnRates(held) : { yaw: 0, pitch: 0 };
-    const turn = turning.current.set(
-      approach(turning.current.x, rates.yaw * TURN_SPEED * boost, step),
-      approach(turning.current.y, rates.pitch * TURN_SPEED * boost, step)
-    );
-    if (turn.lengthSq() < 1e-6) turn.set(0, 0);
-    if (moving.lengthSq() === 0 && turn.lengthSq() === 0) return;
-
-    if (turn.lengthSq() > 0) {
-      const offset = turnedOffset(
-        FLIGHT_STEP.subVectors(camera.position, controls.target),
-        turn.x * step,
-        turn.y * step,
-        // ponytail: the same clamp `Controls` gives Explore, written twice. Reading
-        // it back off the live controls means typing them wider than the two fields
-        // this rig uses them through.
-        Math.PI / 2
-      );
-      controls.target.set(
-        camera.position.x - offset.x,
-        camera.position.y - offset.y,
-        camera.position.z - offset.z
-      );
-    }
+    if (moving.lengthSq() === 0) return;
     if (moving.lengthSq() > 0) {
       FLIGHT_STEP.copy(moving).multiplyScalar(step);
       camera.position.add(FLIGHT_STEP);
@@ -2247,130 +2348,51 @@ function Flight({ explore }: { explore: boolean }) {
   return null;
 }
 
-/** Where the camera stands and what it is looking at, as of the last frame. */
-type Pose = {
-  position: THREE.Vector3;
-  target: THREE.Vector3;
-  worldHeight: number;
-};
-
-/**
- * Remembers the isometric camera's pose every frame, so the Explore camera can be
- * stood up exactly where it was looking from. `worldHeight` is how much world the
- * viewport covers at the target, which is what the two cameras have to agree on for
- * the switch not to jump. It runs only while the isometric camera is the one on, and
- * a session that opens straight into Explore leaves it null.
- */
-function PoseTracker({ pose }: { pose: React.RefObject<Pose | null> }) {
-  const camera = useThree((state) => state.camera);
-  const controls = useThree((state) => state.controls) as {
-    target: THREE.Vector3;
-  } | null;
-  const size = useThree((state) => state.size);
-
-  useFrame(() => {
-    const at = pose.current ?? {
-      position: new THREE.Vector3(),
-      target: new THREE.Vector3(),
-      worldHeight: 1,
-    };
-    at.position.copy(camera.position);
-    if (controls) at.target.copy(controls.target);
-    const perUnit = pixelsPerUnit(
-      camera as THREE.OrthographicCamera & { fov?: number },
-      size.height,
-      camera.position.distanceTo(at.target)
-    );
-    at.worldHeight = size.height / perUnit;
-    pose.current = at;
-  });
-
-  return null;
-}
-
-/**
- * The Explore camera's field of view. At 45 the near corners of the city stretched:
- * a building at the edge of the frame leaned away from one at the centre far enough
- * to read as a different shape. 40 is a longer lens, so the stand-off grows and the
- * perspective flattens, and the city still fills the same screen height because that
- * distance is worked out from this angle.
- */
-const EXPLORE_FOV = 40;
-
-/**
- * The Explore camera. It starts at the isometric camera's own direction and target,
- * far enough back that the viewport covers the same world height, so turning Explore
- * on changes the projection and nothing else.
- */
-function ExploreCamera({
-  bounds,
-  pose,
-  span,
+function ComparisonMarks({
+  comparison,
+  placements,
+  palette,
 }: {
-  bounds: CityBounds;
-  pose: React.RefObject<Pose | null>;
-  span: number;
+  comparison?: SchemaComparison | null;
+  placements: Placement[];
+  palette: Palette;
 }) {
-  const camera = useThree((state) => state.camera);
-  const size = useThree((state) => state.size);
-  const invalidate = useThree((state) => state.invalidate);
-  const controls = useThree((state) => state.controls) as {
-    target: THREE.Vector3;
-    update: () => void;
-  } | null;
-  const placed = useRef(false);
-
-  useEffect(() => {
-    const perspective = camera as THREE.PerspectiveCamera;
-    // drei swaps the default camera one render after this component mounts, so the
-    // first run of this effect is still the orthographic one. A viewport of nothing
-    // is the canvas before it has been measured, which a link straight into Explore
-    // arrives at: framing against it puts the camera a NaN away from the city.
-    if (
-      !perspective.isPerspectiveCamera ||
-      size.width === 0 ||
-      size.height === 0
-    )
-      return;
-    // A link straight into Explore has no isometric camera to copy, so the framing
-    // that one would have taken is worked out here instead.
-    const framing = viewOf(bounds, size);
-    const from = pose.current ?? {
-      position: framing.position,
-      target: framing.target,
-      worldHeight: size.height / framing.zoom,
-    };
-    if (!placed.current) {
-      const distance =
-        from.worldHeight / (2 * Math.tan((EXPLORE_FOV * Math.PI) / 360));
-      const direction = from.position.clone().sub(from.target).normalize();
-      perspective.position
-        .copy(from.target)
-        .addScaledVector(direction, distance);
-      // The controls are what aim the camera, on their first update, and they are
-      // rebuilt for the new camera a render after this one. Until then the camera
-      // keeps the rotation it was made with and looks down -z from above the city,
-      // at nothing, which is the black frame the switch used to open on.
-      perspective.lookAt(from.target);
-      perspective.updateProjectionMatrix();
-      placed.current = true;
-      invalidate();
-    }
-    if (!controls) return;
-    // New controls come with the target at the origin, so it is copied over every
-    // time they are rebuilt, not only on the first one.
-    controls.target.copy(from.target);
-    controls.update();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, controls, invalidate, pose, size]);
-
+  const marks = useMemo(
+    () =>
+      new Map(
+        (comparison ? [...comparison.added, ...comparison.changed] : []).map(
+          (change) => [change.currentId, change.status]
+        )
+      ),
+    [comparison]
+  );
   return (
-    <PerspectiveCamera
-      far={span * 40}
-      fov={EXPLORE_FOV}
-      makeDefault
-      near={0.5}
-    />
+    <group>
+      {placements
+        .filter((at) => marks.has(at.id) && (at.flatten ?? 0) < 0.5)
+        .map((at) => (
+          <mesh
+            key={at.id}
+            position={[at.position.x, (at.y ?? 0) + 0.08, at.position.z]}
+            rotation={[-Math.PI / 2, 0, Math.PI / 4]}
+          >
+            <ringGeometry
+              args={[
+                at.footprint / Math.SQRT2 + 0.45,
+                at.footprint / Math.SQRT2 + 0.7,
+                4,
+              ]}
+            />
+            <meshBasicMaterial
+              color={
+                marks.get(at.id) === "added" ? palette.azure : palette.amber
+              }
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        ))}
+    </group>
   );
 }
 
@@ -2381,6 +2403,9 @@ const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
 export default function Scene({
   graph,
+  baseline,
+  comparison,
+  focusDepth = 1,
   usage,
   scale,
   selected,
@@ -2394,6 +2419,9 @@ export default function Scene({
   onFocus,
 }: {
   graph: SchemaGraph;
+  baseline?: SchemaGraph | null;
+  comparison?: SchemaComparison | null;
+  focusDepth?: number;
   usage?: UsageReport;
   /** Umbraco icon name to SVG, for the roofs. The harness usually passes none. */
   icons?: Record<string, string>;
@@ -2402,7 +2430,7 @@ export default function Scene({
   selected: string | null;
   focus: string | null;
   layers: readonly Layer[];
-  /** The Explore toggle: a free perspective camera instead of the isometric one. */
+  /** True shows the same city from directly above. */
   explore?: boolean;
   /**
    * CSS pixels of the canvas the inspector covers on the right, 0 when it is closed.
@@ -2422,12 +2450,23 @@ export default function Scene({
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const pose = useRef<Pose | null>(null);
   const reducedMotion = useMemo(
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     []
   );
-  const city = useMemo(() => cityDistricts(graph), [graph]);
+  const [bootPhase, setBootPhase] = useState<BootPhase>(
+    reducedMotion ? "done" : "trace"
+  );
+  const [connectionPick, setConnectionPick] = useState<ConnectionPick | null>(
+    null
+  );
+  const city = useMemo(
+    () =>
+      baseline && comparison
+        ? comparisonCity(baseline, graph, comparison.matches)
+        : cityDistricts(graph),
+    [baseline, comparison, graph]
+  );
   // The ground a nested folder's members cover, which tints that patch of its island.
   // The city layout, not what is on screen, so the islands hold still through a focus.
   const folderTints = useMemo(() => {
@@ -2445,13 +2484,21 @@ export default function Scene({
   }, [city]);
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
   const focusNeighbours = useMemo(
-    () => (focus ? neighboursOf(graph, focus) : null),
-    [graph, focus]
+    () => (focus ? reachableWithin(graph, focus, focusDepth) : null),
+    [graph, focus, focusDepth]
   );
   const focusLayout = useMemo(() => {
     const neighbourhood = focus ? neighbourhoodById.get(focus) : undefined;
     if (!(focus && neighbourhood)) return null;
-    const laid = layoutFocus(graph, neighbourhood, focus, city.placements);
+    let laid = layoutFocus(graph, neighbourhood, focus, city.placements);
+    const directIds = reachableWithin(graph, focus, 1);
+    for (let depth = 2; depth <= focusDepth; depth++)
+      laid = expandFocusLayout(
+        city.placements,
+        laid,
+        directIds,
+        reachableWithin(graph, focus, depth)
+      );
     // The layout keeps the neighbourhood around the origin, so the anchor is what
     // stands it back on the focused node's own ground: that node holds still and
     // everything it is joined to gathers around it.
@@ -2482,7 +2529,7 @@ export default function Scene({
       (placement) => placement.id === focus
     )?.districtKind;
     return { anchor, kind: kind ?? "mixed", moved, placements };
-  }, [focus, focusNeighbours, graph, neighbourhoodById, city]);
+  }, [focus, focusDepth, focusNeighbours, graph, neighbourhoodById, city]);
   const target = focusLayout?.placements ?? city.placements;
   // The ground the neighbourhood covers, which the island is drawn on and the camera
   // frames. The moved placements only: the flattened city around them is not part of
@@ -2545,7 +2592,19 @@ export default function Scene({
   }, [target, reducedMotion]);
 
   // Every island, with the ground each one carries around its buildings.
-  const ground = useMemo(() => cityBounds(city.placements, ISLAND_PAD), [city]);
+  const ground = useMemo(() => {
+    if (city.districts.length === 0)
+      return cityBounds(city.placements, ISLAND_PAD);
+    const minX = Math.min(...city.districts.map((d) => d.minX)) - ISLAND_PAD;
+    const maxX = Math.max(...city.districts.map((d) => d.maxX)) + ISLAND_PAD;
+    const minZ = Math.min(...city.districts.map((d) => d.minZ)) - ISLAND_PAD;
+    const maxZ = Math.max(...city.districts.map((d) => d.maxZ)) + ISLAND_PAD;
+    return {
+      width: maxX - minX,
+      depth: maxZ - minZ,
+      centre: { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 },
+    };
+  }, [city]);
   // The stage is scaled by the city's own span, whatever the focus layout does, so
   // entering focus never rescales the world around it.
   const span = citySpan(ground);
@@ -2577,6 +2636,8 @@ export default function Scene({
   // In focus mode the lit set is the focused node's, so clicking through the
   // neighbourhood does not dim the layout you are standing in.
   const neighbours = focusNeighbours ?? selectionNeighbours;
+  const connectionActivity =
+    focus !== null || selected !== null || hovered !== null;
   const { cellsByKind, windows, heights } = useMemo(() => {
     const built = buildFloorCells(nodesById, placements);
     return {
@@ -2596,32 +2657,17 @@ export default function Scene({
   // there whatever the toolbar says, because a hub without its roads is a list.
   const drawnEdges = useMemo(
     () =>
-      focus
-        ? (graph.edges ?? []).filter((edge) => touches(edge, focus))
-        : (graph.edges ?? []),
-    [graph.edges, focus]
-  );
-  const active = useMemo(
-    () => new Set<Layer>(focus ? [...layers, "structure"] : layers),
-    [layers, focus]
-  );
-  // Twenty roads landing on one roof is the wiring mess the overview is meant to
-  // avoid, so a building with more allowed parents than the fan limit keeps the
-  // nearest road and a count. Pointing at it or picking it draws the rest, and
-  // focus mode is already about one node, so nothing is cut there.
-  const fan = useMemo(
-    () =>
-      roadFan(
-        placementsById,
-        drawnEdges,
-        focus
-          ? null
-          : new Set(
-              [hovered, selected].filter((id): id is string => id !== null)
-            )
+      visibleConnections(
+        graph.edges ?? [],
+        selected,
+        hovered,
+        focusNeighbours,
+        bootPhase
       ),
-    [placementsById, drawnEdges, focus, hovered, selected]
+    [graph.edges, selected, hovered, focusNeighbours, bootPhase]
   );
+  const active = useMemo(() => new Set<Layer>(layers), [layers]);
+  const pickConnection: PickConnection = (pick) => setConnectionPick(pick);
   // A link leaves from the roof of the building it belongs to, so it stays visible
   // over a tall neighbour and moves with the focus tween.
   const anchors = useMemo(() => {
@@ -2663,9 +2709,13 @@ export default function Scene({
         <Canvas
           // A click on paving or on the void is a click on nothing, which is how the
           // city goes back the way it was without hunting for a close button.
-          onPointerMissed={() => onSelect(null)}
+          onPointerMissed={() => {
+            setConnectionPick(null);
+            onSelect(null);
+          }}
           orthographic
         >
+          <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
           <ambientLight intensity={1.2} />
           <directionalLight intensity={2.4} position={[8, 16, 6]} />
           <Stage
@@ -2714,30 +2764,80 @@ export default function Scene({
             />
           ) : null}
           <Roads
-            edges={fan.edges}
+            edges={drawnEdges}
             focus={focus}
+            onPick={pickConnection}
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}
-            selected={selected}
-            visible={active.has("structure")}
+            visible={
+              active.has("structure") &&
+              (connectionActivity || bootPhase === "trace")
+            }
           />
           {LINK_LAYERS.map(({ layer, token, opacity }) => (
             <Links
               anchors={anchors}
               colour={palette[token]}
               edges={drawnEdges}
-              focus={focus}
               key={layer}
               layer={layer}
+              onPick={pickConnection}
               opacity={opacity}
-              palette={palette}
               placementsById={placementsById}
               reducedMotion={reducedMotion}
-              selected={selected}
-              visible={active.has(layer)}
+              visible={
+                active.has(layer) &&
+                (connectionActivity || bootPhase === "trace")
+              }
             />
           ))}
+          {connectionPick && connectionActivity ? (
+            <Html
+              center
+              position={connectionPick.position}
+              zIndexRange={[20, 10]}
+            >
+              <div
+                className="w-72 border border-line bg-panel p-3 text-xs text-phosphor shadow-panel"
+                role="status"
+              >
+                <button
+                  aria-label="Close connection details"
+                  className="float-right px-1 text-phosphor-bright"
+                  onClick={() => setConnectionPick(null)}
+                  type="button"
+                >
+                  ×
+                </button>
+                {connectionPick.edges.slice(0, 5).map((edge) => (
+                  <p
+                    className="mb-1"
+                    key={`${edge.kind}|${edge.from}|${edge.to}|${edge.propertyAlias ?? ""}|${edge.role ?? ""}`}
+                  >
+                    {
+                      describeRelationship(
+                        edge,
+                        nodesById,
+                        selected ?? edge.from
+                      ).detail
+                    }
+                  </p>
+                ))}
+                {connectionPick.edges.length > 5 ? (
+                  <p>
+                    {connectionPick.edges.length - 5} more shared relationships
+                    · see inspector
+                  </p>
+                ) : null}
+              </div>
+            </Html>
+          ) : null}
+          <ComparisonMarks
+            comparison={comparison}
+            palette={palette}
+            placements={placements}
+          />
           <Labels
             badge={selected ? usageBadge(usage, selected) : null}
             focusNeighbours={focusNeighbours}
@@ -2749,23 +2849,17 @@ export default function Scene({
             reducedMotion={reducedMotion}
             selected={selected}
           />
-          {explore ? (
-            <ExploreCamera bounds={bounds} pose={pose} span={span} />
-          ) : (
-            <>
-              <CameraRig
-                bounds={bounds}
-                buildingHeight={Math.max(1, ...heights.values())}
-                inspectorWidth={inspectorWidth}
-                overview={focus === null}
-                reducedMotion={reducedMotion}
-                reframe={reframe}
-              />
-              <PoseTracker pose={pose} />
-            </>
-          )}
-          <Controls explore={explore === true} span={span} />
-          <Flight explore={explore === true} />
+          <CameraRig
+            bounds={bounds}
+            buildingHeight={Math.max(1, ...heights.values())}
+            inspectorWidth={inspectorWidth}
+            overview={focus === null}
+            reducedMotion={reducedMotion}
+            reframe={reframe}
+            topDown={explore === true}
+          />
+          <Controls span={span} />
+          <Flight />
         </Canvas>
       ) : null}
     </div>

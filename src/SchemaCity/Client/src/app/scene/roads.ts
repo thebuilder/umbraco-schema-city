@@ -22,6 +22,9 @@ export type RoadSegment = {
   width?: number;
 };
 
+const edgeKey = (edge: SchemaEdge) =>
+  `${edge.kind}|${edge.from}|${edge.to}|${edge.propertyAlias ?? ""}|${edge.role ?? ""}`;
+
 /**
  * The rows of buildings and the streets between them, read off the placements.
  *
@@ -75,7 +78,7 @@ export function buildRoadGeometry(
   const positions: number[] = [];
   const ranges: RoadRange[] = [];
 
-  for (const segment of planRoads(placementsById, edges)) {
+  for (const segment of separateCrossings(planRoads(placementsById, edges))) {
     const start = positions.length / 3;
     pushSegment(positions, segment);
     ranges.push({
@@ -96,6 +99,89 @@ export function buildRoadGeometry(
   }
 
   return { positions: new Float32Array(positions), ranges };
+}
+
+/**
+ * Adds a small visual break to a horizontal ribbon when it crosses an unrelated
+ * vertical ribbon. This is deliberately render-only: planRoads keeps continuous
+ * provenance for hit testing and route validation, while the scene can still
+ * fade ranges independently after this geometry is built.
+ */
+export function separateCrossings(segments: RoadSegment[]): RoadSegment[] {
+  const vertical = segments.filter(
+    (segment) => Math.abs(segment.x1 - segment.x0) < EPS
+  );
+  const result: RoadSegment[] = [];
+  for (const segment of segments) {
+    if (Math.abs(segment.z1 - segment.z0) >= EPS) {
+      result.push(segment);
+      continue;
+    }
+    result.push(...splitAtCuts(segment, crossingCuts(segment, vertical)));
+  }
+  return result;
+}
+
+function crossingCuts(
+  segment: RoadSegment,
+  vertical: RoadSegment[]
+): [number, number][] {
+  const low = Math.min(segment.x0, segment.x1);
+  const high = Math.max(segment.x0, segment.x1);
+  const halfGap = Math.max((segment.width ?? ROAD_WIDTH) * 0.75, 0.12);
+  const cuts = vertical.flatMap((crossing) => {
+    if (crossing === segment || sharesConnection(segment, crossing)) return [];
+    const x = crossing.x0;
+    const zLow = Math.min(crossing.z0, crossing.z1);
+    const zHigh = Math.max(crossing.z0, crossing.z1);
+    if (x <= low + halfGap || x >= high - halfGap) return [];
+    if (segment.z0 <= zLow || segment.z0 >= zHigh) return [];
+    return [[x - halfGap, x + halfGap] as [number, number]];
+  });
+  return cuts
+    .sort((a, b) => a[0] - b[0])
+    .reduce<[number, number][]>((merged, cut) => {
+      const previous = merged[merged.length - 1];
+      if (previous && cut[0] <= previous[1] + EPS)
+        previous[1] = Math.max(previous[1], cut[1]);
+      else merged.push([...cut]);
+      return merged;
+    }, []);
+}
+
+function splitAtCuts(segment: RoadSegment, cuts: [number, number][]) {
+  if (cuts.length === 0) return [segment];
+  const low = Math.min(segment.x0, segment.x1);
+  const high = Math.max(segment.x0, segment.x1);
+  const ends = [low, ...cuts.flat(), high];
+  const forward = segment.x1 >= segment.x0;
+  const pieces: RoadSegment[] = [];
+  for (let i = 0; i < ends.length - 1; i += 2) {
+    const a = ends[i] as number;
+    const b = ends[i + 1] as number;
+    if (b - a < EPS) continue;
+    const x0 = forward ? a : b;
+    const x1 = forward ? b : a;
+    pieces.push({
+      ...segment,
+      x0,
+      x1,
+      into:
+        segment.into && Math.abs(x1 - segment.x1) < EPS ? segment.into : null,
+    });
+  }
+  return pieces;
+}
+
+function sharesConnection(horizontal: RoadSegment, vertical: RoadSegment) {
+  const horizontalKeys = new Set(horizontal.edges.map(edgeKey));
+  return vertical.edges.some(
+    (edge) =>
+      horizontalKeys.has(edgeKey(edge)) ||
+      horizontal.edges.some(
+        (other) => other.from === edge.from || other.to === edge.to
+      )
+  );
 }
 
 /** Every road as axis-aligned runs, with runs that lie on top of each other merged. */

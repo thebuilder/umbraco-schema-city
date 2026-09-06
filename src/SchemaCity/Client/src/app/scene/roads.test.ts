@@ -8,6 +8,7 @@ import {
   planRoads,
   type RoadSegment,
   roadFan,
+  separateCrossings,
 } from "./roads";
 
 import { FOLDER_TINT_HEIGHT } from "./stage";
@@ -510,6 +511,59 @@ describe("buildRoadGeometry", () => {
       next += range.count;
     }
     expect(next).toBe(positions.length / 3);
+  });
+});
+
+describe("render crossing breaks", () => {
+  const horizontal = (edges: SchemaEdge[]): RoadSegment => ({
+    x0: -5,
+    z0: 0,
+    x1: 5,
+    z1: 0,
+    edges,
+    into: null,
+    width: 0.3,
+  });
+  const vertical = (edges: SchemaEdge[]): RoadSegment => ({
+    x0: 0,
+    z0: -5,
+    x1: 0,
+    z1: 5,
+    edges,
+    into: null,
+    width: 0.3,
+  });
+
+  it("breaks an unrelated perpendicular ribbon while retaining both sides", () => {
+    const result = separateCrossings([
+      horizontal([road("parent-a", "child-a")]),
+      vertical([road("parent-b", "child-b")]),
+    ]);
+    expect(result).toHaveLength(3);
+    expect(
+      result.filter((segment) => Math.abs(segment.z1 - segment.z0) < 1e-6)
+    ).toHaveLength(2);
+    expect(
+      result.filter((segment) => Math.abs(segment.x1 - segment.x0) < 1e-6)
+    ).toHaveLength(1);
+    const horizontalParts = result.filter(
+      (segment) => Math.abs(segment.z1 - segment.z0) < 1e-6
+    );
+    expect((horizontalParts[0] as RoadSegment).x1).toBeLessThan(-0.1);
+    expect((horizontalParts[1] as RoadSegment).x0).toBeGreaterThan(0.1);
+  });
+
+  it("keeps shared-parent and shared-target junctions continuous", () => {
+    const sharedParent = separateCrossings([
+      horizontal([road("parent", "child-a")]),
+      vertical([road("parent", "child-b")]),
+    ]);
+    const sharedTarget = separateCrossings([
+      horizontal([road("parent-a", "child")]),
+      vertical([road("parent-b", "child")]),
+    ]);
+    expect(sharedParent).toHaveLength(2);
+    expect(sharedTarget).toHaveLength(2);
   });
 });
 

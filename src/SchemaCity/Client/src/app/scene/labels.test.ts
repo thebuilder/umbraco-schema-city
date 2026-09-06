@@ -131,3 +131,41 @@ it("places a selected type label and usage badge above its current roof", () => 
   expect(labels[0]?.y).toBeCloseTo(10.35);
   expect(labels[1]?.lift).toBe(LABEL_HEIGHT_PX + 4);
 });
+
+it("keeps density and usage badges distinct when a selected type is hovered", () => {
+  const at = {
+    id: "type",
+    position: { x: 2, z: 3 },
+    y: 4,
+    footprint: 2,
+    height: 1,
+    floors: 1,
+    district: "pages",
+    districtKind: "structure" as const,
+    introDelay: 0,
+  };
+  const labels = labelAnchors(new Set(["type"]), {
+    nodesById: new Map([
+      [
+        "type",
+        {
+          name: "A type",
+          ownPropertyCount: 3,
+          composedPropertyCount: 2,
+          groups: [{}],
+        },
+      ],
+    ]),
+    placementsById: new Map([["type", at]]),
+    heights: new Map([["type", 6]]),
+    selected: "type",
+    hovered: "type",
+    badge: "2 published",
+  });
+  expect(labels.map((label) => label.id)).toEqual([
+    "type",
+    "type:properties",
+    "type:usage",
+  ]);
+  expect(labels[2]?.lift).toBe((LABEL_HEIGHT_PX + 4) * 2);
+});

@@ -1,10 +1,58 @@
 import { Fragment, type ReactNode } from "react";
 import { FINDING_LABEL, type Finding } from "../model/findings";
 import type { Neighbourhood } from "../model/neighbourhood";
-import type { SchemaNode, UsageReport } from "../model/types";
+import type { SchemaEdge, SchemaNode, UsageReport } from "../model/types";
 import { FindingRelations } from "./FindingRelations";
+import {
+  connectionKey,
+  describeRelationship,
+  uniqueConnections,
+} from "./relationship";
 
 type Lookup = Map<string, SchemaNode>;
+
+function connectionsFor(edges: SchemaEdge[] | undefined, nodeId: string) {
+  if (!edges) return [];
+  return uniqueConnections(
+    edges.filter((edge) => edge.from === nodeId || edge.to === nodeId)
+  );
+}
+
+function ConnectionList({
+  connections,
+  nodeId,
+  nodesById,
+  onSelect,
+}: {
+  connections: SchemaEdge[];
+  nodeId: string;
+  nodesById: Lookup;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <ul className="space-y-1">
+      {connections.map((edge) => {
+        const description = describeRelationship(edge, nodesById, nodeId);
+        const related = edge.from === nodeId ? edge.to : edge.from;
+        return (
+          <li className="border-line border-l pl-2" key={connectionKey(edge)}>
+            <p className="text-3xs text-phosphor-dim">
+              {description.direction} · {description.label}
+            </p>
+            <button
+              className="block max-w-full truncate text-left text-phosphor text-xs hover:underline"
+              onClick={() => onSelect(related)}
+              type="button"
+            >
+              {nodesById.get(related)?.name ?? "deleted type"}
+            </button>
+            <p className="text-3xs text-phosphor-dim">{description.detail}</p>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
@@ -17,37 +65,6 @@ function Section({ children, title }: { children: ReactNode; title: string }) {
   );
 }
 
-function Links({
-  label,
-  ids,
-  nodesById,
-  onSelect,
-}: {
-  label: string;
-  ids: string[];
-  nodesById: Lookup;
-  onSelect: (id: string) => void;
-}) {
-  if (ids.length === 0) return null;
-  return (
-    <p className="mt-1 text-3xs text-phosphor-dim">
-      {label}{" "}
-      {ids.map((id, index) => (
-        <span key={id}>
-          {index > 0 ? ", " : null}
-          <button
-            className="text-phosphor hover:text-phosphor-bright hover:underline"
-            onClick={() => onSelect(id)}
-            type="button"
-          >
-            {nodesById.get(id)?.name ?? "deleted type"}
-          </button>
-        </span>
-      ))}
-    </p>
-  );
-}
-
 export function InspectorDiagnostics({
   findings,
   neighbourhood,
@@ -55,6 +72,7 @@ export function InspectorDiagnostics({
   nodesById,
   onSelect,
   usage,
+  edges,
 }: {
   findings: Finding[];
   neighbourhood: Neighbourhood;
@@ -62,6 +80,7 @@ export function InspectorDiagnostics({
   nodesById: Lookup;
   onSelect: (id: string) => void;
   usage?: UsageReport;
+  edges?: SchemaEdge[];
 }) {
   const incoming = usage?.references
     .filter((reference) => reference.toType === nodeId)
@@ -90,6 +109,7 @@ export function InspectorDiagnostics({
       outgoing?.toLocaleString() ?? "unavailable",
     ],
   ];
+  const connections = connectionsFor(edges, nodeId);
   return (
     <>
       <Section title="Direct schema connections">
@@ -101,22 +121,21 @@ export function InspectorDiagnostics({
             </Fragment>
           ))}
         </dl>
-        <Links
-          ids={neighbourhood.composedBy}
-          label="Composed by"
-          nodesById={nodesById}
-          onSelect={onSelect}
-        />
-        <Links
-          ids={neighbourhood.inheritedBy}
-          label="Inherited by"
-          nodesById={nodesById}
-          onSelect={onSelect}
-        />
         <p className="mt-1 text-3xs text-phosphor-dim">
           Connections describe direct schema relationships. Observed references
           are aggregated content relations from the usage snapshot.
         </p>
+        <details className="mt-2 border-line border-t pt-2">
+          <summary className="mb-1 font-bold text-3xs text-phosphor-dim uppercase tracking-terminal-xl">
+            Explain {connections.length} connections
+          </summary>
+          <ConnectionList
+            connections={connections}
+            nodeId={nodeId}
+            nodesById={nodesById}
+            onSelect={onSelect}
+          />
+        </details>
       </Section>
       {findings.length > 0 ? (
         <Section title="Schema checks">
