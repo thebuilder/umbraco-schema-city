@@ -1,64 +1,93 @@
-# A content model you can inspect
+# Product direction
 
-Schema City should help an Umbraco developer answer a question before it asks them to explore a city. The useful promise is: see how your content model fits together, find configuration problems, and investigate a type before changing it.
+Schema City should help an Umbraco developer understand a type before changing it. The city gives
+a view of the model's structure; the inspector, findings, search, and list provide the details
+needed to act on it.
 
-The city is a spatial index. A building identifies a Document Type, its floors represent property groups, and its circuits describe schema relationships. Folders and type roles organise districts. The inspector and list supply the exact aliases, properties, counts, and editor links needed to act on that overview.
+## What works today
 
-## Review of the first version
+Buildings represent Document Types, floors represent property groups, and connections represent
+schema relationships. Districts group types by folder and role. Usage is loaded separately from
+the schema and changes colours, not building positions.
 
-The existing implementation already has most of the data needed for a useful review tool: separate schema and usage snapshots, property origins, block targets, composition users, selectable findings, search, focus mode, and a canvas-free list. Preserve those paths. A developer should be able to work without using the camera at all.
+The current app supports:
 
-The first presentation had three weaknesses:
+- Finding types and property aliases through search or the sortable list.
+- Inspecting properties, composition origins, configured targets, and content usage.
+- Revealing a type's direct connections across all layers on hover or selection.
+- Focusing a neighbourhood and expanding it one relationship step at a time.
+- Reviewing configuration findings, following related types, and exporting filtered results.
+- Comparing exported schema snapshots while retaining baseline positions for matched types.
 
-- Buildings rose onto an already visible stage, while connection layers disappeared immediately. The pieces did not share one visual transition.
-- Structure lanes clamp together in busy streets, and other ground links use the same routes. This can suggest relationships that do not exist. Route geometry and direction must remain readable as layers change.
-- Findings mostly identify a type. Developers also need the related composition or missing block key, the checks alongside its properties, and a report they can take into a ticket.
+The list and inspector must remain useful without the 3D canvas. Opening a type's Umbraco editor
+is the handoff from investigation to editing; the visualization itself does not mutate the model.
 
-The current presentation addresses the first weakness with a short trace-to-solid opening. It keeps
-the connections faint after the intro, and brightens direct connections relevant to hover or selection.
-Focus limits the graph to its expanded neighbourhood. The camera offers fixed Iso and Top down orthographic views with the same world positions.
+## Presentation rules
 
-## Presentation
+Districts should look like circuit boards, buildings like components, and relationships like
+traces. Keep the geometry tied to schema data. Decorative models would compete with the
+information encoded by each building.
 
-Treat the world as the inside of a computer. Districts read as circuit boards, buildings as components, and relationships as traces. Keep the geometry generated from the schema; decorative buildings would compete with the information encoded in each type.
+The opening draws the board outlines, grows the buildings and their outer frames together, then
+traces the enabled connections before fading them. Reduced motion skips that sequence. Controls
+stay available during the opening, and changing a layer does not restart it.
 
-Use a brief opening sequence: continuously drawn stage outlines, building frames and solids rising together, then a short connection
-trace. Keep controls available throughout. Respect reduced motion and do not replay the opening just
-because a developer toggles a layer. Hiding a layer should reverse its material transition so the
-change has a visible cause. Keep faint traces in the settled overview, and brighten direct links when a developer
-hovers or selects a type.
+Structure is the default background layer. Hover and selection reveal direct links across all
+layers, while unrelated paths stay quiet. Keep names on the canvas and counts in the inspector.
+Focus should make relationships easier to read, not add more permanent markers to the overview.
 
-Default to structure relationships. Displaying every relationship at once overwhelms even a medium schema. The legend must explain edge direction, and selecting or focusing a type must give a readable local view. Routing can avoid coincident paths and building intersections, but arbitrary graphs will still have crossings in projection.
+Iso and Top down preserve the same world coordinates. Both support pan and zoom. A camera switch
+must finish at a valid angle even when the developer is already moving with the keyboard.
 
-Keep the city unobstructed. Search, findings, and list view are available in the toolbar; an additional introduction card repeats those controls and covers the scene. Avoid a blocking welcome screen or a compulsory camera tour.
+Routing separates shared paths and avoids buildings where possible. Crossings in a projected
+graph are still possible, so the inspector must explain each relationship's endpoints and meaning.
+Avoid a welcome card or camera tour that blocks access to search, findings, and the list.
 
-## Developer workflows
+## Workflows to preserve
 
-### Investigate a check
+### Investigate a finding
 
-Open Findings, filter to a category, select the host type, inspect its checks and related types, and open the Umbraco editor. A broken block configuration should expose the missing key. A duplicate alias should expose the contributing compositions. Export the filtered checks for a ticket or team review.
+Open Findings, choose a category, select the type, and inspect the explanation. A missing block
+target should expose its key. A duplicate property alias should identify its sources. Developers
+can open the type's editor or export the filtered report for a ticket.
 
 ### Review a shared type
 
-Search for a composition or Element Type, select it, and inspect the types that use it. Focus its neighbourhood when the whole city becomes crowded. Expand one step to include the next connected types while keeping previously focused positions stable. Keep direct schema relationships distinct from content-instance references. A relationship identifies something to review; it does not prove that a code change will break it.
+Search for a composition or Element Type and inspect its users. Focus it to see the immediate
+neighbourhood, then expand when the next step matters. Show schema relationships separately from
+observed content references. A connection identifies something to review; it does not prove a
+code change will break it.
 
 ### Review cleanup candidates
 
-Use the usage lens and findings to find types worth investigating, then inspect their relationships and content counts. An unused Document Type has no counted content in the usage snapshot. An unused Element Type has no configured block-editor use in the schema snapshot. Neither conclusion accounts for every possible consumer in custom code, migrations, external systems, or stored block values.
+An unused Document Type has no counted content in the usage snapshot. An unused Element Type has
+no configured block-editor use in the schema snapshot. Neither check accounts for every consumer
+in custom code, migrations, external systems, or stored block values. Show the evidence and its
+timestamp rather than describing a type as safe to delete.
 
 ### Compare schema revisions
 
-Export a versioned JSON snapshot before a deployment or schema change, then import it later or from
-another environment through Compare. Review added and removed types, property groups, properties,
-compositions, allowed targets, and relationship changes. Matched buildings use the baseline positions,
-and new types appear on added boards alongside them. The comparison covers schema configuration;
-usage snapshots and custom-code consumers remain separate evidence.
+Export a snapshot before a schema change, then import it as a baseline later or in another
+environment. Review added and removed types, property and group changes, and changed relationships.
+Keep matched buildings at their baseline positions. Snapshot import must remain a comparison
+operation, with no schema changes applied to Umbraco.
 
-## Next features, in order
+## Planned features
 
-1. **Transitive dependency review.** Trace composition and inheritance users separately from block hosts and allowed-child rules. Show the actual path and direction for each result, handle cycles, and let the user bound the relationship kinds. Avoid a single unexplained “blast radius” score.
-2. **Root reachability.** Detect whole chains of Document Types unreachable from any allowed root. The current dead-end check only catches a type with no allowed parent; it misses a rootless chain whose descendants have parents. Traverse allowed-child edges, retain cycles, and explain exemptions for compositions and elements.
-3. **Property and Data Type investigation.** Search an editor or Data Type and list the affected properties and types. Open the actual Data Type editor when the host provides a supported route. This would help before changing block configurations or migrating property editors.
-4. **Review decisions.** Let a team mark a finding as intentional with a reason. Key decisions to the finding and relevant schema state so a later change reopens the check. Keep these annotations separate from Umbraco schema mutations.
+These are proposals, not current capabilities, in priority order.
 
-Defer model packs, avatars, weather, traffic simulations, and achievement scores. The next investment should help someone explain a schema change or avoid a configuration mistake. Manual pinning and saved layouts can build on the stable baseline positions used by schema comparison.
+1. Trace transitive dependencies. Show composition users, block hosts, and allowed-child paths
+   separately, with direction and cycle handling. Let the developer choose relationship kinds
+   and depth. Explain each path rather than assigning a single impact score.
+2. Check root reachability. Find chains of Document Types that cannot be reached from any allowed
+   root. The current dead-end check catches types with no allowed parent; it misses rootless
+   chains whose descendants have parents. Explain exclusions for compositions and Element Types.
+3. Investigate properties and Data Types. Search by property editor or Data Type, list affected
+   properties and types, and link to the Data Type editor where Umbraco provides a supported route.
+4. Record review decisions. Let a team mark a finding as intentional with a reason. Tie that
+   decision to the relevant schema state so a later change reopens the check. Store decisions
+   separately from the Umbraco schema.
+
+Manual pinning and saved layouts could build on the baseline positions used by comparison.
+Decorative models, traffic simulations, and scores can wait. Work that helps explain a schema
+change or catch a configuration mistake comes first.
