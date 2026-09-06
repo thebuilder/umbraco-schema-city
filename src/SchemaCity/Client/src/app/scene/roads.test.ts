@@ -65,6 +65,35 @@ function crossings(segments: RoadSegment[]): number {
 }
 
 describe("planRoads", () => {
+  it("keeps medium fixture structure road widths positive", () => {
+    const city = cityDistricts(medium).placements;
+    const byId = new Map(city.map((placement) => [placement.id, placement]));
+    const edges = medium.edges.filter(
+      (edge) =>
+        edge.kind === "allowedChild" &&
+        edge.from !== edge.to &&
+        byId.has(edge.from) &&
+        byId.has(edge.to)
+    );
+    expect(
+      planRoads(byId, edges).every((segment) => (segment.width ?? 0) > 0)
+    ).toBe(true);
+  });
+
+  it("keeps a district route stable when a distant district is added", () => {
+    const base = new Map([
+      ["a", placement("a", 0, 0)],
+      ["b", placement("b", 0, 11)],
+    ]);
+    const edge = road("a", "b");
+    const withDistant = new Map(base);
+    withDistant.set("x", { ...placement("x", 0, 100), district: "other" });
+    withDistant.set("y", { ...placement("y", 0, 111), district: "other" });
+    expect(
+      planRoads(withDistant, [edge]).map(({ edges, ...segment }) => segment)
+    ).toEqual(planRoads(base, [edge]).map(({ edges, ...segment }) => segment));
+  });
+
   it("draws nothing for an empty edge list", () => {
     expect(planRoads(placements, [])).toEqual([]);
   });
@@ -459,5 +488,81 @@ describe("road rendering clearance", () => {
     expect(segments.length).toBeGreaterThan(0);
     for (const segment of segments)
       expect(segment.width).toBeGreaterThanOrEqual(0.25);
+  });
+});
+
+/** Includes junctions inside a merged trunk, not only its two endpoints. */
+function runsTouch(a: RoadSegment, b: RoadSegment): boolean {
+  return (
+    Math.max(Math.min(a.x0, a.x1), Math.min(b.x0, b.x1)) <=
+      Math.min(Math.max(a.x0, a.x1), Math.max(b.x0, b.x1)) + 1e-6 &&
+    Math.max(Math.min(a.z0, a.z1), Math.min(b.z0, b.z1)) <=
+      Math.min(Math.max(a.z0, a.z1), Math.max(b.z0, b.z1)) + 1e-6
+  );
+}
+
+function touchesBuilding(run: RoadSegment, at: Placement): boolean {
+  const half = at.footprint / 2;
+  return runsTouch(run, {
+    ...run,
+    x0: at.position.x - half,
+    x1: at.position.x + half,
+    z0: at.position.z - half,
+    z1: at.position.z + half,
+  });
+}
+
+function hasConnectedRoute(
+  segments: RoadSegment[],
+  edge: SchemaEdge,
+  from: Placement,
+  to: Placement
+): boolean {
+  const path = segments.filter((segment) =>
+    segment.edges.some(
+      (candidate) => candidate.from === edge.from && candidate.to === edge.to
+    )
+  );
+  const pending = path.filter((segment) => touchesBuilding(segment, from));
+  const visited = new Set(pending);
+  while (pending.length) {
+    const current = pending.pop() as RoadSegment;
+    if (touchesBuilding(current, to)) return true;
+    for (const segment of path) {
+      if (!visited.has(segment) && runsTouch(current, segment)) {
+        visited.add(segment);
+        pending.push(segment);
+      }
+    }
+  }
+  return false;
+}
+
+describe.each([
+  ["medium", medium],
+  ["pathological", pathological],
+] as const)("%s route continuity", (_, graph) => {
+  it("retains a visible connected path for every valid structure relationship", () => {
+    const city = cityDistricts(graph);
+    const byId = new Map(city.placements.map((at) => [at.id, at]));
+    const edges = graph.edges.filter(
+      (edge) =>
+        edge.kind === "allowedChild" &&
+        edge.from !== edge.to &&
+        byId.has(edge.from) &&
+        byId.has(edge.to)
+    );
+    const segments = planRoads(byId, edges);
+    expect(segments.every((segment) => (segment.width ?? 0) > 0)).toBe(true);
+    const missing = edges.filter(
+      (edge) =>
+        !hasConnectedRoute(
+          segments,
+          edge,
+          byId.get(edge.from) as Placement,
+          byId.get(edge.to) as Placement
+        )
+    );
+    expect(missing.map((edge) => `${edge.from}->${edge.to}`)).toEqual([]);
   });
 });

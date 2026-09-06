@@ -4,7 +4,7 @@
 // parent share the street run, which is what collapses a hub's fan into one trunk
 // that forks at each child's column. Pure: no three.js, no React.
 import type { SchemaEdge } from "../../model/types";
-import { type Placement, STREET } from "../layout/city";
+import { cityBounds, type Placement, STREET } from "../layout/city";
 import { FOLDER_TINT_HEIGHT } from "./stage";
 
 export type RoadRange = { edges: SchemaEdge[]; start: number; count: number };
@@ -26,9 +26,9 @@ export type RoadSegment = {
  * The rows of buildings and the streets between them, read off the placements.
  *
  * A row is a band of z that buildings occupy, so anything between two bands is
- * ground no building stands on. That covers the gap between two folded rows of one
- * rank, the street between two ranks and the void between two islands with the same
- * numbers, which is why a cross-district road needs no separate rule.
+ * ground no building stands on. Structure routes use each district's own grid;
+ * combining unrelated islands can erase valid local streets when their rows overlap.
+ * Cross-island connectors join those local grids through the space between boards.
  */
 export type RoadGrid = {
   /** Street mid-lines, north to south. Street `i` runs above row `i`. */
@@ -103,41 +103,22 @@ export function planRoads(
   placementsById: Map<string, Placement>,
   edges: SchemaEdge[]
 ): RoadSegment[] {
-  const grid = roadGrid(placementsById.values());
   const runs: RoadSegment[] = [];
   const laneOf = new Map<string, number>();
-  const channels = new Map<number, { low: number; high: number }[][]>();
-  const candidates = edges
-    .filter((edge) => edge.kind === "allowedChild" && edge.from !== edge.to)
-    .map((edge) => {
-      const from = placementsById.get(edge.from);
-      const to = placementsById.get(edge.to);
-      if (!(from && to)) return null;
-      return {
-        edge,
-        from,
-        to,
-        trunk: streetsBetween(grid, from, to)[0] as number,
-      };
-    })
-    .filter(
-      (candidate): candidate is NonNullable<typeof candidate> =>
-        candidate !== null
-    )
-    .sort(
-      (a, b) =>
-        a.trunk - b.trunk ||
-        a.from.position.x - b.from.position.x ||
-        a.to.position.x - b.to.position.x ||
-        a.edge.from.localeCompare(b.edge.from) ||
-        a.edge.to.localeCompare(b.edge.to)
-    );
+  const channels = new Map<string, { low: number; high: number }[][]>();
+  const candidates = roadCandidates(placementsById, edges);
   const parentSpans = new Map<
     string,
-    { trunk: number; parent: string; low: number; high: number }
+    {
+      trunk: number;
+      parent: string;
+      gridKey: string;
+      low: number;
+      high: number;
+    }
   >();
-  for (const { edge, from, to, trunk } of candidates) {
-    const key = `${trunk}|${edge.from}`;
+  for (const { edge, from, to, trunk, gridKey } of candidates) {
+    const key = `${gridKey}|${trunk}|${edge.from}`;
     const span = parentSpans.get(key);
     const low = Math.min(from.position.x, to.position.x);
     const high = Math.max(from.position.x, to.position.x);
@@ -145,18 +126,22 @@ export function planRoads(
       span.low = Math.min(span.low, low);
       span.high = Math.max(span.high, high);
     } else {
-      parentSpans.set(key, { trunk, parent: edge.from, low, high });
+      parentSpans.set(key, { trunk, parent: edge.from, gridKey, low, high });
     }
   }
-  for (const { trunk, parent, low, high } of [...parentSpans.values()].sort(
+  for (const { trunk, parent, gridKey, low, high } of [
+    ...parentSpans.values(),
+  ].sort(
     (a, b) =>
+      a.gridKey.localeCompare(b.gridKey) ||
       a.trunk - b.trunk ||
       a.low - b.low ||
       a.high - b.high ||
       a.parent.localeCompare(b.parent)
   )) {
-    const key = `${trunk}|${parent}`;
-    const used = channels.get(trunk) ?? [];
+    const key = `${gridKey}|${trunk}|${parent}`;
+    const channelKey = `${gridKey}|${trunk}`;
+    const used = channels.get(channelKey) ?? [];
     let lane = 0;
     while (
       used[lane]?.some((span) => span.low < high - EPS && span.high > low + EPS)
@@ -164,18 +149,33 @@ export function planRoads(
       lane++;
     used[lane] ??= [];
     used[lane].push({ low, high });
-    channels.set(trunk, used);
+    channels.set(channelKey, used);
     laneOf.set(key, lane);
   }
-  for (const { edge, from, to, trunk } of candidates) {
-    const key = `${trunk}|${edge.from}`;
+  for (const {
+    edge,
+    from,
+    to,
+    grid: selectedGrid,
+    gridKey,
+    trunk,
+    bridge,
+    targetGrid,
+  } of candidates) {
+    const key = `${gridKey}|${trunk}|${edge.from}`;
     const lane = laneOf.get(key) ?? 0;
-    const count = channels.get(trunk)?.length ?? 1;
-    const half = grid.halves[trunk] ?? 0;
-    const spacing = (half * 2) / (count + 1);
-    const offset = -half + spacing * (lane + 1);
+    const count = channels.get(`${gridKey}|${trunk}`)?.length ?? 1;
+    const half = selectedGrid.halves[trunk] ?? 0;
+    const targetHalf = bridge
+      ? (targetGrid.halves[portStreet(targetGrid, to, from)] ?? half)
+      : half;
+    const spacing = (Math.min(half, targetHalf) * 2) / (count + 1);
+    const normalizedLane = -1 + (2 * (lane + 1)) / (count + 1);
+    const offset = half * normalizedLane;
 
-    const points = routePoints(grid, from, to, offset);
+    const points = bridge
+      ? bridgePoints(selectedGrid, targetGrid, from, to, bridge, normalizedLane)
+      : routePoints(selectedGrid, from, to, offset);
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1] as { x: number; z: number };
       const b = points[i] as { x: number; z: number };
@@ -198,6 +198,119 @@ export function planRoads(
   return mergeRuns(runs);
 }
 
+/** Choose real streets before allocating channels; unrelated islands cannot alter them. */
+function roadCandidates(
+  placementsById: Map<string, Placement>,
+  edges: SchemaEdge[]
+) {
+  const grids = new Map<string, RoadGrid>();
+  for (const placement of placementsById.values()) {
+    if (!grids.has(placement.district)) {
+      grids.set(
+        placement.district,
+        roadGrid(
+          [...placementsById.values()].filter(
+            (candidate) => candidate.district === placement.district
+          )
+        )
+      );
+    }
+  }
+  return edges
+    .filter((edge) => edge.kind === "allowedChild" && edge.from !== edge.to)
+    .map((edge) => {
+      const from = placementsById.get(edge.from);
+      const to = placementsById.get(edge.to);
+      if (!(from && to)) return null;
+      const sourceGrid = grids.get(from.district) as RoadGrid;
+      const targetGrid = grids.get(to.district) as RoadGrid;
+      const bridge = bridgeGap(sourceGrid, targetGrid);
+      const selectedGrid =
+        sourceGrid === targetGrid || bridge
+          ? sourceGrid
+          : roadGrid([...sourceGrid.placements, ...targetGrid.placements]);
+      const trunk = bridge
+        ? portStreet(sourceGrid, from, to)
+        : (streetsBetween(selectedGrid, from, to)[0] as number);
+      return {
+        edge,
+        from,
+        to,
+        grid: selectedGrid,
+        gridKey:
+          selectedGrid === sourceGrid
+            ? from.district
+            : [from.district, to.district].sort().join("/"),
+        targetGrid,
+        bridge,
+        trunk,
+      };
+    })
+    .filter(
+      (candidate): candidate is NonNullable<typeof candidate> =>
+        candidate !== null
+    )
+    .sort(
+      (a, b) =>
+        a.gridKey.localeCompare(b.gridKey) ||
+        a.trunk - b.trunk ||
+        a.from.position.x - b.from.position.x ||
+        a.to.position.x - b.to.position.x ||
+        a.edge.from.localeCompare(b.edge.from) ||
+        a.edge.to.localeCompare(b.edge.to)
+    );
+}
+
+/** Side-by-side islands connect through the gap, using each island's own streets. */
+function bridgeGap(
+  from: RoadGrid,
+  to: RoadGrid
+): { low: number; high: number } | null {
+  if (from === to) return null;
+  const a = cityBounds(from.placements);
+  const b = cityBounds(to.placements);
+  if (a.maxX + 1 < b.minX) return { low: a.maxX, high: b.minX };
+  if (b.maxX + 1 < a.minX) return { low: b.maxX, high: a.minX };
+  return null;
+}
+
+function portStreet(grid: RoadGrid, at: Placement, toward: Placement): number {
+  return grid.rowAt(at.position.z) + Number(toward.position.z >= at.position.z);
+}
+
+function bridgePoints(
+  source: RoadGrid,
+  target: RoadGrid,
+  from: Placement,
+  to: Placement,
+  gap: { low: number; high: number },
+  lane: number
+): { x: number; z: number }[] {
+  const start = portStreet(source, from, to);
+  const end = portStreet(target, to, from);
+  const startZ = source.streets[start] + lane * source.halves[start];
+  const endZ = target.streets[end] + lane * target.halves[end];
+  const corridor =
+    (gap.low + gap.high) / 2 +
+    lane * Math.min(2, (gap.high - gap.low) / 2 - ROAD_WIDTH);
+  return [
+    {
+      x: from.position.x,
+      z:
+        from.position.z +
+        (Math.sign(startZ - from.position.z) * from.footprint) / 2,
+    },
+    { x: from.position.x, z: startZ },
+    { x: corridor, z: startZ },
+    { x: corridor, z: endZ },
+    { x: to.position.x, z: endZ },
+    {
+      x: to.position.x,
+      z: to.position.z + (Math.sign(endZ - to.position.z) * to.footprint) / 2,
+    },
+  ];
+}
+
 export function roadGrid(placements: Iterable<Placement>): RoadGrid {
   const allPlacements = [...placements];
   const bands: [number, number][] = [];
@@ -212,7 +325,9 @@ export function roadGrid(placements: Iterable<Placement>): RoadGrid {
   const rows: [number, number][] = [];
   for (const band of bands) {
     const last = rows[rows.length - 1];
-    if (last && band[0] <= last[1]) last[1] = Math.max(last[1], band[1]);
+    // A gap too narrow for a trace is part of the row, never a zero-width street.
+    if (last && band[0] <= last[1] + ROAD_WIDTH * 2)
+      last[1] = Math.max(last[1], band[1]);
     else rows.push([band[0], band[1]]);
   }
   if (rows.length === 0)
