@@ -12,21 +12,27 @@ export function connectionBootAt(
 }
 export function visibleConnections(
   edges: SchemaEdge[],
+  focusIds: ReadonlySet<string> | null
+): SchemaEdge[] {
+  return focusIds
+    ? edges.filter((edge) => focusIds.has(edge.from) && focusIds.has(edge.to))
+    : edges;
+}
+
+/** Opacity for a shared range: any represented edge can provide emphasis. */
+export function connectionEmphasis(
+  edges: SchemaEdge[],
   selected: string | null,
   hovered: string | null,
-  focusIds: ReadonlySet<string> | null,
+  focused: boolean,
   boot: BootPhase
-): SchemaEdge[] {
-  if (focusIds)
-    return edges.filter(
-      (edge) => focusIds.has(edge.from) && focusIds.has(edge.to)
-    );
-  if (boot !== "done") return edges;
-  return edges.filter(
-    (edge) =>
-      edge.from === selected ||
-      edge.to === selected ||
-      edge.from === hovered ||
-      edge.to === hovered
+): number {
+  if (boot === "trace" || focused) return 1;
+  if (!(selected || hovered)) return 0.28;
+  const active = new Set(
+    [selected, hovered].filter((id): id is string => id !== null)
   );
+  return edges.some((edge) => active.has(edge.from) || active.has(edge.to))
+    ? 1
+    : 0.12;
 }

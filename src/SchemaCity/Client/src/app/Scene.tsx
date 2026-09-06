@@ -51,6 +51,7 @@ import {
 import {
   type BootPhase,
   connectionBootAt,
+  connectionEmphasis,
   visibleConnections,
 } from "./scene/connection-visibility";
 import {
@@ -966,6 +967,9 @@ function Roads({
   placementsById,
   edges,
   focus,
+  selected,
+  hovered,
+  boot,
   palette,
   reducedMotion,
   visible,
@@ -974,6 +978,9 @@ function Roads({
   placementsById: Map<string, Placement>;
   edges: SchemaEdge[];
   focus: string | null;
+  selected: string | null;
+  hovered: string | null;
+  boot: BootPhase;
   palette: Palette;
   reducedMotion: boolean;
   visible: boolean;
@@ -995,12 +1002,35 @@ function Roads({
     positions.length / 3
   );
   const colors = useMemo(() => {
-    const paint = {
-      colour: new THREE.Color(palette.phosphor),
-      alpha: 1,
-    };
-    return edgeColors(ranges, positions.length / 3, () => paint);
-  }, [positions, ranges, focus, palette]);
+    const colour = new THREE.Color(palette.phosphor);
+    return edgeColors(ranges, positions.length / 3, (rangeEdges) => ({
+      colour,
+      alpha: connectionEmphasis(
+        rangeEdges,
+        selected,
+        hovered,
+        focus !== null,
+        boot
+      ),
+    }));
+  }, [positions, ranges, focus, selected, hovered, boot, palette]);
+  const fadedColors = useMemo(() => colors.slice(), [colors.length]);
+  useFrame((_, delta) => {
+    for (let i = 0; i < colors.length; i += 4) {
+      fadedColors[i] = colors[i] as number;
+      fadedColors[i + 1] = colors[i + 1] as number;
+      fadedColors[i + 2] = colors[i + 2] as number;
+      fadedColors[i + 3] = reducedMotion
+        ? (colors[i + 3] as number)
+        : transitionToward(
+            fadedColors[i + 3] as number,
+            colors[i + 3] as number,
+            Math.min(delta, 0.1)
+          );
+    }
+    const attribute = geometry.current?.getAttribute("color");
+    if (attribute) attribute.needsUpdate = true;
+  });
 
   if (positions.length === 0) return null;
 
@@ -1022,7 +1052,7 @@ function Roads({
     >
       <bufferGeometry ref={geometry}>
         <bufferAttribute args={[positions, 3]} attach="attributes-position" />
-        <bufferAttribute args={[colors, 4]} attach="attributes-color" />
+        <bufferAttribute args={[fadedColors, 4]} attach="attributes-color" />
       </bufferGeometry>
       <meshBasicMaterial
         depthWrite={false}
@@ -1078,6 +1108,10 @@ function createLinkMaterial(): LineMaterial {
  */
 function Links({
   layer,
+  selected,
+  hovered,
+  focused,
+  boot,
   edges,
   anchors,
   placementsById,
@@ -1088,6 +1122,10 @@ function Links({
   onPick,
 }: {
   layer: Exclude<Layer, "structure">;
+  selected: string | null;
+  hovered: string | null;
+  focused: boolean;
+  boot: BootPhase;
   edges: SchemaEdge[];
   anchors: Map<string, Anchor>;
   placementsById: Map<string, Placement>;
@@ -1110,10 +1148,16 @@ function Links({
       colour: tint(colour, WHITE, INHERITS_MIX),
       alpha: 1,
     };
-    return edgeColors(ranges, positions.length / 3, (range) =>
-      range[0]?.kind === "inherits" ? inheritsPaint : layerPaint
-    );
-  }, [positions, ranges, colour, opacity]);
+    return edgeColors(ranges, positions.length / 3, (range) => {
+      const paint = range[0]?.kind === "inherits" ? inheritsPaint : layerPaint;
+      return {
+        ...paint,
+        alpha:
+          paint.alpha *
+          connectionEmphasis(range, selected, hovered, focused, boot),
+      };
+    });
+  }, [positions, ranges, colour, opacity, selected, hovered, focused, boot]);
 
   return (
     <LinkStrokes
@@ -1178,11 +1222,26 @@ function LinkStrokes({
       alpha.push(colors[i + 3] as number);
     }
     geometry.setColors(rgb);
-    geometry.setAttribute(
-      "instanceAlpha",
-      new THREE.InstancedBufferAttribute(new Float32Array(alpha), 1)
-    );
+    if (!geometry.getAttribute("instanceAlpha"))
+      geometry.setAttribute(
+        "instanceAlpha",
+        new THREE.InstancedBufferAttribute(new Float32Array(alpha), 1)
+      );
   }, [colors, geometry]);
+  useFrame((_, delta) => {
+    const attribute = geometry.getAttribute("instanceAlpha");
+    if (!attribute) return;
+    for (let i = 0; i < attribute.count; i++) {
+      const target = colors[i * 8 + 3] as number;
+      attribute.setX(
+        i,
+        reducedMotion
+          ? target
+          : transitionToward(attribute.getX(i), target, Math.min(delta, 0.1))
+      );
+    }
+    attribute.needsUpdate = true;
+  });
   // LineSegments2 updates resolution from the active viewport before each draw.
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);
@@ -2636,8 +2695,6 @@ export default function Scene({
   // In focus mode the lit set is the focused node's, so clicking through the
   // neighbourhood does not dim the layout you are standing in.
   const neighbours = focusNeighbours ?? selectionNeighbours;
-  const connectionActivity =
-    focus !== null || selected !== null || hovered !== null;
   const { cellsByKind, windows, heights } = useMemo(() => {
     const built = buildFloorCells(nodesById, placements);
     return {
@@ -2652,19 +2709,10 @@ export default function Scene({
   );
   const iconGroups = useIconGroups(icons, nodesById, palette?.phosphor ?? "");
 
-  // In focus mode the city's other edges are noise around a layout that is about
-  // one node, so only the edges that touch it are built at all. Structure is on
-  // there whatever the toolbar says, because a hub without its roads is a list.
+  // Keep the overview graph stable; interaction changes its emphasis, not its routes.
   const drawnEdges = useMemo(
-    () =>
-      visibleConnections(
-        graph.edges ?? [],
-        selected,
-        hovered,
-        focusNeighbours,
-        bootPhase
-      ),
-    [graph.edges, selected, hovered, focusNeighbours, bootPhase]
+    () => visibleConnections(graph.edges ?? [], focusNeighbours),
+    [graph.edges, focusNeighbours]
   );
   const active = useMemo(() => new Set<Layer>(layers), [layers]);
   const pickConnection: PickConnection = (pick) => setConnectionPick(pick);
@@ -2764,35 +2812,36 @@ export default function Scene({
             />
           ) : null}
           <Roads
+            boot={bootPhase}
             edges={drawnEdges}
             focus={focus}
+            hovered={hovered}
             onPick={pickConnection}
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}
-            visible={
-              active.has("structure") &&
-              (connectionActivity || bootPhase === "trace")
-            }
+            selected={selected}
+            visible={active.has("structure")}
           />
           {LINK_LAYERS.map(({ layer, token, opacity }) => (
             <Links
               anchors={anchors}
+              boot={bootPhase}
               colour={palette[token]}
               edges={drawnEdges}
+              focused={focus !== null}
+              hovered={hovered}
               key={layer}
               layer={layer}
               onPick={pickConnection}
               opacity={opacity}
               placementsById={placementsById}
               reducedMotion={reducedMotion}
-              visible={
-                active.has(layer) &&
-                (connectionActivity || bootPhase === "trace")
-              }
+              selected={selected}
+              visible={active.has(layer)}
             />
           ))}
-          {connectionPick && connectionActivity ? (
+          {connectionPick ? (
             <Html
               center
               position={connectionPick.position}

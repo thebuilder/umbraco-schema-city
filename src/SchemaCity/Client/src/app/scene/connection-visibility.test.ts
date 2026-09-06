@@ -1,6 +1,10 @@
 import { expect, test } from "vitest";
 import type { SchemaEdge } from "../../model/types";
-import { connectionBootAt, visibleConnections } from "./connection-visibility";
+import {
+  connectionBootAt,
+  connectionEmphasis,
+  visibleConnections,
+} from "./connection-visibility";
 
 const edges: SchemaEdge[] = [
   { kind: "composition", from: "a", to: "b" },
@@ -13,18 +17,33 @@ test("the boot traces completely, fades, then leaves a quiet overview", () => {
   expect(connectionBootAt(2.3, false).phase).toBe("fade");
   expect(connectionBootAt(3, false).phase).toBe("done");
   expect(connectionBootAt(0, true)).toEqual({ phase: "done", trace: 1 });
-  expect(visibleConnections(edges, null, null, null, "done")).toEqual([]);
-  expect(visibleConnections(edges, null, null, null, "trace")).toEqual(edges);
+  expect(visibleConnections(edges, null)).toEqual(edges);
+  expect(visibleConnections(edges, new Set(["a", "b", "e"]))).toEqual([
+    edges[0],
+    edges[2],
+  ]);
 });
-test("hover and selection reveal only direct connections; focus keeps expanded paths", () => {
-  expect(visibleConnections(edges, null, "a", null, "done")).toEqual([
+test("focus keeps only complete paths; overview retains every edge", () => {
+  expect(visibleConnections(edges, null)).toEqual(edges);
+  expect(visibleConnections(edges, new Set(["a", "b", "e"]))).toEqual([
     edges[0],
+    edges[2],
   ]);
-  expect(visibleConnections(edges, "c", "a", null, "done")).toEqual([
-    edges[0],
-    edges[1],
-  ]);
+});
+test("emphasizes boot, focus, and any edge in a shared trunk", () => {
   expect(
-    visibleConnections(edges, "a", null, new Set(["a", "b", "e"]), "done")
-  ).toEqual([edges[0], edges[2]]);
+    connectionEmphasis([edges[0], edges[1]], null, null, false, "trace")
+  ).toBe(1);
+  expect(
+    connectionEmphasis([edges[0], edges[1]], null, null, true, "done")
+  ).toBe(1);
+  expect(
+    connectionEmphasis([edges[0], edges[1]], null, "a", false, "done")
+  ).toBe(1);
+  expect(
+    connectionEmphasis([edges[0], edges[1]], "z", null, false, "done")
+  ).toBe(0.12);
+  expect(
+    connectionEmphasis([edges[0], edges[1]], null, null, false, "done")
+  ).toBe(0.28);
 });

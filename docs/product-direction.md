@@ -15,8 +15,8 @@ The first presentation had three weaknesses:
 - Findings mostly identify a type. Developers also need the related composition or missing block key, the checks alongside its properties, and a report they can take into a ticket.
 
 The current presentation addresses the first weakness with a short trace-to-solid opening. It keeps
-the overview quiet after the intro, and restores only direct connections relevant to hover, selection,
-or the expanded focus neighbourhood. The camera offers fixed Iso and Top down orthographic views with the same world positions.
+the connections faint after the intro, and brightens direct connections relevant to hover or selection.
+Focus limits the graph to its expanded neighbourhood. The camera offers fixed Iso and Top down orthographic views with the same world positions.
 
 ## Presentation
 
@@ -25,7 +25,7 @@ Treat the world as the inside of a computer. Districts read as circuit boards, b
 Use a brief opening sequence: stage outlines, solid districts and buildings, then a short connection
 trace. Keep controls available throughout. Respect reduced motion and do not replay the opening just
 because a developer toggles a layer. Hiding a layer should reverse its material transition so the
-change has a visible cause. Keep the settled overview quiet, and reveal direct links when a developer
+change has a visible cause. Keep faint traces in the settled overview, and brighten direct links when a developer
 hovers or selects a type.
 
 Default to structure relationships. Displaying every relationship at once overwhelms even a medium schema. The legend must explain edge direction, and selecting or focusing a type must give a readable local view. Routing can avoid coincident paths and building intersections, but arbitrary graphs will still have crossings in projection.

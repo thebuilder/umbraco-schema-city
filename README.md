@@ -14,8 +14,8 @@ property alias, or **List** to work without a 3D canvas. Select a building to in
 properties and direct connections. Focus its neighbourhood when the whole city gets crowded.
 
 The stage traces its wireframe before materialising solid districts and buildings, then briefly
-draws the relationship circuits before settling into a quiet overview. Hovering or selecting a
-type brings back its direct links; focusing a type keeps the local paths readable. Reduced motion
+draws the relationship circuits before settling into faint background traces. Hovering or selecting a
+type brightens its direct links; focusing a type keeps the local paths readable. Reduced motion
 skips the opening animation. Structure is the initial connection layer; add other relationships as
 you investigate them.
 

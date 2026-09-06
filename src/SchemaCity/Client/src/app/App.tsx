@@ -206,8 +206,8 @@ function Legend() {
           </LegendRow>
         </ul>
         <p className="mt-2 text-muted-foreground text-xs">
-          Hover or select a building to reveal its connections. Structure traces
-          show allowed-child rules, not the content tree.
+          Hover or select a building to brighten its connections. Structure
+          traces show allowed-child rules, not the content tree.
         </p>
       </section>
     </div>
