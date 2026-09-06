@@ -201,11 +201,19 @@ export function findFindings(
     const creatable = node.allowedAsRoot || children > 0;
 
     if (!node.isElement && usage && totalOf(node.id) === 0) {
-      add("unusedType", node, "No content of this type exists");
+      add(
+        "unusedType",
+        node,
+        "The usage snapshot reports no content instances for this Document Type"
+      );
     }
 
     if (node.isElement && at(inBlock, node.id) === 0) {
-      add("unusedElementType", node, "No block editor uses this Element Type");
+      add(
+        "unusedElementType",
+        node,
+        "No block editor configuration points at this Element Type"
+      );
     }
 
     // A type nothing composes and nothing can create is a structural dead end, and
@@ -255,7 +263,11 @@ export function findFindings(
       !node.isElement &&
       node.templates.length === 0
     ) {
-      add("noTemplate", node, "No template is allowed, so it renders nothing");
+      add(
+        "noTemplate",
+        node,
+        "No template is allowed; check whether this type is intended for template rendering"
+      );
     }
 
     if (composers > 0 && !creatable && at(inBlock, node.id) === 0) {

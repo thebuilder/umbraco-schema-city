@@ -111,5 +111,7 @@ describe("neighbourhoods", () => {
     expect(map.get("article")?.referencesIn).toEqual(["page"]);
     expect(map.get("page")?.compositions).toEqual(["base"]);
     expect(map.get("page")?.inherits).toEqual(["base"]);
+    expect(map.get("base")?.composedBy).toEqual(["page"]);
+    expect(map.get("base")?.inheritedBy).toEqual(["page"]);
   });
 });

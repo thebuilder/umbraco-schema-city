@@ -3,8 +3,15 @@ import { Fragment, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Finding } from "../model/findings";
 import type { Neighbourhood, PropertyTargets } from "../model/neighbourhood";
-import type { PropertyGroup, SchemaNode, TypeUsage } from "../model/types";
+import type {
+  PropertyGroup,
+  SchemaNode,
+  TypeUsage,
+  UsageReport,
+} from "../model/types";
+import { InspectorDiagnostics } from "./InspectorDiagnostics";
 import { iconMask } from "./scene/icons";
 
 type Lookup = Map<string, SchemaNode>;
@@ -261,6 +268,8 @@ export function Inspector({
   onOpenType,
   onSelect,
   onToggleFocus,
+  findings = [],
+  usageReport,
   usage,
 }: {
   focused: boolean;
@@ -273,6 +282,8 @@ export function Inspector({
   onOpenType?: (id: string) => void;
   onSelect: (id: string) => void;
   onToggleFocus: () => void;
+  findings?: Finding[];
+  usageReport?: UsageReport;
   usage?: TypeUsage;
 }) {
   const list = (ids: string[]) => (
@@ -332,6 +343,14 @@ export function Inspector({
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-3 px-3 py-3">
           {usage ? <Usage usage={usage} /> : null}
+          <InspectorDiagnostics
+            findings={findings}
+            neighbourhood={neighbourhood}
+            nodeId={node.id}
+            nodesById={nodesById}
+            onSelect={onSelect}
+            usage={usageReport}
+          />
           {neighbourhood.compositions.length > 0 ? (
             <Section title="Compositions">
               {list(neighbourhood.compositions)}

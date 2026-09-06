@@ -51,6 +51,7 @@ import type { SchemaGraph, UsageReport } from "../model/types";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_WIDTH, Inspector } from "./Inspector";
+import { Overview } from "./Overview";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   LENS_LABEL,
@@ -277,6 +278,7 @@ export function App({
   const [view, setView] = useState<View>(start.view);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [findingsOpen, setFindingsOpen] = useState(false);
   // Bumped by Home when there is no focus to leave. The scene passes it to the
   // camera rig, which flies back to the city framing and leaves the buildings alone.
   const [reframe, setReframe] = useState(0);
@@ -457,7 +459,10 @@ export function App({
 
   return (
     <PortalContainer value={portal}>
-      <div className="flex h-full flex-col bg-background font-mono text-foreground">
+      <section
+        aria-label="Schema City"
+        className="flex h-full flex-col bg-background font-mono text-foreground"
+      >
         {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
             fitting, which is 848 px with the lens picker reading None and earlier
             once a longer lens name widens it. The backoffice is narrower than the
@@ -585,8 +590,12 @@ export function App({
 
             <Findings
               findings={findings}
+              graph={graph}
               nodesById={nodesById}
+              onOpenChange={setFindingsOpen}
               onSelect={followLink}
+              open={findingsOpen}
+              usage={usage}
             />
 
             <Popover>
@@ -688,8 +697,21 @@ export function App({
             </div>
           )}
 
+          <Overview
+            graph={graph}
+            onFindings={() => setFindingsOpen(true)}
+            onList={() => setView("list")}
+            onSearch={() => setPaletteOpen(true)}
+            selected={selectedNode !== undefined}
+            usage={usage}
+            view={view}
+          />
+
           {selectedNode && neighbourhood ? (
             <Inspector
+              findings={findings.filter(
+                (finding) => finding.nodeId === selectedNode.id
+              )}
               focused={focus === selectedNode.id}
               icons={icons}
               neighbourhood={neighbourhood}
@@ -704,6 +726,7 @@ export function App({
                   : enterFocus(selectedNode.id)
               }
               usage={usage?.byType[selectedNode.id]}
+              usageReport={usage}
             />
           ) : null}
         </div>
@@ -775,7 +798,7 @@ export function App({
         </CommandDialog>
 
         <div ref={portal} />
-      </div>
+      </section>
     </PortalContainer>
   );
 }
