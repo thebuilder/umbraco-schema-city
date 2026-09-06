@@ -566,3 +566,20 @@ describe.each([
     expect(missing.map((edge) => `${edge.from}->${edge.to}`)).toEqual([]);
   });
 });
+
+it("joins side-by-side islands inside their gap using local arrival streets", () => {
+  const at = new Map([
+    ["a", placement("a", 0, 0)],
+    ["row", placement("row", 0, 22)],
+    ["b", { ...placement("b", 100, 11), district: "right" }],
+  ]);
+  const segments = planRoads(at, [road("a", "b")]);
+  const bridge = segments.find(
+    (segment) => vertical(segment) && segment.x0 > 1 && segment.x0 < 99
+  );
+  expect(bridge).toBeDefined();
+  expect(bridge?.x0).toBeCloseTo(50);
+  expect(
+    segments.every((segment) => Math.max(segment.z0, segment.z1) <= 12)
+  ).toBe(true);
+});

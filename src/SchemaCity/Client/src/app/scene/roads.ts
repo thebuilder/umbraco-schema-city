@@ -269,8 +269,10 @@ function bridgeGap(
   if (from === to) return null;
   const a = cityBounds(from.placements);
   const b = cityBounds(to.placements);
-  if (a.maxX + 1 < b.minX) return { low: a.maxX, high: b.minX };
-  if (b.maxX + 1 < a.minX) return { low: b.maxX, high: a.minX };
+  if (a.centre.x + a.width / 2 + 1 < b.centre.x - b.width / 2)
+    return { low: a.centre.x + a.width / 2, high: b.centre.x - b.width / 2 };
+  if (b.centre.x + b.width / 2 + 1 < a.centre.x - a.width / 2)
+    return { low: b.centre.x + b.width / 2, high: a.centre.x - a.width / 2 };
   return null;
 }
 
