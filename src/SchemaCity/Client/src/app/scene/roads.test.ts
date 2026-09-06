@@ -8,7 +8,10 @@ import {
   planRoads,
   type RoadSegment,
   roadFan,
+  separateCrossings,
 } from "./roads";
+
+import { FOLDER_TINT_HEIGHT } from "./stage";
 
 const medium = mediumFixture as unknown as SchemaGraph;
 const pathological = pathologicalFixture as unknown as SchemaGraph;
@@ -63,6 +66,78 @@ function crossings(segments: RoadSegment[]): number {
 }
 
 describe("planRoads", () => {
+  it("separates overlapping bridge trunks across streets and travel directions", () => {
+    const island = new Map<string, Placement>([
+      ["p0", placement("p0", 0, 0)],
+      ["p1", placement("p1", 0, 11)],
+      ["q0", { ...placement("q0", 20, 22), district: "other" }],
+      ["q1", { ...placement("q1", 20, 33), district: "other" }],
+    ]);
+    const edges = [
+      road("p0", "q0"),
+      road("p1", "q1"),
+      road("q0", "p0"),
+      road("q1", "p1"),
+    ];
+    const segments = planRoads(island, edges);
+    expect(planRoads(island, [...edges].reverse())).toEqual(segments);
+    for (const edge of edges) {
+      expect(
+        hasConnectedRoute(
+          segments,
+          edge,
+          island.get(edge.from) as Placement,
+          island.get(edge.to) as Placement
+        )
+      ).toBe(true);
+    }
+    const bridges = segments
+      .filter(
+        (segment) => vertical(segment) && segment.x0 > 1 && segment.x0 < 19
+      )
+      .sort((a, b) => a.x0 - b.x0);
+    expect(bridges).toHaveLength(4);
+    for (const [index, bridge] of bridges.entries()) {
+      expect(bridge.edges).toHaveLength(1);
+      expect(bridge.x0 - (bridge.width ?? 0) / 2).toBeGreaterThan(4);
+      expect(bridge.x0 + (bridge.width ?? 0) / 2).toBeLessThan(16);
+      const previous = bridges[index - 1];
+      if (previous)
+        expect(bridge.x0 - (bridge.width ?? 0) / 2).toBeGreaterThan(
+          previous.x0 + (previous.width ?? 0) / 2
+        );
+    }
+  });
+
+  it("keeps medium fixture structure road widths positive", () => {
+    const city = cityDistricts(medium).placements;
+    const byId = new Map(city.map((placement) => [placement.id, placement]));
+    const edges = medium.edges.filter(
+      (edge) =>
+        edge.kind === "allowedChild" &&
+        edge.from !== edge.to &&
+        byId.has(edge.from) &&
+        byId.has(edge.to)
+    );
+    expect(
+      planRoads(byId, edges).every((segment) => (segment.width ?? 0) > 0)
+    ).toBe(true);
+  });
+
+  it("keeps a district route stable when a distant district is added", () => {
+    const base = new Map([
+      ["a", placement("a", 0, 0)],
+      ["b", placement("b", 0, 11)],
+    ]);
+    const edge = road("a", "b");
+    const withDistant = new Map(base);
+    withDistant.set("x", { ...placement("x", 0, 100), district: "other" });
+    withDistant.set("y", { ...placement("y", 0, 111), district: "other" });
+    expect(
+      planRoads(withDistant, [edge]).map(({ edges, ...segment }) => segment)
+    ).toEqual(planRoads(base, [edge]).map(({ edges, ...segment }) => segment));
+  });
+
   it("draws nothing for an empty edge list", () => {
     expect(planRoads(placements, [])).toEqual([]);
   });
@@ -130,6 +205,22 @@ describe("planRoads", () => {
     ).toBe(true);
   });
 
+  it("detours a rank-skipping run around an intermediate building", () => {
+    const skipped = new Map(placements);
+    skipped.set("blocker", placement("blocker", 12, 11));
+    skipped.set("child", placement("child", 12, 22));
+    const segments = planRoads(skipped, [road("a", "child")]);
+    expect(
+      segments.some(
+        (segment) =>
+          vertical(segment) &&
+          segment.x0 === 12 &&
+          Math.min(segment.z0, segment.z1) < 11 &&
+          Math.max(segment.z0, segment.z1) > 11
+      )
+    ).toBe(false);
+  });
+
   it("merges two parents' runs into the same child instead of stacking them", () => {
     const shared = new Map(placements);
     shared.set("c", placement("c", 12, 0));
@@ -145,8 +236,8 @@ describe("planRoads", () => {
 
   it("keeps two parents on one street in separate lanes", () => {
     const two = new Map(placements);
-    two.set("c", placement("c", 12, 0));
-    two.set("d", placement("d", 18, 11));
+    two.set("c", placement("c", 4, 0));
+    two.set("d", placement("d", 10, 11));
     const runs = planRoads(two, [road("a", "b"), road("c", "d")]).filter(
       horizontal
     );
@@ -155,6 +246,66 @@ describe("planRoads", () => {
       (runs[1] as RoadSegment).z0,
       6
     );
+  });
+
+  it("allocates dense channels deterministically without collapsing spans", () => {
+    const dense = new Map<string, Placement>();
+    for (let i = 0; i < 40; i++) {
+      dense.set(`p${i}`, placement(`p${i}`, i * 3, 0));
+      dense.set(`c${i}`, placement(`c${i}`, 120 + i * 3, 5));
+    }
+    const edges = [...new Array(40).keys()].map((i) => road(`p${i}`, `c${i}`));
+    const shuffled = [...edges].reverse();
+    const routed = planRoads(dense, edges);
+    const rerouted = planRoads(dense, shuffled);
+    expect(rerouted).toEqual(routed);
+
+    const lanes = routed
+      .filter(horizontal)
+      .map((segment) => segment.z0.toFixed(6));
+    expect(new Set(lanes).size).toBe(40);
+    const traces = routed.filter(horizontal).sort((a, b) => a.z0 - b.z0);
+    for (const [index, trace] of traces.entries()) {
+      const halfWidth = (trace.width ?? 0.3) / 2;
+      expect(trace.z0 - halfWidth).toBeGreaterThan(1);
+      expect(trace.z0 + halfWidth).toBeLessThan(4);
+      const previous = traces[index - 1];
+      if (previous)
+        expect(trace.z0 - halfWidth).toBeGreaterThan(
+          previous.z0 + (previous.width ?? 0.3) / 2
+        );
+    }
+  });
+
+  it("clears wide obstacles across every skipped row", () => {
+    const wide = { ...placement("wide", 12, 22), footprint: 8 };
+    const obstacles = [
+      placement("first", 30, 11),
+      wide,
+      placement("last", 12, 33),
+    ];
+    const route = new Map([
+      ["a", placement("a", 0, 0)],
+      ["child", placement("child", 12, 44)],
+      ...obstacles.map((item) => [item.id, item] as const),
+    ]);
+    for (const segment of planRoads(route, [road("a", "child")])) {
+      for (const obstacle of obstacles) {
+        const radius = obstacle.footprint / 2;
+        const margin = (segment.width ?? 0.3) / 2;
+        const crossesX =
+          Math.max(segment.x0, segment.x1) + margin >
+            obstacle.position.x - radius &&
+          Math.min(segment.x0, segment.x1) - margin <
+            obstacle.position.x + radius;
+        const crossesZ =
+          Math.max(segment.z0, segment.z1) + margin >
+            obstacle.position.z - radius &&
+          Math.min(segment.z0, segment.z1) - margin <
+            obstacle.position.z + radius;
+        expect(crossesX && crossesZ).toBe(false);
+      }
+    }
   });
 
   it("crosses less than the straight ribbons it replaced", () => {
@@ -361,4 +512,171 @@ describe("buildRoadGeometry", () => {
     }
     expect(next).toBe(positions.length / 3);
   });
+});
+
+describe("render crossing breaks", () => {
+  const horizontal = (edges: SchemaEdge[]): RoadSegment => ({
+    x0: -5,
+    z0: 0,
+    x1: 5,
+    z1: 0,
+    edges,
+    into: null,
+    width: 0.3,
+  });
+  const vertical = (edges: SchemaEdge[]): RoadSegment => ({
+    x0: 0,
+    z0: -5,
+    x1: 0,
+    z1: 5,
+    edges,
+    into: null,
+    width: 0.3,
+  });
+
+  it("breaks an unrelated perpendicular ribbon while retaining both sides", () => {
+    const result = separateCrossings([
+      horizontal([road("parent-a", "child-a")]),
+      vertical([road("parent-b", "child-b")]),
+    ]);
+    expect(result).toHaveLength(3);
+    expect(
+      result.filter((segment) => Math.abs(segment.z1 - segment.z0) < 1e-6)
+    ).toHaveLength(2);
+    expect(
+      result.filter((segment) => Math.abs(segment.x1 - segment.x0) < 1e-6)
+    ).toHaveLength(1);
+    const horizontalParts = result.filter(
+      (segment) => Math.abs(segment.z1 - segment.z0) < 1e-6
+    );
+    expect((horizontalParts[0] as RoadSegment).x1).toBeLessThan(-0.1);
+    expect((horizontalParts[1] as RoadSegment).x0).toBeGreaterThan(0.1);
+  });
+
+  it("keeps shared-parent and shared-target junctions continuous", () => {
+    const sharedParent = separateCrossings([
+      horizontal([road("parent", "child-a")]),
+      vertical([road("parent", "child-b")]),
+    ]);
+    const sharedTarget = separateCrossings([
+      horizontal([road("parent-a", "child")]),
+      vertical([road("parent-b", "child")]),
+    ]);
+    expect(sharedParent).toHaveLength(2);
+    expect(sharedTarget).toHaveLength(2);
+  });
+});
+
+describe("road rendering clearance", () => {
+  it("keeps ribbons, arrowheads and self loops above raised folder boards", () => {
+    const { positions } = buildRoadGeometry(placements, [
+      road("a", "b"),
+      road("a", "a"),
+    ]);
+    const elevations = Array.from(positions).filter(
+      (_, index) => index % 3 === 1
+    );
+    expect(elevations.length).toBeGreaterThan(0);
+    expect(Math.min(...elevations)).toBeGreaterThan(FOLDER_TINT_HEIGHT + 0.01);
+  });
+
+  it("gives uncrowded roads enough width to read at overview scale", () => {
+    const segments = planRoads(placements, [road("a", "b")]);
+    expect(segments.length).toBeGreaterThan(0);
+    for (const segment of segments)
+      expect(segment.width).toBeGreaterThanOrEqual(0.25);
+  });
+});
+
+/** Includes junctions inside a merged trunk, not only its two endpoints. */
+function runsTouch(a: RoadSegment, b: RoadSegment): boolean {
+  return (
+    Math.max(Math.min(a.x0, a.x1), Math.min(b.x0, b.x1)) <=
+      Math.min(Math.max(a.x0, a.x1), Math.max(b.x0, b.x1)) + 1e-6 &&
+    Math.max(Math.min(a.z0, a.z1), Math.min(b.z0, b.z1)) <=
+      Math.min(Math.max(a.z0, a.z1), Math.max(b.z0, b.z1)) + 1e-6
+  );
+}
+
+function touchesBuilding(run: RoadSegment, at: Placement): boolean {
+  const half = at.footprint / 2;
+  return runsTouch(run, {
+    ...run,
+    x0: at.position.x - half,
+    x1: at.position.x + half,
+    z0: at.position.z - half,
+    z1: at.position.z + half,
+  });
+}
+
+function hasConnectedRoute(
+  segments: RoadSegment[],
+  edge: SchemaEdge,
+  from: Placement,
+  to: Placement
+): boolean {
+  const path = segments.filter((segment) =>
+    segment.edges.some(
+      (candidate) => candidate.from === edge.from && candidate.to === edge.to
+    )
+  );
+  const pending = path.filter((segment) => touchesBuilding(segment, from));
+  const visited = new Set(pending);
+  while (pending.length) {
+    const current = pending.pop() as RoadSegment;
+    if (touchesBuilding(current, to)) return true;
+    for (const segment of path) {
+      if (!visited.has(segment) && runsTouch(current, segment)) {
+        visited.add(segment);
+        pending.push(segment);
+      }
+    }
+  }
+  return false;
+}
+
+describe.each([
+  ["medium", medium],
+  ["pathological", pathological],
+] as const)("%s route continuity", (_, graph) => {
+  it("retains a visible connected path for every valid structure relationship", () => {
+    const city = cityDistricts(graph);
+    const byId = new Map(city.placements.map((at) => [at.id, at]));
+    const edges = graph.edges.filter(
+      (edge) =>
+        edge.kind === "allowedChild" &&
+        edge.from !== edge.to &&
+        byId.has(edge.from) &&
+        byId.has(edge.to)
+    );
+    const segments = planRoads(byId, edges);
+    expect(segments.every((segment) => (segment.width ?? 0) > 0)).toBe(true);
+    const missing = edges.filter(
+      (edge) =>
+        !hasConnectedRoute(
+          segments,
+          edge,
+          byId.get(edge.from) as Placement,
+          byId.get(edge.to) as Placement
+        )
+    );
+    expect(missing.map((edge) => `${edge.from}->${edge.to}`)).toEqual([]);
+  });
+});
+
+it("joins side-by-side islands inside their gap using local arrival streets", () => {
+  const at = new Map([
+    ["a", placement("a", 0, 0)],
+    ["row", placement("row", 0, 22)],
+    ["b", { ...placement("b", 100, 11), district: "right" }],
+  ]);
+  const segments = planRoads(at, [road("a", "b")]);
+  const bridge = segments.find(
+    (segment) => vertical(segment) && segment.x0 > 1 && segment.x0 < 99
+  );
+  expect(bridge).toBeDefined();
+  expect(bridge?.x0).toBeCloseTo(50);
+  expect(
+    segments.every((segment) => Math.max(segment.z0, segment.z1) <= 12)
+  ).toBe(true);
 });

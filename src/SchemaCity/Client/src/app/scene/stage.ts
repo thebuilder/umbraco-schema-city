@@ -8,6 +8,9 @@
 // camera every frame without the lines appearing to slide.
 import { FLOOR_HEIGHT } from "./buildings";
 
+/** Highest board surface; ground traces must sit above nested folder tints. */
+export const FOLDER_TINT_HEIGHT = 0.02;
+
 /**
  * One grid square is six world units. It read as the street the layout left between
  * two ranks until that street grew to nine, and it is a ruler under the islands now
@@ -147,21 +150,17 @@ const FIRST_ROW_FLOORS = 4;
  * can fall along z.
  */
 const LEAN_PER_UNIT = Math.SQRT2;
+/** A full 9-unit outer street plus one unit of clearance below the title. */
+const NORTH_STREET_RESERVE = 10;
 
-/**
- * The ground an island keeps clear along its north edge for the name: an inset, the
- * cap height, and enough room under the letters that a first row of four floors
- * leans past them rather than over them. The name lies flat and never turns, so this
- * band holds the whole of it at every camera angle, and the layout leaves the band
- * empty rather than the scene printing over a row.
- *
- * ponytail: one number for every district, cut for the tallest first row worth
- * planning for rather than for the row each district actually has. A band measured
- * per district would give a two-floor first row its three units back, and no fixture
- * has an island where that reads as wasted ground.
- */
+/** Reserve enough ground below the title for both roads and projected rooftops. */
 export const STAMP_BAND =
-  STAMP_INSET + STAMP_CAP + LEAN_PER_UNIT * FIRST_ROW_FLOORS * FLOOR_HEIGHT;
+  STAMP_INSET +
+  STAMP_CAP +
+  Math.max(
+    LEAN_PER_UNIT * FIRST_ROW_FLOORS * FLOOR_HEIGHT,
+    NORTH_STREET_RESERVE
+  );
 
 /**
  * Where a district's name lies on its island and how big it is, in world units.

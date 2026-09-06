@@ -3,8 +3,20 @@ import { Fragment, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Finding } from "../model/findings";
 import type { Neighbourhood, PropertyTargets } from "../model/neighbourhood";
-import type { PropertyGroup, SchemaNode, TypeUsage } from "../model/types";
+import type {
+  PropertyGroup,
+  SchemaEdge,
+  SchemaNode,
+  TypeUsage,
+  UsageReport,
+} from "../model/types";
+import { InspectorDiagnostics } from "./InspectorDiagnostics";
+import {
+  FocusExpansionRow,
+  InspectorFocusControls,
+} from "./InspectorFocusControls";
 import { iconMask } from "./scene/icons";
 
 type Lookup = Map<string, SchemaNode>;
@@ -251,6 +263,28 @@ function TypeIcon({ svg }: { svg?: string }) {
  */
 export const INSPECTOR_WIDTH = 320;
 
+function TypeSummary({
+  node,
+  properties,
+}: {
+  node: SchemaNode;
+  properties: number;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 border-line border-b px-3 py-2">
+      {node.isElement ? <Badge variant="amber">Element</Badge> : null}
+      {node.allowedAsRoot ? <Badge>Root</Badge> : null}
+      {node.variesByCulture ? (
+        <Badge variant="azure">Varies by culture</Badge>
+      ) : null}
+      <Badge variant="outline">
+        {properties} properties ({node.ownPropertyCount} own ·{" "}
+        {node.composedPropertyCount} composed)
+      </Badge>
+    </div>
+  );
+}
+
 export function Inspector({
   focused,
   icons,
@@ -261,7 +295,14 @@ export function Inspector({
   onOpenType,
   onSelect,
   onToggleFocus,
+  findings = [],
+  usageReport,
   usage,
+  edges,
+  focusDepth,
+  focusCount,
+  onExpandFocus,
+  canExpandFocus = false,
 }: {
   focused: boolean;
   /** Umbraco icon name to SVG, the same map the scene puts on the roofs. */
@@ -273,7 +314,14 @@ export function Inspector({
   onOpenType?: (id: string) => void;
   onSelect: (id: string) => void;
   onToggleFocus: () => void;
+  findings?: Finding[];
+  usageReport?: UsageReport;
   usage?: TypeUsage;
+  edges?: SchemaEdge[];
+  focusDepth?: number;
+  focusCount?: number;
+  onExpandFocus?: () => void;
+  canExpandFocus?: boolean;
 }) {
   const list = (ids: string[]) => (
     <TypeList ids={ids} nodesById={nodesById} onSelect={onSelect} />
@@ -300,13 +348,10 @@ export function Inspector({
             {node.alias}
           </p>
         </div>
-        <Button
-          onClick={onToggleFocus}
-          size="sm"
-          variant={focused ? "signal" : "outline"}
-        >
-          {focused ? "Leave focus" : "Focus"}
-        </Button>
+        <InspectorFocusControls
+          focused={focused}
+          onToggleFocus={onToggleFocus}
+        />
         <Button
           aria-label="Close inspector"
           onClick={onClose}
@@ -316,22 +361,29 @@ export function Inspector({
           <XIcon />
         </Button>
       </header>
+      {focused && focusCount !== undefined && onExpandFocus ? (
+        <FocusExpansionRow
+          canExpand={canExpandFocus}
+          count={focusCount}
+          depth={focusDepth ?? 1}
+          onExpand={onExpandFocus}
+        />
+      ) : null}
 
-      <div className="flex flex-wrap gap-1 border-line border-b px-3 py-2">
-        {node.isElement ? <Badge variant="amber">Element</Badge> : null}
-        {node.allowedAsRoot ? <Badge>Root</Badge> : null}
-        {node.variesByCulture ? (
-          <Badge variant="azure">Varies by culture</Badge>
-        ) : null}
-        <Badge variant="outline">
-          {properties} properties ({node.ownPropertyCount} own ·{" "}
-          {node.composedPropertyCount} composed)
-        </Badge>
-      </div>
+      <TypeSummary node={node} properties={properties} />
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-3 px-3 py-3">
           {usage ? <Usage usage={usage} /> : null}
+          <InspectorDiagnostics
+            edges={edges}
+            findings={findings}
+            neighbourhood={neighbourhood}
+            nodeId={node.id}
+            nodesById={nodesById}
+            onSelect={onSelect}
+            usage={usageReport}
+          />
           {neighbourhood.compositions.length > 0 ? (
             <Section title="Compositions">
               {list(neighbourhood.compositions)}

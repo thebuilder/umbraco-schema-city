@@ -1,10 +1,15 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>Schema City harness</title>
-<body style="margin: 0; height: 100vh; display: flex; flex-direction: column">
-  <div style="padding: 6px">
-    <select id="fixture"></select>
-  </div>
-  <div id="app" style="flex: 1; min-height: 0"></div>
-  <script src="./main.tsx" type="module"></script>
-</body>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>Schema City harness</title>
+  </head>
+  <body style="margin: 0; height: 100vh; display: flex; flex-direction: column">
+    <header style="padding: 6px">
+      <select aria-label="Demo schema" id="fixture"></select>
+    </header>
+    <div id="app" style="flex: 1; min-height: 0"></div>
+    <script src="./main.tsx" type="module"></script>
+  </body>
+</html>

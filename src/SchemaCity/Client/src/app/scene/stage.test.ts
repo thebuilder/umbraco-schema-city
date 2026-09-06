@@ -106,11 +106,29 @@ test("a district's name prints in the band along the north edge of its island", 
   );
 });
 
+test("ordinary district titles keep one cap and one north-west anchor", () => {
+  const islands = [
+    { minX: -40, maxX: 40, minZ: -20, maxZ: 30 },
+    { minX: 50, maxX: 110, minZ: -20, maxZ: 30 },
+    { minX: -40, maxX: 40, minZ: 40, maxZ: 90 },
+  ];
+  const stamps = islands.map((island) => districtStamp(island, 7));
+  for (let i = 0; i < stamps.length; i++) {
+    const stamp = stamps[i] as (typeof stamps)[number];
+    const island = islands[i] as (typeof islands)[number];
+    expect(stamp.height).toBe(STAMP_CAP);
+    expect(stamp.x - stamp.width / 2).toBe(island.minX + 0.5);
+    expect(stamp.z - stamp.height / 2).toBe(island.minZ + 0.5);
+  }
+});
+
 test("the band clears a first row of four floors at the isometric angle", () => {
   const floors = 4 * FLOOR_HEIGHT;
   // An inset, the letters, and the ground a four-floor roof leans over on the
-  // island's diagonal. About 7.9 units.
-  expect(STAMP_BAND).toBeCloseTo(0.5 + STAMP_CAP + Math.SQRT2 * floors);
+  // island's diagonal, or the full outer street with clearance.
+  expect(STAMP_BAND).toBeCloseTo(
+    0.5 + STAMP_CAP + Math.max(Math.SQRT2 * floors, 10)
+  );
 
   // What that buys: a building standing one row south of the band hides the ground
   // sqrt(2) times its height north of it, and the letters end before that reaches.
@@ -121,6 +139,13 @@ test("the band clears a first row of four floors at the isometric angle", () => 
   expect(stamp.z + stamp.height / 2).toBeLessThanOrEqual(
     roof - Math.SQRT2 * floors
   );
+});
+
+test("the reserved outer street remains below the title band", () => {
+  const titleEnd = 0.5 + STAMP_CAP;
+  const firstRowMin = STAMP_BAND;
+  const outerStreetEdge = firstRowMin - 9;
+  expect(outerStreetEdge - titleEnd).toBeGreaterThanOrEqual(1);
 });
 
 test("a name too wide for its island shrinks instead of hanging over the void", () => {

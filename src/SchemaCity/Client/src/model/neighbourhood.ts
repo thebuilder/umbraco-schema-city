@@ -24,7 +24,9 @@ export type PropertyTargets = { propertyAlias: string; ids: string[] };
 
 export type Neighbourhood = {
   compositions: string[];
+  composedBy: string[];
   inherits: string[];
+  inheritedBy: string[];
   allowedParents: string[];
   allowedChildren: string[];
   blockHosts: string[];
@@ -35,7 +37,9 @@ export type Neighbourhood = {
 
 const empty = (): Neighbourhood => ({
   compositions: [],
+  composedBy: [],
   inherits: [],
+  inheritedBy: [],
   allowedParents: [],
   allowedChildren: [],
   blockHosts: [],
@@ -77,9 +81,11 @@ export function neighbourhoods(graph: SchemaGraph): Map<string, Neighbourhood> {
     switch (edge.kind) {
       case "composition":
         at(edge.from).compositions.push(edge.to);
+        at(edge.to).composedBy.push(edge.from);
         break;
       case "inherits":
         at(edge.from).inherits.push(edge.to);
+        at(edge.to).inheritedBy.push(edge.from);
         break;
       case "allowedChild":
         at(edge.from).allowedChildren.push(edge.to);
@@ -113,7 +119,9 @@ export function neighbourhoods(graph: SchemaGraph): Map<string, Neighbourhood> {
 
   for (const entry of map.values()) {
     entry.compositions = tidy(entry.compositions);
+    entry.composedBy = tidy(entry.composedBy);
     entry.inherits = tidy(entry.inherits);
+    entry.inheritedBy = tidy(entry.inheritedBy);
     entry.allowedParents = tidy(entry.allowedParents);
     entry.allowedChildren = tidy(entry.allowedChildren);
     entry.blockHosts = tidy(entry.blockHosts);

@@ -16,7 +16,9 @@ import {
   type FindingKind,
   type FindingSeverity,
 } from "../model/findings";
-import type { SchemaNode } from "../model/types";
+import { findingsCsv } from "../model/findings-export";
+import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
+import { FindingRelations } from "./FindingRelations";
 
 const SEVERITY_TITLE: Record<FindingSeverity, string> = {
   problem: "Problems",
@@ -30,30 +32,39 @@ const SEVERITY_TITLE: Record<FindingSeverity, string> = {
 function Row({
   finding,
   name,
+  nodesById,
   onSelect,
 }: {
   finding: Finding;
   name: string;
+  nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
 }) {
   return (
-    <button
-      className="w-full border border-line border-b-0 bg-panel-sunken px-2 py-1.5 text-left last:border-b hover:border-line-strong hover:bg-accent/60"
-      onClick={() => onSelect(finding.nodeId)}
-      type="button"
-    >
-      <span className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate text-phosphor text-xs">
-          {name}
+    <div className="w-full border-line border-b bg-panel-sunken px-2 py-1.5 last:border-b hover:border-line-strong hover:bg-accent/60">
+      <button
+        className="w-full text-left"
+        onClick={() => onSelect(finding.nodeId)}
+        type="button"
+      >
+        <span className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-phosphor text-xs">
+            {name}
+          </span>
+          <span className="shrink-0 text-3xs text-phosphor-dim uppercase tracking-terminal">
+            {FINDING_LABEL[finding.kind]}
+          </span>
         </span>
-        <span className="shrink-0 text-3xs text-phosphor-dim uppercase tracking-terminal">
-          {FINDING_LABEL[finding.kind]}
+        <span className="block text-muted-foreground text-3xs">
+          {finding.summary}
         </span>
-      </span>
-      <span className="block text-muted-foreground text-3xs">
-        {finding.summary}
-      </span>
-    </button>
+      </button>
+      <FindingRelations
+        finding={finding}
+        nodesById={nodesById}
+        onSelect={onSelect}
+      />
+    </div>
   );
 }
 
@@ -63,15 +74,22 @@ function Row({
  * filter chips behaves.
  */
 export function Findings({
+  graph,
   findings,
   nodesById,
   onSelect,
+  open,
+  onOpenChange,
+  usage,
 }: {
+  graph: SchemaGraph;
   findings: Finding[];
   nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  usage?: UsageReport;
 }) {
-  const [open, setOpen] = useState(false);
   const [kinds, setKinds] = useState<FindingKind[]>([]);
 
   const countOf = (kind: FindingKind) =>
@@ -87,11 +105,26 @@ export function Findings({
 
   const pick = (id: string) => {
     onSelect(id);
-    setOpen(false);
+    onOpenChange(false);
+  };
+
+  const exportCsv = () => {
+    const blob = new Blob([findingsCsv(matched, graph, usage)], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "schema-city-findings.csv";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    // Downloads consume the URL asynchronously, after the click task has ended.
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
   };
 
   return (
-    <Sheet onOpenChange={setOpen} open={open}>
+    <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetTrigger
         render={<Button data-trigger size="sm" variant="outline" />}
       >
@@ -105,9 +138,19 @@ export function Findings({
           <SheetTitle className="text-sm uppercase tracking-terminal-lg">
             Findings
           </SheetTitle>
-          <p className="mt-1 text-muted-foreground text-xs">
-            {matched.length} matched / {findings.length} total
-          </p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="text-muted-foreground text-xs">
+              {matched.length} matched / {findings.length} total
+            </p>
+            <Button onClick={exportCsv} size="sm" variant="outline">
+              Export CSV
+            </Button>
+          </div>
+          {usage ? null : (
+            <p className="mt-1 text-3xs text-amber">
+              Usage snapshot unavailable; usage-dependent checks are omitted.
+            </p>
+          )}
         </div>
 
         {present.length > 0 ? (
@@ -158,6 +201,7 @@ export function Findings({
                       name={
                         nodesById.get(finding.nodeId)?.name ?? "a deleted type"
                       }
+                      nodesById={nodesById}
                       onSelect={pick}
                     />
                   ))}

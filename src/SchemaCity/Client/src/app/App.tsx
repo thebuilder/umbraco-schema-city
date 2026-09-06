@@ -46,8 +46,11 @@ import {
 import { PortalContainer } from "@/portal";
 import { findFindings } from "../model/findings";
 import { neighbourhoods } from "../model/neighbourhood";
+import { reachableWithin } from "../model/reach";
 import { searchNodes } from "../model/search";
+import { compareSchemas } from "../model/snapshots";
 import type { SchemaGraph, UsageReport } from "../model/types";
+import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_WIDTH, Inspector } from "./Inspector";
@@ -158,8 +161,8 @@ function Legend() {
           <LegendRow mark={<Tint className="bg-signal" />}>Selected</LegendRow>
         </ul>
         <p className="mt-2 text-muted-foreground text-xs">
-          One floor per property group, and a wider footprint for more own
-          properties.
+          One floor per property group; windows represent properties. A wider
+          footprint means more own properties. Height is not a complexity score.
         </p>
       </section>
 
@@ -202,6 +205,10 @@ function Legend() {
             Picker reference
           </LegendRow>
         </ul>
+        <p className="mt-2 text-muted-foreground text-xs">
+          Hover or select a building to brighten its connections. Structure
+          traces show allowed-child rules, not the content tree.
+        </p>
       </section>
     </div>
   );
@@ -272,11 +279,18 @@ export function App({
   const [focus, setFocus] = useState<string | null>(
     start.focus ? start.id : null
   );
+  const [focusDepth, setFocusDepth] = useState(1);
+  const [baseline, setBaseline] = useState<SchemaGraph | null>(null);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const lastCamera = useRef<"city" | "top">(
+    start.view === "top" ? "top" : "city"
+  );
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [findingsOpen, setFindingsOpen] = useState(false);
   // Bumped by Home when there is no focus to leave. The scene passes it to the
   // camera rig, which flies back to the city framing and leaves the buildings alone.
   const [reframe, setReframe] = useState(0);
@@ -308,7 +322,10 @@ export function App({
       ) {
         return;
       }
-      if (event.key === "Enter" && selected) setFocus(selected);
+      if (event.key === "Enter" && selected) {
+        setFocusDepth(1);
+        setFocus(selected);
+      }
       // Escape leaves focus first and clears the selection second, so the way out
       // of focus mode never also loses the node you were reading.
       if (event.key === "Escape") {
@@ -331,8 +348,12 @@ export function App({
       // Turning either view off goes back to the city, the way the toolbar's two
       // toggles do.
       const key = event.key.toLowerCase();
-      if (key === "l") setView((at) => (at === "list" ? "city" : "list"));
-      if (key === "e") setView((at) => (at === "explore" ? "city" : "explore"));
+      if (key === "l")
+        setView((at) => (at === "list" ? lastCamera.current : "list"));
+      if (key === "e") {
+        lastCamera.current = lastCamera.current === "top" ? "city" : "top";
+        setView(lastCamera.current);
+      }
       // Leaving focus already flies back to the whole city, so Home only asks for a
       // fresh framing when there is no focus to leave.
       if (key === "home") {
@@ -422,6 +443,21 @@ export function App({
     () => lensScale(graph, usage, lens),
     [graph, usage, lens]
   );
+  const comparison = useMemo(
+    () => (baseline ? compareSchemas(baseline, graph) : null),
+    [baseline, graph]
+  );
+  const focusCount = useMemo(
+    () => (focus ? reachableWithin(graph, focus, focusDepth).size : 0),
+    [graph, focus, focusDepth]
+  );
+  const canExpandFocus = useMemo(
+    () =>
+      focus
+        ? reachableWithin(graph, focus, focusDepth + 1).size > focusCount
+        : false,
+    [graph, focus, focusDepth, focusCount]
+  );
   const selectedNode = selected ? nodesById.get(selected) : undefined;
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
 
@@ -431,6 +467,7 @@ export function App({
   };
 
   const enterFocus = (id: string) => {
+    setFocusDepth(1);
     setSelected(id);
     setFocus(id);
   };
@@ -457,7 +494,10 @@ export function App({
 
   return (
     <PortalContainer value={portal}>
-      <div className="flex h-full flex-col bg-background font-mono text-foreground">
+      <section
+        aria-label="Schema City"
+        className="flex h-full flex-col bg-background font-mono text-foreground"
+      >
         {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
             fitting, which is 848 px with the lens picker reading None and earlier
             once a longer lens name widens it. The backoffice is narrower than the
@@ -502,33 +542,31 @@ export function App({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* The camera is always one of the two, so it is a segmented pair rather
-              than a lone Explore toggle: one toggle says what Explore is and never
-              what it is instead, which is a fixed isometric angle. List is its own
-              toggle still, because the table is not a third camera, and turning it
-              off goes back to whichever camera the pair is on.
-
-              Picking a camera from the list leaves the list, the way turning
-              Explore on used to. */}
+          {/* Both camera modes keep the same city coordinates. */}
           <div className="flex shrink-0 items-center gap-1.5">
             <span className="font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
               Camera
             </span>
             <ToggleGroup
               aria-label="Camera"
-              onValueChange={(value) =>
-                setView(value[0] === "free" ? "explore" : "city")
-              }
+              onValueChange={(value) => {
+                lastCamera.current = value[0] === "top" ? "top" : "city";
+                setView(lastCamera.current);
+              }}
               size="sm"
-              value={[view === "explore" ? "free" : "iso"]}
+              value={[
+                (view === "list" ? lastCamera.current : view) === "top"
+                  ? "top"
+                  : "iso",
+              ]}
               variant="outline"
             >
               <ToggleGroupItem value="iso">Iso</ToggleGroupItem>
-              <ToggleGroupItem value="free">Free</ToggleGroupItem>
+              <ToggleGroupItem value="top">Top down</ToggleGroupItem>
             </ToggleGroup>
           </div>
           <Toggle
-            onPressedChange={(on) => setView(on ? "list" : "city")}
+            onPressedChange={(on) => setView(on ? "list" : lastCamera.current)}
             pressed={view === "list"}
             size="sm"
             variant="outline"
@@ -585,8 +623,29 @@ export function App({
 
             <Findings
               findings={findings}
+              graph={graph}
               nodesById={nodesById}
+              onOpenChange={setFindingsOpen}
               onSelect={followLink}
+              open={findingsOpen}
+              usage={usage}
+            />
+
+            <ComparisonTools
+              baseline={baseline}
+              comparison={comparison}
+              graph={graph}
+              onBaselineChange={(next) => {
+                setBaseline(next);
+                setFocus(null);
+                if (next) setLens("none");
+              }}
+              onOpenChange={setComparisonOpen}
+              onSelect={(id) => {
+                setComparisonOpen(false);
+                followLink(id);
+              }}
+              open={comparisonOpen}
             />
 
             <Popover>
@@ -636,6 +695,9 @@ export function App({
           ) : null}
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
+          {view === "list" ? null : (
+            <ComparisonLegend comparison={comparison} />
+          )}
           {view === "list" ? (
             // The inspector is an overlay, so the table is inset by its width while
             // it is open rather than sliding under it.
@@ -669,8 +731,11 @@ export function App({
                 }
               >
                 <Scene
-                  explore={view === "explore"}
+                  baseline={baseline}
+                  comparison={comparison}
+                  explore={view === "top"}
                   focus={focus}
+                  focusDepth={focusDepth}
                   graph={graph}
                   icons={icons}
                   inspectorWidth={
@@ -690,12 +755,20 @@ export function App({
 
           {selectedNode && neighbourhood ? (
             <Inspector
+              canExpandFocus={canExpandFocus}
+              edges={graph.edges}
+              findings={findings.filter(
+                (finding) => finding.nodeId === selectedNode.id
+              )}
+              focusCount={focusCount}
+              focusDepth={focusDepth}
               focused={focus === selectedNode.id}
               icons={icons}
               neighbourhood={neighbourhood}
               node={selectedNode}
               nodesById={nodesById}
               onClose={done}
+              onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
               onOpenType={onOpenType}
               onSelect={followLink}
               onToggleFocus={() =>
@@ -704,6 +777,7 @@ export function App({
                   : enterFocus(selectedNode.id)
               }
               usage={usage?.byType[selectedNode.id]}
+              usageReport={usage}
             />
           ) : null}
         </div>
@@ -775,7 +849,7 @@ export function App({
         </CommandDialog>
 
         <div ref={portal} />
-      </div>
+      </section>
     </PortalContainer>
   );
 }
