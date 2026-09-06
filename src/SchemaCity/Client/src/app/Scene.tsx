@@ -7,6 +7,9 @@ import {
 } from "@react-three/fiber";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { neighbourhoods } from "../model/neighbourhood";
 import type {
   SchemaEdge,
@@ -58,13 +61,18 @@ import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
   CHAR_PX,
   LABEL_CAP,
-  LABEL_HEIGHT_PX,
+  labelAnchors,
   pickLabels,
+  visibleLabelIds,
 } from "./scene/labels";
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { findNameplate, groundRuns, type Run } from "./scene/nameplate";
-import { revealAt, transitionToward } from "./scene/reveal";
+import {
+  buildOutlinePositions,
+  revealAt,
+  transitionToward,
+} from "./scene/reveal";
 import { buildRoadGeometry, roadFan } from "./scene/roads";
 import {
   FOLDER_TINT_HEIGHT,
@@ -110,9 +118,6 @@ type Palette = {
   mono: string;
 };
 
-/** Seconds a building takes to rise, once its own `introDelay` has passed. */
-const INTRO_DURATION = 0.46;
-const BUILDING_REVEAL_DELAY = 0.48;
 const PLAZA_HEIGHT = 0.05;
 const HOVER_BRIGHTEN = 1.4;
 /** How far a faded building's colour moves toward the void, approximating 20% opacity. */
@@ -197,11 +202,11 @@ function Buildings({
   const plazaRef = useRef<THREE.InstancedMesh>(null);
   const windowRef = useRef<THREE.InstancedMesh>(null);
   const hitRef = useRef<THREE.InstancedMesh>(null);
+  const solidMaterials = useRef(new Map<number, THREE.Material>());
   const scratch = useMemo(() => new THREE.Object3D(), []);
   // Windows are the only thing here that is turned, and a shared scratch object
   // would leave that rotation on the next floor box written through it.
   const turned = useMemo(() => new THREE.Object3D(), []);
-  const introDone = useRef(reducedMotion);
 
   const meshRefs = useMemo(
     () => ({
@@ -212,23 +217,12 @@ function Buildings({
     }),
     []
   );
-  const introDelayById = useMemo(
-    () => new Map(placements.map((p) => [p.id, p.introDelay])),
-    [placements]
-  );
   const flatById = useMemo(
     () => new Map(placements.map((p) => [p.id, p.flatten ?? 0])),
     [placements]
   );
   const districtById = useMemo(
     () => new Map(placements.map((p) => [p.id, p.districtKind])),
-    [placements]
-  );
-  const introEnd = useMemo(
-    () =>
-      BUILDING_REVEAL_DELAY +
-      Math.max(0, ...placements.map((p) => p.introDelay)) +
-      INTRO_DURATION,
     [placements]
   );
 
@@ -251,46 +245,35 @@ function Buildings({
   function applyCell(
     mesh: THREE.InstancedMesh,
     index: number,
-    cell: FloorCell,
-    progress: number
+    cell: FloorCell
   ) {
-    scratch.position.set(cell.cx, cell.cy * progress, cell.cz);
-    scratch.scale.set(cell.sx, Math.max(cell.sy * progress, 0.0001), cell.sz);
+    scratch.position.set(cell.cx, cell.cy, cell.cz);
+    scratch.scale.set(cell.sx, cell.sy, cell.sz);
     scratch.updateMatrix();
     mesh.setMatrixAt(index, scratch.matrix);
   }
 
-  /** A window rises with the floor it is cut into, on the same progress. */
+  /** Place each window on its final floor face. */
   function applyWindow(
     mesh: THREE.InstancedMesh,
     index: number,
-    cell: WindowCell,
-    progress: number
+    cell: WindowCell
   ) {
-    turned.position.set(cell.cx, cell.cy * progress, cell.cz);
+    turned.position.set(cell.cx, cell.cy, cell.cz);
     turned.rotation.set(0, cell.rotY, 0);
-    turned.scale.set(
-      WINDOW_WIDTH,
-      Math.max(WINDOW_HEIGHT * progress, 0.0001),
-      1
-    );
+    turned.scale.set(WINDOW_WIDTH, WINDOW_HEIGHT, 1);
     turned.updateMatrix();
     mesh.setMatrixAt(index, turned.matrix);
   }
 
-  // Sets every mesh to its resting position (or, unless reduced motion is on,
-  // to the ground) before the first paint. The frame loop below takes over
-  // from there until every building has risen. It runs again on every frame of
-  // a focus tween, which is why it reads the intro's progress rather than
-  // resetting it; resetting would replay the rise every time a building moves.
+  // Geometry stays at its final size through the intro. Updating these matrices
+  // also follows the existing focus tween; only material opacity handles arrival.
   useEffect(() => {
-    const startProgress = introDone.current ? 1 : 0;
-
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
       const mesh = meshRefs[kind].current;
       if (!mesh) continue;
       cellsByKind[kind].forEach((cell, i) => {
-        applyCell(mesh, i, cell, startProgress);
+        applyCell(mesh, i, cell);
       });
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
@@ -299,7 +282,7 @@ function Buildings({
     const window = windowRef.current;
     if (window) {
       windows.forEach((cell, i) => {
-        applyWindow(window, i, cell, startProgress);
+        applyWindow(window, i, cell);
       });
       window.instanceMatrix.needsUpdate = true;
       window.computeBoundingSphere();
@@ -345,42 +328,12 @@ function Buildings({
   }, [cellsByKind, windows, plazas, placements, heights, reducedMotion]);
 
   useFrame((state) => {
-    if (introDone.current) return;
-    const elapsed = state.clock.elapsedTime;
-
-    for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
-      const mesh = meshRefs[kind].current;
-      if (!mesh) continue;
-      cellsByKind[kind].forEach((cell, i) => {
-        const delay =
-          BUILDING_REVEAL_DELAY + (introDelayById.get(cell.buildingId) ?? 0);
-        applyCell(
-          mesh,
-          i,
-          cell,
-          smootherstep((elapsed - delay) / INTRO_DURATION)
-        );
-      });
-      mesh.instanceMatrix.needsUpdate = true;
+    const opacity = revealAt(state.clock.elapsedTime, reducedMotion).districts;
+    for (const material of solidMaterials.current.values()) {
+      material.transparent = opacity < 1;
+      material.depthWrite = opacity >= 1;
+      material.opacity = opacity;
     }
-    const window = windowRef.current;
-    if (window) {
-      windows.forEach((cell, i) => {
-        applyWindow(
-          window,
-          i,
-          cell,
-          smootherstep(
-            (elapsed -
-              BUILDING_REVEAL_DELAY -
-              (introDelayById.get(cell.buildingId) ?? 0)) /
-              INTRO_DURATION
-          )
-        );
-      });
-      window.instanceMatrix.needsUpdate = true;
-    }
-    if (elapsed >= introEnd) introDone.current = true;
   });
 
   useEffect(() => {
@@ -501,7 +454,13 @@ function Buildings({
           ref={ownRef}
         >
           <boxGeometry />
-          <meshStandardMaterial metalness={0.1} roughness={0.45} />
+          <meshStandardMaterial
+            metalness={0.1}
+            opacity={reducedMotion ? 1 : 0}
+            ref={trackMaterial(solidMaterials.current, 0)}
+            roughness={0.45}
+            transparent
+          />
         </instancedMesh>
       )}
       {cellsByKind.composed.length > 0 && (
@@ -510,7 +469,13 @@ function Buildings({
           ref={composedRef}
         >
           <boxGeometry />
-          <meshStandardMaterial metalness={0.1} roughness={0.45} />
+          <meshStandardMaterial
+            metalness={0.1}
+            opacity={reducedMotion ? 1 : 0}
+            ref={trackMaterial(solidMaterials.current, 1)}
+            roughness={0.45}
+            transparent
+          />
         </instancedMesh>
       )}
       {cellsByKind.separator.length > 0 && (
@@ -519,7 +484,13 @@ function Buildings({
           ref={separatorRef}
         >
           <boxGeometry />
-          <meshStandardMaterial metalness={0.1} roughness={0.6} />
+          <meshStandardMaterial
+            metalness={0.1}
+            opacity={reducedMotion ? 1 : 0}
+            ref={trackMaterial(solidMaterials.current, 2)}
+            roughness={0.6}
+            transparent
+          />
         </instancedMesh>
       )}
       {cellsByKind.element.length > 0 && (
@@ -528,7 +499,13 @@ function Buildings({
           ref={elementRef}
         >
           <boxGeometry />
-          <meshStandardMaterial metalness={0.05} roughness={0.7} />
+          <meshStandardMaterial
+            metalness={0.05}
+            opacity={reducedMotion ? 1 : 0}
+            ref={trackMaterial(solidMaterials.current, 3)}
+            roughness={0.7}
+            transparent
+          />
         </instancedMesh>
       )}
       {windows.length > 0 && (
@@ -537,7 +514,12 @@ function Buildings({
           ref={windowRef}
         >
           <planeGeometry />
-          <meshBasicMaterial toneMapped={false} />
+          <meshBasicMaterial
+            opacity={reducedMotion ? 1 : 0}
+            ref={trackMaterial(solidMaterials.current, 4)}
+            toneMapped={false}
+            transparent
+          />
         </instancedMesh>
       )}
       {plazas.length > 0 && (
@@ -546,7 +528,13 @@ function Buildings({
           ref={plazaRef}
         >
           <cylinderGeometry args={[1, 1, 1, 24]} />
-          <meshStandardMaterial metalness={0} roughness={0.9} />
+          <meshStandardMaterial
+            metalness={0}
+            opacity={reducedMotion ? 1 : 0}
+            ref={trackMaterial(solidMaterials.current, 5)}
+            roughness={0.9}
+            transparent
+          />
         </instancedMesh>
       )}
       {placements.length > 0 && (
@@ -571,10 +559,66 @@ function Buildings({
           ref={hitRef}
         >
           <boxGeometry />
-          <meshBasicMaterial opacity={0} transparent />
+          <meshBasicMaterial depthWrite={false} opacity={0} transparent />
         </instancedMesh>
       )}
     </>
+  );
+}
+
+function BuildingOutlines({
+  cellsByKind,
+  palette,
+  reducedMotion,
+}: {
+  cellsByKind: Record<FloorCellKind, FloorCell[]>;
+  palette: Palette;
+  reducedMotion: boolean;
+}) {
+  const material = useRef<THREE.LineBasicMaterial>(null);
+  const lines = useRef<THREE.LineSegments>(null);
+  const positions = useMemo(
+    () =>
+      buildOutlinePositions(
+        Object.values(cellsByKind)
+          .flat()
+          .map((cell) => ({
+            x: cell.cx,
+            y: cell.cy - cell.sy / 2,
+            z: cell.cz,
+            width: cell.sx,
+            height: cell.sy,
+            depth: cell.sz,
+          }))
+      ),
+    [cellsByKind]
+  );
+
+  useFrame((state) => {
+    const progress = revealAt(state.clock.elapsedTime, reducedMotion);
+    if (material.current) material.current.opacity = progress.wireframe;
+    if (lines.current) {
+      lines.current.visible = progress.wireframe > 0.001;
+      lines.current.geometry.setDrawRange(
+        0,
+        Math.floor((positions.length / 6) * progress.trace) * 2
+      );
+    }
+  });
+
+  if (positions.length === 0) return null;
+  return (
+    <lineSegments frustumCulled={false} ref={lines}>
+      <bufferGeometry>
+        <bufferAttribute args={[positions, 3]} attach="attributes-position" />
+      </bufferGeometry>
+      <lineBasicMaterial
+        color={palette.phosphor}
+        depthWrite={false}
+        ref={material}
+        transparent
+      />
+    </lineSegments>
   );
 }
 
@@ -687,6 +731,7 @@ function RoofIcons({
   selected,
   hovered,
   palette,
+  reducedMotion,
 }: {
   groups: IconGroup[];
   placementsById: Map<string, Placement>;
@@ -695,6 +740,7 @@ function RoofIcons({
   selected: string | null;
   hovered: string | null;
   palette: Palette;
+  reducedMotion: boolean;
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
@@ -721,11 +767,18 @@ function RoofIcons({
     }
   }, [groups, neighbours, palette]);
 
-  useFrame(() => {
+  useFrame((state) => {
+    const detailOpacity = revealAt(
+      state.clock.elapsedTime,
+      reducedMotion
+    ).links;
     const plate = capRef.current;
+    if (plate)
+      (plate.material as THREE.Material).opacity = detailOpacity * 0.55;
     for (const group of groups) {
       const mesh = meshes.current.get(group.key);
       if (!mesh) continue;
+      (mesh.material as THREE.Material).opacity = detailOpacity;
       group.ids.forEach((id, index) => {
         const placement = placementsById.get(id);
         const side = (placement?.footprint ?? 0) * ICON_FOOTPRINT;
@@ -782,7 +835,7 @@ function RoofIcons({
           <meshBasicMaterial
             color={palette.background}
             depthWrite={false}
-            opacity={0.55}
+            opacity={reducedMotion ? 0.55 : 0}
             transparent
           />
         </instancedMesh>
@@ -803,6 +856,7 @@ function RoofIcons({
             alphaTest={0.08}
             depthWrite={false}
             map={group.texture}
+            opacity={reducedMotion ? 1 : 0}
             side={THREE.DoubleSide}
             transparent
           />
@@ -917,6 +971,37 @@ function Roads({
   );
 }
 
+/** Screen-space line material with the same per-segment alpha as the schema geometry. */
+function createLinkMaterial(): LineMaterial {
+  const next = new LineMaterial({
+    color: 0xff_ff_ff,
+    depthWrite: false,
+    opacity: 0,
+    transparent: true,
+    vertexColors: true,
+    linewidth: 1.7,
+    worldUnits: false,
+  });
+  next.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <color_pars_vertex>",
+        "#include <color_pars_vertex>\nattribute float instanceAlpha;\nvarying float linkAlpha;"
+      )
+      .replace(
+        "vColor.xyz = ( position.y < 0.5 ) ? instanceColorStart : instanceColorEnd;",
+        "vColor.xyz = ( position.y < 0.5 ) ? instanceColorStart : instanceColorEnd;\n\t\t\tlinkAlpha = instanceAlpha;"
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <color_pars_fragment>",
+        "#include <color_pars_fragment>\nvarying float linkAlpha;"
+      )
+      .replace("float alpha = opacity;", "float alpha = opacity * linkAlpha;");
+  };
+  return next;
+}
+
 /**
  * One of the three link layers, merged into a single line geometry. The geometry is
  * rebuilt when the graph, the layout or the layer set changes, and never for a
@@ -951,9 +1036,6 @@ function Links({
   reducedMotion: boolean;
   visible: boolean;
 }) {
-  const material = useRef<THREE.LineBasicMaterial>(null);
-  const lines = useRef<THREE.LineSegments>(null);
-  useLayerReveal(material, lines, visible, reducedMotion);
   const { positions, ranges } = useMemo(
     () => buildLinkGeometry(layer, edges, anchors, placementsById),
     [layer, edges, anchors, placementsById]
@@ -977,22 +1059,68 @@ function Links({
     );
   }, [positions, ranges, colour, opacity, palette, selected, focus]);
 
+  return (
+    <LinkStrokes
+      colors={colors}
+      positions={positions}
+      reducedMotion={reducedMotion}
+      visible={visible}
+    />
+  );
+}
+
+/** Own the GPU resources independently of graph selection and layer styling. */
+function LinkStrokes({
+  colors,
+  positions,
+  reducedMotion,
+  visible,
+}: {
+  colors: Float32Array;
+  positions: Float32Array;
+  reducedMotion: boolean;
+  visible: boolean;
+}) {
+  const geometry = useMemo(() => {
+    const next = new LineSegmentsGeometry();
+    next.setPositions(positions);
+    return next;
+  }, [positions]);
+  const material = useMemo(createLinkMaterial, []);
+  const lines = useMemo(
+    () => new LineSegments2(geometry, material),
+    [geometry, material]
+  );
+  const materialRef = useRef<LineMaterial>(material);
+  const linesRef = useRef<LineSegments2>(null);
+  useLayerReveal(materialRef, linesRef, visible, reducedMotion);
+  useEffect(() => {
+    const rgb: number[] = [];
+    const alpha: number[] = [];
+    for (let i = 0; i < colors.length; i += 8) {
+      rgb.push(
+        colors[i] as number,
+        colors[i + 1] as number,
+        colors[i + 2] as number,
+        colors[i + 4] as number,
+        colors[i + 5] as number,
+        colors[i + 6] as number
+      );
+      alpha.push(colors[i + 3] as number);
+    }
+    geometry.setColors(rgb);
+    geometry.setAttribute(
+      "instanceAlpha",
+      new THREE.InstancedBufferAttribute(new Float32Array(alpha), 1)
+    );
+  }, [colors, geometry]);
+  // LineSegments2 updates resolution from the active viewport before each draw.
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => () => material.dispose(), [material]);
+
   if (positions.length === 0) return null;
 
-  return (
-    <lineSegments frustumCulled={false} ref={lines}>
-      <bufferGeometry>
-        <bufferAttribute args={[positions, 3]} attach="attributes-position" />
-        <bufferAttribute args={[colors, 4]} attach="attributes-color" />
-      </bufferGeometry>
-      <lineBasicMaterial
-        depthWrite={false}
-        ref={material}
-        transparent
-        vertexColors
-      />
-    </lineSegments>
-  );
+  return <primitive object={lines} ref={linesRef} />;
 }
 
 const touches = (edge: SchemaEdge, id: string) =>
@@ -1016,14 +1144,8 @@ const LINK_LAYERS = [
   opacity: number;
 }[];
 
-/** How many neighbours of the selected node still get a label each. */
-const MAX_NEIGHBOUR_LABELS = 8;
-/** World units between the top face of a building and the bottom of its label. */
-const LABEL_LIFT = 0.35;
 const LABEL_CLASS =
   "absolute top-0 left-0 hidden whitespace-nowrap border border-line-strong bg-panel-raised px-1.5 py-0.5 font-mono text-2xs text-phosphor";
-/** A cut fan's count sorts last of all, so it only takes pixels nothing else wants. */
-const FAN_MARKER_RANK = 4;
 
 /**
  * The building names, in one DOM layer over the canvas. Which of the candidates are
@@ -1044,7 +1166,7 @@ function Labels({
   neighbours,
   focusNeighbours,
   badge,
-  fanMarkers,
+  reducedMotion,
 }: {
   nodesById: Map<string, SchemaNode>;
   placementsById: Map<string, Placement>;
@@ -1055,8 +1177,7 @@ function Labels({
   focusNeighbours: Set<string> | null;
   /** The selected building's usage line, drawn as a second label over its name. */
   badge: string | null;
-  /** Buildings whose road fan is cut, and how many roads are not drawn. */
-  fanMarkers: { id: string; hidden: number }[];
+  reducedMotion: boolean;
 }) {
   const camera = useThree(
     (state) => state.camera
@@ -1065,6 +1186,7 @@ function Labels({
   };
   const gl = useThree((state) => state.gl);
   const size = useThree((state) => state.size);
+  const labelLayer = useRef<HTMLDivElement | null>(null);
   const spans = useRef<HTMLSpanElement[]>([]);
   const charPx = useRef(CHAR_PX);
   const anchor = useMemo(() => new THREE.Vector3(), []);
@@ -1075,87 +1197,22 @@ function Labels({
   const framedZoom = useRef(0);
 
   const candidates = useMemo(() => {
-    const ids = new Set<string>();
-    // A faded building gets no label, not even under the cursor.
-    if (hovered && (neighbours === null || neighbours.has(hovered)))
-      ids.add(hovered);
-    // The focus layout spreads the whole neighbourhood over its own compass, so
-    // every placed building is a candidate there.
-    if (focusNeighbours) for (const id of focusNeighbours) ids.add(id);
-    else if (selected) {
-      ids.add(selected);
-      const direct = [...(neighbours ?? [])].filter((id) => id !== selected);
-      // Past this many the scene stops offering the neighbours at all, so a hub
-      // does not spend the whole screen budget on one selection.
-      if (direct.length <= MAX_NEIGHBOUR_LABELS)
-        for (const id of direct) ids.add(id);
-    }
+    const ids = visibleLabelIds({
+      hovered,
+      selected,
+      neighbours,
+      focusNeighbours,
+    });
 
-    const built: {
-      id: string;
-      text: string;
-      rank: number;
-      footprint: number;
-      x: number;
-      y: number;
-      z: number;
-      /** Pixels to raise the box by after projection, so it clears the name below it. */
-      lift: number;
-    }[] = [];
-    for (const id of ids) {
-      const node = nodesById.get(id);
-      const placement = placementsById.get(id);
-      if (!(node && placement)) continue;
-      const anchorY =
-        (placement.y ?? 0) + (heights.get(id) ?? placement.height) + LABEL_LIFT;
-      built.push({
-        id,
-        text: node.name,
-        rank: id === selected ? 0 : id === hovered ? 1 : 2,
-        footprint: placement.footprint,
-        x: placement.position.x,
-        y: anchorY,
-        z: placement.position.z,
-        lift: 0,
-      });
-      // The usage badge is one more label on the same layer, sitting exactly one
-      // box above the name. Lifting it in pixels rather than world units keeps the
-      // two apart at any zoom, which a fixed height over the roof would not.
-      if (id === selected && badge) {
-        built.push({
-          id: `${id}:usage`,
-          text: badge,
-          rank: 0,
-          footprint: placement.footprint,
-          x: placement.position.x,
-          y: anchorY,
-          z: placement.position.z,
-          lift: LABEL_HEIGHT_PX + 4,
-        });
-      }
-    }
-    // The count of the roads a fan cut, over the roof they would land on. It is the
-    // last thing that gets pixels, so a screen full of names never loses one to it.
-    for (const marker of fanMarkers) {
-      const placement = placementsById.get(marker.id);
-      if (!placement || ids.has(marker.id)) continue;
-      built.push({
-        id: `${marker.id}:parents`,
-        text: `+${marker.hidden} parents`,
-        rank: FAN_MARKER_RANK,
-        footprint: placement.footprint,
-        x: placement.position.x,
-        y:
-          (placement.y ?? 0) +
-          (heights.get(marker.id) ?? placement.height) +
-          LABEL_LIFT,
-        z: placement.position.z,
-        lift: 0,
-      });
-    }
-    return built;
+    return labelAnchors(ids, {
+      nodesById,
+      placementsById,
+      heights,
+      selected,
+      hovered,
+      badge,
+    });
   }, [
-    fanMarkers,
     hovered,
     selected,
     neighbours,
@@ -1184,6 +1241,8 @@ function Labels({
       layer.append(span);
       return span;
     });
+    layer.style.opacity = reducedMotion ? "1" : "0";
+    labelLayer.current = layer;
     parent.append(layer);
     spans.current = made;
 
@@ -1199,11 +1258,16 @@ function Labels({
 
     return () => {
       layer.remove();
+      labelLayer.current = null;
       spans.current = [];
     };
-  }, [gl]);
+  }, [gl, reducedMotion]);
 
-  useFrame(() => {
+  useFrame((state) => {
+    if (labelLayer.current)
+      labelLayer.current.style.opacity = String(
+        revealAt(state.clock.elapsedTime, reducedMotion).links
+      );
     if (
       !dirty.current &&
       camera.zoom === framedZoom.current &&
@@ -1496,15 +1560,39 @@ function DistrictBoards({
   districts,
   palette,
   materials,
+  reducedMotion,
 }: {
   districts: District[];
+  reducedMotion: boolean;
   palette: Palette;
   materials: {
     solid: Map<number, THREE.MeshStandardMaterial>;
-    wire: Map<number, THREE.MeshBasicMaterial>;
+    wire: Map<number, THREE.LineBasicMaterial>;
   };
 }) {
+  const outlineGeometry = useRef<THREE.BufferGeometry>(null);
   const rim = useMemo(() => rimColour(palette), [palette]);
+  const outline = useMemo(
+    () =>
+      buildOutlinePositions(
+        districts.map((district) => ({
+          x: district.centre.x,
+          y: -SLAB_HEIGHT,
+          z: district.centre.z,
+          width: district.maxX - district.minX + ISLAND_PAD * 2,
+          height: SLAB_HEIGHT,
+          depth: district.maxZ - district.minZ + ISLAND_PAD * 2,
+        }))
+      ),
+    [districts]
+  );
+  useFrame((state) => {
+    const { trace } = revealAt(state.clock.elapsedTime, reducedMotion);
+    outlineGeometry.current?.setDrawRange(
+      0,
+      Math.floor((outline.length / 6) * trace) * 2
+    );
+  });
   return (
     <>
       {districts.map((district, index) => {
@@ -1545,28 +1633,18 @@ function DistrictBoards({
           </group>
         );
       })}
-      {districts.map((district, index) => {
-        const width =
-          district.maxX - district.minX + ISLAND_PAD * 2 + RIM_OVERHANG * 2;
-        const depth =
-          district.maxZ - district.minZ + ISLAND_PAD * 2 + RIM_OVERHANG * 2;
-        return (
-          <mesh
-            key={`wire-${district.id}`}
-            position={[district.centre.x, 0.03, district.centre.z]}
-          >
-            <boxGeometry args={[width, 0.16, depth]} />
-            <meshBasicMaterial
-              color={palette.phosphor}
-              depthWrite={false}
-              opacity={0}
-              ref={trackMaterial(materials.wire, index)}
-              transparent
-              wireframe
-            />
-          </mesh>
-        );
-      })}
+      <lineSegments frustumCulled={false}>
+        <bufferGeometry ref={outlineGeometry}>
+          <bufferAttribute args={[outline, 3]} attach="attributes-position" />
+        </bufferGeometry>
+        <lineBasicMaterial
+          color={palette.phosphor}
+          depthWrite={false}
+          opacity={0}
+          ref={trackMaterial(materials.wire, 0)}
+          transparent
+        />
+      </lineSegments>
     </>
   );
 }
@@ -1669,7 +1747,7 @@ function Stage({
     () => tint(palette.land, WHITE, 0.15),
     [palette]
   );
-  const wireMaterials = useRef(new Map<number, THREE.MeshBasicMaterial>());
+  const wireMaterials = useRef(new Map<number, THREE.LineBasicMaterial>());
   const solidMaterials = useRef(new Map<number, THREE.MeshStandardMaterial>());
   const folderMaterials = useRef(new Map<number, THREE.MeshStandardMaterial>());
   const stampMaterials = useRef(new Map<number, THREE.MeshBasicMaterial>());
@@ -1717,6 +1795,7 @@ function Stage({
           wire: wireMaterials.current,
         }}
         palette={palette}
+        reducedMotion={reducedMotion}
       />
       {/* A nested folder is a lighter rectangle on the island its members stand on,
           which is what says where one block of a district ends and the next starts. */}
@@ -2637,6 +2716,11 @@ export default function Scene({
             selected={selected}
             windows={windows}
           />
+          <BuildingOutlines
+            cellsByKind={cellsByKind}
+            palette={palette}
+            reducedMotion={reducedMotion}
+          />
           {iconGroups.length > 0 ? (
             <RoofIcons
               groups={iconGroups}
@@ -2645,6 +2729,7 @@ export default function Scene({
               neighbours={neighbours}
               palette={palette}
               placementsById={placementsById}
+              reducedMotion={reducedMotion}
               selected={selected}
             />
           ) : null}
@@ -2675,13 +2760,13 @@ export default function Scene({
           ))}
           <Labels
             badge={selected ? usageBadge(usage, selected) : null}
-            fanMarkers={fan.markers}
             focusNeighbours={focusNeighbours}
             heights={heights}
             hovered={hovered}
             neighbours={neighbours}
             nodesById={nodesById}
             placementsById={placementsById}
+            reducedMotion={reducedMotion}
             selected={selected}
           />
           {explore ? (

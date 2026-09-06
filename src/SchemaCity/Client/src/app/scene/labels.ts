@@ -1,3 +1,5 @@
+import type { Placement } from "../layout/city";
+
 // Which labels get drawn once every candidate is a box on screen. Pure: no
 // three.js, no React, no DOM. Scene.tsx projects the anchors and paints what
 // this keeps.
@@ -105,4 +107,84 @@ export function pickLabels(
     kept.push(box);
   }
   return kept;
+}
+
+/** Names appear through interaction; the idle overview has no persistent markers. */
+export function visibleLabelIds({
+  hovered,
+  selected,
+  neighbours,
+  focusNeighbours,
+}: {
+  hovered: string | null;
+  selected: string | null;
+  neighbours: Set<string> | null;
+  focusNeighbours: Set<string> | null;
+}): Set<string> {
+  const ids = new Set<string>();
+  if (hovered && (neighbours === null || neighbours.has(hovered)))
+    ids.add(hovered);
+  if (focusNeighbours) {
+    for (const id of focusNeighbours) ids.add(id);
+  } else if (selected) {
+    ids.add(selected);
+    const direct = [...(neighbours ?? [])].filter((id) => id !== selected);
+    if (direct.length <= 8) for (const id of direct) ids.add(id);
+  }
+  return ids;
+}
+
+/** World-space anchors; projection and DOM updates stay in the renderer. */
+export function labelAnchors(
+  ids: Set<string>,
+  {
+    nodesById,
+    placementsById,
+    heights,
+    selected,
+    hovered,
+    badge,
+  }: {
+    nodesById: Map<string, { name: string }>;
+    placementsById: Map<string, Placement>;
+    heights: Map<string, number>;
+    selected: string | null;
+    hovered: string | null;
+    badge: string | null;
+  }
+) {
+  const built: {
+    id: string;
+    text: string;
+    rank: number;
+    footprint: number;
+    x: number;
+    y: number;
+    z: number;
+    lift: number;
+  }[] = [];
+  for (const id of ids) {
+    const node = nodesById.get(id);
+    const placement = placementsById.get(id);
+    if (!(node && placement)) continue;
+    const anchor = {
+      id,
+      text: node.name,
+      rank: id === selected ? 0 : id === hovered ? 1 : 2,
+      footprint: placement.footprint,
+      x: placement.position.x,
+      y: (placement.y ?? 0) + (heights.get(id) ?? placement.height) + 0.35,
+      z: placement.position.z,
+      lift: 0,
+    };
+    built.push(anchor);
+    if (id === selected && badge)
+      built.push({
+        ...anchor,
+        id: `${id}:usage`,
+        text: badge,
+        lift: LABEL_HEIGHT_PX + 4,
+      });
+  }
+  return built;
 }

@@ -4,8 +4,10 @@ import {
   LABEL_CAP,
   LABEL_HEIGHT_PX,
   type LabelCandidate,
+  labelAnchors,
   labelWidth,
   pickLabels,
+  visibleLabelIds,
 } from "./labels";
 
 function candidate(
@@ -91,4 +93,41 @@ describe("labelWidth", () => {
     expect(labelWidth("ab") - labelWidth("a")).toBeCloseTo(CHAR_PX);
     expect(labelWidth("")).toBeGreaterThan(0);
   });
+});
+
+it("keeps the idle overview unlabelled until a building is hovered or selected", () => {
+  const idle = {
+    hovered: null,
+    selected: null,
+    neighbours: null,
+    focusNeighbours: null,
+  };
+  expect([...visibleLabelIds(idle)]).toEqual([]);
+  expect([...visibleLabelIds({ ...idle, hovered: "type" })]).toEqual(["type"]);
+  expect([...visibleLabelIds({ ...idle, selected: "type" })]).toEqual(["type"]);
+});
+
+it("places a selected type label and usage badge above its current roof", () => {
+  const at = {
+    id: "type",
+    position: { x: 2, z: 3 },
+    y: 4,
+    footprint: 2,
+    height: 1,
+    floors: 1,
+    district: "pages",
+    districtKind: "structure" as const,
+    introDelay: 0,
+  };
+  const labels = labelAnchors(new Set(["type"]), {
+    nodesById: new Map([["type", { name: "A type" }]]),
+    placementsById: new Map([["type", at]]),
+    heights: new Map([["type", 6]]),
+    selected: "type",
+    hovered: null,
+    badge: "2 published",
+  });
+  expect(labels.map((label) => label.text)).toEqual(["A type", "2 published"]);
+  expect(labels[0]?.y).toBeCloseTo(10.35);
+  expect(labels[1]?.lift).toBe(LABEL_HEIGHT_PX + 4);
 });

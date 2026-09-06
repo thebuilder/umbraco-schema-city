@@ -203,6 +203,10 @@ function Legend() {
             Picker reference
           </LegendRow>
         </ul>
+        <p className="mt-2 text-muted-foreground text-xs">
+          The overview simplifies buildings with many allowed parents. Hover or
+          select a building to reveal all its parent connections.
+        </p>
       </section>
     </div>
   );
