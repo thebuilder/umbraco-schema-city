@@ -28,6 +28,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { keys: ["Right-drag"], does: "Pan the view" },
       { keys: ["Scroll"], does: "Zoom in and out" },
       {
+        keys: ["Hover"],
+        does: "Show a type’s name and direct connections across all layers",
+      },
+      {
         keys: ["Click"],
         does: "Select a building, or clear the selection by clicking bare ground",
       },

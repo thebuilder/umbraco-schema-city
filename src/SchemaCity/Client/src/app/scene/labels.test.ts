@@ -107,7 +107,7 @@ it("keeps the idle overview unlabelled until a building is hovered or selected",
   expect([...visibleLabelIds({ ...idle, selected: "type" })]).toEqual(["type"]);
 });
 
-it("places a selected type label and usage badge above its current roof", () => {
+it("places a selected type name above its current roof", () => {
   const at = {
     id: "type",
     position: { x: 2, z: 3 },
@@ -125,14 +125,12 @@ it("places a selected type label and usage badge above its current roof", () => 
     heights: new Map([["type", 6]]),
     selected: "type",
     hovered: null,
-    badge: "2 published",
   });
-  expect(labels.map((label) => label.text)).toEqual(["A type", "2 published"]);
+  expect(labels.map((label) => label.text)).toEqual(["A type"]);
   expect(labels[0]?.y).toBeCloseTo(10.35);
-  expect(labels[1]?.lift).toBe(LABEL_HEIGHT_PX + 4);
 });
 
-it("keeps density and usage badges distinct when a selected type is hovered", () => {
+it("does not add property summaries when a selected type is hovered", () => {
   const at = {
     id: "type",
     position: { x: 2, z: 3 },
@@ -160,12 +158,6 @@ it("keeps density and usage badges distinct when a selected type is hovered", ()
     heights: new Map([["type", 6]]),
     selected: "type",
     hovered: "type",
-    badge: "2 published",
   });
-  expect(labels.map((label) => label.id)).toEqual([
-    "type",
-    "type:properties",
-    "type:usage",
-  ]);
-  expect(labels[2]?.lift).toBe((LABEL_HEIGHT_PX + 4) * 2);
+  expect(labels.map((label) => label.id)).toEqual(["type"]);
 });

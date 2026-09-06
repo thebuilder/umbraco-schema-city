@@ -20,12 +20,7 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaComparison } from "../model/snapshots";
-import type {
-  SchemaEdge,
-  SchemaGraph,
-  SchemaNode,
-  UsageReport,
-} from "../model/types";
+import type { SchemaEdge, SchemaGraph, SchemaNode } from "../model/types";
 import {
   type CityBounds,
   cityBounds,
@@ -59,6 +54,7 @@ import {
   type BootPhase,
   connectionBootAt,
   connectionEmphasis,
+  connectionPickable,
   connectionTraceAt,
   visibleConnections,
 } from "./scene/connection-visibility";
@@ -81,7 +77,7 @@ import {
   visibleLabelIds,
 } from "./scene/labels";
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
-import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
+import type { LensScale, Ramp } from "./scene/lens";
 import {
   buildBoardOutlinePositions,
   buildBuildingOutlinePositions,
@@ -170,12 +166,17 @@ function pickConnectionRange(
   event: ThreeEvent<MouseEvent>,
   vertex: number,
   ranges: readonly { start: number; count: number; edges: SchemaEdge[] }[],
-  onPick: PickConnection
+  onPick: PickConnection,
+  colors: Float32Array
 ) {
   const range = ranges.find(
     (item) => vertex >= item.start && vertex < item.start + item.count
   );
   if (!range) return;
+  // Hidden incident ranges still share the same pick geometry. Keep the canvas
+  // interaction aligned with vertex alpha so an invisible edge cannot open a
+  // connection inspector.
+  if ((colors[vertex * 4 + 3] as number) < 0.01) return;
   event.stopPropagation();
   onPick({
     edges: uniqueConnections(range.edges),
@@ -848,7 +849,7 @@ function useIconGroups(
 /**
  * The Umbraco icon of each type, painted flat on its roof over a darker cap. Flat
  * rather than billboarded, because a sprite standing over the roof lands behind the
- * label and the usage badge of the very building it names. One instanced mesh per
+ * label of the very building it names. One instanced mesh per
  * icon and colour, which the seeded schema makes 15 of, and the whole set is
  * rewritten every frame, which is 78 matrices: nothing next to the buildings.
  *
@@ -1031,6 +1032,31 @@ function edgeColors(
  * and the roads take the full phosphor, which is what makes them read at the width
  * the README's screenshot is taken at.
  */
+function useFadedEdgeColors(
+  colors: Float32Array,
+  reducedMotion: boolean,
+  geometry: RefObject<THREE.BufferGeometry | null>
+) {
+  const fadedColors = useMemo(() => colors.slice(), [colors.length]);
+  useFrame((_, delta) => {
+    const step = reducedMotion ? 1 : Math.min(delta, 0.1);
+    for (let i = 0; i < colors.length; i += 4) {
+      fadedColors[i] = colors[i] as number;
+      fadedColors[i + 1] = colors[i + 1] as number;
+      fadedColors[i + 2] = colors[i + 2] as number;
+      fadedColors[i + 3] = transitionToward(
+        fadedColors[i + 3] as number,
+        colors[i + 3] as number,
+        step
+      );
+    }
+    const attribute = geometry.current?.getAttribute("color");
+    if (attribute) attribute.needsUpdate = true;
+  });
+
+  return fadedColors;
+}
+
 function Roads({
   placementsById,
   edges,
@@ -1041,6 +1067,7 @@ function Roads({
   palette,
   reducedMotion,
   visible,
+  enabled,
   onPick,
 }: {
   placementsById: Map<string, Placement>;
@@ -1052,6 +1079,7 @@ function Roads({
   palette: Palette;
   reducedMotion: boolean;
   visible: boolean;
+  enabled: boolean;
   onPick: PickConnection;
 }) {
   const material = useRef<THREE.MeshBasicMaterial>(null);
@@ -1078,33 +1106,38 @@ function Roads({
         selected,
         hovered,
         focus !== null,
-        boot
+        boot,
+        enabled
       ),
     }));
-  }, [positions, ranges, focus, selected, hovered, boot, palette]);
-  const fadedColors = useMemo(() => colors.slice(), [colors.length]);
-  useFrame((_, delta) => {
-    for (let i = 0; i < colors.length; i += 4) {
-      fadedColors[i] = colors[i] as number;
-      fadedColors[i + 1] = colors[i + 1] as number;
-      fadedColors[i + 2] = colors[i + 2] as number;
-      fadedColors[i + 3] = reducedMotion
-        ? (colors[i + 3] as number)
-        : transitionToward(
-            fadedColors[i + 3] as number,
-            colors[i + 3] as number,
-            Math.min(delta, 0.1)
-          );
-    }
-    const attribute = geometry.current?.getAttribute("color");
-    if (attribute) attribute.needsUpdate = true;
-  });
+  }, [positions, ranges, focus, selected, hovered, boot, palette, enabled]);
+  const fadedColors = useFadedEdgeColors(colors, reducedMotion, geometry);
+
+  function pickRoad(event: ThreeEvent<MouseEvent>) {
+    if (
+      !connectionPickable(
+        visible,
+        material.current?.opacity ?? 0,
+        event.faceIndex,
+        3,
+        fadedColors
+      )
+    )
+      return;
+    pickConnectionRange(
+      event,
+      (event.faceIndex as number) * 3,
+      ranges,
+      onPick,
+      fadedColors
+    );
+  }
 
   if (positions.length === 0) return null;
 
   return (
     <>
-      <ConnectionIntro boot={boot} visible={visible}>
+      <ConnectionIntro boot={boot} enabled={enabled} visible={visible}>
         <RoadIntroTrace
           colour={palette.phosphor}
           edges={edges}
@@ -1113,20 +1146,7 @@ function Roads({
         />
       </ConnectionIntro>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Three mesh; keyboard users inspect the same connections in the inspector. */}
-      <mesh
-        frustumCulled={false}
-        onClick={(event) => {
-          if (
-            !visible ||
-            (material.current?.opacity ?? 0) < 0.1 ||
-            event.faceIndex === null ||
-            event.faceIndex === undefined
-          )
-            return;
-          pickConnectionRange(event, event.faceIndex * 3, ranges, onPick);
-        }}
-        ref={mesh}
-      >
+      <mesh frustumCulled={false} onClick={pickRoad} ref={mesh}>
         <bufferGeometry ref={geometry}>
           <bufferAttribute args={[positions, 3]} attach="attributes-position" />
           <bufferAttribute args={[fadedColors, 4]} attach="attributes-color" />
@@ -1145,6 +1165,7 @@ function Roads({
 }
 
 function ConnectionIntro({
+  enabled,
   visible,
   boot,
   children,
@@ -1152,8 +1173,9 @@ function ConnectionIntro({
   visible: boolean;
   boot: BootPhase;
   children: ReactNode;
+  enabled: boolean;
 }) {
-  return visible && boot !== "done" ? children : null;
+  return enabled && visible && boot !== "done" ? children : null;
 }
 
 function RoadIntroTrace({
@@ -1235,6 +1257,7 @@ function Links({
   opacity,
   reducedMotion,
   visible,
+  enabled,
   onPick,
 }: {
   layer: Exclude<Layer, "structure">;
@@ -1249,6 +1272,7 @@ function Links({
   opacity: number;
   reducedMotion: boolean;
   visible: boolean;
+  enabled: boolean;
   onPick: PickConnection;
 }) {
   const { positions, ranges } = useMemo(
@@ -1270,14 +1294,24 @@ function Links({
         ...paint,
         alpha:
           paint.alpha *
-          connectionEmphasis(range, selected, hovered, focused, boot),
+          connectionEmphasis(range, selected, hovered, focused, boot, enabled),
       };
     });
-  }, [positions, ranges, colour, opacity, selected, hovered, focused, boot]);
+  }, [
+    positions,
+    ranges,
+    colour,
+    opacity,
+    selected,
+    hovered,
+    focused,
+    boot,
+    enabled,
+  ]);
 
   return (
     <>
-      <ConnectionIntro boot={boot} visible={visible}>
+      <ConnectionIntro boot={boot} enabled={enabled} visible={visible}>
         <IntroOutline
           colour={colour}
           phase="connections"
@@ -1383,11 +1417,10 @@ function LinkStrokes({
         if (
           !visible ||
           material.opacity < 0.1 ||
-          event.faceIndex === null ||
-          event.faceIndex === undefined
+          typeof event.faceIndex !== "number"
         )
           return;
-        pickConnectionRange(event, event.faceIndex * 2, ranges, onPick);
+        pickConnectionRange(event, event.faceIndex * 2, ranges, onPick, colors);
       }}
       ref={linesRef}
     />
@@ -1433,7 +1466,6 @@ function Labels({
   hovered,
   neighbours,
   focusNeighbours,
-  badge,
   reducedMotion,
 }: {
   nodesById: Map<string, SchemaNode>;
@@ -1443,8 +1475,6 @@ function Labels({
   hovered: string | null;
   neighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
-  /** The selected building's usage line, drawn as a second label over its name. */
-  badge: string | null;
   reducedMotion: boolean;
 }) {
   const camera = useThree(
@@ -1478,7 +1508,6 @@ function Labels({
       heights,
       selected,
       hovered,
-      badge,
     });
   }, [
     hovered,
@@ -1488,7 +1517,6 @@ function Labels({
     nodesById,
     placementsById,
     heights,
-    badge,
   ]);
 
   useEffect(() => {
@@ -2564,7 +2592,6 @@ export default function Scene({
   baseline,
   comparison,
   focusDepth = 1,
-  usage,
   scale,
   selected,
   focus,
@@ -2580,7 +2607,6 @@ export default function Scene({
   baseline?: SchemaGraph | null;
   comparison?: SchemaComparison | null;
   focusDepth?: number;
-  usage?: UsageReport;
   /** Umbraco icon name to SVG, for the roofs. The harness usually passes none. */
   icons?: Record<string, string>;
   /** The lens colouring App computed. Absent or null means no lens is on. */
@@ -2814,6 +2840,7 @@ export default function Scene({
     [graph.edges, focusNeighbours]
   );
   const active = useMemo(() => new Set<Layer>(layers), [layers]);
+  const interactionActive = selected !== null || hovered !== null;
   const pickConnection: PickConnection = (pick) => setConnectionPick(pick);
   // A link leaves from the roof of the building it belongs to, so it stays visible
   // over a tall neighbour and moves with the focus tween.
@@ -2913,6 +2940,7 @@ export default function Scene({
           <Roads
             boot={bootPhase}
             edges={drawnEdges}
+            enabled={active.has("structure")}
             focus={focus}
             hovered={hovered}
             onPick={pickConnection}
@@ -2920,7 +2948,7 @@ export default function Scene({
             placementsById={placementsById}
             reducedMotion={reducedMotion}
             selected={selected}
-            visible={active.has("structure")}
+            visible={active.has("structure") || interactionActive}
           />
           {LINK_LAYERS.map(({ layer, token, opacity }) => (
             <Links
@@ -2928,6 +2956,7 @@ export default function Scene({
               boot={bootPhase}
               colour={palette[token]}
               edges={drawnEdges}
+              enabled={active.has(layer)}
               focused={focus !== null}
               hovered={hovered}
               key={layer}
@@ -2937,7 +2966,7 @@ export default function Scene({
               placementsById={placementsById}
               reducedMotion={reducedMotion}
               selected={selected}
-              visible={active.has(layer)}
+              visible={active.has(layer) || interactionActive}
             />
           ))}
           {connectionPick ? (
@@ -2987,7 +3016,6 @@ export default function Scene({
             placements={placements}
           />
           <Labels
-            badge={selected ? usageBadge(usage, selected) : null}
             focusNeighbours={focusNeighbours}
             heights={heights}
             hovered={hovered}

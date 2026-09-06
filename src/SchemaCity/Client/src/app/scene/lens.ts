@@ -129,13 +129,3 @@ export function lensScale(
     maxLabel: max.toLocaleString(),
   };
 }
-
-/** The badge over the selected building's roof, or null when usage has no row for it. */
-export function usageBadge(
-  usage: UsageReport | undefined,
-  id: string
-): string | null {
-  const found = usage?.byType[id];
-  if (!found) return null;
-  return `${found.total.toLocaleString()} · ${found.published.toLocaleString()} published`;
-}

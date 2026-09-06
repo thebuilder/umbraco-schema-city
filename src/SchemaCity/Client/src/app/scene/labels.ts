@@ -142,7 +142,6 @@ export function labelAnchors(
     heights,
     selected,
     hovered,
-    badge,
   }: {
     nodesById: Map<
       string,
@@ -157,7 +156,6 @@ export function labelAnchors(
     heights: Map<string, number>;
     selected: string | null;
     hovered: string | null;
-    badge: string | null;
   }
 ) {
   const built: {
@@ -175,7 +173,7 @@ export function labelAnchors(
     const placement = placementsById.get(id);
     if (!(node && placement)) continue;
     built.push(
-      ...anchorsForNode(id, node, placement, heights, selected, hovered, badge)
+      ...anchorsForNode(id, node, placement, heights, selected, hovered)
     );
   }
   return built;
@@ -192,8 +190,7 @@ function anchorsForNode(
   placement: Placement,
   heights: Map<string, number>,
   selected: string | null,
-  hovered: string | null,
-  badge: string | null
+  hovered: string | null
 ) {
   const anchor = {
     id,
@@ -205,32 +202,7 @@ function anchorsForNode(
     z: placement.position.z,
     lift: 0,
   };
-  const anchors = [anchor];
-  const density = propertyDensity(node);
-  if (id === hovered && density)
-    anchors.push({
-      ...anchor,
-      id: `${id}:properties`,
-      text: density,
-      lift: LABEL_HEIGHT_PX + 4,
-    });
-  if (id === selected && badge)
-    anchors.push({
-      ...anchor,
-      id: `${id}:usage`,
-      text: badge,
-      lift: (LABEL_HEIGHT_PX + 4) * (id === hovered ? 2 : 1),
-    });
-  return anchors;
-}
-
-function propertyDensity(node: {
-  ownPropertyCount?: number;
-  composedPropertyCount?: number;
-  groups?: unknown[];
-}): string | null {
-  if (node.ownPropertyCount === undefined) return null;
-  return `${node.ownPropertyCount} own + ${node.composedPropertyCount ?? 0} composed properties · ${node.groups?.length ?? 0} groups`;
+  return [anchor];
 }
 
 function labelRank(

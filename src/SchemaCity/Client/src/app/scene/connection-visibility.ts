@@ -40,20 +40,34 @@ export function visibleConnections(
     : edges;
 }
 
+/** Whether a connection mesh should accept a click at a face index. */
+export function connectionPickable(
+  visible: boolean,
+  opacity: number,
+  faceIndex: number | null | undefined,
+  vertexStride: number,
+  colors: Float32Array
+): boolean {
+  if (!visible || opacity < 0.1 || typeof faceIndex !== "number") return false;
+  return (colors[faceIndex * vertexStride * 4 + 3] ?? 0) >= 0.01;
+}
+
 /** Opacity for a shared range: any represented edge can provide emphasis. */
 export function connectionEmphasis(
   edges: SchemaEdge[],
   selected: string | null,
   hovered: string | null,
   focused: boolean,
-  boot: BootPhase
+  boot: BootPhase,
+  enabled = true
 ): number {
-  if (boot === "trace" || focused) return 1;
-  if (!(selected || hovered)) return 0.28;
   const active = new Set(
     [selected, hovered].filter((id): id is string => id !== null)
   );
-  return edges.some((edge) => active.has(edge.from) || active.has(edge.to))
-    ? 1
-    : 0.12;
+  const touchesActive = edges.some(
+    (edge) => active.has(edge.from) || active.has(edge.to)
+  );
+  if (boot === "trace" || focused) return enabled || touchesActive ? 1 : 0;
+  if (!(selected || hovered)) return enabled ? 0.28 : 0;
+  return touchesActive ? 1 : enabled ? 0.12 : 0;
 }

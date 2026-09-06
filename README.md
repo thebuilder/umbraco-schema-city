@@ -15,7 +15,8 @@ properties and direct connections. Focus its neighbourhood when the whole city g
 
 The stage traces its perimeter while the buildings and their outer frames rise together, then briefly
 draws the relationship circuits before settling into faint background traces. Hovering or selecting a
-type brightens its direct links; focusing a type keeps the local paths readable. Reduced motion
+type reveals its direct links across all layers; layer switches control the background overview.
+Focusing a type keeps the local paths readable. Reduced motion
 skips the opening animation. Structure is the initial connection layer; add other relationships as
 you investigate them.
 

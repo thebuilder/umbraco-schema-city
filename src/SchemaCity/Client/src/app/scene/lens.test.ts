@@ -7,7 +7,7 @@ import type {
   TypeUsage,
   UsageReport,
 } from "../../model/types";
-import { lensScale, usageBadge } from "./lens";
+import { lensScale } from "./lens";
 
 const medium = mediumFixture as unknown as SchemaGraph;
 const mediumUsage = mediumUsageFixture as unknown as UsageReport;
@@ -141,16 +141,5 @@ describe("the lenses on the seeded site's usage report", () => {
       .map(([id]) => medium.nodes.find((node) => node.id === id)?.alias)
       .sort();
     expect(lit).toEqual(["blogPost", "campaignPage"]);
-  });
-});
-
-describe("usageBadge", () => {
-  it("prints the total and the published count", () => {
-    expect(usageBadge(usage, "article")).toBe("20 · 5 published");
-  });
-
-  it("says nothing about a type usage has no row for", () => {
-    expect(usageBadge(usage, "hero")).toBeNull();
-    expect(usageBadge(undefined, "home")).toBeNull();
   });
 });
