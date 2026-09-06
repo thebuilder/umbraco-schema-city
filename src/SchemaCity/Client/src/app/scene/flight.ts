@@ -10,6 +10,29 @@
 export type Ground = { x: number; z: number };
 export type Vec3 = { x: number; y: number; z: number };
 
+type FlightEndpoints = {
+  from: { position: Vec3; target: Vec3 };
+  to: { position: Vec3; target: Vec3 };
+};
+
+/**
+ * Rebase an in-flight camera transition after a pan. Moving every endpoint by
+ * the same displacement preserves the transition's orientation and progress.
+ */
+export function translateFlightEndpoints(
+  flight: FlightEndpoints,
+  delta: Vec3
+): void {
+  for (const endpoint of [flight.from, flight.to]) {
+    endpoint.position.x += delta.x;
+    endpoint.position.y += delta.y;
+    endpoint.position.z += delta.z;
+    endpoint.target.x += delta.x;
+    endpoint.target.y += delta.y;
+    endpoint.target.z += delta.z;
+  }
+}
+
 /** The keys the city flies by. Every other key belongs to the app's own handler. */
 export const FLIGHT_CODES: ReadonlySet<string> = new Set([
   "KeyW",
@@ -34,9 +57,6 @@ const PAN_PIXELS_PER_SECOND = 900;
 
 /** Explore's flying speed, world units per second. A street is 9 units wide. */
 export const FLY_SPEED = 24;
-
-/** Radians per second the arrows turn the Explore camera by. */
-export const TURN_SPEED = 1.5;
 
 /**
  * Shift doubles both. fsn multiplies by 3.5, over a filesystem that can be a hundred

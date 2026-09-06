@@ -5,6 +5,7 @@ import {
   FLY_SPEED,
   groundAxes,
   panSpeed,
+  translateFlightEndpoints,
   turnedOffset,
   turnRates,
 } from "./flight";
@@ -121,6 +122,64 @@ test("a turn keeps the camera where it is and holds its distance", () => {
   // Yawing left swings the target to the left of the view, which is the offset
   // rotating the other way about the camera.
   expect(turned.x).toBeGreaterThan(0);
+});
+
+test("panning rebases an in-flight transition without changing its orientation", () => {
+  const flight = {
+    from: {
+      position: { x: 0, y: 10, z: 10 },
+      target: { x: 0, y: 0, z: 0 },
+    },
+    to: {
+      position: { x: 2, y: 8, z: 6 },
+      target: { x: 2, y: 0, z: 1 },
+    },
+  };
+  const pan = { x: 3, y: 0, z: -4 };
+  const before = (t: number) => ({
+    position: {
+      x:
+        flight.from.position.x +
+        (flight.to.position.x - flight.from.position.x) * t,
+      y:
+        flight.from.position.y +
+        (flight.to.position.y - flight.from.position.y) * t,
+      z:
+        flight.from.position.z +
+        (flight.to.position.z - flight.from.position.z) * t,
+    },
+    target: {
+      x: flight.from.target.x + (flight.to.target.x - flight.from.target.x) * t,
+      y: flight.from.target.y + (flight.to.target.y - flight.from.target.y) * t,
+      z: flight.from.target.z + (flight.to.target.z - flight.from.target.z) * t,
+    },
+  });
+  const poseBefore = before(0.3);
+  const finalBefore = before(1);
+  translateFlightEndpoints(flight, pan);
+  const poseAfter = before(0.3);
+  const finalAfter = before(1);
+
+  for (const [after, prior] of [
+    [poseAfter, poseBefore],
+    [finalAfter, finalBefore],
+  ]) {
+    expect(after.position.x - prior.position.x).toBeCloseTo(pan.x);
+    expect(after.position.y - prior.position.y).toBeCloseTo(pan.y);
+    expect(after.position.z - prior.position.z).toBeCloseTo(pan.z);
+    expect(after.target.x - prior.target.x).toBeCloseTo(pan.x);
+    expect(after.target.y - prior.target.y).toBeCloseTo(pan.y);
+    expect(after.target.z - prior.target.z).toBeCloseTo(pan.z);
+    expect(after.position.x - after.target.x).toBeCloseTo(
+      prior.position.x - prior.target.x
+    );
+    expect(after.position.y - after.target.y).toBeCloseTo(
+      prior.position.y - prior.target.y
+    );
+    expect(after.position.z - after.target.z).toBeCloseTo(
+      prior.position.z - prior.target.z
+    );
+  }
 });
 
 test("pitch stops at the horizon and short of straight down", () => {

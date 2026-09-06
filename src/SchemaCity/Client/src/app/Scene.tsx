@@ -65,6 +65,7 @@ import {
   FLIGHT_CODES,
   groundAxes,
   panSpeed,
+  translateFlightEndpoints,
 } from "./scene/flight";
 import { isometricZoom } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
@@ -2209,11 +2210,11 @@ function applyCameraView(
   camera: THREE.OrthographicCamera,
   controls: { target: THREE.Vector3; update: () => void } | null,
   view: View,
-  topDown: boolean
+  up: THREE.Vector3
 ) {
   camera.position.copy(view.position);
   camera.zoom = view.zoom;
-  camera.up.copy(cameraUp(topDown));
+  camera.up.copy(up);
   camera.near = -view.span * 2;
   camera.far = view.span * 3;
   camera.updateProjectionMatrix();
@@ -2227,11 +2228,21 @@ function cameraUp(topDown: boolean) {
   return topDown ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
 }
 
+type CameraFlight = {
+  from: View;
+  to: View;
+  started: number;
+  ms: number;
+  ease: (t: number) => number;
+  fromUp: THREE.Vector3;
+  toUp: THREE.Vector3;
+};
+
 /**
  * Frames the city, and flies to a new framing when focus changes it. The flight is
- * an establishing shot in fsn's sense: any pointer down on the canvas ends it where
- * it is, because a camera that keeps moving after you grab it is a camera fighting
- * you. A resize is not a new framing, so the view it has is the view it keeps.
+ * keyboard pan translates the flight as it runs. Pointer input stops a framing
+ * flight in place, or completes an angle change before handing over to the controls.
+ * A resize is not a new framing, so the view it has is the view it keeps.
  */
 function CameraRig({
   bounds,
@@ -2241,6 +2252,7 @@ function CameraRig({
   reducedMotion,
   overview,
   topDown,
+  flightRef,
 }: {
   bounds: CityBounds;
   buildingHeight: number;
@@ -2251,6 +2263,7 @@ function CameraRig({
   reducedMotion: boolean;
   overview: boolean;
   topDown: boolean;
+  flightRef: RefObject<CameraFlight | null>;
 }) {
   const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
   const controls = useThree((state) => state.controls) as {
@@ -2259,15 +2272,7 @@ function CameraRig({
   } | null;
   const gl = useThree((state) => state.gl);
   const size = useThree((state) => state.size);
-  const flight = useRef<{
-    from: View;
-    to: View;
-    started: number;
-    ms: number;
-    ease: (t: number) => number;
-    fromUp: THREE.Vector3;
-    toUp: THREE.Vector3;
-  } | null>(null);
+  const flight = flightRef;
   const framed = useRef<{
     bounds: CityBounds;
     controls: unknown;
@@ -2293,19 +2298,21 @@ function CameraRig({
 
   useEffect(() => {
     const cancel = () => {
+      // A pointer can arrive while the angle is changing. Leaving the camera
+      // halfway between the two up vectors makes the next OrbitControls update
+      // inherit an in-between mode, so settle mode changes before handing over
+      // to direct manipulation. Framing flights retain their interruptible stop.
+      const moving = flight.current;
+      if (moving && !camera.up.equals(moving.toUp)) {
+        applyCameraView(camera, controls, moving.to, moving.toUp);
+      }
       flight.current = null;
     };
-    // A flight key is the reader taking the camera, exactly as a pointer down is.
-    const cancelOnFlightKey = (event: KeyboardEvent) => {
-      if (flownBy(event)) cancel();
-    };
     gl.domElement.addEventListener("pointerdown", cancel);
-    window.addEventListener("keydown", cancelOnFlightKey);
     return () => {
       gl.domElement.removeEventListener("pointerdown", cancel);
-      window.removeEventListener("keydown", cancelOnFlightKey);
     };
-  }, [gl]);
+  }, [camera, controls, flight, gl]);
 
   useEffect(() => {
     // This effect runs again every time the viewport is measured, which a resize
@@ -2342,7 +2349,7 @@ function CameraRig({
     if (action === "none") return;
     if (action === "snap" || reducedMotion) {
       flight.current = null;
-      applyCameraView(camera, controls, destination, topDown);
+      applyCameraView(camera, controls, destination, cameraUp(topDown));
       return;
     }
     flight.current = {
@@ -2445,7 +2452,11 @@ const FLIGHT_STEP = new THREE.Vector3();
  * The camera pans the ground along the screen, at a speed derived from its zoom so a
  * key covers the same screen distance however far in it is.
  */
-function Flight() {
+function Flight({
+  cameraFlight,
+}: {
+  cameraFlight: RefObject<CameraFlight | null>;
+}) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as {
     target: THREE.Vector3;
@@ -2525,6 +2536,12 @@ function Flight() {
     if (moving.lengthSq() === 0) return;
     if (moving.lengthSq() > 0) {
       FLIGHT_STEP.copy(moving).multiplyScalar(step);
+      // Keep an angle flight's endpoints in the same translated frame as the
+      // camera. This lets a held key pan during the transition without the
+      // interpolation snapping back on the next frame.
+      if (cameraFlight.current) {
+        translateFlightEndpoints(cameraFlight.current, FLIGHT_STEP);
+      }
       camera.position.add(FLIGHT_STEP);
       controls.target.add(FLIGHT_STEP);
     }
@@ -2631,6 +2648,7 @@ export default function Scene({
   onFocus: (id: string) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const cameraFlight = useRef<CameraFlight | null>(null);
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -3025,9 +3043,11 @@ export default function Scene({
             reducedMotion={reducedMotion}
             selected={selected}
           />
+          <Flight cameraFlight={cameraFlight} />
           <CameraRig
             bounds={bounds}
             buildingHeight={Math.max(1, ...heights.values())}
+            flightRef={cameraFlight}
             inspectorWidth={inspectorWidth}
             overview={focus === null}
             reducedMotion={reducedMotion}
@@ -3035,7 +3055,6 @@ export default function Scene({
             topDown={explore === true}
           />
           <Controls span={span} />
-          <Flight />
         </Canvas>
       ) : null}
     </div>
