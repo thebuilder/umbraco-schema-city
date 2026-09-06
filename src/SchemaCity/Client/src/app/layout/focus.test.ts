@@ -147,9 +147,11 @@ describe("layoutFocus", () => {
 
   it("sends each group to its own quarter of the compass", () => {
     const { at } = focusOn(hub, "hub");
+    const side = (value: number) =>
+      Math.abs(value) < 1e-9 ? 0 : Math.sign(value);
     const quarter = ({ position, y }: Placement) => ({
-      x: Math.sign(position.x),
-      z: Math.sign(position.z),
+      x: side(position.x),
+      z: side(position.z),
       raised: (y ?? 0) > 0,
     });
 
@@ -285,13 +287,11 @@ describe("layoutFocus", () => {
         placement.position.z + placement.footprint / 2 + ISLAND_PAD
       );
     }
-    expect(bounds.centre).toEqual({
-      x: (bounds.minX + bounds.maxX) / 2,
-      z: (bounds.minZ + bounds.maxZ) / 2,
-    });
+    expect(bounds.centre.x).toBeCloseTo((bounds.minX + bounds.maxX) / 2);
+    expect(bounds.centre.z).toBeCloseTo((bounds.minZ + bounds.maxZ) / 2);
   });
 
-  it("fits the seeded Home and its forty-two neighbours into about sixty units square", () => {
+  it("fits the seeded Home and its forty-two neighbours into about sixty-five units square", () => {
     const home = medium.nodes.find(
       (type) => type.alias === "home"
     ) as SchemaNode;
@@ -299,8 +299,8 @@ describe("layoutFocus", () => {
 
     expect(moved.length).toBe(43);
     // The buildings themselves, before the island's padding around them.
-    expect(bounds.maxX - bounds.minX - ISLAND_PAD * 2).toBeLessThan(60);
-    expect(bounds.maxZ - bounds.minZ - ISLAND_PAD * 2).toBeLessThan(60);
+    expect(bounds.maxX - bounds.minX - ISLAND_PAD * 2).toBeLessThan(65);
+    expect(bounds.maxZ - bounds.minZ - ISLAND_PAD * 2).toBeLessThan(65);
   });
 
   it("gives a node with no neighbours its own footprint plus padding", () => {

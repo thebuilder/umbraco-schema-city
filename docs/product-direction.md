@@ -22,7 +22,7 @@ Focus limits the graph to its expanded neighbourhood. The camera offers fixed Is
 
 Treat the world as the inside of a computer. Districts read as circuit boards, buildings as components, and relationships as traces. Keep the geometry generated from the schema; decorative buildings would compete with the information encoded in each type.
 
-Use a brief opening sequence: stage outlines, solid districts and buildings, then a short connection
+Use a brief opening sequence: continuously drawn stage outlines, building frames and solids rising together, then a short connection
 trace. Keep controls available throughout. Respect reduced motion and do not replay the opening just
 because a developer toggles a layer. Hiding a layer should reverse its material transition so the
 change has a visible cause. Keep faint traces in the settled overview, and brighten direct links when a developer

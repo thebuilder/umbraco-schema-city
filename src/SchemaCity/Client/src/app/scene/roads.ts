@@ -47,6 +47,7 @@ export type RoadGrid = {
 // ribbon below its lane spacing so widening does not join unrelated traces.
 const ROAD_WIDTH = 0.3;
 const ROAD_Y = FOLDER_TINT_HEIGHT + 0.03;
+const ROAD_TRACE_Y = ROAD_Y + 0.015;
 const CHEVRON_Y = ROAD_Y + 0.01;
 const CHEVRON_SPACING = 1.4;
 /**
@@ -88,17 +89,65 @@ export function buildRoadGeometry(
     });
   }
 
-  for (const edge of edges) {
-    // M2 draws the other edge kinds as bridges and dashed lines.
-    if (edge.kind !== "allowedChild" || edge.from !== edge.to) continue;
-    const at = placementsById.get(edge.from);
-    if (!at) continue;
+  for (const { edge, at } of selfLoops(placementsById, edges)) {
     const start = positions.length / 3;
     pushLoop(positions, at);
     ranges.push({ edges: [edge], start, count: positions.length / 3 - start });
   }
 
   return { positions: new Float32Array(positions), ranges };
+}
+
+function selfLoops(
+  placementsById: Map<string, Placement>,
+  edges: SchemaEdge[]
+) {
+  return edges.flatMap((edge) => {
+    if (edge.kind !== "allowedChild" || edge.from !== edge.to) return [];
+    const at = placementsById.get(edge.from);
+    return at ? [{ edge, at }] : [];
+  });
+}
+
+/**
+ * Centerlines for the intro trace. Ribbons remain the authoritative hit geometry;
+ * these endpoints are deliberately a little higher so the trace is not hidden by
+ * the ribbon while it is being drawn.
+ */
+export function roadTracePositions(
+  placementsById: Map<string, Placement>,
+  edges: SchemaEdge[]
+): Float32Array {
+  const positions: number[] = [];
+  for (const segment of separateCrossings(planRoads(placementsById, edges))) {
+    positions.push(
+      segment.x0,
+      ROAD_TRACE_Y,
+      segment.z0,
+      segment.x1,
+      ROAD_TRACE_Y,
+      segment.z1
+    );
+  }
+
+  for (const { at } of selfLoops(placementsById, edges)) {
+    const cx = at.position.x + at.footprint / 2 + LOOP_GAP;
+    const cz = at.position.z;
+    for (let i = 0; i < LOOP_SEGMENTS; i++) {
+      const a0 = (i / LOOP_SEGMENTS) * Math.PI * 2;
+      const a1 = ((i + 1) / LOOP_SEGMENTS) * Math.PI * 2;
+      positions.push(
+        cx + Math.cos(a0) * LOOP_RADIUS,
+        ROAD_TRACE_Y,
+        cz + Math.sin(a0) * LOOP_RADIUS,
+        cx + Math.cos(a1) * LOOP_RADIUS,
+        ROAD_TRACE_Y,
+        cz + Math.sin(a1) * LOOP_RADIUS
+      );
+    }
+  }
+
+  return new Float32Array(positions);
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   planRoads,
   type RoadSegment,
   roadFan,
+  roadTracePositions,
   separateCrossings,
 } from "./roads";
 
@@ -511,6 +512,22 @@ describe("buildRoadGeometry", () => {
       next += range.count;
     }
     expect(next).toBe(positions.length / 3);
+  });
+});
+
+describe("roadTracePositions", () => {
+  it("returns centerline endpoints just above routed ribbons", () => {
+    const positions = roadTracePositions(placements, [road("a", "b")]);
+    expect(positions.length).toBeGreaterThan(0);
+    for (let i = 1; i < positions.length; i += 3)
+      expect(positions[i]).toBeCloseTo(FOLDER_TINT_HEIGHT + 0.045, 6);
+  });
+
+  it("traces self-loops as a centerline ring", () => {
+    const positions = roadTracePositions(placements, [road("a", "a")]);
+    expect(positions.length).toBe(14 * 6);
+    for (let i = 1; i < positions.length; i += 3)
+      expect(positions[i]).toBeCloseTo(FOLDER_TINT_HEIGHT + 0.045, 6);
   });
 });
 

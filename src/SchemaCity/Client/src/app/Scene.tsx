@@ -5,7 +5,14 @@ import {
   useFrame,
   useThree,
 } from "@react-three/fiber";
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as THREE from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
@@ -52,6 +59,7 @@ import {
   type BootPhase,
   connectionBootAt,
   connectionEmphasis,
+  connectionTraceAt,
   visibleConnections,
 } from "./scene/connection-visibility";
 import {
@@ -75,11 +83,15 @@ import {
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import {
-  buildOutlinePositions,
+  buildBoardOutlinePositions,
+  buildBuildingOutlinePositions,
+  buildingRiseAt,
+  growBuildingOutline,
   revealAt,
+  traceOutlinePositions,
   transitionToward,
 } from "./scene/reveal";
-import { buildRoadGeometry } from "./scene/roads";
+import { buildRoadGeometry, roadTracePositions } from "./scene/roads";
 import {
   districtStamp,
   FOLDER_TINT_HEIGHT,
@@ -105,7 +117,8 @@ function useLayerReveal(
   useFrame((state, delta) => {
     const progress = revealAt(state.clock.elapsedTime, reducedMotion);
     const boot = connectionBootAt(state.clock.elapsedTime, reducedMotion);
-    const target = progress.links * Number(visible);
+    // The bright moving trace owns the entrance; settled paths crossfade under it.
+    const target = progress.links * Number(visible && boot.phase !== "trace");
     opacity.current = reducedMotion
       ? target
       : transitionToward(opacity.current, target, Math.min(delta, 0.1));
@@ -269,6 +282,12 @@ function Buildings({
   const windowRef = useRef<THREE.InstancedMesh>(null);
   const hitRef = useRef<THREE.InstancedMesh>(null);
   const solidMaterials = useRef(new Map<number, THREE.Material>());
+  const lastRise = useRef(buildingRiseAt(0, reducedMotion));
+  const bases = useMemo(
+    () =>
+      new Map(placements.map((placement) => [placement.id, placement.y ?? 0])),
+    [placements]
+  );
   const scratch = useMemo(() => new THREE.Object3D(), []);
   // Windows are the only thing here that is turned, and a shared scratch object
   // would leave that rotation on the next floor box written through it.
@@ -311,66 +330,61 @@ function Buildings({
   function applyCell(
     mesh: THREE.InstancedMesh,
     index: number,
-    cell: FloorCell
+    cell: FloorCell,
+    rise: number
   ) {
-    scratch.position.set(cell.cx, cell.cy, cell.cz);
-    scratch.scale.set(cell.sx, cell.sy, cell.sz);
+    const base = bases.get(cell.buildingId) ?? 0;
+    scratch.position.set(cell.cx, base + (cell.cy - base) * rise, cell.cz);
+    scratch.scale.set(cell.sx, cell.sy * rise, cell.sz);
     scratch.updateMatrix();
     mesh.setMatrixAt(index, scratch.matrix);
   }
 
-  /** Place each window on its final floor face. */
+  /** Windows share the floor's growth and stay attached to its wall. */
   function applyWindow(
     mesh: THREE.InstancedMesh,
     index: number,
-    cell: WindowCell
+    cell: WindowCell,
+    rise: number
   ) {
-    turned.position.set(cell.cx, cell.cy, cell.cz);
+    const base = bases.get(cell.buildingId) ?? 0;
+    turned.position.set(cell.cx, base + (cell.cy - base) * rise, cell.cz);
     turned.rotation.set(0, cell.rotY, 0);
-    turned.scale.set(WINDOW_WIDTH, WINDOW_HEIGHT, 1);
+    turned.scale.set(WINDOW_WIDTH, WINDOW_HEIGHT * rise, 1);
     turned.updateMatrix();
     mesh.setMatrixAt(index, turned.matrix);
   }
 
-  // Geometry stays at its final size through the intro. Updating these matrices
-  // also follows the existing focus tween; only material opacity handles arrival.
-  useEffect(() => {
+  function updateWindowGeometry(rise: number) {
+    const window = windowRef.current;
+    if (window) {
+      windows.forEach((cell, i) => {
+        applyWindow(window, i, cell, rise);
+      });
+      window.instanceMatrix.needsUpdate = true;
+      window.computeBoundingSphere();
+    }
+  }
+
+  // The mesh, windows, hit target and outline use the same rise about each base.
+  // Keep depth writes and render queues fixed so the fade cannot pop at its end.
+  function updateBuildingGeometry(rise: number) {
     for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
       const mesh = meshRefs[kind].current;
       if (!mesh) continue;
       cellsByKind[kind].forEach((cell, i) => {
-        applyCell(mesh, i, cell);
+        applyCell(mesh, i, cell, rise);
       });
       mesh.instanceMatrix.needsUpdate = true;
       mesh.computeBoundingSphere();
     }
 
-    const window = windowRef.current;
-    if (window) {
-      windows.forEach((cell, i) => {
-        applyWindow(window, i, cell);
-      });
-      window.instanceMatrix.needsUpdate = true;
-      window.computeBoundingSphere();
-    }
-
-    const plaza = plazaRef.current;
-    if (plaza) {
-      plazas.forEach((cell, i) => {
-        scratch.position.set(cell.cx, cell.cy + PLAZA_HEIGHT / 2, cell.cz);
-        // cylinderGeometry's default radius is 1, so scale by the radius directly.
-        scratch.scale.set(cell.radius, PLAZA_HEIGHT, cell.radius);
-        scratch.updateMatrix();
-        plaza.setMatrixAt(i, scratch.matrix);
-      });
-      plaza.instanceMatrix.needsUpdate = true;
-      plaza.computeBoundingSphere();
-    }
+    updateWindowGeometry(rise);
 
     const hit = hitRef.current;
     if (hit) {
       placements.forEach((placement, i) => {
-        const height = heights.get(placement.id) ?? placement.height;
+        const height = (heights.get(placement.id) ?? placement.height) * rise;
         // A building pressed flat is out of the conversation, so it stops taking the
         // pointer as well: a zero-sized box is one the raycaster cannot hit.
         const pickable = (placement.flatten ?? 0) < 0.999;
@@ -390,16 +404,35 @@ function Buildings({
       hit.instanceMatrix.needsUpdate = true;
       hit.computeBoundingSphere();
     }
+  }
+
+  useEffect(() => {
+    updateBuildingGeometry(lastRise.current);
+    const plaza = plazaRef.current;
+    if (plaza) {
+      plazas.forEach((cell, i) => {
+        scratch.position.set(cell.cx, cell.cy + PLAZA_HEIGHT / 2, cell.cz);
+        // cylinderGeometry's default radius is 1, so scale by the radius directly.
+        scratch.scale.set(cell.radius, PLAZA_HEIGHT, cell.radius);
+        scratch.updateMatrix();
+        plaza.setMatrixAt(i, scratch.matrix);
+      });
+      plaza.instanceMatrix.needsUpdate = true;
+      plaza.computeBoundingSphere();
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cellsByKind, windows, plazas, placements, heights, reducedMotion]);
 
   useFrame((state) => {
-    const opacity = revealAt(state.clock.elapsedTime, reducedMotion).districts;
-    for (const material of solidMaterials.current.values()) {
-      material.transparent = opacity < 1;
-      material.depthWrite = opacity >= 1;
-      material.opacity = opacity;
+    const rise = buildingRiseAt(state.clock.elapsedTime, reducedMotion);
+    if (rise !== lastRise.current) {
+      lastRise.current = rise;
+      updateBuildingGeometry(rise);
     }
+    const opacity = revealAt(state.clock.elapsedTime, reducedMotion).districts;
+    for (const material of solidMaterials.current.values())
+      material.opacity = opacity;
   });
 
   useEffect(() => {
@@ -632,6 +665,73 @@ function Buildings({
   );
 }
 
+/** Screen-space strokes with a continuously advancing endpoint, not whole-edge jumps. */
+function IntroOutline({
+  positions,
+  colour,
+  reducedMotion,
+  strength = 1,
+  grow = false,
+  phase = "stage",
+  width = 1.3,
+}: {
+  positions: Float32Array;
+  phase?: "stage" | "connections";
+  width?: number;
+  grow?: boolean;
+  colour: string;
+  reducedMotion: boolean;
+  strength?: number;
+}) {
+  const traced = useMemo(() => positions.slice(), [positions]);
+  const geometry = useMemo(() => {
+    const next = new LineSegmentsGeometry();
+    next.setPositions(traced);
+    next.instanceCount = 0;
+    return next;
+  }, [traced]);
+  const material = useMemo(
+    () =>
+      new LineMaterial({
+        color: colour,
+        linewidth: width,
+        worldUnits: false,
+        depthWrite: false,
+        transparent: true,
+        opacity: 0,
+        toneMapped: false,
+      }),
+    [colour, width]
+  );
+  const lines = useMemo(
+    () => new LineSegments2(geometry, material),
+    [geometry, material]
+  );
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => () => material.dispose(), [material]);
+  useFrame((state) => {
+    const reveal = revealAt(state.clock.elapsedTime, reducedMotion);
+    const progress =
+      phase === "connections"
+        ? connectionTraceAt(state.clock.elapsedTime, reducedMotion)
+        : { trace: reveal.trace, opacity: reveal.wireframe };
+    material.opacity = progress.opacity * strength;
+    lines.visible = material.opacity > 0.001;
+    if (!lines.visible) return;
+    geometry.instanceCount =
+      traceOutlinePositions(positions, traced, progress.trace) / 2;
+    if (grow)
+      growBuildingOutline(
+        traced,
+        buildingRiseAt(state.clock.elapsedTime, reducedMotion)
+      );
+    (
+      geometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute
+    ).data.needsUpdate = true;
+  });
+  return <primitive frustumCulled={false} object={lines} />;
+}
+
 function BuildingOutlines({
   cellsByKind,
   palette,
@@ -641,50 +741,18 @@ function BuildingOutlines({
   palette: Palette;
   reducedMotion: boolean;
 }) {
-  const material = useRef<THREE.LineBasicMaterial>(null);
-  const lines = useRef<THREE.LineSegments>(null);
   const positions = useMemo(
-    () =>
-      buildOutlinePositions(
-        Object.values(cellsByKind)
-          .flat()
-          .map((cell) => ({
-            x: cell.cx,
-            y: cell.cy - cell.sy / 2,
-            z: cell.cz,
-            width: cell.sx,
-            height: cell.sy,
-            depth: cell.sz,
-          }))
-      ),
+    () => buildBuildingOutlinePositions(Object.values(cellsByKind).flat()),
     [cellsByKind]
   );
-
-  useFrame((state) => {
-    const progress = revealAt(state.clock.elapsedTime, reducedMotion);
-    if (material.current) material.current.opacity = progress.wireframe;
-    if (lines.current) {
-      lines.current.visible = progress.wireframe > 0.001;
-      lines.current.geometry.setDrawRange(
-        0,
-        Math.floor((positions.length / 6) * progress.trace) * 2
-      );
-    }
-  });
-
-  if (positions.length === 0) return null;
   return (
-    <lineSegments frustumCulled={false} ref={lines}>
-      <bufferGeometry>
-        <bufferAttribute args={[positions, 3]} attach="attributes-position" />
-      </bufferGeometry>
-      <lineBasicMaterial
-        color={palette.phosphor}
-        depthWrite={false}
-        ref={material}
-        transparent
-      />
-    </lineSegments>
+    <IntroOutline
+      colour={palette.phosphor}
+      grow
+      positions={positions}
+      reducedMotion={reducedMotion}
+      strength={0.75}
+    />
   );
 }
 
@@ -1035,34 +1103,82 @@ function Roads({
   if (positions.length === 0) return null;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: Three mesh; keyboard users inspect the same connections in the inspector.
-    <mesh
-      frustumCulled={false}
-      onClick={(event) => {
-        if (
-          !visible ||
-          (material.current?.opacity ?? 0) < 0.1 ||
-          event.faceIndex === null ||
-          event.faceIndex === undefined
-        )
-          return;
-        pickConnectionRange(event, event.faceIndex * 3, ranges, onPick);
-      }}
-      ref={mesh}
-    >
-      <bufferGeometry ref={geometry}>
-        <bufferAttribute args={[positions, 3]} attach="attributes-position" />
-        <bufferAttribute args={[fadedColors, 4]} attach="attributes-color" />
-      </bufferGeometry>
-      <meshBasicMaterial
-        depthWrite={false}
-        opacity={0}
-        ref={material}
-        side={THREE.DoubleSide}
-        transparent
-        vertexColors
-      />
-    </mesh>
+    <>
+      <ConnectionIntro boot={boot} visible={visible}>
+        <RoadIntroTrace
+          colour={palette.phosphor}
+          edges={edges}
+          placementsById={placementsById}
+          reducedMotion={reducedMotion}
+        />
+      </ConnectionIntro>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Three mesh; keyboard users inspect the same connections in the inspector. */}
+      <mesh
+        frustumCulled={false}
+        onClick={(event) => {
+          if (
+            !visible ||
+            (material.current?.opacity ?? 0) < 0.1 ||
+            event.faceIndex === null ||
+            event.faceIndex === undefined
+          )
+            return;
+          pickConnectionRange(event, event.faceIndex * 3, ranges, onPick);
+        }}
+        ref={mesh}
+      >
+        <bufferGeometry ref={geometry}>
+          <bufferAttribute args={[positions, 3]} attach="attributes-position" />
+          <bufferAttribute args={[fadedColors, 4]} attach="attributes-color" />
+        </bufferGeometry>
+        <meshBasicMaterial
+          depthWrite={false}
+          opacity={0}
+          ref={material}
+          side={THREE.DoubleSide}
+          transparent
+          vertexColors
+        />
+      </mesh>
+    </>
+  );
+}
+
+function ConnectionIntro({
+  visible,
+  boot,
+  children,
+}: {
+  visible: boolean;
+  boot: BootPhase;
+  children: ReactNode;
+}) {
+  return visible && boot !== "done" ? children : null;
+}
+
+function RoadIntroTrace({
+  placementsById,
+  edges,
+  colour,
+  reducedMotion,
+}: {
+  placementsById: Map<string, Placement>;
+  edges: SchemaEdge[];
+  colour: string;
+  reducedMotion: boolean;
+}) {
+  const positions = useMemo(
+    () => roadTracePositions(placementsById, edges),
+    [placementsById, edges]
+  );
+  return (
+    <IntroOutline
+      colour={colour}
+      phase="connections"
+      positions={positions}
+      reducedMotion={reducedMotion}
+      width={1.7}
+    />
   );
 }
 
@@ -1160,14 +1276,25 @@ function Links({
   }, [positions, ranges, colour, opacity, selected, hovered, focused, boot]);
 
   return (
-    <LinkStrokes
-      colors={colors}
-      onPick={onPick}
-      positions={positions}
-      ranges={ranges}
-      reducedMotion={reducedMotion}
-      visible={visible}
-    />
+    <>
+      <ConnectionIntro boot={boot} visible={visible}>
+        <IntroOutline
+          colour={colour}
+          phase="connections"
+          positions={positions}
+          reducedMotion={reducedMotion}
+          width={1.7}
+        />
+      </ConnectionIntro>
+      <LinkStrokes
+        colors={colors}
+        onPick={onPick}
+        positions={positions}
+        ranges={ranges}
+        reducedMotion={reducedMotion}
+        visible={visible}
+      />
+    </>
   );
 }
 
@@ -1683,18 +1810,8 @@ function trackMaterial<T extends THREE.Material>(
   };
 }
 
-function revealMaterials(
-  materials: Iterable<THREE.Material>,
-  opacity: number,
-  solid = false
-) {
-  for (const material of materials) {
-    material.opacity = opacity;
-    if (solid) {
-      material.depthWrite = opacity >= 1;
-      material.transparent = opacity < 1;
-    }
-  }
+function revealMaterials(materials: Iterable<THREE.Material>, opacity: number) {
+  for (const material of materials) material.opacity = opacity;
 }
 
 function DistrictBoards({
@@ -1708,14 +1825,12 @@ function DistrictBoards({
   palette: Palette;
   materials: {
     solid: Map<number, THREE.MeshStandardMaterial>;
-    wire: Map<number, THREE.LineBasicMaterial>;
   };
 }) {
-  const outlineGeometry = useRef<THREE.BufferGeometry>(null);
   const rim = useMemo(() => rimColour(palette), [palette]);
   const outline = useMemo(
     () =>
-      buildOutlinePositions(
+      buildBoardOutlinePositions(
         districts.map((district) => ({
           x: district.centre.x,
           y: -SLAB_HEIGHT,
@@ -1727,13 +1842,6 @@ function DistrictBoards({
       ),
     [districts]
   );
-  useFrame((state) => {
-    const { trace } = revealAt(state.clock.elapsedTime, reducedMotion);
-    outlineGeometry.current?.setDrawRange(
-      0,
-      Math.floor((outline.length / 6) * trace) * 2
-    );
-  });
   return (
     <>
       {districts.map((district, index) => {
@@ -1749,7 +1857,7 @@ function DistrictBoards({
               <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
               <meshStandardMaterial
                 color={slabColour(district.kind, palette)}
-                depthWrite={false}
+                depthWrite
                 metalness={0}
                 opacity={0}
                 ref={trackMaterial(materials.solid, index * 2)}
@@ -1763,7 +1871,7 @@ function DistrictBoards({
               />
               <meshStandardMaterial
                 color={rim}
-                depthWrite={false}
+                depthWrite
                 metalness={0}
                 opacity={0}
                 ref={trackMaterial(materials.solid, index * 2 + 1)}
@@ -1774,18 +1882,12 @@ function DistrictBoards({
           </group>
         );
       })}
-      <lineSegments frustumCulled={false}>
-        <bufferGeometry ref={outlineGeometry}>
-          <bufferAttribute args={[outline, 3]} attach="attributes-position" />
-        </bufferGeometry>
-        <lineBasicMaterial
-          color={palette.phosphor}
-          depthWrite={false}
-          opacity={0}
-          ref={trackMaterial(materials.wire, 0)}
-          transparent
-        />
-      </lineSegments>
+      <IntroOutline
+        colour={palette.phosphor}
+        positions={outline}
+        reducedMotion={reducedMotion}
+        strength={0.6}
+      />
     </>
   );
 }
@@ -1882,7 +1984,6 @@ function Stage({
     () => tint(palette.land, WHITE, 0.15),
     [palette]
   );
-  const wireMaterials = useRef(new Map<number, THREE.LineBasicMaterial>());
   const solidMaterials = useRef(new Map<number, THREE.MeshStandardMaterial>());
   const folderMaterials = useRef(new Map<number, THREE.MeshStandardMaterial>());
   const stampMaterials = useRef(new Map<number, THREE.MeshBasicMaterial>());
@@ -1909,9 +2010,8 @@ function Stage({
 
   useFrame((state) => {
     const progress = revealAt(state.clock.elapsedTime, reducedMotion);
-    revealMaterials(wireMaterials.current.values(), progress.wireframe * 0.9);
-    revealMaterials(solidMaterials.current.values(), progress.districts, true);
-    revealMaterials(folderMaterials.current.values(), progress.districts, true);
+    revealMaterials(solidMaterials.current.values(), progress.districts);
+    revealMaterials(folderMaterials.current.values(), progress.districts);
     revealMaterials(
       stampMaterials.current.values(),
       STAMP_OPACITY * progress.links
@@ -1925,7 +2025,6 @@ function Stage({
         districts={districts}
         materials={{
           solid: solidMaterials.current,
-          wire: wireMaterials.current,
         }}
         palette={palette}
         reducedMotion={reducedMotion}
@@ -1950,7 +2049,7 @@ function Stage({
           />
           <meshStandardMaterial
             color={folderColour}
-            depthWrite={false}
+            depthWrite
             metalness={0}
             opacity={0}
             ref={trackMaterial(folderMaterials.current, index)}

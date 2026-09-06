@@ -636,10 +636,10 @@ describe("layoutCity", () => {
       ])
     ) as [Placement, Placement];
 
-    expect(wide.footprint).toBe(3);
+    expect(wide.footprint).toBeCloseTo(3.6);
     expect(wide.floors).toBe(2);
     expect(wide.height).toBeCloseTo(1.2);
-    expect(capped.footprint).toBe(5);
+    expect(capped.footprint).toBeCloseTo(6);
     expect(capped.floors).toBe(1);
   });
 

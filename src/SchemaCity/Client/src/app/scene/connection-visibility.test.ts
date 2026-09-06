@@ -3,6 +3,7 @@ import type { SchemaEdge } from "../../model/types";
 import {
   connectionBootAt,
   connectionEmphasis,
+  connectionTraceAt,
   visibleConnections,
 } from "./connection-visibility";
 
@@ -29,6 +30,16 @@ test("focus keeps only complete paths; overview retains every edge", () => {
     edges[0],
     edges[2],
   ]);
+});
+test("traces before fading and stays quiet when motion is reduced", () => {
+  expect(connectionTraceAt(1.34)).toEqual({ trace: 0, opacity: 0 });
+  expect(connectionTraceAt(1.47).trace).toBeCloseTo(0.1846, 3);
+  expect(connectionTraceAt(1.47).opacity).toBeCloseTo(1, 6);
+  expect(connectionTraceAt(2.05)).toEqual({ trace: 1, opacity: 1 });
+  expect(connectionTraceAt(2.3).trace).toBe(1);
+  expect(connectionTraceAt(2.3).opacity).toBeLessThan(1);
+  expect(connectionTraceAt(2.65).opacity).toBe(0);
+  expect(connectionTraceAt(0, true)).toEqual({ trace: 1, opacity: 0 });
 });
 test("emphasizes boot, focus, and any edge in a shared trunk", () => {
   expect(

@@ -63,7 +63,7 @@ export type CityBounds = {
   centre: { x: number; z: number };
 };
 
-/** A building is 2 units square before its own properties widen it. */
+/** Base size before own properties and the overview readability multiplier. */
 const FOOTPRINT = 2;
 /**
  * Ground between two buildings in the same row, row or grid. One and a half
@@ -217,7 +217,7 @@ const compareByAlias = (a: SchemaNode, b: SchemaNode) =>
   compare(a.alias, b.alias);
 
 const footprintOf = (node: SchemaNode) =>
-  FOOTPRINT + 0.25 * Math.min(Math.max(node.ownPropertyCount, 0), 12);
+  1.2 * (FOOTPRINT + 0.25 * Math.min(Math.max(node.ownPropertyCount, 0), 12));
 
 // ponytail: one floor per group, and a type with no groups still gets a ground floor.
 // M1's building work splits a Tab from a Group; today they are the same slab.

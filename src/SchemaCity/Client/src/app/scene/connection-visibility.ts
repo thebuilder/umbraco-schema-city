@@ -1,5 +1,11 @@
 import type { SchemaEdge } from "../../model/types";
 export type BootPhase = "trace" | "fade" | "done";
+
+export type ConnectionTrace = {
+  trace: number;
+  opacity: number;
+};
+
 export function connectionBootAt(
   elapsed: number,
   reducedMotion: boolean
@@ -8,6 +14,21 @@ export function connectionBootAt(
   return {
     phase: elapsed < 2.1 ? "trace" : elapsed < 2.65 ? "fade" : "done",
     trace: Math.min(1, Math.max(0, (elapsed - 1.35) / 0.65)),
+  };
+}
+
+/** The short, bright trace that introduces the otherwise quiet connection layer. */
+export function connectionTraceAt(
+  elapsed: number,
+  reducedMotion = false
+): ConnectionTrace {
+  const { trace } = connectionBootAt(elapsed, reducedMotion);
+  if (reducedMotion) return { trace, opacity: 0 };
+  const fadeIn = Math.min(1, Math.max(0, (elapsed - 1.35) / 0.12));
+  const fadeOut = Math.min(1, Math.max(0, (elapsed - 2.1) / 0.55));
+  return {
+    trace,
+    opacity: elapsed >= 2.65 ? 0 : Math.max(0, fadeIn * (1 - fadeOut)),
   };
 }
 export function visibleConnections(
