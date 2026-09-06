@@ -100,11 +100,52 @@ it("keeps the idle overview unlabelled until a building is hovered or selected",
     hovered: null,
     selected: null,
     neighbours: null,
+    hoveredNeighbours: null,
     focusNeighbours: null,
   };
   expect([...visibleLabelIds(idle)]).toEqual([]);
   expect([...visibleLabelIds({ ...idle, hovered: "type" })]).toEqual(["type"]);
   expect([...visibleLabelIds({ ...idle, selected: "type" })]).toEqual(["type"]);
+});
+
+it("shows direct connected names for a hovered building", () => {
+  expect([
+    ...visibleLabelIds({
+      hovered: "type",
+      selected: null,
+      neighbours: null,
+      hoveredNeighbours: new Set(["type", "block", "reference"]),
+      focusNeighbours: null,
+    }),
+  ]).toEqual(["type", "block", "reference"]);
+});
+
+it("keeps every selected neighbour as a candidate for collision picking", () => {
+  const neighbours = new Set([
+    "type",
+    ...Array.from({ length: 12 }, (_, i) => `n${i}`),
+  ]);
+  expect(
+    visibleLabelIds({
+      hovered: null,
+      selected: "type",
+      neighbours,
+      hoveredNeighbours: null,
+      focusNeighbours: null,
+    })
+  ).toEqual(neighbours);
+});
+
+it("does not label hover connections hidden outside the focused neighbourhood", () => {
+  expect(
+    visibleLabelIds({
+      hovered: "block",
+      selected: "page",
+      neighbours: new Set(["page", "block"]),
+      hoveredNeighbours: new Set(["block", "page", "outside"]),
+      focusNeighbours: new Set(["page", "block"]),
+    })
+  ).toEqual(new Set(["block", "page"]));
 });
 
 it("places a selected type name above its current roof", () => {

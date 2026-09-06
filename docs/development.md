@@ -142,7 +142,7 @@ checks that the package contains `workspace.js`, has no source maps, and is smal
 
 ## Refresh README screenshots
 
-Run the standalone client with `medium.json` selected. Capture the settled UI after the opening
+Run the standalone client with **Medium schema** selected. Capture the settled UI after the opening
 animation at a consistent viewport size. Omit the fixture selector from the image; it belongs to
 the demo page, not the extension. Do not alter schema values for screenshots.
 

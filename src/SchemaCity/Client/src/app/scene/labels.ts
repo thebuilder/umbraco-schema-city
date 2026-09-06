@@ -114,22 +114,26 @@ export function visibleLabelIds({
   hovered,
   selected,
   neighbours,
+  hoveredNeighbours,
   focusNeighbours,
 }: {
   hovered: string | null;
   selected: string | null;
   neighbours: Set<string> | null;
+  hoveredNeighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
 }): Set<string> {
   const ids = new Set<string>();
   if (hovered) ids.add(hovered);
+  for (const id of hoveredNeighbours ?? []) {
+    if (!focusNeighbours || focusNeighbours.has(id)) ids.add(id);
+  }
   if (focusNeighbours) {
     for (const id of focusNeighbours) ids.add(id);
   } else if (selected) {
     ids.add(selected);
-    const direct = [...(neighbours ?? [])].filter((id) => id !== selected);
-    if (direct.length <= 8) for (const id of direct) ids.add(id);
   }
+  for (const id of neighbours ?? []) ids.add(id);
   return ids;
 }
 

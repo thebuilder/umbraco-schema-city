@@ -25,7 +25,7 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:5173](http://localhost:5173). The fixture selector switches between small, medium,
+Open [localhost:5173](http://localhost:5173). The sample selector in the footer switches between small, medium,
 and pathological schemas. Editor links in this demo log the selected type to the browser console.
 They open real editors when the extension runs inside Umbraco.
 
@@ -50,7 +50,8 @@ for testing the integration.
 ## Investigate a type
 
 Use Search or `⌘K` / `Ctrl+K` to find a type by name, alias, or property alias. Hover a building to
-see its name and direct connections. Click it to keep those connections visible and open the
+see its direct connections and the names of connected types. Labels that would overlap stay
+hidden until there is room for them as you zoom in. Click a building to keep its connections visible and open the
 inspector, which shows properties, composition origins, usage counts, and related types.
 
 Layer switches control the background overview. Hover and selection reveal direct connections

@@ -3,13 +3,99 @@
   <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1" name="viewport">
-    <title>Schema City harness</title>
+    <title>Schema City demo</title>
+    <style>
+    :root {
+      font-family: ui-monospace, monospace;
+      color-scheme: dark;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      color: #e9f6f1;
+      background: #05090a;
+    }
+
+    .demo-footer {
+      flex: 0 0 auto;
+      padding: 0.45rem 0.75rem 0.55rem;
+      background: #081210;
+      border-top: 1px solid rgb(132 255 224 / 0.22);
+    }
+
+    .demo-footer__inner {
+      display: flex;
+      gap: 0.65rem;
+      align-items: center;
+      justify-content: flex-end;
+      max-width: 100%;
+    }
+
+    .demo-footer__context,
+    .demo-footer label {
+      font-size: 0.6875rem;
+      color: #87a39d;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .demo-footer__context {
+      margin-right: auto;
+    }
+
+    .demo-footer select {
+      min-width: 11rem;
+      padding: 0.35rem 1.8rem 0.35rem 0.55rem;
+      font: inherit;
+      font-size: 0.75rem;
+      color: #d9ffef;
+      cursor: pointer;
+      background-color: #0b1515;
+      border: 1px solid rgb(132 255 224 / 0.38);
+      border-radius: 0;
+    }
+
+    .demo-footer select:hover {
+      border-color: #86fadd;
+    }
+
+    .demo-footer select:focus-visible {
+      outline: 2px solid #d9ffef;
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 34rem) {
+      .demo-footer__context {
+        display: none;
+      }
+
+      .demo-footer__inner {
+        justify-content: space-between;
+      }
+
+      .demo-footer select {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+    </style>
   </head>
   <body style="margin: 0; height: 100vh; display: flex; flex-direction: column">
-    <header style="padding: 6px">
-      <select aria-label="Demo schema" id="fixture"></select>
-    </header>
     <div id="app" style="flex: 1; min-height: 0"></div>
+    <footer class="demo-footer">
+      <div class="demo-footer__inner">
+        <span aria-hidden="true" class="demo-footer__context"
+          >Schema City demo</span
+        >
+        <label for="fixture">Sample schema</label>
+        <select id="fixture"></select>
+      </div>
+    </footer>
     <script src="./main.tsx" type="module"></script>
   </body>
 </html>

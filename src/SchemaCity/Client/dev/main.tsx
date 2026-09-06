@@ -39,9 +39,17 @@ const icons = {
 const picker = document.querySelector("select") as HTMLSelectElement;
 const root = createRoot(document.querySelector("#app") as HTMLElement);
 
+const fixtureLabel = (path: string) => {
+  const name = path
+    .slice("./fixtures/".length)
+    .replace(JSON_SUFFIX, "")
+    .replace(/-/g, " ");
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} schema`;
+};
+
 for (const path of Object.keys(fixtures).sort()) {
   if (path.endsWith("-usage.json")) continue;
-  picker.add(new Option(path.slice("./fixtures/".length), path));
+  picker.add(new Option(fixtureLabel(path), path));
 }
 
 async function show(path: string) {

@@ -1465,6 +1465,7 @@ function Labels({
   heights,
   selected,
   hovered,
+  graph,
   neighbours,
   focusNeighbours,
   reducedMotion,
@@ -1474,6 +1475,7 @@ function Labels({
   heights: Map<string, number>;
   selected: string | null;
   hovered: string | null;
+  graph: SchemaGraph;
   neighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
   reducedMotion: boolean;
@@ -1500,6 +1502,7 @@ function Labels({
       hovered,
       selected,
       neighbours,
+      hoveredNeighbours: hovered ? neighboursOf(graph, hovered) : null,
       focusNeighbours,
     });
 
@@ -1513,6 +1516,7 @@ function Labels({
   }, [
     hovered,
     selected,
+    graph,
     neighbours,
     focusNeighbours,
     nodesById,
@@ -1882,7 +1886,7 @@ function DistrictBoards({
             key={district.id}
             position={[district.centre.x, 0, district.centre.z]}
           >
-            <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
+            <mesh position={[0, -SLAB_HEIGHT / 2, 0]} renderOrder={-1}>
               <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
               <meshStandardMaterial
                 color={slabColour(district.kind, palette)}
@@ -1894,7 +1898,10 @@ function DistrictBoards({
                 transparent
               />
             </mesh>
-            <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
+            <mesh
+              position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}
+              renderOrder={-1}
+            >
               <boxGeometry
                 args={[width + overhang, RIM_HEIGHT, depth + overhang]}
               />
@@ -2059,7 +2066,9 @@ function Stage({
         reducedMotion={reducedMotion}
       />
       {/* A nested folder is a lighter rectangle on the island its members stand on,
-          which is what says where one block of a district ends and the next starts. */}
+          which is what says where one block of a district ends and the next starts.
+          Like the district boards, it draws before connections so its reveal material
+          cannot paint over lines that do not write depth. */}
       {folders.map((folder, index) => (
         <mesh
           key={folder.id}
@@ -2068,6 +2077,7 @@ function Stage({
             FOLDER_TINT_HEIGHT / 2 - SLAB_HEIGHT / 2,
             folder.centre.z,
           ]}
+          renderOrder={-1}
         >
           <boxGeometry
             args={[
@@ -3035,6 +3045,7 @@ export default function Scene({
           />
           <Labels
             focusNeighbours={focusNeighbours}
+            graph={graph}
             heights={heights}
             hovered={hovered}
             neighbours={neighbours}
