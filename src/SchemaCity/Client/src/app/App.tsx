@@ -51,7 +51,6 @@ import type { SchemaGraph, UsageReport } from "../model/types";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_WIDTH, Inspector } from "./Inspector";
-import { Overview } from "./Overview";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   LENS_LABEL,
@@ -700,16 +699,6 @@ export function App({
               </Suspense>
             </div>
           )}
-
-          <Overview
-            graph={graph}
-            onFindings={() => setFindingsOpen(true)}
-            onList={() => setView("list")}
-            onSearch={() => setPaletteOpen(true)}
-            selected={selectedNode !== undefined}
-            usage={usage}
-            view={view}
-          />
 
           {selectedNode && neighbourhood ? (
             <Inspector

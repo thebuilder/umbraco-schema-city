@@ -22,7 +22,7 @@ Use a brief opening sequence: stage outlines, solid districts and buildings, the
 
 Default to structure relationships. Displaying every relationship at once overwhelms even a medium schema. The legend must explain edge direction, and selecting or focusing a type must give a readable local view. Routing can avoid coincident paths and building intersections, but arbitrary graphs will still have crossings in projection.
 
-Give the unselected view a compact purpose statement and a model count. Search, findings, and list view should be visible starting points. Avoid a blocking welcome screen or a compulsory camera tour.
+Keep the city unobstructed. Search, findings, and list view are available in the toolbar; an additional introduction card repeats those controls and covers the scene. Avoid a blocking welcome screen or a compulsory camera tour.
 
 ## Developer workflows
 
