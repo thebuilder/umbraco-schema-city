@@ -8,6 +8,9 @@
 // camera every frame without the lines appearing to slide.
 import { FLOOR_HEIGHT } from "./buildings";
 
+/** Highest board surface; ground traces must sit above nested folder tints. */
+export const FOLDER_TINT_HEIGHT = 0.02;
+
 /**
  * One grid square is six world units. It read as the street the layout left between
  * two ranks until that street grew to nine, and it is a ruler under the islands now

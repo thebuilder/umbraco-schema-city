@@ -67,6 +67,7 @@ import { findNameplate, groundRuns, type Run } from "./scene/nameplate";
 import { revealAt, transitionToward } from "./scene/reveal";
 import { buildRoadGeometry, roadFan } from "./scene/roads";
 import {
+  FOLDER_TINT_HEIGHT,
   fogRange,
   framingAction,
   GRID_FRAGMENT_SHADER,
@@ -1261,8 +1262,6 @@ const RIM_HEIGHT = 0.18;
 const RIM_OVERHANG = 0.9;
 /** Ground around a nested folder's members that its tint covers. */
 const FOLDER_PAD = 1;
-/** How far the tint under a nested folder stands proud of the island. */
-const FOLDER_TINT_HEIGHT = 0.02;
 /** The grid sits under the rim, so the two can never z-fight. */
 const GRID_Y = -(SLAB_HEIGHT + RIM_HEIGHT + 0.05);
 

@@ -5,6 +5,7 @@
 // that forks at each child's column. Pure: no three.js, no React.
 import type { SchemaEdge } from "../../model/types";
 import { type Placement, STREET } from "../layout/city";
+import { FOLDER_TINT_HEIGHT } from "./stage";
 
 export type RoadRange = { edges: SchemaEdge[]; start: number; count: number };
 
@@ -39,9 +40,11 @@ export type RoadGrid = {
   placements: Placement[];
 };
 
-const ROAD_WIDTH = 0.08;
-const ROAD_Y = 0.015;
-const CHEVRON_Y = 0.02;
+// Wide enough to survive overview rasterization; busy streets still cap each
+// ribbon below its lane spacing so widening does not join unrelated traces.
+const ROAD_WIDTH = 0.3;
+const ROAD_Y = FOLDER_TINT_HEIGHT + 0.03;
+const CHEVRON_Y = ROAD_Y + 0.01;
 const CHEVRON_SPACING = 1.4;
 /**
  * How much of the run before a child carries chevrons. A rank-skipping road descends

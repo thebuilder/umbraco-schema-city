@@ -43,7 +43,7 @@ const ARCH = 3;
 /**
  * How close to the ground a block link and a reference come on their way across the
  * city. They run the streets there, so they sit just clear of the road ribbons at
- * 0.015 and of each other.
+ * 0.05 and of each other.
  */
 const BLOCK_Y = 0.25;
 const REFERENCE_Y = 0.4;

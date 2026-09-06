@@ -10,6 +10,8 @@ import {
   roadFan,
 } from "./roads";
 
+import { FOLDER_TINT_HEIGHT } from "./stage";
+
 const medium = mediumFixture as unknown as SchemaGraph;
 const pathological = pathologicalFixture as unknown as SchemaGraph;
 
@@ -436,5 +438,26 @@ describe("buildRoadGeometry", () => {
       next += range.count;
     }
     expect(next).toBe(positions.length / 3);
+  });
+});
+
+describe("road rendering clearance", () => {
+  it("keeps ribbons, arrowheads and self loops above raised folder boards", () => {
+    const { positions } = buildRoadGeometry(placements, [
+      road("a", "b"),
+      road("a", "a"),
+    ]);
+    const elevations = Array.from(positions).filter(
+      (_, index) => index % 3 === 1
+    );
+    expect(elevations.length).toBeGreaterThan(0);
+    expect(Math.min(...elevations)).toBeGreaterThan(FOLDER_TINT_HEIGHT + 0.01);
+  });
+
+  it("gives uncrowded roads enough width to read at overview scale", () => {
+    const segments = planRoads(placements, [road("a", "b")]);
+    expect(segments.length).toBeGreaterThan(0);
+    for (const segment of segments)
+      expect(segment.width).toBeGreaterThanOrEqual(0.25);
   });
 });
