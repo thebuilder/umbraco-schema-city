@@ -46,6 +46,26 @@ file exists, a .NET rebuild alone can leave old JavaScript in place. Use `npm ru
 `npm run build` after client changes. `-p:SkipClientBuild=true` skips the automatic client build
 when assets have already been produced.
 
+## Build and deploy the standalone demo
+
+The Umbraco build produces extension modules, not a website. Use the separate demo build for
+static hosting:
+
+```bash
+cd src/SchemaCity/Client
+npm run build:demo
+npm run preview:demo
+```
+
+This writes `Client/dist/index.html` and its assets from the same fixtures used by the dev server.
+It does not need an Umbraco server, API credentials, or a database. Editor links still log to the
+console because the demo has no backoffice.
+
+For Vercel, set the project Root Directory to `src/SchemaCity/Client` and use Node.js 24.
+The checked-in `vercel.json` selects `npm ci`, `npm run build:demo`, and output directory `dist`.
+Leave the ordinary `npm run build` command for the Umbraco extension. Changing only Vercel's output
+directory to `wwwroot` would deploy JavaScript modules without an HTML page.
+
 ## Run checks
 
 ```bash
@@ -112,8 +132,8 @@ not publish it.
 ## Continuous integration
 
 [The CI workflow](../.github/workflows/ci.yml) runs on pushes and pull requests. It lints and builds
-the client, then builds and tests the .NET solution against Umbraco 17.6.2 and 18.1.1. Pull requests
-also run the Fallow gate against their base commit. Run the client tests locally: the workflow does
+the extension and standalone demo, then builds and tests the .NET solution against Umbraco 17.6.2
+and 18.1.1. Pull requests also run the Fallow gate against their base commit. Run the client tests locally: the workflow does
 not currently invoke Vitest.
 
 Each matrix job boots the demo site and checks the backoffice, static package manifest, and 401

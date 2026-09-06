@@ -15,6 +15,7 @@ node_modules/
 
 # Vite output, generated from Client/
 src/SchemaCity/wwwroot/App_Plugins/SchemaCity/
+src/SchemaCity/Client/dist/
 
 # Umbraco runtime
 **/umbraco/Data/
