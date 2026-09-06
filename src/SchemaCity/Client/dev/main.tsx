@@ -52,6 +52,7 @@ async function show(path: string) {
     <App
       graph={graph}
       icons={icons}
+      key={path}
       onOpenType={(id) => console.log("schema-city: open type", id)}
       usage={usage ? ((await usage()) as UsageReport) : undefined}
     />

@@ -5,7 +5,7 @@ import {
   useFrame,
   useThree,
 } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { neighbourhoods } from "../model/neighbourhood";
 import type {
@@ -52,6 +52,7 @@ import {
   turnedOffset,
   turnRates,
 } from "./scene/flight";
+import { isometricZoom } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
 import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
@@ -63,6 +64,7 @@ import {
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
 import { type LensScale, type Ramp, usageBadge } from "./scene/lens";
 import { findNameplate, groundRuns, type Run } from "./scene/nameplate";
+import { revealAt, transitionToward } from "./scene/reveal";
 import { buildRoadGeometry, roadFan } from "./scene/roads";
 import {
   fogRange,
@@ -73,6 +75,25 @@ import {
   stageMetrics,
   zoomRange,
 } from "./scene/stage";
+
+/** Retain geometry through exits, then stop drawing a fully hidden layer. */
+function useLayerReveal(
+  material: RefObject<THREE.Material | null>,
+  object: RefObject<THREE.Object3D | null>,
+  visible: boolean,
+  reducedMotion: boolean
+) {
+  const opacity = useRef(0);
+  useFrame((state, delta) => {
+    const target =
+      revealAt(state.clock.elapsedTime, reducedMotion).links * Number(visible);
+    opacity.current = reducedMotion
+      ? target
+      : transitionToward(opacity.current, target, Math.min(delta, 0.1));
+    if (material.current) material.current.opacity = opacity.current;
+    if (object.current) object.current.visible = opacity.current > 0.001;
+  });
+}
 
 type Palette = {
   phosphor: string;
@@ -90,6 +111,7 @@ type Palette = {
 
 /** Seconds a building takes to rise, once its own `introDelay` has passed. */
 const INTRO_DURATION = 0.46;
+const BUILDING_REVEAL_DELAY = 0.48;
 const PLAZA_HEIGHT = 0.05;
 const HOVER_BRIGHTEN = 1.4;
 /** How far a faded building's colour moves toward the void, approximating 20% opacity. */
@@ -202,7 +224,10 @@ function Buildings({
     [placements]
   );
   const introEnd = useMemo(
-    () => Math.max(0, ...placements.map((p) => p.introDelay)) + INTRO_DURATION,
+    () =>
+      BUILDING_REVEAL_DELAY +
+      Math.max(0, ...placements.map((p) => p.introDelay)) +
+      INTRO_DURATION,
     [placements]
   );
 
@@ -326,7 +351,8 @@ function Buildings({
       const mesh = meshRefs[kind].current;
       if (!mesh) continue;
       cellsByKind[kind].forEach((cell, i) => {
-        const delay = introDelayById.get(cell.buildingId) ?? 0;
+        const delay =
+          BUILDING_REVEAL_DELAY + (introDelayById.get(cell.buildingId) ?? 0);
         applyCell(
           mesh,
           i,
@@ -344,7 +370,9 @@ function Buildings({
           i,
           cell,
           smootherstep(
-            (elapsed - (introDelayById.get(cell.buildingId) ?? 0)) /
+            (elapsed -
+              BUILDING_REVEAL_DELAY -
+              (introDelayById.get(cell.buildingId) ?? 0)) /
               INTRO_DURATION
           )
         );
@@ -835,13 +863,20 @@ function Roads({
   selected,
   focus,
   palette,
+  reducedMotion,
+  visible,
 }: {
   placementsById: Map<string, Placement>;
   edges: SchemaEdge[];
   selected: string | null;
   focus: string | null;
   palette: Palette;
+  reducedMotion: boolean;
+  visible: boolean;
 }) {
+  const material = useRef<THREE.MeshBasicMaterial>(null);
+  const mesh = useRef<THREE.Mesh>(null);
+  useLayerReveal(material, mesh, visible, reducedMotion);
   const { positions, ranges } = useMemo(
     () => buildRoadGeometry(placementsById, edges),
     [placementsById, edges]
@@ -864,12 +899,19 @@ function Roads({
   if (positions.length === 0) return null;
 
   return (
-    <mesh frustumCulled={false}>
+    <mesh frustumCulled={false} ref={mesh}>
       <bufferGeometry>
         <bufferAttribute args={[positions, 3]} attach="attributes-position" />
         <bufferAttribute args={[colors, 4]} attach="attributes-color" />
       </bufferGeometry>
-      <meshBasicMaterial side={THREE.DoubleSide} vertexColors />
+      <meshBasicMaterial
+        depthWrite={false}
+        opacity={0}
+        ref={material}
+        side={THREE.DoubleSide}
+        transparent
+        vertexColors
+      />
     </mesh>
   );
 }
@@ -893,6 +935,8 @@ function Links({
   palette,
   selected,
   focus,
+  reducedMotion,
+  visible,
 }: {
   layer: Exclude<Layer, "structure">;
   edges: SchemaEdge[];
@@ -903,7 +947,12 @@ function Links({
   palette: Palette;
   selected: string | null;
   focus: string | null;
+  reducedMotion: boolean;
+  visible: boolean;
 }) {
+  const material = useRef<THREE.LineBasicMaterial>(null);
+  const lines = useRef<THREE.LineSegments>(null);
+  useLayerReveal(material, lines, visible, reducedMotion);
   const { positions, ranges } = useMemo(
     () => buildLinkGeometry(layer, edges, anchors, placementsById),
     [layer, edges, anchors, placementsById]
@@ -930,12 +979,17 @@ function Links({
   if (positions.length === 0) return null;
 
   return (
-    <lineSegments frustumCulled={false}>
+    <lineSegments frustumCulled={false} ref={lines}>
       <bufferGeometry>
         <bufferAttribute args={[positions, 3]} attach="attributes-position" />
         <bufferAttribute args={[colors, 4]} attach="attributes-color" />
       </bufferGeometry>
-      <lineBasicMaterial transparent vertexColors />
+      <lineBasicMaterial
+        depthWrite={false}
+        ref={material}
+        transparent
+        vertexColors
+      />
     </lineSegments>
   );
 }
@@ -1413,27 +1467,112 @@ function FocusIsland({
  * does not rescale the world, and the islands come from the city layout as well, so
  * the focused neighbourhood stands on whatever island it lands over.
  *
- * Three draw calls per district, the name printed on it included, plus one per nested
- * folder. Nothing here animates.
+ * District outlines precede the slabs, then the stamped labels join the circuits.
  */
-function Stage({
-  buildings,
+function trackMaterial<T extends THREE.Material>(
+  materials: Map<number, T>,
+  index: number
+) {
+  return (material: T | null) => {
+    if (material) materials.set(index, material);
+    else materials.delete(index);
+  };
+}
+
+function revealMaterials(
+  materials: Iterable<THREE.Material>,
+  opacity: number,
+  solid = false
+) {
+  for (const material of materials) {
+    material.opacity = opacity;
+    if (solid) {
+      material.depthWrite = opacity >= 1;
+      material.transparent = opacity < 1;
+    }
+  }
+}
+
+function DistrictBoards({
   districts,
-  folders,
-  runs,
-  span,
   palette,
+  materials,
 }: {
-  /** Every building in the city, which is what the names have to find a gap in. */
-  buildings: Placement[];
   districts: District[];
-  /** The ground a nested folder's members cover, for the tint on the island. */
-  folders: (CityBounds & { id: string })[];
-  /** Every road and ground link, the other thing a name may not be printed under. */
-  runs: Run[];
-  span: number;
   palette: Palette;
+  materials: {
+    solid: Map<number, THREE.MeshStandardMaterial>;
+    wire: Map<number, THREE.MeshBasicMaterial>;
+  };
 }) {
+  const rim = useMemo(() => rimColour(palette), [palette]);
+  return (
+    <>
+      {districts.map((district, index) => {
+        const width = district.maxX - district.minX + ISLAND_PAD * 2;
+        const depth = district.maxZ - district.minZ + ISLAND_PAD * 2;
+        const overhang = RIM_OVERHANG * 2;
+        return (
+          <group
+            key={district.id}
+            position={[district.centre.x, 0, district.centre.z]}
+          >
+            <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
+              <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
+              <meshStandardMaterial
+                color={slabColour(district.kind, palette)}
+                depthWrite={false}
+                metalness={0}
+                opacity={0}
+                ref={trackMaterial(materials.solid, index * 2)}
+                roughness={1}
+                transparent
+              />
+            </mesh>
+            <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
+              <boxGeometry
+                args={[width + overhang, RIM_HEIGHT, depth + overhang]}
+              />
+              <meshStandardMaterial
+                color={rim}
+                depthWrite={false}
+                metalness={0}
+                opacity={0}
+                ref={trackMaterial(materials.solid, index * 2 + 1)}
+                roughness={1}
+                transparent
+              />
+            </mesh>
+          </group>
+        );
+      })}
+      {districts.map((district, index) => {
+        const width =
+          district.maxX - district.minX + ISLAND_PAD * 2 + RIM_OVERHANG * 2;
+        const depth =
+          district.maxZ - district.minZ + ISLAND_PAD * 2 + RIM_OVERHANG * 2;
+        return (
+          <mesh
+            key={`wire-${district.id}`}
+            position={[district.centre.x, 0.03, district.centre.z]}
+          >
+            <boxGeometry args={[width, 0.16, depth]} />
+            <meshBasicMaterial
+              color={palette.phosphor}
+              depthWrite={false}
+              opacity={0}
+              ref={trackMaterial(materials.wire, index)}
+              transparent
+              wireframe
+            />
+          </mesh>
+        );
+      })}
+    </>
+  );
+}
+
+function WorldGrid({ palette, span }: { palette: Palette; span: number }) {
   const camera = useThree((state) => state.camera);
   const grid = useRef<THREE.Mesh>(null);
   const ray = useMemo(() => new THREE.Raycaster(), []);
@@ -1445,12 +1584,6 @@ function Stage({
   const centre = useMemo(() => new THREE.Vector3(), []);
   const { fadeNear, fadeFar, plane } = stageMetrics(span);
   const fog = fogRange(span);
-  const rim = useMemo(() => rimColour(palette), [palette]);
-  const folderColour = useMemo(
-    () => tint(palette.land, WHITE, 0.15),
-    [palette]
-  );
-
   const uniforms = useMemo(
     () => ({
       uCentre: { value: new THREE.Vector2() },
@@ -1468,6 +1601,79 @@ function Stage({
     }),
     [palette, fadeNear, fadeFar]
   );
+
+  useFrame(() => {
+    // The ground point at the centre of the screen, from the camera's own centre
+    // ray. The orbit target would do under the isometric camera, whose panning holds
+    // it on y = 0, but the Explore camera can look anywhere.
+    if (!grid.current) return;
+    ray.setFromCamera(screenCentre, camera);
+    if (!ray.ray.intersectPlane(ground, centre)) return;
+    // Looking at the horizon puts that point most of a mile away, where re-centring
+    // the plane on it would take the grid out from under the city. Past the fade it
+    // makes no difference to what is drawn, so the grid stays where it was.
+    if (
+      Math.hypot(centre.x - camera.position.x, centre.z - camera.position.z) >
+      fadeFar
+    )
+      return;
+    grid.current.position.set(centre.x, GRID_Y, centre.z);
+    uniforms.uCentre.value.set(centre.x, centre.z);
+  });
+  return (
+    <>
+      <color args={[palette.background]} attach="background" />
+      {/* Fog and background have to be the exact same colour or the far ground ends
+          in a horizon ring instead of dissolving. */}
+      <fog args={[palette.background, fog.near, fog.far]} attach="fog" />
+      <mesh
+        frustumCulled={false}
+        ref={grid}
+        renderOrder={-1}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[plane, plane]} />
+        <shaderMaterial
+          depthWrite={false}
+          fragmentShader={GRID_FRAGMENT_SHADER}
+          glslVersion={THREE.GLSL3}
+          transparent
+          uniforms={uniforms}
+          vertexShader={GRID_VERTEX_SHADER}
+        />
+      </mesh>
+    </>
+  );
+}
+
+function Stage({
+  buildings,
+  districts,
+  folders,
+  runs,
+  span,
+  palette,
+  reducedMotion,
+}: {
+  /** Every building in the city, which is what the names have to find a gap in. */
+  buildings: Placement[];
+  districts: District[];
+  /** The ground a nested folder's members cover, for the tint on the island. */
+  folders: (CityBounds & { id: string })[];
+  /** Every road and ground link, the other thing a name may not be printed under. */
+  runs: Run[];
+  span: number;
+  palette: Palette;
+  reducedMotion: boolean;
+}) {
+  const folderColour = useMemo(
+    () => tint(palette.land, WHITE, 0.15),
+    [palette]
+  );
+  const wireMaterials = useRef(new Map<number, THREE.MeshBasicMaterial>());
+  const solidMaterials = useRef(new Map<number, THREE.MeshStandardMaterial>());
+  const folderMaterials = useRef(new Map<number, THREE.MeshStandardMaterial>());
+  const stampMaterials = useRef(new Map<number, THREE.MeshBasicMaterial>());
 
   // One rasterised name per district, with the quad it prints on. The name is fixed
   // to its island, so the search for its spot runs once rather than every frame.
@@ -1491,76 +1697,31 @@ function Stage({
     [buildings, districts, palette.mono, runs]
   );
 
-  useFrame(() => {
-    // The ground point at the centre of the screen, from the camera's own centre
-    // ray. The orbit target would do under the isometric camera, whose panning holds
-    // it on y = 0, but the Explore camera can look anywhere.
-    if (!grid.current) return;
-    ray.setFromCamera(screenCentre, camera);
-    if (!ray.ray.intersectPlane(ground, centre)) return;
-    // Looking at the horizon puts that point most of a mile away, where re-centring
-    // the plane on it would take the grid out from under the city. Past the fade it
-    // makes no difference to what is drawn, so the grid stays where it was.
-    if (
-      Math.hypot(centre.x - camera.position.x, centre.z - camera.position.z) >
-      fadeFar
-    )
-      return;
-    grid.current.position.set(centre.x, GRID_Y, centre.z);
-    uniforms.uCentre.value.set(centre.x, centre.z);
+  useFrame((state) => {
+    const progress = revealAt(state.clock.elapsedTime, reducedMotion);
+    revealMaterials(wireMaterials.current.values(), progress.wireframe * 0.9);
+    revealMaterials(solidMaterials.current.values(), progress.districts, true);
+    revealMaterials(folderMaterials.current.values(), progress.districts, true);
+    revealMaterials(
+      stampMaterials.current.values(),
+      STAMP_OPACITY * progress.links
+    );
   });
 
   return (
     <>
-      <color args={[palette.background]} attach="background" />
-      {/* Fog and background have to be the exact same colour or the far ground ends
-          in a horizon ring instead of dissolving. */}
-      <fog args={[palette.background, fog.near, fog.far]} attach="fog" />
-      <mesh
-        frustumCulled={false}
-        ref={grid}
-        renderOrder={-1}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <planeGeometry args={[plane, plane]} />
-        <shaderMaterial
-          depthWrite={false}
-          fragmentShader={GRID_FRAGMENT_SHADER}
-          glslVersion={THREE.GLSL3}
-          transparent
-          uniforms={uniforms}
-          vertexShader={GRID_VERTEX_SHADER}
-        />
-      </mesh>
-      {districts.map((district) => {
-        const width = district.maxX - district.minX + ISLAND_PAD * 2;
-        const depth = district.maxZ - district.minZ + ISLAND_PAD * 2;
-        const overhang = RIM_OVERHANG * 2;
-        return (
-          <group
-            key={district.id}
-            position={[district.centre.x, 0, district.centre.z]}
-          >
-            <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
-              <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
-              <meshStandardMaterial
-                color={slabColour(district.kind, palette)}
-                metalness={0}
-                roughness={1}
-              />
-            </mesh>
-            <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
-              <boxGeometry
-                args={[width + overhang, RIM_HEIGHT, depth + overhang]}
-              />
-              <meshStandardMaterial color={rim} metalness={0} roughness={1} />
-            </mesh>
-          </group>
-        );
-      })}
+      <WorldGrid palette={palette} span={span} />
+      <DistrictBoards
+        districts={districts}
+        materials={{
+          solid: solidMaterials.current,
+          wire: wireMaterials.current,
+        }}
+        palette={palette}
+      />
       {/* A nested folder is a lighter rectangle on the island its members stand on,
           which is what says where one block of a district ends and the next starts. */}
-      {folders.map((folder) => (
+      {folders.map((folder, index) => (
         <mesh
           key={folder.id}
           position={[
@@ -1578,8 +1739,12 @@ function Stage({
           />
           <meshStandardMaterial
             color={folderColour}
+            depthWrite={false}
             metalness={0}
+            opacity={0}
+            ref={trackMaterial(folderMaterials.current, index)}
             roughness={1}
+            transparent
           />
         </mesh>
       ))}
@@ -1593,10 +1758,11 @@ function Stage({
           use for. ponytail: a nested folder's tint is opaque and stands a hundredth of
           a unit higher, so it would cover a name that reached under it. No folder in
           either fixture reaches into the margin the name is printed in. */}
-      {stampsOf.map(({ id, stamp, texture }) => (
+      {stampsOf.map(({ id, stamp, texture }, index) => (
         <mesh
           key={id}
           position={[stamp.x, STAMP_Y, stamp.z]}
+          renderOrder={1}
           rotation={[-Math.PI / 2, 0, stamp.rotation]}
         >
           <planeGeometry args={[stamp.width, stamp.height]} />
@@ -1604,7 +1770,8 @@ function Stage({
             color={palette.dim}
             depthWrite={false}
             map={texture}
-            opacity={STAMP_OPACITY}
+            opacity={0}
+            ref={trackMaterial(stampMaterials.current, index)}
             transparent
           />
         </mesh>
@@ -1665,14 +1832,17 @@ const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 function viewOf(
   bounds: CityBounds,
   size: { width: number; height: number },
-  shift = 0
+  shift = 0,
+  fill = 0.88,
+  buildingHeight = 4
 ): View {
   const span = citySpan(bounds);
-  const zoom = Math.min(size.width, size.height) / span;
+  // Fit the projected ground rectangle rather than its longest world axis.
+  const zoom = isometricZoom(bounds, size, buildingHeight, shift * 2, fill);
   const direction = new THREE.Vector3(1, 1, 1).normalize();
   const target = new THREE.Vector3(
     bounds.centre.x,
-    0,
+    buildingHeight / 2,
     bounds.centre.z
   ).addScaledVector(SCREEN_RIGHT, shift / zoom);
   return {
@@ -1691,16 +1861,20 @@ function viewOf(
  */
 function CameraRig({
   bounds,
+  buildingHeight,
   inspectorWidth,
   reframe,
   reducedMotion,
+  overview,
 }: {
   bounds: CityBounds;
+  buildingHeight: number;
   /** CSS pixels of canvas the inspector covers on the right, 0 when it is closed. */
   inspectorWidth: number;
   /** Bumped by Home to ask for the same city to be framed again. */
   reframe: number;
   reducedMotion: boolean;
+  overview: boolean;
 }) {
   const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
   const controls = useThree((state) => state.controls) as {
@@ -1725,8 +1899,15 @@ function CameraRig({
   // Half the panel, because the middle of the uncovered canvas is that far left of
   // the middle of the whole of it.
   const view = useMemo(
-    () => viewOf(bounds, size, inspectorWidth / 2),
-    [bounds, inspectorWidth, size]
+    () =>
+      viewOf(
+        bounds,
+        size,
+        inspectorWidth / 2,
+        overview ? 0.9 : 0.84,
+        buildingHeight
+      ),
+    [bounds, buildingHeight, inspectorWidth, overview, size]
   );
 
   useEffect(() => {
@@ -2432,6 +2613,7 @@ export default function Scene({
             districts={city.districts}
             folders={folderTints}
             palette={palette}
+            reducedMotion={reducedMotion}
             runs={groundRunsOfCity}
             span={span}
           />
@@ -2467,31 +2649,31 @@ export default function Scene({
               selected={selected}
             />
           ) : null}
-          {active.has("structure") ? (
-            <Roads
-              edges={fan.edges}
+          <Roads
+            edges={fan.edges}
+            focus={focus}
+            palette={palette}
+            placementsById={placementsById}
+            reducedMotion={reducedMotion}
+            selected={selected}
+            visible={active.has("structure")}
+          />
+          {LINK_LAYERS.map(({ layer, token, opacity }) => (
+            <Links
+              anchors={anchors}
+              colour={palette[token]}
+              edges={drawnEdges}
               focus={focus}
+              key={layer}
+              layer={layer}
+              opacity={opacity}
               palette={palette}
               placementsById={placementsById}
+              reducedMotion={reducedMotion}
               selected={selected}
+              visible={active.has(layer)}
             />
-          ) : null}
-          {LINK_LAYERS.map(({ layer, token, opacity }) =>
-            active.has(layer) ? (
-              <Links
-                anchors={anchors}
-                colour={palette[token]}
-                edges={drawnEdges}
-                focus={focus}
-                key={layer}
-                layer={layer}
-                opacity={opacity}
-                palette={palette}
-                placementsById={placementsById}
-                selected={selected}
-              />
-            ) : null
-          )}
+          ))}
           <Labels
             badge={selected ? usageBadge(usage, selected) : null}
             fanMarkers={fan.markers}
@@ -2509,7 +2691,9 @@ export default function Scene({
             <>
               <CameraRig
                 bounds={bounds}
+                buildingHeight={Math.max(1, ...heights.values())}
                 inspectorWidth={inspectorWidth}
+                overview={focus === null}
                 reducedMotion={reducedMotion}
                 reframe={reframe}
               />

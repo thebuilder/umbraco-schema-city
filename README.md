@@ -1,12 +1,21 @@
 # Schema City
 
-An Umbraco backoffice extension that draws the content model as an isometric city you can walk
-around. One building per Document Type, roads for the relationships between them.
+Inspect your Umbraco content model as a virtual city. Find configuration problems, follow a
+type's relationships, and open its editor with the relevant context in view. One building per
+Document Type, property groups as floors, and circuits for the relationships between types.
 
 Source and issues live at
 [github.com/thebuilder/umbraco-schema-city](https://github.com/thebuilder/umbraco-schema-city).
 
 ## What it does
+
+Start with **Findings** to investigate configuration checks, **Search** to find a type or
+property alias, or **List** to work without a 3D canvas. Select a building to inspect its
+properties and direct connections. Focus its neighbourhood when the whole city gets crowded.
+
+The stage reveals its wireframe before its solid districts and circuits. Reduced motion skips
+the opening animation. Structure is the initial connection layer; add other relationships as
+you investigate them.
 
 - **Sidebar workspace.** Schema City sits in the Settings sidebar under Advanced, next to
   Relations and Log Viewer, and opens the whole city. Click a building for an inspector with the
@@ -28,7 +37,9 @@ Source and issues live at
 - **Findings.** A drawer listing what looks wrong: unused types, unused Element Types, dead ends,
   duplicate aliases, broken block configurations, types with no properties, types with no
   template, pure mixins, and types complex enough to be worth a second look. Each row selects the
-  type it is about.
+  type it is about. Related links identify contributing types, and broken block configurations
+  expose missing target keys. The selected type's inspector includes its checks. Export the
+  filtered findings as CSV, with the schema and usage snapshot timestamps, for a ticket or review.
 
   ![The findings drawer over the city, listing 115 findings with a row of filter chips above them.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
 
@@ -50,6 +61,15 @@ Source and issues live at
 
 Adding a type can move buildings. The layout is deterministic for a given set of types, so it only
 moves what it must, but there is no pinning yet.
+
+Findings are review prompts. An unused Document Type has no counted content in the usage snapshot;
+an unused Element Type has no configured block-editor use in the schema snapshot. Neither means
+it is safe to delete. Schema connections and observed content references are different datasets,
+and neither includes every possible dependency in custom code or external systems.
+
+[Product direction](docs/product-direction.md) records the review, the intended developer
+workflows, and the next features: schema comparison, transitive dependency review, and root
+reachability checks.
 
 ## Install
 
