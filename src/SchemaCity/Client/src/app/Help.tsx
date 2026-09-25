@@ -21,12 +21,12 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "Mouse",
     rows: [
+      { keys: ["Drag"], does: "Orbit the camera around the city" },
+      { keys: ["Right-drag"], does: "Pan along the ground" },
       {
-        keys: ["Drag"],
-        does: "Pan the city in either camera view",
+        keys: ["Scroll"],
+        does: "Move toward the point under the cursor, or away",
       },
-      { keys: ["Right-drag"], does: "Pan the view" },
-      { keys: ["Scroll"], does: "Zoom in and out" },
       {
         keys: ["Hover"],
         does: "Show a type’s name and direct connections across all layers",
@@ -43,12 +43,11 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     rows: [
       {
         keys: ["W", "A", "S", "D"],
-        does: "Pan the view along the ground",
+        does: "Fly along the ground the way the camera faces",
       },
-      {
-        keys: ["↑", "←", "↓", "→"],
-        does: "Pan the view",
-      },
+      { keys: ["R", "F"], does: "Rise and descend" },
+      { keys: ["←", "→"], does: "Turn left and right" },
+      { keys: ["↑", "↓"], does: "Tilt the view up and down" },
       {
         keys: ["Shift"],
         does: "Hold alongside any of these to go twice as fast",
@@ -67,7 +66,6 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         does: "Toggle Structure, Compositions, Blocks, References",
       },
       { keys: ["L"], does: "List view" },
-      { keys: ["E"], does: "Switch the camera between Iso and Top down" },
       { keys: ["?"], does: "Show this page" },
     ],
   },
