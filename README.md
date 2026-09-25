@@ -123,18 +123,21 @@ can rearrange the city; manual pinning is not available.
 
 ## Navigate the city
 
-Iso and Top down use the same world coordinates. Pan and zoom in either view; keyboard movement
-continues while the camera changes angle. The brief opening animation respects reduced-motion
+The city stands in a 3D world with a sky, a horizon and a ground that runs out to it. It opens on a
+raised three-quarter view of the whole city, and from there you can orbit, pan, dolly toward any
+point and come down to street level. Focusing a type, leaving focus and Home fly the camera to the
+new framing. The brief opening animation and the establishing flight respect reduced-motion
 preferences.
-
-![The same schema in Top down view with structure connections.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/top-down.png)
 
 | Action | Control |
 | --- | --- |
-| Pan | Drag, WASD, or arrow keys |
-| Pan faster | Hold Shift with a movement key |
-| Zoom | Mouse wheel |
-| Switch camera | E or the Iso / Top down buttons |
+| Orbit | Drag |
+| Pan along the ground | Right-drag |
+| Move toward the cursor, or away | Mouse wheel |
+| Fly along the ground | W, A, S, D |
+| Rise and descend | R, F |
+| Turn and tilt | Arrow keys |
+| Move or turn faster | Hold Shift with a movement key |
 | Focus selected type | Enter |
 | Leave focus, then clear selection | Escape |
 | Reframe the city or leave focus | Home |

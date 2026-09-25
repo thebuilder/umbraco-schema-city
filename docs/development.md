@@ -148,5 +148,5 @@ the demo page, not the extension. Do not alter schema values for screenshots.
 
 Save images under `docs/screenshots/` and update the README captions to describe what they show.
 The current set covers the structure overview, Home in focus, filtered findings, Article with the
-content-count lens, the list sorted by own property count, and Top down. The README uses absolute
+content-count lens, the list sorted by own property count, and a low orbit toward the horizon. The README uses absolute
 image URLs so images also work when it is included in a NuGet package.
