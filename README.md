@@ -128,6 +128,8 @@ Document Types that no root can reach, with the types they are allowed under, so
 only hangs off another unreachable type is visible. Element Types and compositions that nothing
 can create are left out of that list.
 
+![The creation tree from the three root types, with Home selected under Site and the unreachable types below.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/tree.png)
+
 ### Compare types in a matrix
 
 Matrix has two grids. Compositions shows which types use which compositions, and marks a
@@ -136,12 +138,16 @@ properties use each Data Type. Each column is headed by the Data Type name, with
 editor alias and the start of the Data Type key below it, so two Data Types with similar names
 stay distinguishable. Rows are sorted by name; columns sort by usage or by name.
 
+![The compositions matrix, with Seo Composition used by most page types.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/matrix.png)
+
 ### Read a type as an editor sees it
 
 Editor draws the selected type as tabs and groups, in the order the schema lists them, with each
 property's alias, editor, mandatory marker and culture variance. A property from a composition
 names its source. Tab labels carry their property counts. Choose Editor layout in the inspector
 to open a type here.
+
+![Home in the editor view, with its tabs, groups and the composition each property comes from.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
 
 ## Compare schema snapshots
 

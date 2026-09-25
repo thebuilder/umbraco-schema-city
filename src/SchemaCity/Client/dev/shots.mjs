@@ -12,7 +12,7 @@ import { writeFileSync } from "node:fs";
 import { quantise } from "./quantise.mjs";
 
 const out = process.argv[2] ?? ".";
-/** Names to capture, or all six when none are named. */
+/** Names to capture, or all of them when none are named. */
 const only = process.argv.slice(3);
 const HARNESS = process.env.HARNESS ?? "http://127.0.0.1:5206/";
 const CDP = process.env.CDP ?? "http://127.0.0.1:9333";
@@ -63,7 +63,7 @@ const clickButton = (pattern, nth = 1) =>
     return "ok";
   })()`);
 
-/** Drag across the canvas, which turns the camera's azimuth and its elevation. */
+/** Drag across the canvas, which orbits the camera: sideways turns it, upwards lowers it. */
 async function orbit(from, to) {
   const at = (type, [x, y]) =>
     send("Input.dispatchMouseEvent", {
@@ -113,13 +113,19 @@ const shots = [
       await wait(400);
     },
   },
+  // What an editor can create where, with Home selected under Site.
+  { name: "tree", query: "?view=tree&type=home" },
+  // Compositions per type, most used first.
+  { name: "matrix", query: "?view=matrix" },
+  // Home laid out the way the content editor shows it.
+  { name: "editor", query: "?view=editor&type=home" },
   // Orbited round and down to a few degrees above the ground, where the city meets
   // the horizon.
   {
     name: "free-camera",
     query: `?layers=${ALL_LAYERS}`,
     async after() {
-      await orbit([800, 560], [900, 640]);
+      await orbit([800, 640], [900, 470]);
       await wait(1400);
     },
   },
@@ -132,7 +138,7 @@ await send("Page.enable");
 await send("Page.addScriptToEvaluateOnNewDocument", {
   source: `document.addEventListener("DOMContentLoaded", () => {
     const style = document.createElement("style");
-    style.textContent = "body > div:first-of-type { display: none }";
+    style.textContent = ".demo-footer { display: none }";
     document.head.append(style);
   });`,
 });
