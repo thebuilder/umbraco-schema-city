@@ -65,11 +65,7 @@ import {
   FLIGHT_CODES,
   flySpeed,
   groundAxes,
-  groundedTarget,
-  TURN_SPEED,
   translateFlightEndpoints,
-  turnedOffset,
-  turnRates,
 } from "./scene/flight";
 import { framingDistance } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
@@ -2349,6 +2345,23 @@ const REFRAME_MS = 400;
  * runs 2.6 seconds over a skyline that rises for longer.
  */
 const INTRO_MS = 2400;
+/** Set once the establishing shot has played in this browser. */
+const INTRO_SEEN_KEY = "schema-city:intro-seen";
+
+/**
+ * Whether this browser has already seen the establishing shot, marking it seen if
+ * not. The shot is an introduction, and on every later visit it would only delay the
+ * city. Storage can be blocked, and then the shot plays again, which is harmless.
+ */
+function introSeen(): boolean {
+  try {
+    if (localStorage.getItem(INTRO_SEEN_KEY)) return true;
+    localStorage.setItem(INTRO_SEEN_KEY, "1");
+  } catch {
+    // Blocked storage falls through to playing the shot.
+  }
+  return false;
+}
 /** How much further out the establishing shot opens than it lands, and how far round. */
 const INTRO_PULL_BACK = 1.75;
 const INTRO_SWING = 0.42;
@@ -2532,7 +2545,7 @@ function CameraRig({
     // their target every frame and hands them the camera when it lands.
     if (action === "snap" && !first && flight.current) return;
     if (reducedMotion || action === "snap") {
-      if (reducedMotion || !first) {
+      if (reducedMotion || !first || introSeen()) {
         flight.current = null;
         placeCamera(camera, controls, view);
         return;
@@ -2655,7 +2668,6 @@ function Flight({
   const held = useMemo(() => new Set<string>(), []);
   const boosting = useRef(false);
   const velocity = useRef(new THREE.Vector3());
-  const turn = useRef({ yaw: 0, pitch: 0 });
 
   useEffect(() => {
     const release = () => {
@@ -2696,45 +2708,11 @@ function Flight({
   useFrame((_, delta) => {
     if (!controls) return;
     const moving = velocity.current;
-    const turning = turn.current;
-    if (
-      held.size === 0 &&
-      moving.lengthSq() === 0 &&
-      turning.yaw === 0 &&
-      turning.pitch === 0
-    )
-      return;
+    if (held.size === 0 && moving.lengthSq() === 0) return;
     // A tab that was in the background hands back one enormous delta, which would
     // teleport the camera as far as the whole time it was away.
     const step = Math.min(delta, 0.05);
     const boost = boosting.current ? BOOST : 1;
-
-    const rates = turnRates(held);
-    // Under a thousandth of a radian a second is a stop.
-    const settle = (value: number) => (Math.abs(value) < 1e-3 ? 0 : value);
-    turning.yaw = settle(
-      approach(turning.yaw, rates.yaw * TURN_SPEED * boost, step)
-    );
-    turning.pitch = settle(
-      approach(turning.pitch, rates.pitch * TURN_SPEED * boost, step)
-    );
-    if (turning.yaw !== 0 || turning.pitch !== 0) {
-      // A turn aims the camera itself, so it takes over from a framing flight.
-      cameraFlight.current = null;
-      const turned = turnedOffset(
-        FLIGHT_STEP.subVectors(camera.position, controls.target),
-        turning.yaw * step,
-        turning.pitch * step,
-        controls.maxPolarAngle
-      );
-      const aim = groundedTarget(camera.position, {
-        x: camera.position.x - turned.x,
-        y: camera.position.y - turned.y,
-        z: camera.position.z - turned.z,
-      });
-      controls.target.set(aim.x, aim.y, aim.z);
-      camera.lookAt(controls.target);
-    }
 
     const wanted = desiredVelocity(
       held,

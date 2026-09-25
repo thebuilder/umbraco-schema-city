@@ -5,10 +5,7 @@ import {
   FLY_SPEED,
   flySpeed,
   groundAxes,
-  groundedTarget,
   translateFlightEndpoints,
-  turnedOffset,
-  turnRates,
 } from "./flight";
 
 /** The default framing's pose: standing south-east of the city, looking at it. */
@@ -43,13 +40,15 @@ test("D flies right of the screen and A the other way", () => {
   expect(right.z).toBeCloseTo(-10 / Math.SQRT2);
 });
 
-test("the arrows move nothing, because they turn instead", () => {
+test("the arrows pan the same way as W, A, S and D", () => {
   const axes = groundAxes(ISO.from, ISO.to);
-  expect(desiredVelocity(held("ArrowUp", "ArrowLeft"), axes, 10)).toEqual({
-    x: 0,
-    y: 0,
-    z: 0,
-  });
+  expect(desiredVelocity(held("ArrowUp", "ArrowLeft"), axes, 10)).toEqual(
+    desiredVelocity(held("KeyW", "KeyA"), axes, 10)
+  );
+  // An arrow and its letter held together are one push, not two.
+  expect(desiredVelocity(held("ArrowUp", "KeyW"), axes, 10)).toEqual(
+    desiredVelocity(held("KeyW"), axes, 10)
+  );
 });
 
 test("a diagonal is no faster than one key, and holding both ways stands still", () => {
@@ -89,26 +88,6 @@ test("velocity eases in and out at the same rate whatever the frame rate", () =>
   // And it is most of the way there by then, rather than still ramping up.
   expect(step(30, 1 / 60)).toBeGreaterThan(19);
   expect(approach(20, 0, 1 / 60)).toBeLessThan(20);
-});
-
-test("the arrows turn left, right, up and down", () => {
-  expect(turnRates(held("ArrowLeft"))).toEqual({ yaw: 1, pitch: 0 });
-  expect(turnRates(held("ArrowRight", "ArrowDown"))).toEqual({
-    yaw: -1,
-    pitch: -1,
-  });
-  expect(turnRates(held("KeyW"))).toEqual({ yaw: 0, pitch: 0 });
-});
-
-test("a turn keeps the camera where it is and holds its distance", () => {
-  const offset = { x: 0, y: 6, z: 10 };
-  const turned = turnedOffset(offset, 0.3, 0.1, Math.PI / 2);
-  expect(Math.hypot(turned.x, turned.y, turned.z)).toBeCloseTo(
-    Math.hypot(0, 6, 10)
-  );
-  // Yawing left swings the target to the left of the view, which is the offset
-  // rotating the other way about the camera.
-  expect(turned.x).toBeGreaterThan(0);
 });
 
 test("panning rebases an in-flight transition without changing its orientation", () => {
@@ -167,31 +146,4 @@ test("panning rebases an in-flight transition without changing its orientation",
       prior.position.z - prior.target.z
     );
   }
-});
-
-test("pitch stops at the horizon and short of straight down", () => {
-  const radius = Math.hypot(0, 6, 10);
-  // Looking up, which the controls stop at a polar angle of 90 degrees: past it the
-  // view would swing under the ground. The offset ends level with the camera.
-  const up = turnedOffset({ x: 0, y: 6, z: 10 }, 0, 4, Math.PI / 2);
-  expect(up.y).toBeGreaterThan(0);
-  expect(up.y / radius).toBeLessThan(0.03);
-  // Looking down stops a hair short of the pole, where an azimuth has nothing left
-  // to rotate.
-  const down = turnedOffset({ x: 0, y: 6, z: 10 }, 0, -4, Math.PI / 2);
-  expect(down.y).toBeCloseTo(radius, 1);
-  expect(down.z).toBeGreaterThan(0);
-});
-
-test("tilting down never leaves the orbit target under the ground", () => {
-  const camera = { x: 0, y: 10, z: 10 };
-  // Looking down through the ground to a point ten units under it.
-  expect(groundedTarget(camera, { x: 0, y: -10, z: -10 })).toEqual({
-    x: 0,
-    y: 0,
-    z: 0,
-  });
-  // A target already on or over the ground stays where it is.
-  const above = { x: 3, y: 2, z: 1 };
-  expect(groundedTarget(camera, above)).toBe(above);
 });

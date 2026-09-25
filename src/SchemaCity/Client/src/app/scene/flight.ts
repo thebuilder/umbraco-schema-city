@@ -2,9 +2,10 @@
 // a screen-relative push becomes world motion. Pure: no three.js, no React, no DOM.
 // Scene.tsx owns the listeners and applies this in `useFrame`.
 //
-// Borrowed from fsn's scene.ts, including the ease and the way a turn walks the orbit
-// target around a camera that stays put. W, A, S and D fly along the ground the way
-// the camera faces, R and F rise and descend, and the arrows turn and tilt.
+// Borrowed from fsn's scene.ts, including the ease. W, A, S and D and the arrows fly
+// along the ground the way the camera faces, and R and F rise and descend. fsn turns
+// with the arrows; here they pan, because dragging already orbits and a turn from the
+// overview distance swings the view a long way.
 
 export type Ground = { x: number; z: number };
 export type Vec3 = { x: number; y: number; z: number };
@@ -59,11 +60,8 @@ export const FLY_SPEED = 24;
  */
 const FLY_PER_DISTANCE = 0.6;
 
-/** How fast the arrows turn and tilt the view, radians per second. fsn's rate. */
-export const TURN_SPEED = 1.5;
-
 /**
- * Shift doubles flying and turning. fsn multiplies by 3.5, over a filesystem that can
+ * Shift doubles the flying speed. fsn multiplies by 3.5, over a filesystem that can
  * be a hundred times the size of a schema; two crosses this city fast enough.
  */
 export const BOOST = 2;
@@ -75,9 +73,6 @@ export const BOOST = 2;
  * rather than snapping either way.
  */
 const EASE_REMAINING = 0.0016;
-
-/** Keeps a turn off the pole and off the ground, where a clamp has no angle left. */
-const POLAR_MARGIN = 0.02;
 
 /** Flying speed for a camera `distance` from its orbit target. */
 export function flySpeed(distance: number): number {
@@ -126,8 +121,11 @@ export function desiredVelocity(
   speed: number
 ): Vec3 {
   const on = (code: string) => Number(held.has(code));
-  const forward = on("KeyW") - on("KeyS");
-  const right = on("KeyD") - on("KeyA");
+  const forward =
+    Math.max(on("KeyW"), on("ArrowUp")) - Math.max(on("KeyS"), on("ArrowDown"));
+  const right =
+    Math.max(on("KeyD"), on("ArrowRight")) -
+    Math.max(on("KeyA"), on("ArrowLeft"));
   const up = on("KeyR") - on("KeyF");
   const length = Math.hypot(forward, right, up);
   if (length === 0) return { x: 0, y: 0, z: 0 };
@@ -136,61 +134,5 @@ export function desiredVelocity(
     x: (axes.forward.x * forward + axes.right.x * right) * scale,
     y: up * scale,
     z: (axes.forward.z * forward + axes.right.z * right) * scale,
-  };
-}
-
-/** How hard the arrows are turning, from -1 to 1. */
-export function turnRates(held: ReadonlySet<string>): {
-  yaw: number;
-  pitch: number;
-} {
-  return {
-    yaw: Number(held.has("ArrowLeft")) - Number(held.has("ArrowRight")),
-    pitch: Number(held.has("ArrowUp")) - Number(held.has("ArrowDown")),
-  };
-}
-
-/**
- * Swings the view by walking the orbit target around a camera that stays put, which
- * is the only way a keyboard can change heading while the orbit controls read the
- * pose back off those two points every frame.
- *
- * `offset` is the camera minus its target, so the new target is the camera minus what
- * comes back. The pitch is clamped to the same range the controls allow, which stops
- * the view at the horizon rather than letting it swing under the ground.
- */
-export function turnedOffset(
-  offset: Vec3,
-  yaw: number,
-  pitch: number,
-  maxPolar: number
-): Vec3 {
-  const radius = Math.hypot(offset.x, offset.y, offset.z);
-  if (radius < 1e-6) return offset;
-  const theta = Math.atan2(offset.x, offset.z) + yaw;
-  const phi = Math.min(
-    Math.max(Math.acos(offset.y / radius) + pitch, POLAR_MARGIN),
-    maxPolar - POLAR_MARGIN
-  );
-  return {
-    x: radius * Math.sin(phi) * Math.sin(theta),
-    y: radius * Math.cos(phi),
-    z: radius * Math.sin(phi) * Math.cos(theta),
-  };
-}
-
-/**
- * Where the orbit target belongs after a turn. Tilting down swings the target
- * through the ground, and orbiting a point under the city would take the camera
- * under it as well, so a target below the ground is pulled back along the view to
- * where the view meets the ground.
- */
-export function groundedTarget(camera: Vec3, target: Vec3): Vec3 {
-  if (target.y >= 0 || camera.y <= 0) return target;
-  const t = camera.y / (camera.y - target.y);
-  return {
-    x: camera.x + (target.x - camera.x) * t,
-    y: 0,
-    z: camera.z + (target.z - camera.z) * t,
   };
 }

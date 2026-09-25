@@ -43,11 +43,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     rows: [
       {
         keys: ["W", "A", "S", "D"],
-        does: "Fly along the ground the way the camera faces",
+        does: "Pan along the ground the way the camera faces",
       },
+      { keys: ["←", "↑", "↓", "→"], does: "Pan, the same as W, A, S and D" },
       { keys: ["R", "F"], does: "Rise and descend" },
-      { keys: ["←", "→"], does: "Turn left and right" },
-      { keys: ["↑", "↓"], does: "Tilt the view up and down" },
       {
         keys: ["Shift"],
         does: "Hold alongside any of these to go twice as fast",
