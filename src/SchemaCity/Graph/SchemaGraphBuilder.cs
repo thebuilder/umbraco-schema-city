@@ -282,12 +282,15 @@ public sealed class SchemaGraphBuilder :
                 : new SchemaEdge(EdgeKind.Block, hostId, target.NodeId, property.Alias, target.Role));
         }
 
+        IDataType? dataType = dataTypesByKey.GetValueOrDefault(property.DataTypeKey);
+
         return new SchemaProperty(
             Alias: property.Alias ?? string.Empty,
             Name: property.Name ?? string.Empty,
             DataTypeId: property.DataTypeKey.ToString(),
+            DataTypeName: dataType?.Name,
             EditorAlias: property.PropertyEditorAlias ?? string.Empty,
-            EditorUiAlias: dataTypesByKey.TryGetValue(property.DataTypeKey, out IDataType? dataType) ? dataType.EditorUiAlias : null,
+            EditorUiAlias: dataType?.EditorUiAlias,
             Mandatory: property.Mandatory,
             VariesByCulture: property.Variations.HasFlag(ContentVariation.Culture),
             FromCompositionId: fromCompositionId,

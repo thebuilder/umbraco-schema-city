@@ -124,9 +124,9 @@ can create are left out of that list.
 
 Matrix has two grids. Compositions shows which types use which compositions, and marks a
 composition that arrives through another one. Data Types shows how many of each type's own
-properties use each Data Type. The schema does not include Data Type names, so each column shows
-the property editor alias and the start of the Data Type key. Rows are sorted by name; columns
-sort by usage or by name.
+properties use each Data Type. Each column is headed by the Data Type name, with the property
+editor alias and the start of the Data Type key below it, so two Data Types with similar names
+stay distinguishable. Rows are sorted by name; columns sort by usage or by name.
 
 ### Read a type as an editor sees it
 

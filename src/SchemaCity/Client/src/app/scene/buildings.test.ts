@@ -59,6 +59,7 @@ const property = (alias: string, mandatory = false): SchemaProperty => ({
   alias,
   name: alias,
   dataTypeId: "d",
+  dataTypeName: null,
   editorAlias: "Umbraco.TextBox",
   editorUiAlias: null,
   mandatory,

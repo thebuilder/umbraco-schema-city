@@ -148,7 +148,7 @@ internal sealed class FakeDataType(object configuration) : IDataType
 
         public void SetParent(ITreeEntity? parent) => throw new NotSupportedException();
 
-        public string? Name { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public string? Name { get; set; }
 
         public int CreatorId { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 

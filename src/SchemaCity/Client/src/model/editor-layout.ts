@@ -18,6 +18,17 @@ export type EditorTab = {
   count: number;
 };
 
+/**
+ * "Textstring (Umb.PropertyEditorUi.TextBox)": the Data Type an editor picks by name,
+ * then the editor behind it. The editor alone when the Data Type has no name.
+ */
+export function editorLabel(property: SchemaProperty): string {
+  const editor = property.editorUiAlias ?? property.editorAlias;
+  return property.dataTypeName
+    ? `${property.dataTypeName} (${editor})`
+    : editor;
+}
+
 /** Umbraco's name for the tab that holds root groups once a type has tabs. */
 export const GENERIC_TAB = "Generic";
 
