@@ -108,6 +108,33 @@ type to open the inspector. The table works without the 3D canvas.
 
 ![The type list sorted by own property count, largest first.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png)
 
+The view switcher in the toolbar chooses between City, List, Tree, Matrix and Editor. The choice is
+kept in the URL, and every view except City works without the 3D canvas.
+
+### Follow the creation tree
+
+Tree starts at each type allowed at root and lists what an editor can create under it, following
+the allowed-child rules. A type allowed under two parents appears under both. A type that already
+appears higher in the same branch is marked and not expanded again. Below the tree, a list shows
+Document Types that no root can reach, with the types they are allowed under, so a chain that
+only hangs off another unreachable type is visible. Element Types and compositions that nothing
+can create are left out of that list.
+
+### Compare types in a matrix
+
+Matrix has two grids. Compositions shows which types use which compositions, and marks a
+composition that arrives through another one. Data Types shows how many of each type's own
+properties use each Data Type. The schema does not include Data Type names, so each column shows
+the property editor alias and the start of the Data Type key. Rows are sorted by name; columns
+sort by usage or by name.
+
+### Read a type as an editor sees it
+
+Editor draws the selected type as tabs and groups, in the order the schema lists them, with each
+property's alias, editor, mandatory marker and culture variance. A property from a composition
+names its source. Tab labels carry their property counts. Choose Editor layout in the inspector
+to open a type here.
+
 ## Compare schema snapshots
 
 Open Compare and export the current schema before making a change. Later, import that JSON file
@@ -139,7 +166,7 @@ preferences.
 | Leave focus, then clear selection | Escape |
 | Reframe the city or leave focus | Home |
 | Toggle connection layers | 1, 2, 3, 4 |
-| Switch list view | L |
+| Switch to List, Tree or Matrix, or back to the city | L, T, M |
 | Search | ⌘K / Ctrl+K |
 | Show controls | ? |
 
