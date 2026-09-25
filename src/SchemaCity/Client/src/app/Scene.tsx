@@ -40,15 +40,17 @@ import {
 } from "./layout/focus";
 import { describeRelationship, uniqueConnections } from "./relationship";
 import {
+  BuildingFrames,
+  Buildings,
+  RoofIcons,
+  useIconGroups,
+} from "./scene/BuildingMeshes";
+import {
   buildFloorCells,
   buildPlazaCells,
+  connectionsOf,
   type FloorCell,
-  type FloorCellKind,
-  type PlazaCell,
   smootherstep,
-  WINDOW_HEIGHT,
-  WINDOW_WIDTH,
-  type WindowCell,
 } from "./scene/buildings";
 import {
   type BootPhase,
@@ -69,7 +71,6 @@ import {
 } from "./scene/flight";
 import { framingDistance } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
-import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
   CHAR_PX,
   LABEL_CAP,
@@ -78,7 +79,7 @@ import {
   visibleLabelIds,
 } from "./scene/labels";
 import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
-import type { LensScale, Ramp } from "./scene/lens";
+import type { LensScale } from "./scene/lens";
 import {
   buildBoardOutlinePositions,
   buildBuildingOutlinePositions,
@@ -200,482 +201,8 @@ type Palette = {
   mono: string;
 };
 
-const PLAZA_HEIGHT = 0.05;
-const HOVER_BRIGHTEN = 1.4;
-/** How far a faded building's colour moves toward the void, approximating 20% opacity. */
-const FADE_MIX = 0.8;
-/** The same, for a building focus mode has pressed flat: about 12% opacity. */
-const PLATE_MIX = 0.88;
 /** How far an inherits arc is mixed toward white, off the composition azure. */
 const INHERITS_MIX = 0.4;
-
-/**
- * Where one building lands on the lens's ramp. Amber to azure both ways, with
- * phosphor-dim as the diverging middle and the unused lens's quiet end, because
- * phosphor against signal is the pair colour-vision deficiency ruins.
- */
-function rampColour(
-  ramp: Ramp,
-  t: number,
-  colors: {
-    amber: THREE.Color;
-    azure: THREE.Color;
-    dim: THREE.Color;
-    signal: THREE.Color;
-  }
-): THREE.Color {
-  if (ramp === "binary")
-    return t >= 0.5 ? colors.signal.clone() : colors.dim.clone();
-  if (ramp === "diverging") {
-    return t < 0.5
-      ? colors.amber.clone().lerp(colors.dim, t * 2)
-      : colors.dim.clone().lerp(colors.azure, (t - 0.5) * 2);
-  }
-  return colors.amber.clone().lerp(colors.azure, t);
-}
-
-function groupByKind(cells: FloorCell[]): Record<FloorCellKind, FloorCell[]> {
-  const byKind: Record<FloorCellKind, FloorCell[]> = {
-    own: [],
-    composed: [],
-    separator: [],
-    element: [],
-  };
-  for (const cell of cells) byKind[cell.kind].push(cell);
-  return byKind;
-}
-
-function Buildings({
-  cellsByKind,
-  windows,
-  plazas,
-  heights,
-  placements,
-  selected,
-  hovered,
-  neighbours,
-  reducedMotion,
-  palette,
-  scale,
-  onSelect,
-  onFocus,
-  onHover,
-}: {
-  cellsByKind: Record<FloorCellKind, FloorCell[]>;
-  windows: WindowCell[];
-  plazas: PlazaCell[];
-  heights: Map<string, number>;
-  placements: Placement[];
-  selected: string | null;
-  hovered: string | null;
-  neighbours: Set<string> | null;
-  reducedMotion: boolean;
-  palette: Palette;
-  /** The lens colouring, or null when no lens is on. */
-  scale: LensScale | null;
-  onSelect: (id: string | null) => void;
-  onFocus: (id: string) => void;
-  onHover: (id: string | null) => void;
-}) {
-  const ownRef = useRef<THREE.InstancedMesh>(null);
-  const composedRef = useRef<THREE.InstancedMesh>(null);
-  const separatorRef = useRef<THREE.InstancedMesh>(null);
-  const elementRef = useRef<THREE.InstancedMesh>(null);
-  const plazaRef = useRef<THREE.InstancedMesh>(null);
-  const windowRef = useRef<THREE.InstancedMesh>(null);
-  const hitRef = useRef<THREE.InstancedMesh>(null);
-  const solidMaterials = useRef(new Map<number, THREE.Material>());
-  const lastRise = useRef(buildingRiseAt(0, reducedMotion));
-  const bases = useMemo(
-    () =>
-      new Map(placements.map((placement) => [placement.id, placement.y ?? 0])),
-    [placements]
-  );
-  const scratch = useMemo(() => new THREE.Object3D(), []);
-  // Windows are the only thing here that is turned, and a shared scratch object
-  // would leave that rotation on the next floor box written through it.
-  const turned = useMemo(() => new THREE.Object3D(), []);
-
-  const meshRefs = useMemo(
-    () => ({
-      own: ownRef,
-      composed: composedRef,
-      separator: separatorRef,
-      element: elementRef,
-    }),
-    []
-  );
-  const flatById = useMemo(
-    () => new Map(placements.map((p) => [p.id, p.flatten ?? 0])),
-    [placements]
-  );
-  const districtById = useMemo(
-    () => new Map(placements.map((p) => [p.id, p.districtKind])),
-    [placements]
-  );
-
-  const colors = useMemo(() => {
-    const phosphor = new THREE.Color(palette.phosphor);
-    const dim = new THREE.Color(palette.dim);
-    return {
-      own: phosphor,
-      separator: new THREE.Color(palette.separator),
-      element: new THREE.Color(palette.amber),
-      plaza: dim,
-      signal: new THREE.Color(palette.signal),
-      fade: new THREE.Color(palette.background),
-      amber: new THREE.Color(palette.amber),
-      azure: new THREE.Color(palette.azure),
-      dim,
-    };
-  }, [palette]);
-
-  function applyCell(
-    mesh: THREE.InstancedMesh,
-    index: number,
-    cell: FloorCell,
-    rise: number
-  ) {
-    const base = bases.get(cell.buildingId) ?? 0;
-    scratch.position.set(cell.cx, base + (cell.cy - base) * rise, cell.cz);
-    scratch.scale.set(cell.sx, cell.sy * rise, cell.sz);
-    scratch.updateMatrix();
-    mesh.setMatrixAt(index, scratch.matrix);
-  }
-
-  /** Windows share the floor's growth and stay attached to its wall. */
-  function applyWindow(
-    mesh: THREE.InstancedMesh,
-    index: number,
-    cell: WindowCell,
-    rise: number
-  ) {
-    const base = bases.get(cell.buildingId) ?? 0;
-    turned.position.set(cell.cx, base + (cell.cy - base) * rise, cell.cz);
-    turned.rotation.set(0, cell.rotY, 0);
-    turned.scale.set(WINDOW_WIDTH, WINDOW_HEIGHT * rise, 1);
-    turned.updateMatrix();
-    mesh.setMatrixAt(index, turned.matrix);
-  }
-
-  function updateWindowGeometry(rise: number) {
-    const window = windowRef.current;
-    if (window) {
-      windows.forEach((cell, i) => {
-        applyWindow(window, i, cell, rise);
-      });
-      window.instanceMatrix.needsUpdate = true;
-      window.computeBoundingSphere();
-    }
-  }
-
-  // The mesh, windows, hit target and outline use the same rise about each base.
-  // Keep depth writes and render queues fixed so the fade cannot pop at its end.
-  function updateBuildingGeometry(rise: number) {
-    for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
-      const mesh = meshRefs[kind].current;
-      if (!mesh) continue;
-      cellsByKind[kind].forEach((cell, i) => {
-        applyCell(mesh, i, cell, rise);
-      });
-      mesh.instanceMatrix.needsUpdate = true;
-      mesh.computeBoundingSphere();
-    }
-
-    updateWindowGeometry(rise);
-
-    const hit = hitRef.current;
-    if (hit) {
-      placements.forEach((placement, i) => {
-        const height = (heights.get(placement.id) ?? placement.height) * rise;
-        // A building pressed flat is out of the conversation, so it stops taking the
-        // pointer as well: a zero-sized box is one the raycaster cannot hit.
-        const pickable = (placement.flatten ?? 0) < 0.999;
-        scratch.position.set(
-          placement.position.x,
-          (placement.y ?? 0) + height / 2,
-          placement.position.z
-        );
-        scratch.scale.set(
-          pickable ? placement.footprint : 0,
-          pickable ? height : 0,
-          pickable ? placement.footprint : 0
-        );
-        scratch.updateMatrix();
-        hit.setMatrixAt(i, scratch.matrix);
-      });
-      hit.instanceMatrix.needsUpdate = true;
-      hit.computeBoundingSphere();
-    }
-  }
-
-  useEffect(() => {
-    updateBuildingGeometry(lastRise.current);
-    const plaza = plazaRef.current;
-    if (plaza) {
-      plazas.forEach((cell, i) => {
-        scratch.position.set(cell.cx, cell.cy + PLAZA_HEIGHT / 2, cell.cz);
-        // cylinderGeometry's default radius is 1, so scale by the radius directly.
-        scratch.scale.set(cell.radius, PLAZA_HEIGHT, cell.radius);
-        scratch.updateMatrix();
-        plaza.setMatrixAt(i, scratch.matrix);
-      });
-      plaza.instanceMatrix.needsUpdate = true;
-      plaza.computeBoundingSphere();
-    }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cellsByKind, windows, plazas, placements, heights, reducedMotion]);
-
-  useFrame((state) => {
-    const rise = buildingRiseAt(state.clock.elapsedTime, reducedMotion);
-    if (rise !== lastRise.current) {
-      lastRise.current = rise;
-      updateBuildingGeometry(rise);
-    }
-    const opacity = revealAt(state.clock.elapsedTime, reducedMotion).districts;
-    for (const material of solidMaterials.current.values())
-      material.opacity = opacity;
-  });
-
-  useEffect(() => {
-    const lit = (id: string) => neighbours === null || neighbours.has(id);
-    // A building pressed flat is further out of the way than a merely faded one, so
-    // the focus layout stands on a map rather than in a crowd.
-    const fadeOf = (id: string) =>
-      FADE_MIX + (PLATE_MIX - FADE_MIX) * (flatById.get(id) ?? 0);
-    // A lens repaints the buildings it has a number for. The ones it says nothing
-    // about are Element Types, which have no content of their own, and under a lens
-    // they go phosphor-dim: amber is the zero end of the ramp, and an amber district
-    // sitting next to it reads as the emptiest place in the city.
-    const lensColour = (buildingId: string) => {
-      const t = scale?.t.get(buildingId);
-      return t === undefined || !scale
-        ? null
-        : rampColour(scale.ramp, t, colors);
-    };
-    // A building takes its colour from the district it stands in, not from what it
-    // is: a structure district is phosphor, an element district amber, and a
-    // composition or mixed district phosphor-dim. A composed floor is the same
-    // colour desaturated, whichever district that is.
-    const districtColour = (buildingId: string) => {
-      const district = districtById.get(buildingId);
-      if (district === "elements") return colors.element;
-      if (district === "structure") return colors.own;
-      return colors.dim;
-    };
-    const colourFor = (kind: FloorCellKind, buildingId: string) => {
-      const district = districtColour(buildingId);
-      const unlit =
-        kind === "separator"
-          ? colors.separator
-          : kind === "composed"
-            ? district.clone().lerp(colors.dim, 0.55)
-            : scale && kind === "element"
-              ? colors.dim
-              : district;
-      const base =
-        buildingId === selected
-          ? colors.signal
-          : (lensColour(buildingId) ?? unlit);
-      const bright =
-        buildingId === hovered
-          ? base.clone().multiplyScalar(HOVER_BRIGHTEN)
-          : base;
-      return lit(buildingId)
-        ? bright
-        : bright.clone().lerp(colors.fade, fadeOf(buildingId));
-    };
-
-    for (const kind of Object.keys(meshRefs) as (keyof typeof meshRefs)[]) {
-      const mesh = meshRefs[kind].current;
-      if (!mesh) continue;
-      cellsByKind[kind].forEach((cell, i) => {
-        mesh.setColorAt(i, colourFor(cell.kind, cell.buildingId));
-      });
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    }
-
-    // A window is the floor's own colour turned up, so it carries the lens, the
-    // selection and the fade without a second set of rules. Mandatory properties
-    // are turned up further, which is the one thing the wall does not already say.
-    const window = windowRef.current;
-    if (window) {
-      windows.forEach((cell, i) => {
-        window.setColorAt(
-          i,
-          colourFor(cell.kind, cell.buildingId)
-            .clone()
-            .multiplyScalar(cell.mandatory ? 1.9 : 1.45)
-        );
-      });
-      if (window.instanceColor) window.instanceColor.needsUpdate = true;
-    }
-
-    const plaza = plazaRef.current;
-    if (plaza) {
-      plazas.forEach((cell, i) => {
-        const base =
-          cell.buildingId === selected ? colors.signal : colors.plaza;
-        const bright =
-          cell.buildingId === hovered
-            ? base.clone().multiplyScalar(HOVER_BRIGHTEN)
-            : base;
-        plaza.setColorAt(
-          i,
-          lit(cell.buildingId)
-            ? bright
-            : bright.clone().lerp(colors.fade, fadeOf(cell.buildingId))
-        );
-      });
-      if (plaza.instanceColor) plaza.instanceColor.needsUpdate = true;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    cellsByKind,
-    windows,
-    plazas,
-    selected,
-    hovered,
-    neighbours,
-    colors,
-    scale,
-    flatById,
-    districtById,
-  ]);
-
-  const pick = (event: ThreeEvent<MouseEvent | PointerEvent>) =>
-    placements[event.instanceId ?? -1];
-
-  return (
-    <>
-      {cellsByKind.own.length > 0 && (
-        <instancedMesh
-          args={[undefined, undefined, cellsByKind.own.length]}
-          castShadow
-          receiveShadow
-          ref={ownRef}
-        >
-          <boxGeometry />
-          <meshStandardMaterial
-            metalness={0.1}
-            opacity={reducedMotion ? 1 : 0}
-            ref={trackMaterial(solidMaterials.current, 0)}
-            roughness={0.45}
-            transparent
-          />
-        </instancedMesh>
-      )}
-      {cellsByKind.composed.length > 0 && (
-        <instancedMesh
-          args={[undefined, undefined, cellsByKind.composed.length]}
-          castShadow
-          receiveShadow
-          ref={composedRef}
-        >
-          <boxGeometry />
-          <meshStandardMaterial
-            metalness={0.1}
-            opacity={reducedMotion ? 1 : 0}
-            ref={trackMaterial(solidMaterials.current, 1)}
-            roughness={0.45}
-            transparent
-          />
-        </instancedMesh>
-      )}
-      {cellsByKind.separator.length > 0 && (
-        <instancedMesh
-          args={[undefined, undefined, cellsByKind.separator.length]}
-          castShadow
-          receiveShadow
-          ref={separatorRef}
-        >
-          <boxGeometry />
-          <meshStandardMaterial
-            metalness={0.1}
-            opacity={reducedMotion ? 1 : 0}
-            ref={trackMaterial(solidMaterials.current, 2)}
-            roughness={0.6}
-            transparent
-          />
-        </instancedMesh>
-      )}
-      {cellsByKind.element.length > 0 && (
-        <instancedMesh
-          args={[undefined, undefined, cellsByKind.element.length]}
-          castShadow
-          receiveShadow
-          ref={elementRef}
-        >
-          <boxGeometry />
-          <meshStandardMaterial
-            metalness={0.05}
-            opacity={reducedMotion ? 1 : 0}
-            ref={trackMaterial(solidMaterials.current, 3)}
-            roughness={0.7}
-            transparent
-          />
-        </instancedMesh>
-      )}
-      {windows.length > 0 && (
-        <instancedMesh
-          args={[undefined, undefined, windows.length]}
-          ref={windowRef}
-        >
-          <planeGeometry />
-          <meshBasicMaterial
-            opacity={reducedMotion ? 1 : 0}
-            ref={trackMaterial(solidMaterials.current, 4)}
-            toneMapped={false}
-            transparent
-          />
-        </instancedMesh>
-      )}
-      {plazas.length > 0 && (
-        <instancedMesh
-          args={[undefined, undefined, plazas.length]}
-          receiveShadow
-          ref={plazaRef}
-        >
-          <cylinderGeometry args={[1, 1, 1, 24]} />
-          <meshStandardMaterial
-            metalness={0}
-            opacity={reducedMotion ? 1 : 0}
-            ref={trackMaterial(solidMaterials.current, 5)}
-            roughness={0.9}
-            transparent
-          />
-        </instancedMesh>
-      )}
-      {placements.length > 0 && (
-        // biome-ignore lint/a11y/noStaticElementInteractions: instancedMesh is a three.js object, not a DOM element; the keyboard path is the command palette.
-        <instancedMesh
-          args={[undefined, undefined, placements.length]}
-          onClick={(event) => {
-            event.stopPropagation();
-            const placement = pick(event);
-            if (placement) onSelect(placement.id);
-          }}
-          onDoubleClick={(event) => {
-            event.stopPropagation();
-            const placement = pick(event);
-            if (placement) onFocus(placement.id);
-          }}
-          onPointerMove={(event) => {
-            event.stopPropagation();
-            onHover(pick(event)?.id ?? null);
-          }}
-          onPointerOut={() => onHover(null)}
-          ref={hitRef}
-        >
-          <boxGeometry />
-          <meshBasicMaterial depthWrite={false} opacity={0} transparent />
-        </instancedMesh>
-      )}
-    </>
-  );
-}
 
 /** Screen-space strokes with a continuously advancing endpoint, not whole-edge jumps. */
 function IntroOutline({
@@ -745,17 +272,17 @@ function IntroOutline({
 }
 
 function BuildingOutlines({
-  cellsByKind,
+  cells,
   palette,
   reducedMotion,
 }: {
-  cellsByKind: Record<FloorCellKind, FloorCell[]>;
+  cells: FloorCell[];
   palette: Palette;
   reducedMotion: boolean;
 }) {
   const positions = useMemo(
-    () => buildBuildingOutlinePositions(Object.values(cellsByKind).flat()),
-    [cellsByKind]
+    () => buildBuildingOutlinePositions(cells),
+    [cells]
   );
   return (
     <IntroOutline
@@ -765,246 +292,6 @@ function BuildingOutlines({
       reducedMotion={reducedMotion}
       strength={0.75}
     />
-  );
-}
-
-/** Fraction of the footprint one roof icon covers, and the cap under it. */
-const ICON_FOOTPRINT = 0.7;
-const CAP_FOOTPRINT = 0.88;
-/**
- * A building narrower than this on screen gets no icon. Most of a schema shares two
- * or three icons, so a city of 12 px smudges reads as noise rather than as identity.
- * It was 40 px, from when an icon was extruded and needed the size to read as a
- * shape; flat on the roof it holds together at 24, which is most of a district at
- * the framing zoom rather than a handful of buildings. The inspector header carries
- * the same icon at any zoom.
- */
-const ICON_MIN_PX = 24;
-
-/** One rasterised icon, the buildings that wear it, and where its caps start. */
-type IconGroup = {
-  key: string;
-  texture: THREE.Texture;
-  ids: string[];
-  offset: number;
-};
-
-/**
- * The icons, rasterised once per name and colour and kept until the graph changes.
- * The map is empty until they have decoded, which is a frame or two after the city
- * paints, and a type whose icon the host did not hand over is simply not in it.
- */
-function useIconGroups(
-  icons: Record<string, string> | undefined,
-  nodesById: Map<string, SchemaNode>,
-  phosphor: string
-): IconGroup[] {
-  const wanted = useMemo(() => {
-    const byKey = new Map<
-      string,
-      { svg: string; colour: string; ids: string[] }
-    >();
-    // The palette arrives one render in, and rasterising against a colour that is
-    // not the theme's yet would do every icon twice.
-    if (!(icons && phosphor)) return byKey;
-    // Sorted, so the draw order of the icon meshes is the same city to city.
-    for (const node of [...nodesById.values()].sort((a, b) =>
-      a.alias.localeCompare(b.alias)
-    )) {
-      const svg = icons[node.icon];
-      if (!svg) continue;
-      const colour = iconColour(node.iconColor, phosphor);
-      const key = `${node.icon}|${colour}`;
-      const group = byKey.get(key) ?? { svg, colour, ids: [] };
-      group.ids.push(node.id);
-      byKey.set(key, group);
-    }
-    return byKey;
-  }, [icons, nodesById, phosphor]);
-
-  const [groups, setGroups] = useState<IconGroup[]>([]);
-
-  useEffect(() => {
-    let live = true;
-    const made: IconGroup[] = [];
-    Promise.all(
-      [...wanted].map(async ([key, { svg, colour, ids }]) => {
-        // An icon the browser cannot draw is one the city goes without.
-        const canvas = await rasteriseIcon(key, svg, colour).catch(() => null);
-        if (!canvas) return;
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        made.push({ key, texture, ids, offset: 0 });
-      })
-    ).then(() => {
-      if (!live) return;
-      // The caps are one mesh across every group, so each group is told where its
-      // own instances start in it.
-      let offset = 0;
-      for (const group of made) {
-        group.offset = offset;
-        offset += group.ids.length;
-      }
-      setGroups(made);
-    });
-
-    return () => {
-      live = false;
-      for (const group of made) group.texture.dispose();
-    };
-  }, [wanted]);
-
-  return groups;
-}
-
-/**
- * The Umbraco icon of each type, painted flat on its roof over a darker cap. Flat
- * rather than billboarded, because a sprite standing over the roof lands behind the
- * label of the very building it names. One instanced mesh per
- * icon and colour, which the seeded schema makes 15 of, and the whole set is
- * rewritten every frame, which is 78 matrices: nothing next to the buildings.
- *
- * An icon whose building is under `ICON_MIN_PX` across is scaled away rather than
- * drawn, the same projected measure the label layer culls names by, except for the
- * selected and the hovered building, which keep theirs at any zoom. Each icon sits
- * over a darker cap on the roof, so a pale glyph still has something to read against.
- */
-function RoofIcons({
-  groups,
-  placementsById,
-  heights,
-  neighbours,
-  selected,
-  hovered,
-  palette,
-  reducedMotion,
-}: {
-  groups: IconGroup[];
-  placementsById: Map<string, Placement>;
-  heights: Map<string, number>;
-  neighbours: Set<string> | null;
-  selected: string | null;
-  hovered: string | null;
-  palette: Palette;
-  reducedMotion: boolean;
-}) {
-  const camera = useThree((state) => state.camera);
-  const size = useThree((state) => state.size);
-  const meshes = useRef(new Map<string, THREE.InstancedMesh>());
-  const capRef = useRef<THREE.InstancedMesh>(null);
-  const scratch = useMemo(() => new THREE.Object3D(), []);
-  const cap = useMemo(() => new THREE.Object3D(), []);
-  const anchor = useMemo(() => new THREE.Vector3(), []);
-  const caps = groups.reduce((total, group) => total + group.ids.length, 0);
-
-  useEffect(() => {
-    const lit = new THREE.Color(1, 1, 1);
-    const faded = new THREE.Color(palette.background).lerp(lit, 0.22);
-    for (const group of groups) {
-      const mesh = meshes.current.get(group.key);
-      if (!mesh) continue;
-      group.ids.forEach((id, index) => {
-        mesh.setColorAt(
-          index,
-          neighbours === null || neighbours.has(id) ? lit : faded
-        );
-      });
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    }
-  }, [groups, neighbours, palette]);
-
-  useFrame((state) => {
-    const detailOpacity = revealAt(
-      state.clock.elapsedTime,
-      reducedMotion
-    ).links;
-    const plate = capRef.current;
-    if (plate)
-      (plate.material as THREE.Material).opacity = detailOpacity * 0.55;
-    for (const group of groups) {
-      const mesh = meshes.current.get(group.key);
-      if (!mesh) continue;
-      (mesh.material as THREE.Material).opacity = detailOpacity;
-      group.ids.forEach((id, index) => {
-        const placement = placementsById.get(id);
-        const side = (placement?.footprint ?? 0) * ICON_FOOTPRINT;
-        const roof = placement
-          ? (placement.y ?? 0) + (heights.get(id) ?? placement.height)
-          : 0;
-        if (placement)
-          anchor.set(placement.position.x, roof, placement.position.z);
-        const px = placement
-          ? placement.footprint *
-            pixelsPerUnit(size.height, camera.position.distanceTo(anchor))
-          : 0;
-        const shown =
-          placement !== undefined &&
-          (px >= ICON_MIN_PX || id === selected || id === hovered);
-
-        scratch.position.set(anchor.x, roof + 0.03, anchor.z);
-        scratch.rotation.set(-Math.PI / 2, 0, 0);
-        scratch.scale.setScalar(shown ? side : 0);
-        scratch.updateMatrix();
-        mesh.setMatrixAt(index, scratch.matrix);
-
-        if (!plate) return;
-        cap.position.set(
-          placement?.position.x ?? 0,
-          roof + 0.02,
-          placement?.position.z ?? 0
-        );
-        cap.rotation.set(-Math.PI / 2, 0, 0);
-        cap.scale.setScalar(
-          shown ? (placement?.footprint ?? 0) * CAP_FOOTPRINT : 0
-        );
-        cap.updateMatrix();
-        plate.setMatrixAt(group.offset + index, cap.matrix);
-      });
-      mesh.instanceMatrix.needsUpdate = true;
-    }
-    if (plate) plate.instanceMatrix.needsUpdate = true;
-  });
-
-  return (
-    <>
-      {caps > 0 && (
-        <instancedMesh
-          args={[undefined, undefined, caps]}
-          frustumCulled={false}
-          ref={capRef}
-        >
-          <planeGeometry />
-          <meshBasicMaterial
-            color={palette.background}
-            depthWrite={false}
-            opacity={reducedMotion ? 0.55 : 0}
-            transparent
-          />
-        </instancedMesh>
-      )}
-      {groups.map((group) => (
-        <instancedMesh
-          args={[undefined, undefined, group.ids.length]}
-          frustumCulled={false}
-          key={group.key}
-          ref={(mesh) => {
-            if (mesh) meshes.current.set(group.key, mesh);
-            else meshes.current.delete(group.key);
-          }}
-          renderOrder={1}
-        >
-          <planeGeometry />
-          <meshBasicMaterial
-            alphaTest={0.08}
-            depthWrite={false}
-            map={group.texture}
-            opacity={reducedMotion ? 1 : 0}
-            side={THREE.DoubleSide}
-            transparent
-          />
-        </instancedMesh>
-      ))}
-    </>
   );
 }
 
@@ -3046,14 +2333,12 @@ export default function Scene({
   // In focus mode the lit set is the focused node's, so clicking through the
   // neighbourhood does not dim the layout you are standing in.
   const neighbours = focusNeighbours ?? selectionNeighbours;
-  const { cellsByKind, windows, heights } = useMemo(() => {
-    const built = buildFloorCells(nodesById, placements);
-    return {
-      cellsByKind: groupByKind(built.cells),
-      windows: built.windows,
-      heights: built.heights,
-    };
-  }, [nodesById, placements]);
+  // Pins and roles come from the edges alone, so a focus tween does not recount them.
+  const connections = useMemo(() => connectionsOf(graph.edges ?? []), [graph]);
+  const { cells, windows, heights } = useMemo(
+    () => buildFloorCells(nodesById, placements, connections),
+    [nodesById, placements, connections]
+  );
   const plazas = useMemo(
     () => buildPlazaCells(nodesById, placements),
     [nodesById, placements]
@@ -3131,7 +2416,7 @@ export default function Scene({
             reducedMotion={reducedMotion}
           />
           <Buildings
-            cellsByKind={cellsByKind}
+            cells={cells}
             heights={heights}
             hovered={hovered}
             neighbours={neighbours}
@@ -3147,9 +2432,17 @@ export default function Scene({
             windows={windows}
           />
           <BuildingOutlines
-            cellsByKind={cellsByKind}
+            cells={cells}
             palette={palette}
             reducedMotion={reducedMotion}
+          />
+          <BuildingFrames
+            heights={heights}
+            hovered={hovered}
+            palette={palette}
+            placementsById={placementsById}
+            reducedMotion={reducedMotion}
+            selected={selected}
           />
           {iconGroups.length > 0 ? (
             <RoofIcons
