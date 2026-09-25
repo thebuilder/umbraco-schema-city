@@ -390,16 +390,6 @@ function arrange(laid: Laid[], edges: SchemaEdge[]) {
     const to = home.get(edge.to) as Laid;
     return from === to ? [] : [{ edge, from, to }];
   });
-  const bandOf = (district: Laid) =>
-    district.kind === "compositions"
-      ? "north"
-      : district.kind === "elements"
-        ? "south"
-        : district.kind === "structure" || district.hasStructure
-          ? "middle"
-          : "east";
-  const bySize = (a: Laid, b: Laid) =>
-    b.members.length - a.members.length || compare(a.name, b.name);
   const linksBetween = (a: Laid, others: readonly Laid[]) =>
     crossing.filter(
       ({ from, to }) =>
@@ -407,23 +397,10 @@ function arrange(laid: Laid[], edges: SchemaEdge[]) {
         (to === a && others.includes(from))
     ).length;
 
-  const row: Laid[] = [];
-  const middle = laid.filter((d) => bandOf(d) === "middle").sort(bySize);
-  while (middle.length > 0) {
-    middle.sort(
-      (a, b) => linksBetween(b, row) - linksBetween(a, row) || bySize(a, b)
-    );
-    const next = middle.shift() as Laid;
-    const [first] = row;
-    const last = row[row.length - 1];
-    if (
-      first &&
-      last &&
-      linksBetween(next, [first]) > linksBetween(next, [last])
-    )
-      row.unshift(next);
-    else row.push(next);
-  }
+  const row = middleRow(
+    laid.filter((d) => bandOf(d) === "middle"),
+    linksBetween
+  );
   const placed = new Set<Laid>();
   let x = 0;
   let middleDepth = 0;
@@ -491,6 +468,43 @@ function arrange(laid: Laid[], edges: SchemaEdge[]) {
     placement.position.x -= box.minX;
     placement.position.z -= box.minZ;
   }
+}
+
+const bandOf = (district: Laid) => {
+  if (district.kind === "compositions") return "north";
+  if (district.kind === "elements") return "south";
+  return district.kind === "structure" || district.hasStructure
+    ? "middle"
+    : "east";
+};
+
+const bySize = (a: Laid, b: Laid) =>
+  b.members.length - a.members.length || compare(a.name, b.name);
+
+/**
+ * The middle row, west to east: the largest district, then each time the district
+ * with the most connections into the row so far, at the end of the row it shares
+ * more of them with.
+ */
+function middleRow(
+  middle: Laid[],
+  linksBetween: (a: Laid, others: readonly Laid[]) => number
+): Laid[] {
+  const row: Laid[] = [];
+  const left = [...middle].sort(bySize);
+  while (left.length > 0) {
+    left.sort(
+      (a, b) => linksBetween(b, row) - linksBetween(a, row) || bySize(a, b)
+    );
+    const next = left.shift() as Laid;
+    const [first] = row;
+    const last = row[row.length - 1];
+    const west =
+      first && last && linksBetween(next, [first]) > linksBetween(next, [last]);
+    if (west) row.unshift(next);
+    else row.push(next);
+  }
+  return row;
 }
 
 /**

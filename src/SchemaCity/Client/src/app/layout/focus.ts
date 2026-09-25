@@ -15,7 +15,7 @@ import { cityBounds, ISLAND_PAD, type Placement, ROW_LIMIT } from "./city";
  * neighbourhood is a few dozen buildings with every road drawn, so it has room to
  * spare, and its corner rule measures slack in streets.
  */
-export const STREET = 9;
+export const FOCUS_STREET = 9;
 
 /** Ground between two buildings in a row, and between two rows, as the city uses. */
 const GAP = 3;
@@ -107,7 +107,7 @@ export function layoutFocus(
   const spots = new Map<string, Spot>([[focusId, { x: 0, z: 0, y: 0 }]]);
   const half = sizeOf(focusId) / 2;
   /** Near edge of the first band in any direction: one street off the focused node. */
-  const near = half + STREET;
+  const near = half + FOCUS_STREET;
   /** Ground the neighbourhood covers so far, and every band in it. */
   const box: Box = { minX: -half, maxX: half, minZ: -half, maxZ: half };
   const bands: Box[] = [];
@@ -213,7 +213,7 @@ export function layoutFocus(
   // the upgrade, and nothing in the seeded schema pays for it.
   /** True while an edge reaches at most a street past the ground already covered. */
   const affordable = (edge: number, sideX: number) =>
-    Math.abs(edge) <= (sideX < 0 ? -box.minX : box.maxX) + STREET;
+    Math.abs(edge) <= (sideX < 0 ? -box.minX : box.maxX) + FOCUS_STREET;
 
   /**
    * One corner group. It stands beside the group it shares a side with while that

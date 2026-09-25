@@ -78,7 +78,7 @@ export type Connections = {
 export type BuildingRole = "page" | "composition" | "element";
 
 /** One group's share of the height: a slab and the gap under it. */
-export const FLOOR_HEIGHT = 0.6;
+const FLOOR_HEIGHT = 0.6;
 const GAP = 0.1;
 const SLAB_HEIGHT = FLOOR_HEIGHT - GAP;
 const PLINTH_HEIGHT = 0.14;
