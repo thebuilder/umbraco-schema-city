@@ -37,7 +37,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -282,9 +281,6 @@ export function App({
   const [focusDepth, setFocusDepth] = useState(1);
   const [baseline, setBaseline] = useState<SchemaGraph | null>(null);
   const [comparisonOpen, setComparisonOpen] = useState(false);
-  const lastCamera = useRef<"city" | "top">(
-    start.view === "top" ? "top" : "city"
-  );
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
@@ -345,15 +341,9 @@ export function App({
         setLayers((on) => withLayer(on, layer));
         return;
       }
-      // Turning either view off goes back to the city, the way the toolbar's two
-      // toggles do.
+      // Turning the list off goes back to the city, the way the toolbar's toggle does.
       const key = event.key.toLowerCase();
-      if (key === "l")
-        setView((at) => (at === "list" ? lastCamera.current : "list"));
-      if (key === "e") {
-        lastCamera.current = lastCamera.current === "top" ? "city" : "top";
-        setView(lastCamera.current);
-      }
+      if (key === "l") setView((at) => (at === "list" ? "city" : "list"));
       // Leaving focus already flies back to the whole city, so Home only asks for a
       // fresh framing when there is no focus to leave.
       if (key === "home") {
@@ -542,31 +532,8 @@ export function App({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Both camera modes keep the same city coordinates. */}
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className="font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
-              Camera
-            </span>
-            <ToggleGroup
-              aria-label="Camera"
-              onValueChange={(value) => {
-                lastCamera.current = value[0] === "top" ? "top" : "city";
-                setView(lastCamera.current);
-              }}
-              size="sm"
-              value={[
-                (view === "list" ? lastCamera.current : view) === "top"
-                  ? "top"
-                  : "iso",
-              ]}
-              variant="outline"
-            >
-              <ToggleGroupItem value="iso">Iso</ToggleGroupItem>
-              <ToggleGroupItem value="top">Top down</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
           <Toggle
-            onPressedChange={(on) => setView(on ? "list" : lastCamera.current)}
+            onPressedChange={(on) => setView(on ? "list" : "city")}
             pressed={view === "list"}
             size="sm"
             variant="outline"
@@ -733,7 +700,6 @@ export function App({
                 <Scene
                   baseline={baseline}
                   comparison={comparison}
-                  explore={view === "top"}
                   focus={focus}
                   focusDepth={focusDepth}
                   graph={graph}

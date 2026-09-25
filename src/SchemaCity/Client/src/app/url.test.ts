@@ -149,8 +149,9 @@ describe("urlToWrite", () => {
 describe("the view", () => {
   it("reads and writes the list view, and leaves the city out", () => {
     expect(parseUrl("?view=list", aliases).view).toBe("list");
-    expect(parseUrl("?view=top", aliases).view).toBe("top");
-    expect(parseUrl("?view=explore", aliases).view).toBe("top");
+    // The old camera modes are angles on the city, so their links open the city.
+    expect(parseUrl("?view=top", aliases).view).toBe("city");
+    expect(parseUrl("?view=explore", aliases).view).toBe("city");
     expect(parseUrl("?view=orbit", aliases).view).toBe("city");
     expect(
       serialiseUrl({
