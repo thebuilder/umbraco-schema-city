@@ -1,7 +1,7 @@
 # Schema City, implementation plan
 
 > Status note, 2026-09-06: this is the original implementation plan and still records design
-> decisions and milestone history. The shipped camera modes are Iso and Top down, and the [README](README.md) and [development guide](docs/development.md) describe current usage and setup. Treat unchecked or
+> decisions and milestone history. The shipped camera is one perspective orbit camera in a 3D world (section 6, World stage), and the [README](README.md) and [development guide](docs/development.md) describe current usage and setup. Treat unchecked or
 > future-looking items below as plan history, not as a promise that the feature is present. The
 > remaining release work listed in M4 is publishing to NuGet and submitting the marketplace entry.
 
@@ -442,10 +442,9 @@ Same placements, different colours. The picker has six modes: None, Content coun
 
 The camera frames the city at a span of its longer side. At a true isometric angle a city `width` by `depth` covers `(width + depth) / sqrt(6)` of the framed height, so that span shows all of it with about a quarter of the height left for the buildings standing up in it.
 
-Built 2026-09-03, after fsn's scene. Background and fog share the void colour. One grid plane of `span * 13.2` units follows the ground point at the centre of the screen every frame, from the camera's own centre ray, with its lines drawn from world position and faded radially from `span * 1.2` out to `span * 6`. Its squares are 6 and 30 world units, a ruler under the islands rather than their street plan. One padded slab with a rim carries each district, and the void with the grid shows between them. `cityBounds(placements, pad)` covers every island plus its padding, so the camera span and the grid fade follow it; the seeded city frames 141 by 146 with the island gap. The zoom clamp is derived from where the fade ends, so no edge can show at any zoom. Fog is measured in view depth and fades the ground past `span * 1.8`. There is no star dome, because a dome has no parallax under an orthographic camera.
+Built 2026-09-03, after fsn's scene. Background and fog share the void colour. One grid plane of `span * 13.2` units follows the ground point at the centre of the screen every frame, from the camera's own centre ray, with its lines drawn from world position and faded radially from `span * 1.2` out to `span * 6`. Its squares are 6 and 30 world units, a ruler under the islands rather than their street plan. One padded slab with a rim carries each district, and the void with the grid shows between them. `cityBounds(placements, pad)` covers every island plus its padding, so the camera span and the grid fade follow it; the seeded city frames 141 by 146 with the island gap. The zoom clamp is derived from where the fade ends, so no edge can show at any zoom. Fog is measured in view depth and fades the ground past `span * 1.8`. There was no star dome then, because a dome has no parallax under an orthographic camera.
 
-The Top down camera keeps the same orthographic projection and city coordinates as Iso. Switching
-views changes the camera angle, not the layout.
+Reworked 2026-09-25 (M6 world). The orthographic camera and the Iso / Top down switch are gone, and `view=top` links open the city. One perspective camera with fsn's damped orbit controls (drag orbits, right-drag pans, the wheel dollies toward the cursor, the polar angle stops just above the ground) and fsn's keys (W A S D fly, R F rise and descend, arrows turn and tilt, Shift doubles). The default framing looks down the isometric diagonal and fits every island's corners in perspective; the first framing is fsn's establishing shot. A gradient sky dome and a seeded star field ride with the camera. Fog, the ground's haze and the sky below the horizon share one horizon colour, and fog is measured from the camera (`atmosphere`), so the city stays crisp and no distance shows an edge. The ground is an opaque grid re-centred under the camera. Lights are fsn's hemisphere, key, rim and headlight, with PCF shadows fitted around the orbit target on plates lifted a quarter toward phosphor-dim.
 
 ---
 

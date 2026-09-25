@@ -63,11 +63,15 @@ import {
   BOOST,
   desiredVelocity,
   FLIGHT_CODES,
+  flySpeed,
   groundAxes,
-  panSpeed,
+  groundedTarget,
+  TURN_SPEED,
   translateFlightEndpoints,
+  turnedOffset,
+  turnRates,
 } from "./scene/flight";
-import { isometricZoom } from "./scene/framing";
+import { framingDistance } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
 import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
@@ -90,15 +94,16 @@ import {
 } from "./scene/reveal";
 import { buildRoadGeometry, roadTracePositions } from "./scene/roads";
 import {
+  atmosphere,
+  CAMERA_FOV,
   districtStamp,
   FOLDER_TINT_HEIGHT,
-  fogRange,
   framingAction,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
   pixelsPerUnit,
-  stageMetrics,
-  zoomRange,
+  SKY_FRAGMENT_SHADER,
+  SKY_VERTEX_SHADER,
 } from "./scene/stage";
 
 /** Retain geometry through exits, then stop drawing a fully hidden layer. */
@@ -552,6 +557,8 @@ function Buildings({
       {cellsByKind.own.length > 0 && (
         <instancedMesh
           args={[undefined, undefined, cellsByKind.own.length]}
+          castShadow
+          receiveShadow
           ref={ownRef}
         >
           <boxGeometry />
@@ -567,6 +574,8 @@ function Buildings({
       {cellsByKind.composed.length > 0 && (
         <instancedMesh
           args={[undefined, undefined, cellsByKind.composed.length]}
+          castShadow
+          receiveShadow
           ref={composedRef}
         >
           <boxGeometry />
@@ -582,6 +591,8 @@ function Buildings({
       {cellsByKind.separator.length > 0 && (
         <instancedMesh
           args={[undefined, undefined, cellsByKind.separator.length]}
+          castShadow
+          receiveShadow
           ref={separatorRef}
         >
           <boxGeometry />
@@ -597,6 +608,8 @@ function Buildings({
       {cellsByKind.element.length > 0 && (
         <instancedMesh
           args={[undefined, undefined, cellsByKind.element.length]}
+          castShadow
+          receiveShadow
           ref={elementRef}
         >
           <boxGeometry />
@@ -626,6 +639,7 @@ function Buildings({
       {plazas.length > 0 && (
         <instancedMesh
           args={[undefined, undefined, plazas.length]}
+          receiveShadow
           ref={plazaRef}
         >
           <cylinderGeometry args={[1, 1, 1, 24]} />
@@ -925,11 +939,7 @@ function RoofIcons({
           anchor.set(placement.position.x, roof, placement.position.z);
         const px = placement
           ? placement.footprint *
-            pixelsPerUnit(
-              camera as THREE.OrthographicCamera & { fov?: number },
-              size.height,
-              camera.position.distanceTo(anchor)
-            )
+            pixelsPerUnit(size.height, camera.position.distanceTo(anchor))
           : 0;
         const shown =
           placement !== undefined &&
@@ -1480,11 +1490,7 @@ function Labels({
   focusNeighbours: Set<string> | null;
   reducedMotion: boolean;
 }) {
-  const camera = useThree(
-    (state) => state.camera
-  ) as THREE.OrthographicCamera & {
-    fov?: number;
-  };
+  const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
   const size = useThree((state) => state.size);
   const labelLayer = useRef<HTMLDivElement | null>(null);
@@ -1495,7 +1501,6 @@ function Labels({
   // skipped otherwise, so a still city costs one matrix comparison a frame.
   const dirty = useRef(true);
   const framedAt = useRef(new THREE.Matrix4());
-  const framedZoom = useRef(0);
 
   const candidates = useMemo(() => {
     const ids = visibleLabelIds({
@@ -1569,37 +1574,31 @@ function Labels({
       labelLayer.current.style.opacity = String(
         revealAt(state.clock.elapsedTime, reducedMotion).links
       );
-    if (
-      !dirty.current &&
-      camera.zoom === framedZoom.current &&
-      camera.matrixWorld.equals(framedAt.current)
-    ) {
-      return;
-    }
+    if (!dirty.current && camera.matrixWorld.equals(framedAt.current)) return;
     dirty.current = false;
-    framedZoom.current = camera.zoom;
     framedAt.current.copy(camera.matrixWorld);
 
     const kept = pickLabels(
       candidates.map((candidate) => {
         anchor.set(candidate.x, candidate.y, candidate.z);
-        // How big the building is on screen, through whichever camera is on: the
-        // orthographic zoom is its pixels per world unit, and the Explore camera's
-        // answer depends on how far away this particular building is.
+        // How big the building is on screen, which depends on how far away this
+        // particular building is.
         const perUnit = pixelsPerUnit(
-          camera,
           size.height,
           camera.position.distanceTo(anchor)
         );
         anchor.project(camera);
+        // A point behind the camera projects mirrored onto the screen, so it is
+        // moved off it instead, which drops even a pinned name.
+        const behind = anchor.z > 1;
         return {
           id: candidate.id,
           text: candidate.text,
           rank: candidate.rank,
           pinned: candidate.rank < 2,
-          x: (anchor.x * 0.5 + 0.5) * size.width,
+          x: behind ? -1 : (anchor.x * 0.5 + 0.5) * size.width,
           y: (0.5 - anchor.y * 0.5) * size.height - candidate.lift,
-          buildingPx: anchor.z > 1 ? 0 : candidate.footprint * perUnit,
+          buildingPx: behind ? 0 : candidate.footprint * perUnit,
         };
       }),
       { charPx: charPx.current, width: size.width, height: size.height }
@@ -1727,12 +1726,20 @@ function stampTexture(name: string, font: string): THREE.CanvasTexture {
  * The land under a district. Structure is the same panel colour the chrome uses,
  * compositions and mixed are a touch lighter and elements a touch warmer, so the
  * islands read as different places without turning into four colours.
+ *
+ * The panel colour is lifted toward phosphor-dim first. Under the scene's lights the
+ * panel colour itself comes out close to black, and a shadow on black does not show,
+ * so the buildings would stand on their islands without casting anything.
  */
 function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
-  if (kind === "structure") return new THREE.Color(palette.land);
-  if (kind === "elements") return tint(palette.land, palette.amber, 0.09);
-  return tint(palette.land, WHITE, 0.07);
+  const land = `#${tint(palette.land, palette.dim, SLAB_LIFT).getHexString()}`;
+  if (kind === "structure") return new THREE.Color(land);
+  if (kind === "elements") return tint(land, palette.amber, 0.09);
+  return tint(land, WHITE, 0.07);
 }
+
+/** How far the land is lifted from the panel colour toward phosphor-dim. */
+const SLAB_LIFT = 0.25;
 
 /** The lip of land around an island, the same for every district and for the focus one. */
 function rimColour(palette: Palette): THREE.Color {
@@ -1803,7 +1810,7 @@ function FocusIsland({
       <group
         position={[at.centre.x - at.anchor.x, 0, at.centre.z - at.anchor.z]}
       >
-        <mesh position={[0, -SLAB_HEIGHT / 2, 0]}>
+        <mesh position={[0, -SLAB_HEIGHT / 2, 0]} receiveShadow>
           <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
           <meshStandardMaterial
             color={slabColour(at.kind, palette)}
@@ -1825,8 +1832,8 @@ function FocusIsland({
 }
 
 /**
- * The world stage, borrowed from fsn: a void-coloured background and fog, one grid
- * plane that follows the camera so the ground never runs out, and an island of land
+ * The world stage, borrowed from fsn: a sky and fog that meet at one horizon colour,
+ * one ground plane that follows the camera so it never runs out, and an island of land
  * per district. `span` is the city's own, not the focus layout's, so entering focus
  * does not rescale the world, and the islands come from the city layout as well, so
  * the focused neighbourhood stands on whatever island it lands over.
@@ -1886,7 +1893,11 @@ function DistrictBoards({
             key={district.id}
             position={[district.centre.x, 0, district.centre.z]}
           >
-            <mesh position={[0, -SLAB_HEIGHT / 2, 0]} renderOrder={-1}>
+            <mesh
+              position={[0, -SLAB_HEIGHT / 2, 0]}
+              receiveShadow
+              renderOrder={-1}
+            >
               <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
               <meshStandardMaterial
                 color={slabColour(district.kind, palette)}
@@ -1900,6 +1911,7 @@ function DistrictBoards({
             </mesh>
             <mesh
               position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}
+              receiveShadow
               renderOrder={-1}
             >
               <boxGeometry
@@ -1928,21 +1940,88 @@ function DistrictBoards({
   );
 }
 
-function WorldGrid({ palette, span }: { palette: Palette; span: number }) {
-  const camera = useThree((state) => state.camera);
+/** fsn's count. Faint and small, so the sky reads as depth rather than decoration. */
+const STAR_COUNT = 700;
+/**
+ * How far the key light's shadow reaches from the orbit target, as a share of the
+ * camera's distance to it. Close in, the map covers less ground and the edges sharpen.
+ */
+const SHADOW_REACH = 0.9;
+/** Texels along each side of the key light's shadow map. */
+const SHADOW_MAP = 2048;
+/**
+ * Where the key light stands relative to what the camera looks at: up to the left of
+ * the default view at about 40 degrees, so shadows fall to the right on screen,
+ * across open ground, rather than behind the buildings or under them.
+ */
+const KEY_DIRECTION = new THREE.Vector3(-0.8, 0.9, 0.3).normalize();
+/** Stands in for the orbit target in the frame before the controls exist. */
+const ORIGIN = new THREE.Vector3();
+
+/**
+ * Stars on a unit dome, all above the horizon so none of them ever sits on the
+ * ground. fsn scatters them at random; a fixed seed keeps the sky the same on every
+ * load.
+ */
+function starPositions(): Float32Array {
+  const positions = new Float32Array(STAR_COUNT * 3);
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 16_807) % 2_147_483_647;
+    return seed / 2_147_483_647;
+  };
+  for (let index = 0; index < STAR_COUNT; index++) {
+    const theta = random() * Math.PI * 2;
+    // Uniform over the cap, stopping about five degrees above the horizon, where the
+    // band of light takes over.
+    const phi = Math.acos(0.08 + random() * 0.92);
+    const radius = 0.9 + random() * 0.08;
+    positions[index * 3] = radius * Math.sin(phi) * Math.cos(theta);
+    positions[index * 3 + 1] = radius * Math.cos(phi);
+    positions[index * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+  }
+  return positions;
+}
+
+/**
+ * The world around the city, after fsn: a sky dome and a star field that ride with
+ * the camera, fog in the horizon colour, a ground plane re-centred under the camera,
+ * and the lights.
+ *
+ * Every distance here follows the camera's distance to its target through
+ * `atmosphere`, so dollying out pushes the horizon back rather than finding an edge,
+ * and the far plane is pulled in to where fog has already hidden everything, which
+ * keeps the depth buffer's precision on the city.
+ *
+ * The lights are fsn's: a hemisphere for the ambient, a key light with soft shadows,
+ * a cyan rim from behind, and a headlight on the camera so no face the reader can
+ * see is ever unlit. The key light and its shadow follow the orbit target.
+ */
+function World({ palette, span }: { palette: Palette; span: number }) {
+  const camera = useThree((state) => state.camera) as THREE.PerspectiveCamera;
+  const controls = useThree((state) => state.controls) as {
+    target: THREE.Vector3;
+  } | null;
+  const gl = useThree((state) => state.gl);
   const grid = useRef<THREE.Mesh>(null);
-  const ray = useMemo(() => new THREE.Raycaster(), []);
-  const ground = useMemo(
-    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
-    []
-  );
-  const screenCentre = useMemo(() => new THREE.Vector2(0, 0), []);
-  const centre = useMemo(() => new THREE.Vector3(), []);
-  const { fadeNear, fadeFar, plane } = stageMetrics(span);
-  const fog = fogRange(span);
-  const uniforms = useMemo(
+  const sky = useRef<THREE.Group>(null);
+  const fog = useRef<THREE.Fog>(null);
+  const key = useRef<THREE.DirectionalLight>(null);
+  const head = useRef<THREE.DirectionalLight>(null);
+  const reach = useRef(0);
+  const stars = useMemo(starPositions, []);
+  const colours = useMemo(
     () => ({
-      uCentre: { value: new THREE.Vector2() },
+      // A teal band where the ground meets the sky, out of the chrome's own dim
+      // phosphor, under a zenith darker than the void the panels sit on.
+      horizon: tint(palette.background, palette.dim, 0.3),
+      zenith: tint(palette.background, "#000000", 0.55),
+    }),
+    [palette]
+  );
+  const gridUniforms = useMemo(
+    () => ({
+      uGround: { value: new THREE.Color(palette.background) },
       // The minor lines are the same phosphor-dim mixed back toward the void, so the
       // grid reads as one thing at two strengths rather than as two colours.
       uMinorColour: {
@@ -1952,49 +2031,148 @@ function WorldGrid({ palette, span }: { palette: Palette; span: number }) {
         ),
       },
       uMajorColour: { value: new THREE.Color(palette.dim) },
-      uFadeNear: { value: fadeNear },
-      uFadeFar: { value: fadeFar },
+      uHorizon: { value: colours.horizon },
+      uFogNear: { value: 1 },
+      uFogFar: { value: 2 },
     }),
-    [palette, fadeNear, fadeFar]
+    [palette, colours]
+  );
+  const skyUniforms = useMemo(
+    () => ({
+      uZenith: { value: colours.zenith },
+      uHorizon: { value: colours.horizon },
+    }),
+    [colours]
   );
 
   useFrame(() => {
-    // The ground point at the centre of the screen, from the camera's own centre
-    // ray. The orbit target would do under the isometric camera, whose panning holds
-    // it on y = 0, but the Explore camera can look anywhere.
-    if (!grid.current) return;
-    ray.setFromCamera(screenCentre, camera);
-    if (!ray.ray.intersectPlane(ground, centre)) return;
-    // Looking at the horizon puts that point most of a mile away, where re-centring
-    // the plane on it would take the grid out from under the city. Past the fade it
-    // makes no difference to what is drawn, so the grid stays where it was.
-    if (
-      Math.hypot(centre.x - camera.position.x, centre.z - camera.position.z) >
-      fadeFar
-    )
-      return;
-    grid.current.position.set(centre.x, GRID_Y, centre.z);
-    uniforms.uCentre.value.set(centre.x, centre.z);
+    const target = controls?.target ?? ORIGIN;
+    const distance = camera.position.distanceTo(target);
+    const { near, far } = atmosphere(span, distance);
+    if (fog.current) {
+      fog.current.near = near;
+      fog.current.far = far;
+    }
+    // The material's own uniforms, because the renderer copies the ones it is handed.
+    const ground = (grid.current?.material as THREE.ShaderMaterial | undefined)
+      ?.uniforms;
+    if (ground) {
+      ground.uFogNear.value = near;
+      ground.uFogFar.value = far;
+    }
+    // Past the fog's far end everything is the horizon colour, which is what the sky
+    // below the horizon already is, so nothing further out needs drawing.
+    const cut = far * 1.2;
+    if (Math.abs(camera.far - cut) > cut * 0.01) {
+      camera.far = cut;
+      camera.updateProjectionMatrix();
+    }
+    // The plane's half width clears the fog's end even along its own axes.
+    grid.current?.position.set(camera.position.x, GRID_Y, camera.position.z);
+    grid.current?.scale.setScalar(far * 2.2);
+    sky.current?.position.copy(camera.position);
+    sky.current?.scale.setScalar(far * 1.1);
+
+    const light = key.current;
+    if (light) {
+      // In steps of a square root of two, so a dolly refits the shadow camera a few
+      // times on the way rather than on every frame.
+      const wanted = Math.max(12, Math.min(distance * SHADOW_REACH, span));
+      const stepped = Math.SQRT2 ** Math.ceil(Math.log2(wanted) * 2);
+      if (stepped !== reach.current) {
+        reach.current = stepped;
+        const shadow = light.shadow.camera;
+        shadow.left = -stepped;
+        shadow.right = stepped;
+        shadow.top = stepped;
+        shadow.bottom = -stepped;
+        shadow.near = 1;
+        shadow.far = stepped * 6 + 60;
+        shadow.updateProjectionMatrix();
+      }
+      // Moving the light in whole shadow texels keeps a pan from making the shadow
+      // edges crawl as each one lands on a different row of the map.
+      const texel = (stepped * 2) / SHADOW_MAP;
+      light.target.position.set(
+        Math.round(target.x / texel) * texel,
+        0,
+        Math.round(target.z / texel) * texel
+      );
+      light.position
+        .copy(light.target.position)
+        .addScaledVector(KEY_DIRECTION, stepped * 3 + 30);
+      light.target.updateMatrixWorld();
+    }
+    if (head.current) {
+      head.current.position.copy(camera.position);
+      head.current.target.position.copy(target);
+      head.current.target.updateMatrixWorld();
+    }
   });
+
   return (
     <>
-      <color args={[palette.background]} attach="background" />
-      {/* Fog and background have to be the exact same colour or the far ground ends
-          in a horizon ring instead of dissolving. */}
-      <fog args={[palette.background, fog.near, fog.far]} attach="fog" />
+      <color args={[colours.horizon]} attach="background" />
+      {/* Fog, the ground's own fade and the sky below the horizon all end on this one
+          colour, or the far ground ends in a ring instead of dissolving. */}
+      <fog args={[colours.horizon, 1, 2]} attach="fog" ref={fog} />
+      <hemisphereLight args={["#a8e8ff", "#101c1e", 0.7]} />
+      <directionalLight
+        castShadow
+        color="#ffeef0"
+        intensity={2.1}
+        ref={key}
+        shadow-bias={-0.0006}
+        shadow-mapSize={[SHADOW_MAP, SHADOW_MAP]}
+        shadow-normalBias={0.05}
+        shadow-radius={3}
+      />
+      <directionalLight
+        color="#6fffe0"
+        intensity={0.85}
+        position={[-14, 8, -12]}
+      />
+      <directionalLight color="#cdeee5" intensity={0.55} ref={head} />
+      <group ref={sky}>
+        <mesh frustumCulled={false} renderOrder={-2}>
+          <sphereGeometry args={[1, 32, 16]} />
+          <shaderMaterial
+            depthTest={false}
+            depthWrite={false}
+            fragmentShader={SKY_FRAGMENT_SHADER}
+            side={THREE.BackSide}
+            uniforms={skyUniforms}
+            vertexShader={SKY_VERTEX_SHADER}
+          />
+        </mesh>
+        <points frustumCulled={false} renderOrder={-2}>
+          <bufferGeometry>
+            <bufferAttribute args={[stars, 3]} attach="attributes-position" />
+          </bufferGeometry>
+          {/* An unattenuated point is sized in buffer pixels, so it is told the
+              ratio, or a sharper buffer shrinks the sky to specks. */}
+          <pointsMaterial
+            color={palette.dim}
+            depthWrite={false}
+            fog={false}
+            opacity={0.6}
+            size={1.3 * gl.getPixelRatio()}
+            sizeAttenuation={false}
+            transparent
+          />
+        </points>
+      </group>
       <mesh
         frustumCulled={false}
         ref={grid}
         renderOrder={-1}
         rotation={[-Math.PI / 2, 0, 0]}
       >
-        <planeGeometry args={[plane, plane]} />
+        <planeGeometry />
         <shaderMaterial
           depthWrite={false}
           fragmentShader={GRID_FRAGMENT_SHADER}
-          glslVersion={THREE.GLSL3}
-          transparent
-          uniforms={uniforms}
+          uniforms={gridUniforms}
           vertexShader={GRID_VERTEX_SHADER}
         />
       </mesh>
@@ -2056,7 +2234,7 @@ function Stage({
 
   return (
     <>
-      <WorldGrid palette={palette} span={span} />
+      <World palette={palette} span={span} />
       <DistrictBoards
         districts={districts}
         materials={{
@@ -2077,6 +2255,7 @@ function Stage({
             FOLDER_TINT_HEIGHT / 2 - SLAB_HEIGHT / 2,
             folder.centre.z,
           ]}
+          receiveShadow
           renderOrder={-1}
         >
           <boxGeometry
@@ -2130,15 +2309,9 @@ function Stage({
 }
 
 /**
- * The camera's framing distance, in world units, and the height of what it sees.
- * The grid reuses it too, so the ground always reaches past whatever the camera
- * can see.
- *
- * At a true isometric angle a city `width` by `depth` on the ground covers
- * `(width + depth) / sqrt(6)` of that height, so the longer side on its own frames
- * the whole city with about a quarter of the height left for the buildings
- * standing up in it. The old 1.5x of that pushed the camera far enough back that
- * a single-group building came out under three pixels tall.
+ * The size of the city, in world units: its longer side. The fog, the horizon and
+ * the camera's dolly range scale by it, so a schema of ten types and one of three
+ * hundred sit in the same world at the same proportions.
  */
 function citySpan(bounds: CityBounds): number {
   return Math.max(bounds.width, bounds.depth, 4);
@@ -2147,95 +2320,118 @@ function citySpan(bounds: CityBounds): number {
 type View = {
   position: THREE.Vector3;
   target: THREE.Vector3;
-  zoom: number;
-  span: number;
+};
+
+/** What a framing shows: the ground it has to fit, and the point it centres on. */
+type Framed = {
+  centre: { x: number; z: number };
+  grounds: readonly {
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+  }[];
+};
+
+/** The orbit controls, as far as the camera code touches them. */
+type Rig = {
+  target: THREE.Vector3;
+  enabled: boolean;
+  maxPolarAngle: number;
 };
 
 /** Milliseconds the camera takes to reach a new framing. */
 const FLIGHT_MS = 700;
 /** Home is a shorter trip: the city is already on screen, only badly aimed. */
 const REFRAME_MS = 400;
+/**
+ * The establishing shot, which lands about as the connections finish drawing. fsn's
+ * runs 2.6 seconds over a skyline that rises for longer.
+ */
+const INTRO_MS = 2400;
+/** How much further out the establishing shot opens than it lands, and how far round. */
+const INTRO_PULL_BACK = 1.75;
+const INTRO_SWING = 0.42;
 
-/** fsn's easing for the establishing shot. */
+/** fsn's easing for a flight. */
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
 /**
- * Screen-right on the ground at the isometric angle, which is the camera's own x
- * axis: `cross(up, position - target)` normalised, for a camera on (1, 1, 1).
+ * The default view looks down the isometric diagonal, from the south-east at about
+ * 35 degrees, so the city opens on the overview it always has, now with depth.
  */
+const FRAMING_DIRECTION = new THREE.Vector3(1, 1, 1).normalize();
+/** Screen-right on the ground from that direction. */
 const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
+const UP = new THREE.Vector3(0, 1, 0);
 
 /**
- * Where the ortho camera stands to frame `bounds` at a true isometric angle.
+ * Where the camera stands to frame `bounds` from the default direction: every corner
+ * of every piece of ground, at the ground and at the height of the tallest building.
  *
  * `shift` is how many CSS pixels the framed centre moves left on screen, which is
- * half the inspector's width when it is open. The camera moves the other way, along
- * its own right, by that many pixels over the framing zoom: an orthographic camera's
- * zoom is its pixels per world unit, so that is the whole conversion. The framed
- * centre then lands in the middle of the canvas the panel does not cover.
+ * half the inspector's width when it is open. The target moves that many pixels'
+ * worth of ground along screen-right, measured at the target's own distance, and the
+ * framed centre lands in the middle of the canvas the panel does not cover.
  */
 function viewOf(
-  bounds: CityBounds,
+  bounds: Framed,
   size: { width: number; height: number },
-  shift = 0,
-  fill = 0.88,
-  buildingHeight = 4,
-  topDown = false
+  shift: number,
+  fill: number,
+  buildingHeight: number
 ): View {
-  const span = citySpan(bounds);
-  // Fit the projected ground rectangle rather than its longest world axis.
-  const availableWidth = Math.max(1, size.width - shift * 2);
-  const frame = topDown
-    ? {
-        zoom:
-          Math.min(
-            availableWidth / Math.max(1, bounds.width),
-            size.height / Math.max(1, bounds.depth)
-          ) * fill,
-        direction: new THREE.Vector3(0, 1, 0),
-        right: new THREE.Vector3(1, 0, 0),
-        height: 0,
-      }
-    : {
-        zoom: isometricZoom(bounds, size, buildingHeight, shift * 2, fill),
-        direction: new THREE.Vector3(1, 1, 1).normalize(),
-        right: SCREEN_RIGHT,
-        height: buildingHeight / 2,
-      };
+  const corners = bounds.grounds.flatMap((ground) =>
+    [ground.minX, ground.maxX].flatMap((x) =>
+      [ground.minZ, ground.maxZ].flatMap((z) =>
+        [0, buildingHeight].map((y) => ({
+          x: x - bounds.centre.x,
+          y: y - buildingHeight / 2,
+          z: z - bounds.centre.z,
+        }))
+      )
+    )
+  );
+  const distance = framingDistance(
+    corners,
+    FRAMING_DIRECTION,
+    size,
+    shift * 2,
+    fill,
+    CAMERA_FOV
+  );
   const target = new THREE.Vector3(
     bounds.centre.x,
-    frame.height,
+    buildingHeight / 2,
     bounds.centre.z
-  ).addScaledVector(frame.right, shift / frame.zoom);
+  ).addScaledVector(SCREEN_RIGHT, shift / pixelsPerUnit(size.height, distance));
   return {
-    position: target.clone().addScaledVector(frame.direction, span),
+    position: target.clone().addScaledVector(FRAMING_DIRECTION, distance),
     target,
-    zoom: frame.zoom,
-    span,
   };
 }
 
-function applyCameraView(
-  camera: THREE.OrthographicCamera,
-  controls: { target: THREE.Vector3; update: () => void } | null,
-  view: View,
-  up: THREE.Vector3
-) {
-  camera.position.copy(view.position);
-  camera.zoom = view.zoom;
-  camera.up.copy(up);
-  camera.near = -view.span * 2;
-  camera.far = view.span * 3;
-  camera.updateProjectionMatrix();
-  if (controls) {
-    controls.target.copy(view.target);
-    controls.update();
-  } else camera.lookAt(view.target);
+/**
+ * fsn's opening pose: wider, swung round and looking at the same point, so the
+ * establishing shot falls into the framing as the city finishes building.
+ */
+function introOf(view: View): View {
+  const offset = view.position
+    .clone()
+    .sub(view.target)
+    .multiplyScalar(INTRO_PULL_BACK)
+    .applyAxisAngle(UP, INTRO_SWING);
+  return {
+    position: view.target.clone().add(offset),
+    target: view.target.clone(),
+  };
 }
 
-function cameraUp(topDown: boolean) {
-  return topDown ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(0, 1, 0);
+function placeCamera(camera: THREE.Camera, controls: Rig | null, view: View) {
+  camera.position.copy(view.position);
+  if (controls) controls.target.copy(view.target);
+  camera.lookAt(view.target);
 }
 
 type CameraFlight = {
@@ -2244,15 +2440,22 @@ type CameraFlight = {
   started: number;
   ms: number;
   ease: (t: number) => number;
-  fromUp: THREE.Vector3;
-  toUp: THREE.Vector3;
 };
 
+/** Stands in for the orbit target in the frame before the controls exist. */
+const LOOSE_TARGET = new THREE.Vector3();
+
 /**
- * Frames the city, and flies to a new framing when focus changes it. The flight is
- * keyboard pan translates the flight as it runs. Pointer input stops a framing
- * flight in place, or completes an angle change before handing over to the controls.
- * A resize is not a new framing, so the view it has is the view it keeps.
+ * Frames the city, and flies to a new framing when focus changes it. The first
+ * framing is fsn's establishing shot. A keyboard move translates a flight as it
+ * runs; a pointer press or the wheel stops it where it is and hands the camera
+ * straight to the controls. A resize is not a new framing, so the view it has is
+ * the view it keeps.
+ *
+ * While a flight runs the controls are switched off. Their update re-derives the
+ * camera from its own orbit state and clamps it to the dolly range, which is a tug
+ * of war with a flight writing the pose, and the establishing shot opens outside
+ * that range on purpose.
  */
 function CameraRig({
   bounds,
@@ -2261,10 +2464,9 @@ function CameraRig({
   reframe,
   reducedMotion,
   overview,
-  topDown,
   flightRef,
 }: {
-  bounds: CityBounds;
+  bounds: Framed;
   buildingHeight: number;
   /** CSS pixels of canvas the inspector covers on the right, 0 when it is closed. */
   inspectorWidth: number;
@@ -2272,23 +2474,17 @@ function CameraRig({
   reframe: number;
   reducedMotion: boolean;
   overview: boolean;
-  topDown: boolean;
   flightRef: RefObject<CameraFlight | null>;
 }) {
-  const camera = useThree((state) => state.camera) as THREE.OrthographicCamera;
-  const controls = useThree((state) => state.controls) as {
-    target: THREE.Vector3;
-    update: () => void;
-  } | null;
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as Rig | null;
   const gl = useThree((state) => state.gl);
   const size = useThree((state) => state.size);
   const flight = flightRef;
   const framed = useRef<{
-    bounds: CityBounds;
+    bounds: Framed;
     controls: unknown;
     reframe: number;
-    topDown: boolean;
-    fitZoom: number;
   } | null>(null);
 
   // Half the panel, because the middle of the uncovered canvas is that far left of
@@ -2299,104 +2495,83 @@ function CameraRig({
         bounds,
         size,
         inspectorWidth / 2,
-        overview ? 0.9 : 0.84,
-        buildingHeight,
-        topDown
+        overview ? 0.94 : 0.9,
+        buildingHeight
       ),
-    [bounds, buildingHeight, inspectorWidth, overview, size, topDown]
+    [bounds, buildingHeight, inspectorWidth, overview, size]
   );
 
   useEffect(() => {
+    // Captured, so it runs before the controls' own listener on the same canvas:
+    // handing them the camera first is what lets the press that stops a flight also
+    // start an orbit, rather than being spent on stopping the camera.
     const cancel = () => {
-      // A pointer can arrive while the angle is changing. Leaving the camera
-      // halfway between the two up vectors makes the next OrbitControls update
-      // inherit an in-between mode, so settle mode changes before handing over
-      // to direct manipulation. Framing flights retain their interruptible stop.
-      const moving = flight.current;
-      if (moving && !camera.up.equals(moving.toUp)) {
-        applyCameraView(camera, controls, moving.to, moving.toUp);
-      }
       flight.current = null;
+      if (controls) controls.enabled = true;
     };
-    gl.domElement.addEventListener("pointerdown", cancel);
+    const options = { capture: true, passive: true };
+    gl.domElement.addEventListener("pointerdown", cancel, options);
+    gl.domElement.addEventListener("wheel", cancel, options);
     return () => {
-      gl.domElement.removeEventListener("pointerdown", cancel);
+      gl.domElement.removeEventListener("pointerdown", cancel, options);
+      gl.domElement.removeEventListener("wheel", cancel, options);
     };
-  }, [camera, controls, flight, gl]);
+  }, [controls, flight, gl]);
 
   useEffect(() => {
     // This effect runs again every time the viewport is measured, which a resize
     // does a dozen times over, and hover, selection and lens changes all re-render
     // the scene around it. Framing again on any of those puts the camera back where
     // it started, so only a new set of bounds is allowed to move it.
-    const asked = framed.current !== null && framed.current.reframe !== reframe;
-    const modeChanged =
-      framed.current !== null && framed.current.topDown !== topDown;
-    const action = modeChanged
-      ? "fly"
-      : framingAction(framed.current, { bounds, controls, reframe });
-    const currentTarget = controls ? controls.target : view.target;
-    const distance = camera.position.distanceTo(currentTarget);
-    const destination =
-      modeChanged && !flight.current
-        ? {
-            position: currentTarget
-              .clone()
-              .addScaledVector(
-                topDown
-                  ? new THREE.Vector3(0, 1, 0)
-                  : new THREE.Vector3(1, 1, 1).normalize(),
-                distance
-              ),
-            target: currentTarget.clone(),
-            zoom:
-              (camera.zoom * view.zoom) /
-              (framed.current?.fitZoom ?? view.zoom),
-            span: distance,
-          }
-        : view;
-    framed.current = { bounds, controls, reframe, topDown, fitZoom: view.zoom };
+    const first = framed.current === null;
+    const asked = !first && framed.current?.reframe !== reframe;
+    const action = framingAction(framed.current, { bounds, controls, reframe });
+    framed.current = { bounds, controls, reframe };
     if (action === "none") return;
-    if (action === "snap" || reducedMotion) {
-      flight.current = null;
-      applyCameraView(camera, controls, destination, cameraUp(topDown));
+    // The controls arriving mid-establishing-shot need nothing: the flight writes
+    // their target every frame and hands them the camera when it lands.
+    if (action === "snap" && !first && flight.current) return;
+    if (reducedMotion || action === "snap") {
+      if (reducedMotion || !first) {
+        flight.current = null;
+        placeCamera(camera, controls, view);
+        return;
+      }
+      const opening = introOf(view);
+      placeCamera(camera, controls, opening);
+      flight.current = {
+        from: opening,
+        to: view,
+        started: performance.now(),
+        ms: INTRO_MS,
+        ease: smootherstep,
+      };
       return;
     }
     flight.current = {
       from: {
         position: camera.position.clone(),
-        target: controls ? controls.target.clone() : new THREE.Vector3(),
-        zoom: camera.zoom,
-        span: -camera.near / 2,
+        target: (controls?.target ?? view.target).clone(),
       },
-      to: destination,
-      fromUp: camera.up.clone(),
-      toUp: cameraUp(topDown),
+      to: view,
       started: performance.now(),
       ms: asked ? REFRAME_MS : FLIGHT_MS,
       ease: asked ? smootherstep : easeInOutCubic,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, bounds, controls, inspectorWidth, reframe, reducedMotion]);
+  }, [view, bounds, controls, reframe, reducedMotion]);
 
   useFrame(() => {
     const moving = flight.current;
+    if (controls) controls.enabled = moving === null;
     if (!moving) return;
     const t = moving.ease(
       Math.min(1, (performance.now() - moving.started) / moving.ms)
     );
-    const span = moving.from.span + (moving.to.span - moving.from.span) * t;
-
-    camera.up.lerpVectors(moving.fromUp, moving.toUp, t).normalize();
+    const target = controls?.target ?? LOOSE_TARGET;
     camera.position.lerpVectors(moving.from.position, moving.to.position, t);
-    camera.zoom = moving.from.zoom + (moving.to.zoom - moving.from.zoom) * t;
-    camera.near = -span * 2;
-    camera.far = span * 3;
-    camera.updateProjectionMatrix();
-    if (controls) {
-      controls.target.lerpVectors(moving.from.target, moving.to.target, t);
-      controls.update();
-    }
+    target.lerpVectors(moving.from.target, moving.to.target, t);
+    camera.lookAt(target);
     if (t >= 1) flight.current = null;
   });
 
@@ -2404,27 +2579,32 @@ function CameraRig({
 }
 
 /**
- * Orbit at the fixed isometric angle or directly above the board. The pan stays in
- * the ground plane in either view, while the camera rig owns the smooth transition.
+ * The polar angle the orbit stops at: just above the ground, so the camera can come
+ * down to street level and look along a road without ever going under it.
+ */
+const MAX_POLAR = Math.PI * 0.49;
+
+/**
+ * fsn's orbit controls. Left drag orbits, right drag pans along the ground, and the
+ * wheel dollies toward the point under the cursor. Damping gives the camera weight.
+ * The dolly range scales with the city, and the horizon moves out with the camera,
+ * so no distance in it shows an edge.
  */
 function Controls({ span }: { span: number }) {
-  const size = useThree((state) => state.size);
-  const { minZoom, maxZoom } = zoomRange(span, size);
-
   return (
     <OrbitControls
-      enableRotate={false}
+      dampingFactor={0.065}
       makeDefault
-      maxPolarAngle={Math.PI}
-      maxZoom={maxZoom}
-      minPolarAngle={0}
-      minZoom={minZoom}
+      maxDistance={span * 6}
+      maxPolarAngle={MAX_POLAR}
+      minDistance={3}
       mouseButtons={{
-        LEFT: THREE.MOUSE.PAN,
+        LEFT: THREE.MOUSE.ROTATE,
         MIDDLE: THREE.MOUSE.DOLLY,
         RIGHT: THREE.MOUSE.PAN,
       }}
-      screenSpacePanning
+      screenSpacePanning={false}
+      zoomToCursor
     />
   );
 }
@@ -2453,14 +2633,17 @@ function flownBy(event: KeyboardEvent): boolean {
 
 /** Scratch, so flying allocates nothing per frame. */
 const FLIGHT_STEP = new THREE.Vector3();
+/** How low the camera may fly, in world units above the ground. */
+const MIN_EYE = 1;
 
 /**
- * Keyboard pan, the rig that owns the keys. Held keys become a velocity that eases
- * in and out, which moves the camera and its orbit target together, so the controls
- * pick the pose back up unchanged the moment a hand goes back to the mouse.
+ * Keyboard flight, after fsn. Held keys become a velocity that eases in and out,
+ * which moves the camera and its orbit target together, so the controls pick the
+ * pose back up unchanged the moment a hand goes back to the mouse. The arrows turn
+ * and tilt by walking the target around a camera that stays put.
  *
- * The camera pans the ground along the screen, at a speed derived from its zoom so a
- * key covers the same screen distance however far in it is.
+ * The speed grows with the distance to the target, so a key crosses about the same
+ * share of the screen from the overview as from close in.
  */
 function Flight({
   cameraFlight,
@@ -2468,14 +2651,11 @@ function Flight({
   cameraFlight: RefObject<CameraFlight | null>;
 }) {
   const camera = useThree((state) => state.camera);
-  const controls = useThree((state) => state.controls) as {
-    target: THREE.Vector3;
-    update: () => void;
-  } | null;
-  const size = useThree((state) => state.size);
+  const controls = useThree((state) => state.controls) as Rig | null;
   const held = useMemo(() => new Set<string>(), []);
   const boosting = useRef(false);
   const velocity = useRef(new THREE.Vector3());
+  const turn = useRef({ yaw: 0, pitch: 0 });
 
   useEffect(() => {
     const release = () => {
@@ -2515,47 +2695,78 @@ function Flight({
 
   useFrame((_, delta) => {
     if (!controls) return;
+    const moving = velocity.current;
+    const turning = turn.current;
+    if (
+      held.size === 0 &&
+      moving.lengthSq() === 0 &&
+      turning.yaw === 0 &&
+      turning.pitch === 0
+    )
+      return;
     // A tab that was in the background hands back one enormous delta, which would
     // teleport the camera as far as the whole time it was away.
     const step = Math.min(delta, 0.05);
     const boost = boosting.current ? BOOST : 1;
-    const distance = camera.position.distanceTo(controls.target);
-    const speed =
-      panSpeed(
-        pixelsPerUnit(
-          camera as THREE.OrthographicCamera & { fov?: number },
-          size.height,
-          distance
-        )
-      ) * boost;
+
+    const rates = turnRates(held);
+    // Under a thousandth of a radian a second is a stop.
+    const settle = (value: number) => (Math.abs(value) < 1e-3 ? 0 : value);
+    turning.yaw = settle(
+      approach(turning.yaw, rates.yaw * TURN_SPEED * boost, step)
+    );
+    turning.pitch = settle(
+      approach(turning.pitch, rates.pitch * TURN_SPEED * boost, step)
+    );
+    if (turning.yaw !== 0 || turning.pitch !== 0) {
+      // A turn aims the camera itself, so it takes over from a framing flight.
+      cameraFlight.current = null;
+      const turned = turnedOffset(
+        FLIGHT_STEP.subVectors(camera.position, controls.target),
+        turning.yaw * step,
+        turning.pitch * step,
+        controls.maxPolarAngle
+      );
+      const aim = groundedTarget(camera.position, {
+        x: camera.position.x - turned.x,
+        y: camera.position.y - turned.y,
+        z: camera.position.z - turned.z,
+      });
+      controls.target.set(aim.x, aim.y, aim.z);
+      camera.lookAt(controls.target);
+    }
+
     const wanted = desiredVelocity(
       held,
       groundAxes(camera.position, controls.target),
-      speed,
-      "pan"
+      flySpeed(camera.position.distanceTo(controls.target)) * boost
     );
-    const moving = velocity.current.set(
-      approach(velocity.current.x, wanted.x, step),
-      approach(velocity.current.y, wanted.y, step),
-      approach(velocity.current.z, wanted.z, step)
+    moving.set(
+      approach(moving.x, wanted.x, step),
+      approach(moving.y, wanted.y, step),
+      approach(moving.z, wanted.z, step)
     );
     // A hundredth of a world unit a second is a stop, and rounding it to one keeps
-    // the controls from being updated on every idle frame for ever.
-    if (moving.lengthSq() < 1e-4) moving.set(0, 0, 0);
-
-    if (moving.lengthSq() === 0) return;
-    if (moving.lengthSq() > 0) {
-      FLIGHT_STEP.copy(moving).multiplyScalar(step);
-      // Keep an angle flight's endpoints in the same translated frame as the
-      // camera. This lets a held key pan during the transition without the
-      // interpolation snapping back on the next frame.
-      if (cameraFlight.current) {
-        translateFlightEndpoints(cameraFlight.current, FLIGHT_STEP);
-      }
-      camera.position.add(FLIGHT_STEP);
-      controls.target.add(FLIGHT_STEP);
+    // the frame from doing this work on every idle frame for ever.
+    if (moving.lengthSq() < 1e-4) {
+      moving.set(0, 0, 0);
+      return;
     }
-    controls.update();
+    FLIGHT_STEP.copy(moving).multiplyScalar(step);
+    // Neither the camera nor the point it orbits goes under the ground.
+    FLIGHT_STEP.y = Math.max(
+      FLIGHT_STEP.y,
+      Math.min(0, MIN_EYE - camera.position.y),
+      Math.min(0, -controls.target.y)
+    );
+    // Keep a framing flight's endpoints in the same translated frame as the camera,
+    // so a held key moves the view during the flight without the interpolation
+    // snapping back on the next frame.
+    if (cameraFlight.current) {
+      translateFlightEndpoints(cameraFlight.current, FLIGHT_STEP);
+    }
+    camera.position.add(FLIGHT_STEP);
+    controls.target.add(FLIGHT_STEP);
   });
 
   return null;
@@ -2624,7 +2835,6 @@ export default function Scene({
   focus,
   layers,
   icons,
-  explore,
   inspectorWidth = 0,
   reframe = 0,
   onSelect,
@@ -2641,8 +2851,6 @@ export default function Scene({
   selected: string | null;
   focus: string | null;
   layers: readonly Layer[];
-  /** True shows the same city from directly above. */
-  explore?: boolean;
   /**
    * CSS pixels of the canvas the inspector covers on the right, 0 when it is closed.
    * Every framing flight aims at the middle of what it leaves rather than at the
@@ -2820,19 +3028,31 @@ export default function Scene({
   // The stage is scaled by the city's own span, whatever the focus layout does, so
   // entering focus never rescales the world around it.
   const span = citySpan(ground);
-  // The camera frames the focus layout instead, which is the focused node and
-  // everything moved around it, not the whole city behind them.
-  const bounds = useMemo(
-    () =>
-      focusIsland
-        ? {
-            width: focusIsland.maxX - focusIsland.minX,
-            depth: focusIsland.maxZ - focusIsland.minZ,
-            centre: focusIsland.centre,
-          }
-        : ground,
-    [focusIsland, ground]
-  );
+  // The camera frames every island rather than the rectangle around them all, which
+  // leaves out the empty corners of a city that is not itself a rectangle. In focus
+  // it frames the focus layout instead, the focused node and everything moved around
+  // it, not the whole city behind them.
+  const bounds = useMemo((): Framed => {
+    if (focusIsland)
+      return { centre: focusIsland.centre, grounds: [focusIsland] };
+    const grounds =
+      city.districts.length > 0
+        ? city.districts.map((district) => ({
+            minX: district.minX - ISLAND_PAD,
+            maxX: district.maxX + ISLAND_PAD,
+            minZ: district.minZ - ISLAND_PAD,
+            maxZ: district.maxZ + ISLAND_PAD,
+          }))
+        : [
+            {
+              minX: ground.centre.x - ground.width / 2,
+              maxX: ground.centre.x + ground.width / 2,
+              minZ: ground.centre.z - ground.depth / 2,
+              maxZ: ground.centre.z + ground.depth / 2,
+            },
+          ];
+    return { centre: ground.centre, grounds };
+  }, [city, focusIsland, ground]);
   const nodesById = useMemo(
     () => new Map(graph.nodes.map((node) => [node.id, node])),
     [graph]
@@ -2909,17 +3129,17 @@ export default function Scene({
     <div className="absolute inset-0" ref={host}>
       {palette ? (
         <Canvas
+          // The far plane is the world's to set, from where the fog ends.
+          camera={{ fov: CAMERA_FOV, near: 0.5, far: 1000 }}
           // A click on paving or on the void is a click on nothing, which is how the
           // city goes back the way it was without hunting for a close button.
           onPointerMissed={() => {
             setConnectionPick(null);
             onSelect(null);
           }}
-          orthographic
+          shadows="percentage"
         >
           <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
-          <ambientLight intensity={1.2} />
-          <directionalLight intensity={2.4} position={[8, 16, 6]} />
           <Stage
             districts={city.districts}
             folders={folderTints}
@@ -3063,7 +3283,6 @@ export default function Scene({
             overview={focus === null}
             reducedMotion={reducedMotion}
             reframe={reframe}
-            topDown={explore === true}
           />
           <Controls span={span} />
         </Canvas>

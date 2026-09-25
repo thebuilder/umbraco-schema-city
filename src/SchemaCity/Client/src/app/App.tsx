@@ -36,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -287,9 +286,6 @@ export function App({
   const [focusDepth, setFocusDepth] = useState(1);
   const [baseline, setBaseline] = useState<SchemaGraph | null>(null);
   const [comparisonOpen, setComparisonOpen] = useState(false);
-  const lastCamera = useRef<"city" | "top">(
-    start.view === "top" ? "top" : "city"
-  );
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
@@ -350,15 +346,10 @@ export function App({
         setLayers((on) => withLayer(on, layer));
         return;
       }
-      // A view key pressed again goes back to the city, whichever camera it had.
+      // A view key pressed again goes back to the city.
       const key = event.key.toLowerCase();
       const tab = VIEW_TABS.find((candidate) => candidate.key === key);
-      if (tab)
-        setView((at) => (at === tab.value ? lastCamera.current : tab.value));
-      if (key === "e") {
-        lastCamera.current = lastCamera.current === "top" ? "city" : "top";
-        setView(lastCamera.current);
-      }
+      if (tab) setView((at) => (at === tab.value ? "city" : tab.value));
       // Leaving focus already flies back to the whole city, so Home only asks for a
       // fresh framing when there is no focus to leave.
       if (key === "home") {
@@ -548,35 +539,7 @@ export function App({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Both camera modes keep the same city coordinates. */}
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className="font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
-              Camera
-            </span>
-            <ToggleGroup
-              aria-label="Camera"
-              onValueChange={(value) => {
-                lastCamera.current = value[0] === "top" ? "top" : "city";
-                setView(lastCamera.current);
-              }}
-              size="sm"
-              value={[
-                (view === "list" ? lastCamera.current : view) === "top"
-                  ? "top"
-                  : "iso",
-              ]}
-              variant="outline"
-            >
-              <ToggleGroupItem value="iso">Iso</ToggleGroupItem>
-              <ToggleGroupItem value="top">Top down</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-          <ViewSwitcher
-            onView={(next) =>
-              setView(next === "city" ? lastCamera.current : next)
-            }
-            view={view}
-          />
+          <ViewSwitcher onView={setView} view={view} />
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* A disabled trigger swallows its own pointer events, and with them
@@ -738,7 +701,6 @@ export function App({
                 <Scene
                   baseline={baseline}
                   comparison={comparison}
-                  explore={view === "top"}
                   focus={focus}
                   focusDepth={focusDepth}
                   graph={graph}

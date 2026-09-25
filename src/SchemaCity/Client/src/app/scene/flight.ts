@@ -3,9 +3,8 @@
 // Scene.tsx owns the listeners and applies this in `useFrame`.
 //
 // Borrowed from fsn's scene.ts, including the ease and the way a turn walks the orbit
-// target around a camera that stays put. Both cameras fly through the same axes: the
-// isometric one pans the ground along the screen, and Explore flies along its heading,
-// so one set of ground vectors covers the pair.
+// target around a camera that stays put. W, A, S and D fly along the ground the way
+// the camera faces, R and F rise and descend, and the arrows turn and tilt.
 
 export type Ground = { x: number; z: number };
 export type Vec3 = { x: number; y: number; z: number };
@@ -16,7 +15,7 @@ type FlightEndpoints = {
 };
 
 /**
- * Rebase an in-flight camera transition after a pan. Moving every endpoint by
+ * Rebase an in-flight camera transition after the keys move the camera. Moving every endpoint by
  * the same displacement preserves the transition's orientation and progress.
  */
 export function translateFlightEndpoints(
@@ -48,19 +47,24 @@ export const FLIGHT_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * How far a held key moves the isometric view, in CSS pixels per second. A speed in
- * world units would crawl when zoomed out and bolt when zoomed in, because the ortho
- * zoom is the only thing between a world unit and a pixel. At 900 a key crosses a
- * 1200 pixel viewport in about a second and a third, at every zoom.
+ * The slowest the keys fly, world units per second. A street is 9 units wide.
  */
-const PAN_PIXELS_PER_SECOND = 900;
-
-/** Explore's flying speed, world units per second. A street is 9 units wide. */
 export const FLY_SPEED = 24;
 
 /**
- * Shift doubles both. fsn multiplies by 3.5, over a filesystem that can be a hundred
- * times the size of a schema; two crosses this city fast enough.
+ * How much faster the keys fly per world unit between the camera and its target.
+ * A fixed speed would crawl across the whole city from the overview and bolt past a
+ * building from street level. At 0.6 the overview crosses the city in two seconds or
+ * so, and close in the floor of `FLY_SPEED` takes over.
+ */
+const FLY_PER_DISTANCE = 0.6;
+
+/** How fast the arrows turn and tilt the view, radians per second. fsn's rate. */
+export const TURN_SPEED = 1.5;
+
+/**
+ * Shift doubles flying and turning. fsn multiplies by 3.5, over a filesystem that can
+ * be a hundred times the size of a schema; two crosses this city fast enough.
  */
 export const BOOST = 2;
 
@@ -75,17 +79,9 @@ const EASE_REMAINING = 0.0016;
 /** Keeps a turn off the pole and off the ground, where a clamp has no angle left. */
 const POLAR_MARGIN = 0.02;
 
-/**
- * World units per second that move the view `PAN_PIXELS_PER_SECOND` across the screen.
- *
- * ponytail: the zoom is the only term. A world unit along the screen's up direction
- * lies on the ground at the camera's elevation, so at the isometric angle W and S
- * cover about 0.58 of the screen distance D and A do. Dividing the forward component
- * by the sine of the elevation would even them out, at the price of a second speed
- * and a camera angle to pass in.
- */
-export function panSpeed(pixelsPerUnit: number): number {
-  return PAN_PIXELS_PER_SECOND / Math.max(pixelsPerUnit, 1e-6);
+/** Flying speed for a camera `distance` from its orbit target. */
+export function flySpeed(distance: number): number {
+  return Math.max(FLY_SPEED, distance * FLY_PER_DISTANCE);
 }
 
 /**
@@ -102,9 +98,8 @@ export function approach(
 
 /**
  * The ground directions the screen's up and right lie along, for a camera at `from`
- * looking at `to`. Under either camera "up the screen" is the view direction flattened
- * onto the ground, so W pans the isometric view the way the reader sees it and flies
- * Explore along its heading, with no second rule for the second camera.
+ * looking at `to`. "Up the screen" is the view direction flattened onto the ground,
+ * so W flies the way the camera faces however far it is tilted.
  *
  * Looking straight down leaves no heading, so the fallback is north.
  */
@@ -122,25 +117,18 @@ export function groundAxes(
 }
 
 /**
- * The velocity the held keys ask for, in world units per second.
- *
- * In `pan` the arrows are the WASD keys under another name and there is no vertical,
- * because the isometric camera holds its own height. In `fly` the arrows are turning
- * instead, and R and F rise and descend. A diagonal is normalised, so two keys are
- * not faster than one.
+ * The velocity the held keys ask for, in world units per second. A diagonal is
+ * normalised, so two keys are not faster than one.
  */
 export function desiredVelocity(
   held: ReadonlySet<string>,
   axes: { forward: Ground; right: Ground },
-  speed: number,
-  mode: "pan" | "fly"
+  speed: number
 ): Vec3 {
-  const on = (fly: string, arrow: string) =>
-    held.has(fly) || (mode === "pan" && held.has(arrow)) ? 1 : 0;
-  const forward = on("KeyW", "ArrowUp") - on("KeyS", "ArrowDown");
-  const right = on("KeyD", "ArrowRight") - on("KeyA", "ArrowLeft");
-  const up =
-    mode === "fly" ? Number(held.has("KeyR")) - Number(held.has("KeyF")) : 0;
+  const on = (code: string) => Number(held.has(code));
+  const forward = on("KeyW") - on("KeyS");
+  const right = on("KeyD") - on("KeyA");
+  const up = on("KeyR") - on("KeyF");
   const length = Math.hypot(forward, right, up);
   if (length === 0) return { x: 0, y: 0, z: 0 };
   const scale = speed / length;
@@ -151,7 +139,7 @@ export function desiredVelocity(
   };
 }
 
-/** How hard the arrows are turning, from -1 to 1. Explore only. */
+/** How hard the arrows are turning, from -1 to 1. */
 export function turnRates(held: ReadonlySet<string>): {
   yaw: number;
   pitch: number;
@@ -188,5 +176,21 @@ export function turnedOffset(
     x: radius * Math.sin(phi) * Math.sin(theta),
     y: radius * Math.cos(phi),
     z: radius * Math.sin(phi) * Math.cos(theta),
+  };
+}
+
+/**
+ * Where the orbit target belongs after a turn. Tilting down swings the target
+ * through the ground, and orbiting a point under the city would take the camera
+ * under it as well, so a target below the ground is pulled back along the view to
+ * where the view meets the ground.
+ */
+export function groundedTarget(camera: Vec3, target: Vec3): Vec3 {
+  if (target.y >= 0 || camera.y <= 0) return target;
+  const t = camera.y / (camera.y - target.y);
+  return {
+    x: camera.x + (target.x - camera.x) * t,
+    y: 0,
+    z: camera.z + (target.z - camera.z) * t,
   };
 }

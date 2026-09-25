@@ -113,12 +113,13 @@ const shots = [
       await wait(400);
     },
   },
-  // The free camera after a short orbit.
+  // Orbited round and down to a few degrees above the ground, where the city meets
+  // the horizon.
   {
     name: "free-camera",
-    query: `?view=explore&layers=${ALL_LAYERS}`,
+    query: `?layers=${ALL_LAYERS}`,
     async after() {
-      await orbit([800, 560], [890, 610]);
+      await orbit([800, 560], [900, 640]);
       await wait(1400);
     },
   },
@@ -146,7 +147,7 @@ for (const shot of shots) {
   if (only.length > 0 && !only.includes(shot.name)) continue;
   // biome-ignore lint/performance/noAwaitInLoops: one browser, so the shots are taken one at a time.
   await send("Page.navigate", { url: HARNESS + shot.query });
-  // The fixture fetch, the lazy scene chunk, layout, and the 700 ms establishing flight.
+  // The fixture fetch, the lazy scene chunk, layout, and the establishing shot.
   await wait(7000);
   await shot.after?.();
   const png = await send("Page.captureScreenshot", { format: "png" });

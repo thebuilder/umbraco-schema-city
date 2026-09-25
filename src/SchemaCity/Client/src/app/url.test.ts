@@ -152,8 +152,9 @@ describe("the view", () => {
     expect(parseUrl("?view=tree", aliases).view).toBe("tree");
     expect(parseUrl("?view=matrix", aliases).view).toBe("matrix");
     expect(parseUrl("?view=editor", aliases).view).toBe("editor");
-    expect(parseUrl("?view=top", aliases).view).toBe("top");
-    expect(parseUrl("?view=explore", aliases).view).toBe("top");
+    // The old camera modes are angles on the city, so their links open the city.
+    expect(parseUrl("?view=top", aliases).view).toBe("city");
+    expect(parseUrl("?view=explore", aliases).view).toBe("city");
     expect(parseUrl("?view=orbit", aliases).view).toBe("city");
     expect(
       serialiseUrl({

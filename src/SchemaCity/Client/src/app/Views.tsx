@@ -14,10 +14,10 @@ export const VIEW_TABS: { value: View; label: string; key?: string }[] = [
   { value: "list", label: "List", key: "l" },
   { value: "tree", label: "Tree", key: "t" },
   { value: "matrix", label: "Matrix", key: "m" },
-  { value: "editor", label: "Editor" },
+  { value: "editor", label: "Editor", key: "e" },
 ];
 
-/** City stands for both camera views; the app decides which one it returns to. */
+/** The canvas view and the 2D views that replace it. */
 export function ViewSwitcher({
   view,
   onView,
