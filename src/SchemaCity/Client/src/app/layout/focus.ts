@@ -7,13 +7,15 @@ import {
   type PropertyTargets,
 } from "../../model/neighbourhood";
 import type { SchemaGraph } from "../../model/types";
-import {
-  cityBounds,
-  ISLAND_PAD,
-  type Placement,
-  ROW_LIMIT,
-  STREET,
-} from "./city";
+import { cityBounds, ISLAND_PAD, type Placement, ROW_LIMIT } from "./city";
+
+/**
+ * The street between the focused node and its first band. It stays at the nine units
+ * the focus layout was tuned at when the city's own street shrank to six: a
+ * neighbourhood is a few dozen buildings with every road drawn, so it has room to
+ * spare, and its corner rule measures slack in streets.
+ */
+export const STREET = 9;
 
 /** Ground between two buildings in a row, and between two rows, as the city uses. */
 const GAP = 3;

@@ -3,14 +3,8 @@ import mediumFixture from "../../../dev/fixtures/medium.json";
 import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import { type Neighbourhood, neighbourhoods } from "../../model/neighbourhood";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
-import {
-  ISLAND_PAD,
-  layoutCity,
-  type Placement,
-  ROW_LIMIT,
-  STREET,
-} from "./city";
-import { focusAnchor, focusBounds, layoutFocus } from "./focus";
+import { ISLAND_PAD, layoutCity, type Placement, ROW_LIMIT } from "./city";
+import { focusAnchor, focusBounds, layoutFocus, STREET } from "./focus";
 
 const medium = mediumFixture as unknown as SchemaGraph;
 const pathological = pathologicalFixture as unknown as SchemaGraph;

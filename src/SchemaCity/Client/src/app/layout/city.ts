@@ -66,21 +66,21 @@ export type CityBounds = {
 /** Base size before own properties and the overview readability multiplier. */
 const FOOTPRINT = 2;
 /**
- * Ground between two buildings in the same row, row or grid. One and a half
- * footprints, up from one, because at one the blocks read as a single plate.
+ * Ground between two buildings in the same row or grid. Three quarters of a
+ * footprint: wide enough for a road to thread a column between two neighbours, and
+ * narrow enough that a block reads as a block. At one and a half footprints, with a
+ * nine-unit street, the seeded city covered its plates about 8 percent.
  */
-const GAP = FOOTPRINT * 1.5;
+const GAP = FOOTPRINT * 0.75;
 /**
- * The street between two dagre ranks, between a district's ranked block and its
- * packed grid, and between two districts. It grew with the gap inside a block, so a
- * street still reads as wider than the ground between two neighbours.
+ * The street between two dagre ranks and between a district's ranked block and its
+ * packed grid. Six units carries a dozen lanes at the spacing the roads keep, and
+ * matches the ground's grid square.
  */
-export const STREET = 9;
+export const STREET = 6;
 /**
  * The void between two islands, which is twice a street. At one street the islands
- * read as one plate with seams in it: the padding around each district's buildings
- * meets its neighbour's and the grid under them never shows. The roads between
- * districts route over the wider void the same way.
+ * read as one plate with seams in it. The roads between districts route over it.
  */
 export const DISTRICT_GAP = STREET * 2;
 /**
@@ -88,11 +88,11 @@ export const DISTRICT_GAP = STREET * 2;
  * scene draws the slab from it, and the layout needs it here to know how much of the
  * name's band the padding already covers.
  */
-export const ISLAND_PAD = 3;
+export const ISLAND_PAD = 2;
 /**
- * Ground a district holds empty north of its first row, on top of the island's own
+ * Ground a district holds empty south of its last row, on top of the island's own
  * padding, so its name has somewhere to stand. The name is printed on the ground and
- * writes no depth, so without this the first row drew over it and ate the letters.
+ * writes no depth, so a row standing on it would eat the letters.
  */
 const STAMP_MARGIN = Math.max(0, STAMP_BAND - ISLAND_PAD);
 const FLOOR_HEIGHT = 0.6;
@@ -122,10 +122,13 @@ const UNPLACED = "unplaced";
 type Role = "structure" | "compositions" | "elements" | "unplaced";
 
 type Group = { id: string; name: string; members: SchemaNode[] };
+const rankCache = new WeakMap<Group, Placement[]>();
 type Laid = Group & {
   kind: DistrictKind;
   hasStructure: boolean;
   placements: Placement[];
+  /** The packed grid's members, which the layout reorders once the city is placed. */
+  loose: Placement[];
 };
 
 /**
@@ -180,12 +183,17 @@ export function cityDistricts(graph: SchemaGraph): {
   const groups = filed.some((group) => group.id !== UNFILED)
     ? filed
     : byRole(nodes, roleOf);
-  const laid = groups.map((group) => layoutDistrict(group, roads, roleOf));
-
-  const districts = arrange(laid);
+  // Laid out and arranged twice: the first city says where each loose type's
+  // connections stand, and the second packs every grid in that order.
+  const layAll = (order?: Map<string, number>) =>
+    groups.map((group) => layoutDistrict(group, roads, roleOf, order));
+  const first = layAll();
+  arrange(first, edges);
+  const laid = layAll(looseOrder(first, edges));
+  arrange(laid, edges);
   return {
     placements: laid.flatMap((district) => district.placements),
-    districts,
+    districts: laid.map(districtOf),
   };
 }
 
@@ -304,7 +312,8 @@ function kindOf(
 function layoutDistrict(
   group: Group,
   roads: SchemaEdge[],
-  roleOf: (node: SchemaNode) => Role
+  roleOf: (node: SchemaNode) => Role,
+  order?: Map<string, number>
 ): Laid {
   const mine = new Set(group.members.map((node) => node.id));
   const inside = roads.filter(
@@ -313,19 +322,31 @@ function layoutDistrict(
   const linked = new Set(inside.flatMap((road) => [road.from, road.to]));
   const kind = kindOf(group.members, roleOf);
 
-  const ranked = layoutRanks(
-    group.members.filter((node) => linked.has(node.id)),
-    inside,
-    group.id,
-    kind
-  );
+  // The second pass only reorders the grid, so dagre runs once per group. The copy
+  // is because arranging the city moves placements in place.
+  const once =
+    rankCache.get(group) ??
+    layoutRanks(
+      group.members.filter((node) => linked.has(node.id)),
+      inside,
+      group.id,
+      kind
+    );
+  rankCache.set(group, once);
+  const ranked = once.map((placement) => ({
+    ...placement,
+    position: { ...placement.position },
+  }));
   const box = boxOf(ranked);
-  const loose = group.members.filter((node) => !linked.has(node.id));
+  const rank = (node: SchemaNode) => order?.get(node.id) ?? 0;
+  // A stable sort, so without an order the members keep their alias order.
+  const loose = group.members
+    .filter((node) => !linked.has(node.id))
+    .sort((a, b) => rank(a) - rank(b));
   const packed = layoutGrid(
     loose,
     group.id,
     kind,
-    ranked.length > 0 ? box.minX : 0,
     ranked.length > 0 ? box.maxZ + STREET : 0,
     // The grid keeps rippling where the ranks stopped, so a district lights up once.
     new Set(ranked.map((placement) => placement.introDelay)).size
@@ -336,84 +357,231 @@ function layoutDistrict(
     kind,
     hasStructure: group.members.some((node) => roleOf(node) === "structure"),
     placements: [...ranked, ...packed],
+    loose: packed,
   };
 }
 
 /**
- * Puts the districts on the map and reports the ground each one ends up covering.
+ * Puts the districts on the map, in bands by kind.
  *
- * Compositions north, the structure districts across the middle ordered largest first,
- * elements south, and everything with no structure in it, Unfiled included, east of the
- * lot. A void of two streets separates any two of them.
+ * The structure districts, and any district holding structure, Unfiled included,
+ * form the middle row. The largest goes first, then each next one is the district
+ * with the most connections into the row so far, placed at whichever end of the row
+ * it shares more of them with. Compositions go north with their bottom edges on one
+ * line and elements south with their top edges on one line, each centred over the
+ * types it connects to as far as its neighbour in the row allows, so a composition
+ * district sits above the pages using it and an element district below the pages
+ * whose block editors hold it. A mixed district with no structure stacks east of
+ * everything. A void of two streets separates any two islands, and the city's
+ * north-west corner is the origin.
  */
-function arrange(laid: Laid[]): District[] {
+function arrange(laid: Laid[], edges: SchemaEdge[]) {
+  const home = new Map<string, Laid>();
+  const at = new Map<string, Placement>();
+  for (const district of laid) {
+    for (const placement of district.placements) {
+      home.set(placement.id, district);
+      at.set(placement.id, placement);
+    }
+  }
+  // Edges between two different districts, each end resolved to its district once.
+  const crossing = edges.flatMap((edge) => {
+    const from = home.get(edge.from) as Laid;
+    const to = home.get(edge.to) as Laid;
+    return from === to ? [] : [{ edge, from, to }];
+  });
   const bandOf = (district: Laid) =>
-    district.id === UNFILED || district.id === UNPLACED
-      ? "east"
-      : district.kind === "compositions"
-        ? "north"
-        : district.kind === "elements"
-          ? "south"
-          : district.kind === "structure" || district.hasStructure
-            ? "middle"
-            : "east";
+    district.kind === "compositions"
+      ? "north"
+      : district.kind === "elements"
+        ? "south"
+        : district.kind === "structure" || district.hasStructure
+          ? "middle"
+          : "east";
   const bySize = (a: Laid, b: Laid) =>
     b.members.length - a.members.length || compare(a.name, b.name);
+  const linksBetween = (a: Laid, others: readonly Laid[]) =>
+    crossing.filter(
+      ({ from, to }) =>
+        (from === a && others.includes(to)) ||
+        (to === a && others.includes(from))
+    ).length;
 
-  const districts: District[] = [];
-  // The district's box starts at (x, z) and its buildings a stamp margin south of
-  // that, so the ground the name stands on is inside the district rather than in the
-  // street, and two islands stay a void apart however deep the margin grows.
-  const moveTo = (island: Laid, toX: number, toZ: number) => {
-    const box = boxOf(island.placements);
-    for (const placement of island.placements) {
-      placement.position.x += toX - box.minX;
-      placement.position.z += toZ + STAMP_MARGIN - box.minZ;
-    }
-    const width = box.maxX - box.minX;
-    const depth = box.maxZ - box.minZ + STAMP_MARGIN;
-    districts.push({
-      id: island.id,
-      name: island.name,
-      kind: island.kind,
-      minX: toX,
-      maxX: toX + width,
-      minZ: toZ,
-      maxZ: toZ + depth,
-      centre: { x: toX + width / 2, z: toZ + depth / 2 },
-    });
-    return { width, depth };
-  };
-
-  let z = 0;
-  for (const band of ["north", "middle", "south"] as const) {
-    const row = laid
-      .filter((district) => bandOf(district) === band)
-      .sort(bySize);
-    if (row.length === 0) continue;
-    let x = 0;
-    let depth = 0;
-    for (const district of row) {
-      const size = moveTo(district, x, z);
-      x += size.width + DISTRICT_GAP;
-      depth = Math.max(depth, size.depth);
-    }
-    z += depth + DISTRICT_GAP;
+  const row: Laid[] = [];
+  const middle = laid.filter((d) => bandOf(d) === "middle").sort(bySize);
+  while (middle.length > 0) {
+    middle.sort(
+      (a, b) => linksBetween(b, row) - linksBetween(a, row) || bySize(a, b)
+    );
+    const next = middle.shift() as Laid;
+    const [first] = row;
+    const last = row[row.length - 1];
+    if (
+      first &&
+      last &&
+      linksBetween(next, [first]) > linksBetween(next, [last])
+    )
+      row.unshift(next);
+    else row.push(next);
   }
+  const placed = new Set<Laid>();
+  let x = 0;
+  let middleDepth = 0;
+  for (const district of row) {
+    const size = moveTo(district, x, 0);
+    x += size.width + DISTRICT_GAP;
+    middleDepth = Math.max(middleDepth, size.depth);
+    placed.add(district);
+  }
+
+  // The mean x of every placed type a district connects to, or null for none.
+  const wantedCentre = (district: Laid) => {
+    const xs = crossing.flatMap(({ edge, from, to }) => {
+      if (from === district && placed.has(to))
+        return [(at.get(edge.to) as Placement).position.x];
+      if (to === district && placed.has(from))
+        return [(at.get(edge.from) as Placement).position.x];
+      return [];
+    });
+    return xs.length > 0
+      ? xs.reduce((sum, value) => sum + value, 0) / xs.length
+      : null;
+  };
+  // A row sweeps west to east in the order of the centres its districts want, and
+  // each one stands as close to its own as the one before it allows.
+  const sweep = (band: "north" | "south") => {
+    const wanted = laid
+      .filter((d) => bandOf(d) === band)
+      .map((district) => ({ district, centre: wantedCentre(district) }))
+      .sort(
+        (a, b) =>
+          (a.centre ?? Number.POSITIVE_INFINITY) -
+            (b.centre ?? Number.POSITIVE_INFINITY) ||
+          bySize(a.district, b.district)
+      );
+    let cursor = Number.NEGATIVE_INFINITY;
+    for (const { district, centre } of wanted) {
+      const box = boxOf(district.placements);
+      const width = box.maxX - box.minX;
+      const depth = box.maxZ - box.minZ + STAMP_MARGIN;
+      const own = centre === null ? 0 : centre - width / 2;
+      const left = Math.max(cursor, own);
+      moveTo(
+        district,
+        left,
+        band === "north" ? -DISTRICT_GAP - depth : middleDepth + DISTRICT_GAP
+      );
+      cursor = left + width + DISTRICT_GAP;
+    }
+    for (const { district } of wanted) placed.add(district);
+  };
+  sweep("north");
+  sweep("south");
 
   // East of every row, so a wide row can never grow into this column.
-  const eastX =
-    districts.length > 0
-      ? districts.reduce((max, district) => Math.max(max, district.maxX), 0) +
-        DISTRICT_GAP
-      : 0;
+  let eastX = 0;
+  for (const district of placed)
+    eastX = Math.max(eastX, boxOf(district.placements).maxX + DISTRICT_GAP);
   let eastZ = 0;
-  for (const district of laid
-    .filter((d) => bandOf(d) === "east")
-    .sort(bySize)) {
+  for (const district of laid.filter((d) => bandOf(d) === "east").sort(bySize))
     eastZ += moveTo(district, eastX, eastZ).depth + DISTRICT_GAP;
+
+  const box = boxOf([...at.values()]);
+  for (const placement of at.values()) {
+    placement.position.x -= box.minX;
+    placement.position.z -= box.minZ;
   }
-  return districts;
+}
+
+/**
+ * Moves a district so its buildings' box starts at (toX, toZ), and returns the ground
+ * it covers, which includes the name's band south of its last row.
+ */
+function moveTo(island: Laid, toX: number, toZ: number) {
+  const box = boxOf(island.placements);
+  for (const placement of island.placements) {
+    placement.position.x += toX - box.minX;
+    placement.position.z += toZ - box.minZ;
+  }
+  return {
+    width: box.maxX - box.minX,
+    depth: box.maxZ - box.minZ + STAMP_MARGIN,
+  };
+}
+
+function districtOf(island: Laid): District {
+  const box = boxOf(island.placements);
+  const maxZ = box.maxZ + STAMP_MARGIN;
+  return {
+    id: island.id,
+    name: island.name,
+    kind: island.kind,
+    minX: box.minX,
+    maxX: box.maxX,
+    minZ: box.minZ,
+    maxZ,
+    centre: { x: (box.minX + box.maxX) / 2, z: (box.minZ + maxZ) / 2 },
+  };
+}
+
+/**
+ * The order each district's packed grid should take, read off a first arrangement of
+ * the city: members by the mean x of every type they connect to, so an Element Type
+ * lands under the pages that hold it, a composition over the pages that use it, and
+ * two types sharing compositions end up side by side. The grid fills column by
+ * column, west to east, so that order is the order along x.
+ *
+ * Two passes, where each swaps the members over the first arrangement's slots,
+ * because one grid's order moves the types the next grid reads. Members with no
+ * connection keep their alias order after the rest.
+ *
+ * ponytail: a barycentre on x alone. The grids are at most eight wide and the
+ * districts already sit by kind, so x is the axis most links run along. Placing by
+ * assignment in both axes is the upgrade if one grid ever holds hundreds.
+ */
+function looseOrder(laid: Laid[], edges: SchemaEdge[]): Map<string, number> {
+  const at = new Map<string, Placement>();
+  for (const district of laid)
+    for (const placement of district.placements)
+      at.set(placement.id, placement);
+  const neighbours = new Map<string, Placement[]>();
+  const link = (a: string, b: string) => {
+    const other = at.get(b) as Placement;
+    const list = neighbours.get(a);
+    if (list) list.push(other);
+    else neighbours.set(a, [other]);
+  };
+  for (const edge of edges) {
+    if (edge.from === edge.to) continue;
+    link(edge.from, edge.to);
+    link(edge.to, edge.from);
+  }
+  const centreOf = (id: string) => {
+    const list = neighbours.get(id) ?? [];
+    return list.length > 0
+      ? list.reduce((sum, other) => sum + other.position.x, 0) / list.length
+      : Number.POSITIVE_INFINITY;
+  };
+
+  const order = new Map<string, number>();
+  for (let pass = 0; pass < 2; pass++) {
+    for (const district of laid) {
+      const slots = district.loose
+        .map(({ position }) => position)
+        .sort((a, b) => a.x - b.x || a.z - b.z);
+      // The loose list is in alias order and the sort is stable, so ties keep it.
+      const keyed = district.loose
+        .map((placement) => ({ placement, centre: centreOf(placement.id) }))
+        .sort((a, b) =>
+          a.centre === b.centre ? 0 : a.centre < b.centre ? -1 : 1
+        );
+      keyed.forEach(({ placement }, i) => {
+        placement.position = { ...(slots[i] as Placement["position"]) };
+        order.set(placement.id, i);
+      });
+    }
+  }
+  return order;
 }
 
 function reachableFromRoots(
@@ -630,29 +798,56 @@ function bandRanks(
   return bands;
 }
 
+/**
+ * Packs members into a table centred on the district's axis, filled column by column
+ * so the order the members arrive in runs west to east. Each column is as wide as its
+ * widest member and each row as deep as its deepest, so one large type widens only
+ * its own column. Rows are balanced: nine members take two rows of five and four,
+ * not eight and one.
+ */
 function layoutGrid(
   nodes: SchemaNode[],
   district: string,
   kind: DistrictKind,
-  originX: number,
   originZ: number,
   firstStep: number
 ): Placement[] {
   if (nodes.length === 0) return [];
 
-  // One pitch for the whole grid, so squares of different widths still cannot touch.
-  const pitch = Math.max(...nodes.map(footprintOf)) + GAP;
+  const rows = Math.ceil(nodes.length / ROW_LIMIT);
+  const columns = Math.ceil(nodes.length / rows);
+  const widths = new Array<number>(columns).fill(0);
+  const depths = new Array<number>(rows).fill(0);
+  nodes.forEach((node, i) => {
+    const column = Math.floor(i / rows);
+    widths[column] = Math.max(widths[column] as number, footprintOf(node));
+    depths[i % rows] = Math.max(depths[i % rows] as number, footprintOf(node));
+  });
+  const lefts = offsets(widths);
+  const tops = offsets(depths);
+  const width =
+    (lefts[columns - 1] as number) + (widths[columns - 1] as number);
   return nodes.map((node, i) => {
-    const row = Math.floor(i / ROW_LIMIT);
-    const column = i % ROW_LIMIT;
+    const column = Math.floor(i / rows);
+    const row = i % rows;
     return place(
       node,
-      originX + (column + 0.5) * pitch,
-      originZ + (row + 0.5) * pitch,
+      (lefts[column] as number) + (widths[column] as number) / 2 - width / 2,
+      originZ + (tops[row] as number) + (depths[row] as number) / 2,
       district,
       kind,
       firstStep + row
     );
+  });
+}
+
+/** Where each cell of a run starts, one gap after the cell before it. */
+function offsets(sizes: number[]): number[] {
+  let at = 0;
+  return sizes.map((size) => {
+    const start = at;
+    at += size + GAP;
+    return start;
   });
 }
 

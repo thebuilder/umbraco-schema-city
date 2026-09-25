@@ -184,8 +184,8 @@ describe("cityDistricts", () => {
   it("gives the medium fixture one district per top-level folder plus Unfiled", () => {
     expect(summarise(medium)).toEqual([
       { name: "Compositions", kind: "compositions", size: 7 },
-      { name: "Pages", kind: "structure", size: 42 },
       { name: "Elements", kind: "elements", size: 15 },
+      { name: "Pages", kind: "structure", size: 42 },
       { name: "Unfiled", kind: "structure", size: 14 },
     ]);
   });
@@ -232,8 +232,8 @@ describe("cityDistricts", () => {
 
   it("falls back to districts named by role when nothing is filed", () => {
     expect(summarise(folderless)).toEqual([
-      { name: "Compositions", kind: "compositions", size: 1 },
       { name: "Pages", kind: "structure", size: 6 },
+      { name: "Compositions", kind: "compositions", size: 1 },
       { name: "Elements", kind: "elements", size: 3 },
       { name: "Unplaced", kind: "mixed", size: 2 },
     ]);
@@ -279,16 +279,16 @@ describe("cityDistricts", () => {
     );
   });
 
-  it("holds a band clear along each island's north edge for the name", () => {
+  it("holds a band clear along each island's south edge for the name", () => {
     // The name is printed on the ground and writes no depth, so a row standing in
     // the band would draw over the letters.
     for (const graph of [small, medium, pathological]) {
       const { placements, districts } = cityDistricts(graph);
       const byId = new Map(districts.map((d) => [d.id, d]));
       for (const p of placements) {
-        const island = (byId.get(p.district) as District).minZ - ISLAND_PAD;
-        expect(p.position.z - p.footprint / 2).toBeGreaterThanOrEqual(
-          island + STAMP_BAND - 1e-9
+        const island = (byId.get(p.district) as District).maxZ + ISLAND_PAD;
+        expect(p.position.z + p.footprint / 2).toBeLessThanOrEqual(
+          island - STAMP_BAND + 1e-9
         );
       }
     }
@@ -643,7 +643,7 @@ describe("layoutCity", () => {
     expect(capped.floors).toBe(1);
   });
 
-  it("leaves one and a half footprints between two buildings in a row", () => {
+  it("leaves three quarters of a footprint between two buildings in a row", () => {
     const placements = layoutCity(
       graphOf(
         [node("root", { allowedAsRoot: true }), node("a"), node("b")],
@@ -659,7 +659,7 @@ describe("layoutCity", () => {
 
     expect(
       b.position.x - a.position.x - (a.footprint + b.footprint) / 2
-    ).toBeCloseTo(3);
+    ).toBeCloseTo(1.5);
   });
 
   it("leaves a street between a district's ranked block and its packed grid", () => {
