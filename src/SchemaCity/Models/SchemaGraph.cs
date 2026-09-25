@@ -49,10 +49,12 @@ public record PropertyGroup(
     string? FromCompositionId,
     IReadOnlyList<SchemaProperty> Properties);
 
+/// <summary>DataTypeName is null when the Data Type the property names could not be found.</summary>
 public record SchemaProperty(
     string Alias,
     string Name,
     string DataTypeId,
+    string? DataTypeName,
     string EditorAlias,
     string? EditorUiAlias,
     bool Mandatory,

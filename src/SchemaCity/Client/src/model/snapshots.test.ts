@@ -179,6 +179,7 @@ describe("schema snapshots", () => {
       alias,
       name: alias,
       dataTypeId: "text",
+      dataTypeName: "Textstring",
       editorAlias: "textbox",
       editorUiAlias: null,
       mandatory,

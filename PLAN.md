@@ -170,7 +170,7 @@ export type PropertyGroup = {
 
 export type SchemaProperty = {
   alias: string; name: string;
-  dataTypeId: string;
+  dataTypeId: string; dataTypeName: string | null;
   editorAlias: string; editorUiAlias: string | null;
   mandatory: boolean; variesByCulture: boolean;
   fromCompositionId: string | null;
