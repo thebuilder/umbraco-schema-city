@@ -36,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
@@ -62,8 +61,14 @@ import {
   lensScale,
   type Ramp,
 } from "./scene/lens";
-import { TypeTable } from "./TypeTable";
-import { parseUrl, type UrlState, urlToWrite, type View } from "./url";
+import {
+  FLAT_VIEWS,
+  parseUrl,
+  type UrlState,
+  urlToWrite,
+  type View,
+} from "./url";
+import { FlatView, VIEW_TABS, ViewSwitcher } from "./Views";
 
 /** The tag names whose own keyboard handling wins over the shortcut keys. */
 const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
@@ -345,11 +350,11 @@ export function App({
         setLayers((on) => withLayer(on, layer));
         return;
       }
-      // Turning either view off goes back to the city, the way the toolbar's two
-      // toggles do.
+      // A view key pressed again goes back to the city, whichever camera it had.
       const key = event.key.toLowerCase();
-      if (key === "l")
-        setView((at) => (at === "list" ? lastCamera.current : "list"));
+      const tab = VIEW_TABS.find((candidate) => candidate.key === key);
+      if (tab)
+        setView((at) => (at === tab.value ? lastCamera.current : tab.value));
       if (key === "e") {
         lastCamera.current = lastCamera.current === "top" ? "city" : "top";
         setView(lastCamera.current);
@@ -459,6 +464,7 @@ export function App({
     [graph, focus, focusDepth, focusCount]
   );
   const selectedNode = selected ? nodesById.get(selected) : undefined;
+  const flat = FLAT_VIEWS.includes(view);
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
 
   const openPalette = (open: boolean) => {
@@ -565,14 +571,12 @@ export function App({
               <ToggleGroupItem value="top">Top down</ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <Toggle
-            onPressedChange={(on) => setView(on ? "list" : lastCamera.current)}
-            pressed={view === "list"}
-            size="sm"
-            variant="outline"
-          >
-            List
-          </Toggle>
+          <ViewSwitcher
+            onView={(next) =>
+              setView(next === "city" ? lastCamera.current : next)
+            }
+            view={view}
+          />
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* A disabled trigger swallows its own pointer events, and with them
@@ -680,7 +684,7 @@ export function App({
               the same reason. It covers its own box and nothing else, so the ground
               under it is the only pick the canvas loses. The list view colours
               nothing by lens, so it gets no legend over its first row. */}
-          {scale && view !== "list" ? (
+          {scale && !flat ? (
             <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
               <span className="font-bold uppercase tracking-terminal">
                 {LENS_LABEL[lens]}
@@ -695,20 +699,21 @@ export function App({
           ) : null}
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
-          {view === "list" ? null : (
-            <ComparisonLegend comparison={comparison} />
-          )}
-          {view === "list" ? (
-            // The inspector is an overlay, so the table is inset by its width while
+          {flat ? null : <ComparisonLegend comparison={comparison} />}
+          {flat ? (
+            // The inspector is an overlay, so the view is inset by its width while
             // it is open rather than sliding under it.
             <div className={`absolute inset-0 ${selectedNode ? "pr-80" : ""}`}>
-              <TypeTable
+              <FlatView
                 graph={graph}
+                nodesById={nodesById}
+                onPick={() => setPaletteOpen(true)}
                 onQuery={setQuery}
                 onSelect={setSelected}
                 query={query}
                 selected={selected}
                 usage={usage}
+                view={view}
               />
             </div>
           ) : nodes.length === 0 ? (
@@ -756,6 +761,7 @@ export function App({
             <Inspector
               canExpandFocus={canExpandFocus}
               edges={graph.edges}
+              editorLayoutOpen={view === "editor"}
               findings={findings.filter(
                 (finding) => finding.nodeId === selectedNode.id
               )}
@@ -767,6 +773,7 @@ export function App({
               node={selectedNode}
               nodesById={nodesById}
               onClose={done}
+              onEditorLayout={() => setView("editor")}
               onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
               onOpenType={onOpenType}
               onSelect={followLink}

@@ -292,6 +292,8 @@ export function Inspector({
   node,
   nodesById,
   onClose,
+  editorLayoutOpen,
+  onEditorLayout,
   onOpenType,
   onSelect,
   onToggleFocus,
@@ -311,6 +313,9 @@ export function Inspector({
   node: SchemaNode;
   nodesById: Lookup;
   onClose: () => void;
+  /** Shows the type in the editor view, unless that view is already on. */
+  onEditorLayout?: () => void;
+  editorLayoutOpen?: boolean;
   onOpenType?: (id: string) => void;
   onSelect: (id: string) => void;
   onToggleFocus: () => void;
@@ -449,16 +454,40 @@ export function Inspector({
         </div>
       </ScrollArea>
 
-      <div className="border-line border-t p-3">
-        <Button
-          className="w-full"
-          onClick={() => onOpenType?.(node.id)}
-          size="sm"
-          variant="primary"
-        >
-          Open in editor
-        </Button>
-      </div>
+      <InspectorActions
+        editorLayoutOpen={editorLayoutOpen}
+        onEditorLayout={onEditorLayout}
+        onOpen={() => onOpenType?.(node.id)}
+      />
     </aside>
+  );
+}
+
+function InspectorActions({
+  editorLayoutOpen,
+  onEditorLayout,
+  onOpen,
+}: {
+  editorLayoutOpen?: boolean;
+  onEditorLayout?: () => void;
+  onOpen: () => void;
+}) {
+  return (
+    <div className="flex gap-2 border-line border-t p-3">
+      {/* Hidden while the editor view is already showing this type. */}
+      {onEditorLayout && !editorLayoutOpen ? (
+        <Button
+          className="flex-1"
+          onClick={onEditorLayout}
+          size="sm"
+          variant="outline"
+        >
+          Editor layout
+        </Button>
+      ) : null}
+      <Button className="flex-1" onClick={onOpen} size="sm" variant="primary">
+        Open in editor
+      </Button>
+    </div>
   );
 }
