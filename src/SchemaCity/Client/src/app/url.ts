@@ -11,13 +11,16 @@ import { LENSES, type Lens } from "./scene/lens";
 
 /**
  * Which view is on screen. `city` is the isometric map, `top` is the same city
- * viewed directly from above, and `list` is the table that replaces the canvas.
- * One value rather than a flag each, because the list has no camera and the camera
- * has no table.
+ * viewed directly from above, and the rest are the 2D views that replace the canvas.
+ * One value rather than a flag each, because those views have no camera and the
+ * camera has no table.
  */
-export type View = "city" | "top" | "list";
+export type View = "city" | "top" | "list" | "tree" | "matrix" | "editor";
 
-const VIEWS: readonly View[] = ["city", "top", "list"];
+/** The views drawn without the 3D canvas. */
+export const FLAT_VIEWS: readonly View[] = ["list", "tree", "matrix", "editor"];
+
+const VIEWS: readonly View[] = ["city", "top", ...FLAT_VIEWS];
 
 export type UrlState = {
   /** Alias of the type the view is about, or null when nothing is selected. */
