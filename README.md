@@ -54,6 +54,14 @@ see its direct connections and the names of connected types. Labels that would o
 hidden until there is room for them as you zoom in. Click a building to keep its connections visible and open the
 inspector, which shows properties, composition origins, usage counts, and related types.
 
+Each building is built like a chip on a circuit board. Every slab is one property group, with a
+gap between groups and a thin board where a new tab starts; the lit windows are its properties.
+Composed groups are translucent azure, and a composition that no content can be created from is
+made of those shells alone. Element Types are low amber blocks. Pins along the base count direct
+connections: allowed parents on the north edge, allowed children on the south, other links out on
+the east and in on the west. A lit lid means the type has a template, and a dot on the roof means
+it varies by culture (a second dot: by segment). The Legend button lists these.
+
 Layer switches control the background overview. Hover and selection reveal direct connections
 across all layers, including ones you have switched off.
 

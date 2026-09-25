@@ -153,20 +153,38 @@ function Legend() {
           <LegendRow mark={<Tint className="bg-phosphor" />}>
             Own property group
           </LegendRow>
-          <LegendRow mark={<Tint className="bg-phosphor/45" />}>
-            Composed group
+          <LegendRow
+            mark={<Tint className="border border-azure bg-azure/35" />}
+          >
+            Composed group; a building of only these is a composition
           </LegendRow>
           <LegendRow mark={<Tint className="bg-amber" />}>
             Element Type, until a lens is on
           </LegendRow>
+          <LegendRow
+            mark={
+              <Tint className="border border-phosphor bg-phosphor-bright" />
+            }
+          >
+            Lit lid: the type has a template
+          </LegendRow>
+          <LegendRow mark={<span className="size-1.5 bg-phosphor-bright" />}>
+            Roof dot: varies by culture, a second by segment
+          </LegendRow>
           <LegendRow mark={<Tint className="bg-phosphor-dim" />}>
             Root plaza
           </LegendRow>
-          <LegendRow mark={<Tint className="bg-signal" />}>Selected</LegendRow>
+          <LegendRow mark={<Tint className="border-2 border-signal" />}>
+            Selected
+          </LegendRow>
         </ul>
         <p className="mt-2 text-muted-foreground text-xs">
-          One floor per property group; windows represent properties. A wider
-          footprint means more own properties. Height is not a complexity score.
+          One slab per property group, with a gap between groups and a thin
+          board where a new tab starts; windows represent properties. Pins on
+          the base count direct connections: allowed parents on the north edge,
+          allowed children on the south, links out on the east and links in on
+          the west. A wider footprint means more own properties. Height is not a
+          complexity score.
         </p>
       </section>
 
