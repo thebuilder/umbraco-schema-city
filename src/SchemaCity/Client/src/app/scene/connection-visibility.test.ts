@@ -54,10 +54,10 @@ test("emphasizes boot, focus, and any edge in a shared trunk", () => {
   ).toBe(1);
   expect(
     connectionEmphasis([edges[0], edges[1]], "z", null, false, "done")
-  ).toBe(0.12);
+  ).toBe(0.07);
   expect(
     connectionEmphasis([edges[0], edges[1]], null, null, false, "done")
-  ).toBe(0.28);
+  ).toBe(0.4);
   expect(
     connectionEmphasis([edges[0], edges[1]], "a", null, false, "done", false)
   ).toBe(1);
@@ -93,7 +93,7 @@ test("disabled layers suppress unrelated ranges during boot and focus", () => {
   );
 
   expect(connectionEmphasis([edges[1]], "a", null, false, "done", true)).toBe(
-    0.12
+    0.07
   );
   expect(connectionEmphasis([edges[1]], "a", null, false, "done", false)).toBe(
     0
