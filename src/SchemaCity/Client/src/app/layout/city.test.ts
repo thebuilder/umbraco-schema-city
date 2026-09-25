@@ -310,6 +310,117 @@ describe("cityDistricts", () => {
       expect(p.position.z + p.footprint / 2).toBeLessThanOrEqual(d.maxZ + 1e-9);
     }
   });
+
+  it("covers more of its plates than a fifth of the old spacing allowed", () => {
+    // Footprint area over island area, padding included. The spacing before this
+    // layout covered the seeded schema's plates 7.5 percent and the stress
+    // fixture's 10.8; the rule is that a denser city stays well above both.
+    for (const [graph, floor] of [
+      [medium, 0.14],
+      [pathological, 0.16],
+    ] as const) {
+      const { placements, districts } = cityDistricts(graph);
+      const plates = districts.reduce(
+        (sum, d) =>
+          sum +
+          (d.maxX - d.minX + ISLAND_PAD * 2) *
+            (d.maxZ - d.minZ + ISLAND_PAD * 2),
+        0
+      );
+      const built = placements.reduce((sum, p) => sum + p.footprint ** 2, 0);
+      expect(built / plates).toBeGreaterThan(floor);
+    }
+  });
+
+  it("orders a packed grid by where its connections stand, not by alias", () => {
+    // Eight pages in one ranked row, west to east. Each page's block editor holds
+    // one Element Type and uses one composition, and both are named so that alias
+    // order is the reverse of their pages' order along the row.
+    const pages = Array.from({ length: 8 }, (_, i) =>
+      node(`page${i}`, { folderId: "pages" })
+    );
+    const elements = pages.map((_, i) =>
+      node(`element${7 - i}`, { isElement: true, folderId: "elements" })
+    );
+    const compositions = pages.map((_, i) =>
+      node(`mixin${7 - i}`, { folderId: "compositions" })
+    );
+    const { placements } = cityDistricts(
+      graphOf(
+        [
+          node("root", { allowedAsRoot: true, folderId: "pages" }),
+          ...pages,
+          ...elements,
+          ...compositions,
+        ],
+        [
+          ...pages.map((page) => road("root", page.id)),
+          ...pages.map((page, i) => ({
+            kind: "block" as const,
+            from: page.id,
+            to: (elements[i] as SchemaNode).id,
+          })),
+          ...pages.map((page, i) => ({
+            kind: "composition" as const,
+            from: page.id,
+            to: (compositions[i] as SchemaNode).id,
+          })),
+        ],
+        [
+          { id: "pages", name: "Pages", parentId: null },
+          { id: "elements", name: "Elements", parentId: null },
+          { id: "compositions", name: "Compositions", parentId: null },
+        ]
+      )
+    );
+    const x = (id: string) =>
+      (placements.find((p) => p.id === id) as Placement).position.x;
+    const byX = (ids: string[]) => [...ids].sort((a, b) => x(a) - x(b));
+
+    const pageOrder = byX(pages.map((page) => page.id));
+    const holder = (list: SchemaNode[], id: string) =>
+      pages[list.findIndex((item) => item.id === id)]?.id;
+    expect(
+      byX(elements.map((e) => e.id)).map((id) => holder(elements, id))
+    ).toEqual(pageOrder);
+    expect(
+      byX(compositions.map((c) => c.id)).map((id) => holder(compositions, id))
+    ).toEqual(pageOrder);
+  });
+
+  it("stands Unfiled beside the district it shares the most connections with", () => {
+    const { districts } = cityDistricts(
+      graphOf(
+        [
+          node("aRoot", { allowedAsRoot: true, folderId: "a" }),
+          node("aOne", { folderId: "a" }),
+          node("aTwo", { folderId: "a" }),
+          node("aThree", { folderId: "a" }),
+          node("bRoot", { allowedAsRoot: true, folderId: "b" }),
+          node("bOne", { folderId: "b" }),
+          node("home", { allowedAsRoot: true }),
+        ],
+        [
+          road("aRoot", "aOne"),
+          road("aRoot", "aTwo"),
+          road("bRoot", "bOne"),
+          road("home", "aRoot"),
+          road("home", "aThree"),
+        ],
+        [
+          { id: "a", name: "A", parentId: null },
+          { id: "b", name: "B", parentId: null },
+        ]
+      )
+    );
+    const at = (name: string) =>
+      districts.find((d) => d.name === name) as District;
+    // A is the largest, so it starts the row, and Unfiled joins it next because it
+    // holds A's root's parent. B shares nothing and goes on the far end.
+    expect(at("A").maxX).toBeLessThan(at("Unfiled").minX);
+    expect(at("Unfiled").maxX).toBeLessThan(at("B").minX);
+    expect(at("Unfiled").minZ).toBe(at("A").minZ);
+  });
 });
 
 describe("layoutCity", () => {
