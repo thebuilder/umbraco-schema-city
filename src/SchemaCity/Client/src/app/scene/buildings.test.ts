@@ -8,6 +8,7 @@ import type {
 import type { Placement } from "../layout/city";
 import {
   buildFloorCells,
+  buildingBox,
   buildPlazaCells,
   connectionsOf,
   roleOf,
@@ -298,6 +299,34 @@ describe("connectionsOf and roleOf", () => {
     // Pins stand between the plinth and the footprint's edge, never past it.
     for (const pin of pins)
       expect(Math.abs(pin.cz) + pin.sz / 2).toBeCloseTo(1);
+  });
+});
+
+describe("buildingBox", () => {
+  it("wraps the risen building, grown on every side and on top", () => {
+    const at = placement("a", { position: { x: 4, z: -2 }, y: 1 });
+    const heights = new Map([["a", 2]]);
+
+    expect(buildingBox(at, heights, 0.5, 0, 1)).toEqual({
+      x: 4,
+      y: 1.5,
+      z: -2,
+      sx: 2,
+      sy: 1,
+      sz: 2,
+    });
+    expect(buildingBox(at, heights, 1, 0.1, 1)).toMatchObject({
+      sx: 2.2,
+      sy: 2.2,
+      y: 2.1,
+    });
+  });
+
+  it("has none for a building pressed past its limit", () => {
+    const flat = placement("a", { flatten: 0.6 });
+
+    expect(buildingBox(flat, new Map(), 1, 0, 0.5)).toBeNull();
+    expect(buildingBox(flat, new Map(), 1, 0, 0.999)).not.toBeNull();
   });
 });
 

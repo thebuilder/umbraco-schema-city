@@ -39,12 +39,7 @@ import {
   layoutFocus,
 } from "./layout/focus";
 import { describeRelationship, uniqueConnections } from "./relationship";
-import {
-  BuildingFrames,
-  Buildings,
-  RoofIcons,
-  useIconGroups,
-} from "./scene/BuildingMeshes";
+import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -71,6 +66,7 @@ import {
 } from "./scene/flight";
 import { framingDistance } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
+import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
   CHAR_PX,
   LABEL_CAP,
@@ -292,6 +288,249 @@ function BuildingOutlines({
       reducedMotion={reducedMotion}
       strength={0.75}
     />
+  );
+}
+
+/**
+ * Fraction of the footprint one roof icon covers, and the darker cap under it. Both
+ * stay inside the top slab, which is 0.8 of the footprint.
+ */
+const ICON_FOOTPRINT = 0.6;
+const CAP_FOOTPRINT = 0.72;
+/**
+ * A building narrower than this on screen gets no icon. Most of a schema shares two
+ * or three icons, so a city of 12 px smudges reads as noise rather than as identity.
+ * It was 40 px, from when an icon was extruded and needed the size to read as a
+ * shape; flat on the roof it holds together at 24, which is most of a district at
+ * the framing zoom rather than a handful of buildings. The inspector header carries
+ * the same icon at any zoom.
+ */
+const ICON_MIN_PX = 24;
+
+/** One rasterised icon, the buildings that wear it, and where its caps start. */
+type IconGroup = {
+  key: string;
+  texture: THREE.Texture;
+  ids: string[];
+  offset: number;
+};
+
+/**
+ * The icons, rasterised once per name and colour and kept until the graph changes.
+ * The map is empty until they have decoded, which is a frame or two after the city
+ * paints, and a type whose icon the host did not hand over is simply not in it.
+ */
+function useIconGroups(
+  icons: Record<string, string> | undefined,
+  nodesById: Map<string, SchemaNode>,
+  phosphor: string
+): IconGroup[] {
+  const wanted = useMemo(() => {
+    const byKey = new Map<
+      string,
+      { svg: string; colour: string; ids: string[] }
+    >();
+    // The palette arrives one render in, and rasterising against a colour that is
+    // not the theme's yet would do every icon twice.
+    if (!(icons && phosphor)) return byKey;
+    // Sorted, so the draw order of the icon meshes is the same city to city.
+    for (const node of [...nodesById.values()].sort((a, b) =>
+      a.alias.localeCompare(b.alias)
+    )) {
+      const svg = icons[node.icon];
+      if (!svg) continue;
+      const colour = iconColour(node.iconColor, phosphor);
+      const key = `${node.icon}|${colour}`;
+      const group = byKey.get(key) ?? { svg, colour, ids: [] };
+      group.ids.push(node.id);
+      byKey.set(key, group);
+    }
+    return byKey;
+  }, [icons, nodesById, phosphor]);
+
+  const [groups, setGroups] = useState<IconGroup[]>([]);
+
+  useEffect(() => {
+    let live = true;
+    const made: IconGroup[] = [];
+    Promise.all(
+      [...wanted].map(async ([key, { svg, colour, ids }]) => {
+        // An icon the browser cannot draw is one the city goes without.
+        const canvas = await rasteriseIcon(key, svg, colour).catch(() => null);
+        if (!canvas) return;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        made.push({ key, texture, ids, offset: 0 });
+      })
+    ).then(() => {
+      if (!live) return;
+      // The caps are one mesh across every group, so each group is told where its
+      // own instances start in it.
+      let offset = 0;
+      for (const group of made) {
+        group.offset = offset;
+        offset += group.ids.length;
+      }
+      setGroups(made);
+    });
+
+    return () => {
+      live = false;
+      for (const group of made) group.texture.dispose();
+    };
+  }, [wanted]);
+
+  return groups;
+}
+
+/**
+ * The Umbraco icon of each type, painted flat on its roof over a darker cap. Flat
+ * rather than billboarded, because a sprite standing over the roof lands behind the
+ * label of the very building it names. One instanced mesh per
+ * icon and colour, which the seeded schema makes 15 of, and the whole set is
+ * rewritten every frame, which is 78 matrices: nothing next to the buildings.
+ *
+ * An icon whose building is under `ICON_MIN_PX` across is scaled away rather than
+ * drawn, the same projected measure the label layer culls names by, except for the
+ * selected and the hovered building, which keep theirs at any zoom. Each icon sits
+ * over a darker cap on the roof, so a pale glyph still has something to read against.
+ */
+function RoofIcons({
+  groups,
+  placementsById,
+  heights,
+  neighbours,
+  selected,
+  hovered,
+  palette,
+  reducedMotion,
+}: {
+  groups: IconGroup[];
+  placementsById: Map<string, Placement>;
+  heights: Map<string, number>;
+  neighbours: Set<string> | null;
+  selected: string | null;
+  hovered: string | null;
+  palette: Palette;
+  reducedMotion: boolean;
+}) {
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
+  const meshes = useRef(new Map<string, THREE.InstancedMesh>());
+  const capRef = useRef<THREE.InstancedMesh>(null);
+  const scratch = useMemo(() => new THREE.Object3D(), []);
+  const cap = useMemo(() => new THREE.Object3D(), []);
+  const anchor = useMemo(() => new THREE.Vector3(), []);
+  const caps = groups.reduce((total, group) => total + group.ids.length, 0);
+
+  useEffect(() => {
+    const lit = new THREE.Color(1, 1, 1);
+    const faded = new THREE.Color(palette.background).lerp(lit, 0.22);
+    for (const group of groups) {
+      const mesh = meshes.current.get(group.key);
+      if (!mesh) continue;
+      group.ids.forEach((id, index) => {
+        mesh.setColorAt(
+          index,
+          neighbours === null || neighbours.has(id) ? lit : faded
+        );
+      });
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+  }, [groups, neighbours, palette]);
+
+  useFrame((state) => {
+    const detailOpacity = revealAt(
+      state.clock.elapsedTime,
+      reducedMotion
+    ).links;
+    const plate = capRef.current;
+    if (plate)
+      (plate.material as THREE.Material).opacity = detailOpacity * 0.55;
+    for (const group of groups) {
+      const mesh = meshes.current.get(group.key);
+      if (!mesh) continue;
+      (mesh.material as THREE.Material).opacity = detailOpacity;
+      group.ids.forEach((id, index) => {
+        const placement = placementsById.get(id);
+        const side = (placement?.footprint ?? 0) * ICON_FOOTPRINT;
+        const roof = placement
+          ? (placement.y ?? 0) + (heights.get(id) ?? placement.height)
+          : 0;
+        if (placement)
+          anchor.set(placement.position.x, roof, placement.position.z);
+        const px = placement
+          ? placement.footprint *
+            pixelsPerUnit(size.height, camera.position.distanceTo(anchor))
+          : 0;
+        const shown =
+          placement !== undefined &&
+          (px >= ICON_MIN_PX || id === selected || id === hovered);
+
+        scratch.position.set(anchor.x, roof + 0.03, anchor.z);
+        scratch.rotation.set(-Math.PI / 2, 0, 0);
+        scratch.scale.setScalar(shown ? side : 0);
+        scratch.updateMatrix();
+        mesh.setMatrixAt(index, scratch.matrix);
+
+        if (!plate) return;
+        cap.position.set(
+          placement?.position.x ?? 0,
+          roof + 0.02,
+          placement?.position.z ?? 0
+        );
+        cap.rotation.set(-Math.PI / 2, 0, 0);
+        cap.scale.setScalar(
+          shown ? (placement?.footprint ?? 0) * CAP_FOOTPRINT : 0
+        );
+        cap.updateMatrix();
+        plate.setMatrixAt(group.offset + index, cap.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    if (plate) plate.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <>
+      {caps > 0 && (
+        <instancedMesh
+          args={[undefined, undefined, caps]}
+          frustumCulled={false}
+          ref={capRef}
+        >
+          <planeGeometry />
+          <meshBasicMaterial
+            color={palette.background}
+            depthWrite={false}
+            opacity={reducedMotion ? 0.55 : 0}
+            transparent
+          />
+        </instancedMesh>
+      )}
+      {groups.map((group) => (
+        <instancedMesh
+          args={[undefined, undefined, group.ids.length]}
+          frustumCulled={false}
+          key={group.key}
+          ref={(mesh) => {
+            if (mesh) meshes.current.set(group.key, mesh);
+            else meshes.current.delete(group.key);
+          }}
+          renderOrder={1}
+        >
+          <planeGeometry />
+          <meshBasicMaterial
+            alphaTest={0.08}
+            depthWrite={false}
+            map={group.texture}
+            opacity={reducedMotion ? 1 : 0}
+            side={THREE.DoubleSide}
+            transparent
+          />
+        </instancedMesh>
+      ))}
+    </>
   );
 }
 

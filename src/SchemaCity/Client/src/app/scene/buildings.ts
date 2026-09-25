@@ -451,6 +451,44 @@ export function buildFloorCells(
   return { cells, windows, heights };
 }
 
+/** A box by its centre and size. */
+export type Box = {
+  x: number;
+  y: number;
+  z: number;
+  sx: number;
+  sy: number;
+  sz: number;
+};
+
+/**
+ * The box around a whole building at `rise` of its height, for its hit target and
+ * the selection and hover frames. `grow` widens it by that share of the footprint
+ * and raises its top by the same. A building pressed at least `flatLimit` of the
+ * way flat has none: it is out of the conversation.
+ */
+export function buildingBox(
+  placement: Placement,
+  heights: Map<string, number>,
+  rise: number,
+  grow: number,
+  flatLimit: number
+): Box | null {
+  if ((placement.flatten ?? 0) >= flatLimit) return null;
+  const tall =
+    (heights.get(placement.id) ?? placement.height) * rise +
+    grow * placement.footprint;
+  const side = placement.footprint * (1 + grow);
+  return {
+    x: placement.position.x,
+    y: (placement.y ?? 0) + tall / 2,
+    z: placement.position.z,
+    sx: side,
+    sy: tall,
+    sz: side,
+  };
+}
+
 /** How much of its height a building keeps: 1 at rest, `PLATE_HEIGHT` when flat. */
 function squashOf(flatten: number, height: number): number {
   if (flatten <= 0 || height <= 0) return 1;
