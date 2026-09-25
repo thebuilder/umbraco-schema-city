@@ -7,15 +7,13 @@
 // ending in a ring or an edge, and the grid comes from world position rather than
 // from the geometry, so one plane can be re-centred on the camera every frame
 // without the lines appearing to slide.
-import { FLOOR_HEIGHT } from "./buildings";
 
 /** Highest board surface; ground traces must sit above nested folder tints. */
 export const FOLDER_TINT_HEIGHT = 0.02;
 
 /**
- * One grid square is six world units. It read as the street the layout left between
- * two ranks until that street grew to nine, and it is a ruler under the islands now
- * rather than their street plan.
+ * One grid square is six world units, the street the layout leaves between two
+ * ranks, so the ruler under the islands matches their street plan.
  */
 const MINOR_SPACING = 6;
 const MAJOR_SPACING = 30;
@@ -88,34 +86,23 @@ export const STAMP_CAP = 4;
 
 /**
  * Ground between the name and the two island edges it sits near: the west edge it is
- * aligned to and the north edge above it.
+ * aligned to and the south edge below it.
  */
 const STAMP_INSET = 0.5;
 
 /**
- * Floors in the first row the band is cut to clear. Four covers every first row in
- * both fixtures; a taller building in that row still leans over the letters.
+ * Ground between the name and the last row, which holds the outer street a road
+ * takes out of that row: half of the layout's six-unit street plus half a unit.
  */
-const FIRST_ROW_FLOORS = 4;
+const STAMP_CLEARANCE = 3.5;
 
 /**
- * How much ground a building of height 1 hides behind itself. At the isometric angle
- * the point (0, 1, 0) draws where the ground point (-1, 0, -1) does, so a roof leans
- * sqrt(2) units up the island's diagonal, and the city orbits, so the whole of that
- * can fall along z.
+ * Ground a district holds along its south edge for its name. South, because the
+ * default camera looks from the south-east: a roof leans away from it, over the
+ * ground north of the building, so the name needs no room for leaning roofs. On the
+ * north edge it did, and that band was 14.5 units of empty plate on every island.
  */
-const LEAN_PER_UNIT = Math.SQRT2;
-/** A full 9-unit outer street plus one unit of clearance below the title. */
-const NORTH_STREET_RESERVE = 10;
-
-/** Reserve enough ground below the title for both roads and projected rooftops. */
-export const STAMP_BAND =
-  STAMP_INSET +
-  STAMP_CAP +
-  Math.max(
-    LEAN_PER_UNIT * FIRST_ROW_FLOORS * FLOOR_HEIGHT,
-    NORTH_STREET_RESERVE
-  );
+export const STAMP_BAND = STAMP_INSET + STAMP_CAP + STAMP_CLEARANCE;
 
 /**
  * Where a district's name lies on its island and how big it is, in world units.
@@ -123,16 +110,11 @@ export const STAMP_BAND =
  * rasterised name's width over its cap height.
  *
  * The name is a fixed part of the city rather than a label: it lies flat along the
- * island's north edge, tucked into the north-west corner of the band the layout
- * holds clear, and it does not turn, grow or move with the camera. The isometric
- * projection makes a 30 degree diagonal of a line running east, so that is how the
- * name reads, and it stays where it was put while the city is orbited.
+ * island's south edge, tucked into the south-west corner of the band the layout
+ * holds clear, and it does not turn, grow or move with the camera.
  *
  * Lying square to the island is what contains it: its footprint is its own width and
  * height, so the band holds all of it and no building can ever stand over a letter.
- * Turning it to face the camera read horizontally at every azimuth but swept a strip
- * at 45 degrees to the island that ran north over the street, where a building on
- * the island behind covered the end of a long name.
  *
  * A name wider than its island shrinks until it fits, which is what a district of two
  * types would otherwise hang over the void.
@@ -151,7 +133,7 @@ export function districtStamp(
   height *= fit;
   return {
     x: island.minX + STAMP_INSET + width / 2,
-    z: island.minZ + STAMP_INSET + height / 2,
+    z: island.maxZ - STAMP_INSET - height / 2,
     width,
     height,
   };

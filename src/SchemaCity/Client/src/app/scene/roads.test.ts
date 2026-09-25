@@ -170,15 +170,27 @@ describe("planRoads", () => {
     two.set("c", placement("c", -6, 11));
     const segments = planRoads(two, [road("a", "b"), road("a", "c")]);
 
-    // One drop out of the parent, one street run covering both children's columns,
-    // and one rise into each child.
-    expect(segments.filter(vertical)).toHaveLength(3);
+    // One drop out of the parent, carrying both roads, one street run from the
+    // parent's column to either child's, and one rise into each child. The run is
+    // cut at the parent's column, so each half lists only the road it carries and
+    // hovering one child does not light the way to the other.
+    const verticals = segments.filter(vertical);
+    expect(verticals).toHaveLength(3);
+    expect(verticals.find((segment) => segment.x0 === 0)?.edges).toHaveLength(
+      2
+    );
     const runs = segments.filter(horizontal);
-    expect(runs).toHaveLength(1);
-    const run = runs[0] as RoadSegment;
-    expect(Math.min(run.x0, run.x1)).toBeCloseTo(-6, 6);
-    expect(Math.max(run.x0, run.x1)).toBeCloseTo(6, 6);
-    expect(run.edges).toHaveLength(2);
+    expect(runs).toHaveLength(2);
+    expect(new Set(runs.map((run) => run.z0)).size).toBe(1);
+    expect(Math.min(...runs.flatMap((run) => [run.x0, run.x1]))).toBeCloseTo(
+      -6,
+      6
+    );
+    expect(Math.max(...runs.flatMap((run) => [run.x0, run.x1]))).toBeCloseTo(
+      6,
+      6
+    );
+    expect(runs.every((run) => run.edges.length === 1)).toBe(true);
   });
 
   it("takes a rank-skipping edge along the street and down the child's column", () => {

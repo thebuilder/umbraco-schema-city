@@ -153,8 +153,11 @@ Matched buildings keep their baseline positions. New types appear on separate ad
 Comparison covers schema configuration only. It does not compare content usage or dependencies
 in custom code. Snapshot import is for review and does not apply changes to Umbraco.
 
-Outside comparison mode, layouts are deterministic for the same schema. Adding or removing types
-can rearrange the city; manual pinning is not available.
+Outside comparison mode, layouts are deterministic for the same schema. Each top-level folder is a
+district, and a district's place and the order of its loose types follow their connections: an
+Element Type sits under the pages that use it, a composition over the pages that compose it. So
+adding or removing types, or connections between them, can rearrange the city; manual pinning is
+not available.
 
 ## Navigate the city
 
