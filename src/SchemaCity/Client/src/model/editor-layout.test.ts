@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import mediumFixture from "../../dev/fixtures/medium.json";
-import { editorLayout, GENERIC_TAB } from "./editor-layout";
-import type { PropertyGroup, SchemaGraph, SchemaNode } from "./types";
+import { editorLabel, editorLayout, GENERIC_TAB } from "./editor-layout";
+import type {
+  PropertyGroup,
+  SchemaGraph,
+  SchemaNode,
+  SchemaProperty,
+} from "./types";
 
 const group = (
   alias: string,
@@ -94,5 +99,21 @@ describe("editorLayout", () => {
       const total = editorLayout(node).reduce((sum, tab) => sum + tab.count, 0);
       expect(total).toBe(node.ownPropertyCount + node.composedPropertyCount);
     }
+  });
+});
+
+describe("editorLabel", () => {
+  const property = (dataTypeName: string | null) =>
+    ({
+      dataTypeName,
+      editorAlias: "Umbraco.TextBox",
+      editorUiAlias: "Umb.PropertyEditorUi.TextBox",
+    }) as SchemaProperty;
+
+  it("names the Data Type and then its editor, or the editor alone", () => {
+    expect(editorLabel(property("Textstring"))).toBe(
+      "Textstring (Umb.PropertyEditorUi.TextBox)"
+    );
+    expect(editorLabel(property(null))).toBe("Umb.PropertyEditorUi.TextBox");
   });
 });

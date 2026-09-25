@@ -5,7 +5,11 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { type EditorTab, editorLayout } from "../model/editor-layout";
+import {
+  type EditorTab,
+  editorLabel,
+  editorLayout,
+} from "../model/editor-layout";
 import type { SchemaNode, SchemaProperty } from "../model/types";
 
 type Lookup = Map<string, SchemaNode>;
@@ -100,7 +104,7 @@ function PropertyItem({
           ) : null}
         </p>
         <p className="truncate font-mono text-3xs text-phosphor-dim">
-          {property.alias} · {property.editorUiAlias ?? property.editorAlias}
+          {property.alias} · {editorLabel(property)}
         </p>
       </div>
       <div className="flex flex-wrap items-start justify-end gap-1">

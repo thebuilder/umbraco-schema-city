@@ -10,6 +10,7 @@ const property = (
   ({
     alias: dataTypeId,
     dataTypeId,
+    dataTypeName: dataTypeId === "TextBox" ? "Textstring" : null,
     editorAlias: `Umbraco.${dataTypeId}`,
     fromCompositionId,
   }) as SchemaProperty;
@@ -90,11 +91,23 @@ describe("dataTypeMatrix", () => {
     expect(matrix.rows.map((row) => row.id)).toEqual(["article", "seo"]);
     expect(matrix.cells.get("article")?.get("TextBox")).toBe(2);
     expect(
-      matrix.columns.map((column) => [column.label, column.total])
+      matrix.columns.map((column) => [
+        column.label,
+        column.detail,
+        column.total,
+      ])
     ).toEqual([
-      ["Umbraco.TextBox", 3],
-      ["Umbraco.RichText", 1],
+      // Named when the schema has a name, the editor alias when it does not.
+      ["Textstring", "Umbraco.TextBox · TextBox", 3],
+      ["Umbraco.RichText", "Umbraco.RichText · RichText", 1],
     ]);
+  });
+
+  it("names every Data Type column in the medium sample", () => {
+    const matrix = dataTypeMatrix(mediumFixture as unknown as SchemaGraph);
+    const labels = matrix.columns.map((column) => column.label);
+    expect(labels).toContain("Textstring");
+    expect(labels.every((label) => !label.startsWith("Umbraco."))).toBe(true);
   });
 
   it("covers every own property in the medium sample", () => {

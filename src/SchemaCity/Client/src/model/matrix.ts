@@ -72,24 +72,27 @@ function compositionsOf(
  */
 export function dataTypeMatrix(graph: SchemaGraph): Matrix<number> {
   const known = new Map(graph.nodes.map((node) => [node.id, node]));
-  const editors = new Map<string, string>();
+  const headers = new Map<string, { label: string; detail: string }>();
   const cells = new Map<string, Map<string, number>>();
   for (const node of graph.nodes)
     for (const group of node.groups ?? [])
       for (const property of group.properties) {
         if (property.fromCompositionId) continue;
-        editors.set(property.dataTypeId, property.editorAlias);
+        // The start of the key keeps two Data Types with one name apart.
+        headers.set(property.dataTypeId, {
+          label: property.dataTypeName ?? property.editorAlias,
+          detail: `${property.editorAlias} · ${property.dataTypeId.slice(0, 8)}`,
+        });
         const row = cells.get(node.id) ?? new Map<string, number>();
         row.set(property.dataTypeId, (row.get(property.dataTypeId) ?? 0) + 1);
         cells.set(node.id, row);
       }
 
-  // ponytail: the graph carries no Data Type names, so the header is the editor
-  // alias and the start of the key. Add a name to SchemaProperty to print it here.
-  return build(known, cells, (id) => ({
-    label: editors.get(id) ?? id,
-    detail: id.slice(0, 8),
-  }));
+  return build(
+    known,
+    cells,
+    (id) => headers.get(id) ?? { label: id, detail: "" }
+  );
 }
 
 function build<Cell>(
