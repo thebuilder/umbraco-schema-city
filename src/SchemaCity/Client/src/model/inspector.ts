@@ -210,8 +210,8 @@ export function connectionGroups(
       )
     )
   );
-  const fields = (groups: Neighbourhood["blockTargets"]): Field[] =>
-    groups.map((group) => ({
+  const fields = (targets: Neighbourhood["blockTargets"]): Field[] =>
+    targets.map((group) => ({
       propertyAlias: group.propertyAlias,
       dataType: dataTypeOf.get(group.propertyAlias) ?? null,
       ids: group.ids,
