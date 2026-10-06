@@ -8,6 +8,7 @@ import {
   labelCorners,
   labelEm,
   labelFade,
+  labelRoom,
   labelsFlipped,
   MAX_EM,
   MIN_EM,
@@ -42,24 +43,53 @@ describe("boardText", () => {
   });
 
   it("prints a short name whole on the smallest footprint", () => {
-    expect(boardText("Home", 2.4)).toMatchObject({ text: "Home", full: true });
+    expect(boardText("Home", 2.4, 2.4)).toMatchObject({
+      text: "Home",
+      full: true,
+    });
   });
 
-  it("cuts a long name and says so", () => {
-    const printed = boardText("Product Comparison Landing Page", 2.4);
+  it("cuts a long name to its room and says so", () => {
+    const printed = boardText("Product Comparison Landing Page", 2.4, 3.3);
     expect(printed.full).toBe(false);
     expect(printed.text.endsWith("…")).toBe(true);
-    // The line stays within the footprint plus its overhang.
     expect([...printed.text].length * printed.em * 0.6).toBeLessThanOrEqual(
-      2.4 + 0.9 + 1e-9
+      3.3 + 1e-9
     );
   });
 
-  it("lets a wider building print more of the same name", () => {
+  it("prints more of the same name with more room", () => {
     const name = "Product Comparison Landing Page";
-    expect(boardText(name, 6).text.length).toBeGreaterThan(
-      boardText(name, 2.4).text.length
+    expect(boardText(name, 2.4, 6).text.length).toBeGreaterThan(
+      boardText(name, 2.4, 3).text.length
     );
+  });
+});
+
+describe("labelRoom", () => {
+  const at = (id: string, x: number, z: number, footprint = 2) => ({
+    id,
+    position: { x, z },
+    footprint,
+  });
+
+  it("splits the gap to a neighbour in the row, less the spacing", () => {
+    // Edges 1.5 apart: 0.45 a side, the same on both sides of each.
+    const room = labelRoom([at("a", 0, 0), at("b", 3.5, 0)]);
+    expect(room.get("a")).toBeCloseTo(2.9);
+    expect(room.get("b")).toBeCloseTo(2.9);
+  });
+
+  it("gives a building alone in its row the full overhang", () => {
+    // The other one stands in the next row, so it does not limit the name.
+    const room = labelRoom([at("a", 0, 0), at("b", 0, 5)]);
+    expect(room.get("a")).toBeCloseTo(6);
+  });
+
+  it("takes the nearer neighbour on either side", () => {
+    const room = labelRoom([at("a", 0, 0), at("b", 3, 0), at("c", -8, 0)]);
+    // One unit to b: 0.2 a side.
+    expect(room.get("a")).toBeCloseTo(2.4);
   });
 });
 
@@ -83,8 +113,9 @@ describe("level of detail", () => {
   });
 
   it("projects nothing from below the board", () => {
-    expect(boardTextPx(0.5, 1000, { x: 0, y: -1, z: 5 }, { x: 0, y: 0, z: 0 }))
-      .toBe(0);
+    expect(
+      boardTextPx(0.5, 1000, { x: 0, y: -1, z: 5 }, { x: 0, y: 0, z: 0 })
+    ).toBe(0);
   });
 });
 
@@ -159,7 +190,9 @@ describe("packAtlas", () => {
           other.x + (widths[b] as number) <= one.x;
         expect(apart).toBe(true);
       }
-      expect((spots[a] as { x: number }).x + (widths[a] as number)).toBeLessThanOrEqual(256);
+      expect(
+        (spots[a] as { x: number }).x + (widths[a] as number)
+      ).toBeLessThanOrEqual(256);
     }
   });
 

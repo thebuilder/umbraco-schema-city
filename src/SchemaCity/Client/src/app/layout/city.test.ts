@@ -572,7 +572,7 @@ describe("layoutCity", () => {
         ),
       ].sort((a, b) => a - b);
       expect(rows).toHaveLength(2);
-      const footprint = (placements[1] as Placement).footprint;
+      const { footprint } = placements[1] as Placement;
       const between = (rows[1] as number) - (rows[0] as number) - footprint;
       expect(between).toBeCloseTo(1.5 + LABEL_STRIP);
       expect(between - tallest).toBeGreaterThan(1);

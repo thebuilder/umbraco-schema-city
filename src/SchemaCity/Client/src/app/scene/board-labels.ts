@@ -8,14 +8,18 @@ import { pixelsPerUnit } from "./stage";
  * building can carry, so a small type gets small print and a large one larger print,
  * and the board keeps the proportions a real one has.
  */
-const EM_PER_FOOTPRINT = 0.17;
-/** Smallest print, so the smallest footprint still reads once the camera comes close. */
-export const MIN_EM = 0.45;
+const EM_PER_FOOTPRINT = 0.2;
+/**
+ * Smallest print. At 0.45 the smallest building had to fill about 80 px of screen
+ * before its name crossed the 8 px it is shown from, which is closer than anyone
+ * zooms to find a type.
+ */
+export const MIN_EM = 0.55;
 /**
  * Largest print. The strip the layout leaves in front of a row holds this with room
  * to spare, so a larger footprint widens the name's line but not its height.
  */
-export const MAX_EM = 0.8;
+export const MAX_EM = 0.9;
 /** Height of a printed line over its font size: the ascenders and descenders. */
 export const LINE_HEIGHT = 1.25;
 /**
@@ -26,11 +30,13 @@ export const LINE_HEIGHT = 1.25;
  */
 const MONO_ADVANCE = 0.6;
 /**
- * How far past its footprint a name may run, in world units, split over both sides.
- * Two buildings in a row stand 1.5 units apart, so this leaves 0.6 of bare board
- * between two names that both use it.
+ * The most a name may run past each side of its footprint, in world units. A name
+ * longer than its building plus this is cut, however open the ground beside it is,
+ * so the print still reads as belonging to the one component.
  */
-const OVERHANG = 0.9;
+const MAX_OVERHANG = 2;
+/** Bare board kept between two names, or a name and the next building, side by side. */
+const NAME_SPACING = 0.6;
 /** Bare board between the footprint's edge and the top of the print. */
 export const LABEL_INSET = 0.1;
 /**
@@ -82,12 +88,60 @@ export function truncate(name: string, chars: number): string {
     .trimEnd()}…`;
 }
 
-/** What a building of `footprint` prints of `name`, and how big. */
-export function boardText(name: string, footprint: number): BoardText {
+/**
+ * What a building of `footprint` prints of `name`, and how big, when its name may be
+ * `room` world units wide.
+ */
+export function boardText(
+  name: string,
+  footprint: number,
+  room: number
+): BoardText {
   const em = labelEm(footprint);
-  const chars = Math.floor((footprint + OVERHANG) / (em * MONO_ADVANCE));
+  const chars = Math.floor(room / (em * MONO_ADVANCE));
   const text = truncate(name, chars);
   return { text, em, full: text === name };
+}
+
+/**
+ * How wide each building's name may be, in world units: its footprint plus the same
+ * overhang on both sides, so the name stays centred under it. The overhang is half
+ * the open ground to the nearest building beside it, east or west, less the spacing,
+ * and at most `MAX_OVERHANG`. Beside means sharing some of its north-south extent,
+ * which is every building in its row. A building in a tight row of a grid gets about
+ * half a unit a side; one alone in a wide rank gets the full two.
+ *
+ * Both neighbours take half the gap between them, so two names never meet.
+ *
+ * ponytail: every building against every other, about 90,000 pairs on the 300-type
+ * fixture, once per layout. Sorting each row by x is the upgrade if a schema of
+ * thousands of types makes this show in a profile.
+ */
+export function labelRoom(
+  placements: readonly {
+    id: string;
+    position: { x: number; z: number };
+    footprint: number;
+  }[]
+): Map<string, number> {
+  const room = new Map<string, number>();
+  for (const one of placements) {
+    const half = one.footprint / 2;
+    let open = MAX_OVERHANG * 2 + NAME_SPACING;
+    for (const other of placements) {
+      if (other === one) continue;
+      const reach = half + other.footprint / 2;
+      if (Math.abs(other.position.z - one.position.z) >= reach) continue;
+      const apart = Math.abs(other.position.x - one.position.x) - reach;
+      if (apart >= 0) open = Math.min(open, apart);
+    }
+    const overhang = Math.min(
+      MAX_OVERHANG,
+      Math.max(0, open / 2 - NAME_SPACING / 2)
+    );
+    room.set(one.id, one.footprint + overhang * 2);
+  }
+  return room;
 }
 
 /**
