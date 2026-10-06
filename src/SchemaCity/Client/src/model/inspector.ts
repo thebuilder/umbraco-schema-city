@@ -124,6 +124,20 @@ export function directUsageRows(usage: TypeUsage): [string, string][] {
   ];
 }
 
+/**
+ * Content items per type for the chips, once the usage report is in. An Element
+ * Type always counts zero, so its chip shows no number rather than a misleading 0.
+ */
+export function contentCountOf(
+  report: UsageReport | undefined,
+  nodesById: Map<string, SchemaNode>
+): (id: string) => number | undefined {
+  return (id) =>
+    report && !nodesById.get(id)?.isElement
+      ? (report.byType[id]?.total ?? 0)
+      : undefined;
+}
+
 export type Chip = { id: string; name: string | null; count?: number };
 
 /**

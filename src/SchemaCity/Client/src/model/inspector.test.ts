@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   chips,
   connectionGroups,
+  contentCountOf,
   directUsageRows,
   emptyKindsLine,
   observedReferences,
@@ -163,6 +164,20 @@ describe("chips", () => {
       { id: "beta", name: "beta", count: undefined },
       { id: "gone", name: null, count: undefined },
     ]);
+  });
+});
+
+describe("contentCountOf", () => {
+  const nodesById = new Map([
+    ["page", node("page")],
+    ["block", node("block", { isElement: true })],
+  ]);
+
+  it("counts nothing before the report arrives and nothing for Element Types", () => {
+    expect(contentCountOf(undefined, nodesById)("page")).toBeUndefined();
+    const count = contentCountOf(report({ block: used(0) }), nodesById);
+    expect(count("page")).toBe(0);
+    expect(count("block")).toBeUndefined();
   });
 });
 

@@ -4,6 +4,7 @@ import {
   type Chip,
   type ConnectionGroup,
   chips,
+  contentCountOf,
   directUsageRows,
   emptyKindsLine,
   type Field,
@@ -52,10 +53,6 @@ function Values({ rows }: { rows: [string, string][] }) {
     </dl>
   );
 }
-
-/** Content items per type, once the usage report is in; until then no counts. */
-const contentCount = (report?: UsageReport) => (id: string) =>
-  report ? (report.byType[id]?.total ?? 0) : undefined;
 
 /** What reaches a composition through the types that compose it, with a bar. */
 function Through({ through }: { through: ThroughUsage }) {
@@ -128,7 +125,11 @@ function GroupSection({
       </Heading>
       {"ids" in group ? (
         <TypeChips
-          chips={chips(group.ids, nodesById, contentCount(usageReport))}
+          chips={chips(
+            group.ids,
+            nodesById,
+            contentCountOf(usageReport, nodesById)
+          )}
           limit={limit}
           onSelect={onSelect}
         />
@@ -304,7 +305,11 @@ export function Connections({
                   </span>
                 </p>
                 <TypeChips
-                  chips={chips(field.ids, nodesById, contentCount(usageReport))}
+                  chips={chips(
+                    field.ids,
+                    nodesById,
+                    contentCountOf(usageReport, nodesById)
+                  )}
                   limit={6}
                   onSelect={onSelect}
                 />
