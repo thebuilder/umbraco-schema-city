@@ -10,7 +10,7 @@ it does not change your schema or content.
 
 ![The city overview with Pages, Elements, Compositions and Unfiled districts and faint structure connections.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png)
 
-The screenshots use the included demo schema with 78 types and deliberately planted problems.
+The screenshots use the included demo schema with 86 types and deliberately planted problems.
 They show the standalone client, without the surrounding Umbraco backoffice.
 
 ## Try it locally
@@ -115,7 +115,7 @@ headless by design, and on a type already reported as unused.
   ones included.
 - Empty block: an Element Type offered as a content block that has no properties.
 
-![Findings filtered to dead ends, duplicate aliases, broken blocks, empty types and complexity checks.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
+![Findings grouped by kind with broken blocks and duplicate aliases first, each row naming its own evidence.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
 
 A finding is a reason to investigate, not an instruction to delete. An unused Document Type has
 no counted content in the usage snapshot. An unused Element Type has no configured block-editor
