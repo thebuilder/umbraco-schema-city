@@ -87,8 +87,17 @@ again to clear the selection.
 ### Review findings
 
 Findings lists unused types, duplicate aliases, missing block targets, empty types, and other
-configuration checks. Filter by category, select a result, and inspect the explanation and related
-types. Export CSV saves the filtered results with schema and usage timestamps for a ticket or review.
+configuration checks. Results are grouped by kind: each group explains the kind once, and each row
+shows the type and what is particular to it, such as where an unused type is allowed. Problems are
+open and notes collapsed. Within a group, the strongest cases come first, for example an unused
+type whose allowed parents have no content either. Filter by category, select a result, and inspect
+it with its related types. Export CSV saves the filtered results with schema and usage timestamps
+and the kind's explanation for a ticket or review.
+
+Only a type an editor can create, at root or under another type, is reported as unused. A type
+nothing can create is a dead end, or a pure mixin when something composes it. The no template note
+is left out when more than half of the creatable types have no template, since that schema is
+headless by design, and on a type already reported as unused.
 
 ![Findings filtered to dead ends, duplicate aliases, broken blocks, empty types and complexity checks.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
 
