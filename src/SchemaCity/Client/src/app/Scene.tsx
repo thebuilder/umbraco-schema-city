@@ -44,9 +44,8 @@ import { BoardLabels } from "./scene/BoardLabels";
 import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
 import {
   type BoardText,
+  boardRepeats,
   boardText,
-  boardTextPx,
-  LOD_SHOW_PX,
   labelRoom,
 } from "./scene/board-labels";
 import {
@@ -1119,16 +1118,14 @@ function Labels({
     framedAt.current.copy(camera.matrixWorld);
 
     // A related type whose board already prints its whole name, legibly.
-    const printedWhole = (candidate: { id: string; rank: number }) => {
-      const printed = boardTexts.get(candidate.id);
-      const placement = placementsById.get(candidate.id);
-      if (candidate.rank < 2 || !printed?.full || !placement) return false;
-      anchor.set(placement.position.x, placement.y ?? 0, placement.position.z);
-      return (
-        boardTextPx(printed.em, size.height, camera.position, anchor) >=
-        LOD_SHOW_PX
+    const printedWhole = (candidate: { id: string; rank: number }) =>
+      candidate.rank >= 2 &&
+      boardRepeats(
+        boardTexts.get(candidate.id),
+        placementsById.get(candidate.id),
+        camera.position,
+        size.height
       );
-    };
 
     const kept = pickLabels(
       candidates
@@ -2608,6 +2605,10 @@ export default function Scene({
     () => (hovered ? neighboursOf(graph, hovered) : null),
     [graph, hovered]
   );
+  const interaction = useMemo(
+    () => ({ hovered, selected, neighbours, hoveredNeighbours }),
+    [hovered, selected, neighbours, hoveredNeighbours]
+  );
   // What each type prints on the board, sized from the city's footprints, which a
   // focus tween moves but never resizes.
   const boardTexts = useMemo(() => {
@@ -2830,14 +2831,11 @@ export default function Scene({
             placements={placements}
           />
           <BoardLabels
-            hovered={hovered}
-            hoveredNeighbours={hoveredNeighbours}
-            neighbours={neighbours}
+            interaction={interaction}
             nodesById={nodesById}
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}
-            selected={selected}
             texts={boardTexts}
           />
           <Labels

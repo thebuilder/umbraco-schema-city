@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  BASE_OPACITY,
+  boardRepeats,
   boardText,
   boardTextPx,
+  DIMMED,
   LABEL_INSET,
   LOD_HIDE_PX,
   LOD_SHOW_PX,
   labelCorners,
   labelEm,
   labelFade,
+  labelLight,
+  labelOpacity,
   labelRoom,
   labelsFlipped,
   MAX_EM,
@@ -116,6 +121,82 @@ describe("level of detail", () => {
     expect(
       boardTextPx(0.5, 1000, { x: 0, y: -1, z: 5 }, { x: 0, y: 0, z: 0 })
     ).toBe(0);
+  });
+});
+
+describe("labelLight", () => {
+  const rest = {
+    hovered: null,
+    selected: null,
+    neighbours: null,
+    hoveredNeighbours: null,
+  };
+
+  it("keeps every name whole when nothing is hovered or selected", () => {
+    expect(labelLight("a", rest)).toBe(1);
+  });
+
+  it("dims names unrelated to the hovered type and keeps related ones", () => {
+    const now = {
+      ...rest,
+      hovered: "a",
+      hoveredNeighbours: new Set(["a", "b"]),
+    };
+    expect(labelLight("b", now)).toBe(1);
+    expect(labelLight("c", now)).toBe(DIMMED);
+  });
+
+  it("leaves the hovered and selected names to their floating labels", () => {
+    const now = {
+      ...rest,
+      hovered: "a",
+      selected: "b",
+      neighbours: new Set(["b"]),
+    };
+    expect(labelLight("a", now)).toBe(0);
+    expect(labelLight("b", now)).toBe(0);
+  });
+
+  it("dims everything outside a focus with nothing selected", () => {
+    const now = { ...rest, neighbours: new Set(["a"]) };
+    expect(labelLight("a", now)).toBe(1);
+    expect(labelLight("z", now)).toBe(DIMMED);
+  });
+});
+
+describe("labelOpacity", () => {
+  it("is the rest strength for a legible, lit, revealed name on standing ground", () => {
+    expect(labelOpacity(LOD_SHOW_PX, 1, 1, 0)).toBeCloseTo(BASE_OPACITY);
+  });
+
+  it("goes with the building when focus presses it flat", () => {
+    expect(labelOpacity(LOD_SHOW_PX, 1, 1, 1)).toBe(0);
+  });
+
+  it("waits for the intro", () => {
+    expect(labelOpacity(LOD_SHOW_PX, 1, 0, 0)).toBe(0);
+  });
+});
+
+describe("boardRepeats", () => {
+  const ground = { position: { x: 0, z: 0 } };
+  const near = { x: 3, y: 3, z: 3 };
+  const far = { x: 300, y: 300, z: 300 };
+
+  it("says a whole name legible on the board needs no floating label", () => {
+    expect(
+      boardRepeats({ text: "Home", em: 0.6, full: true }, ground, near, 1000)
+    ).toBe(true);
+  });
+
+  it("keeps the floating label for a cut name or one too small to read", () => {
+    expect(
+      boardRepeats({ text: "Hom…", em: 0.6, full: false }, ground, near, 1000)
+    ).toBe(false);
+    expect(
+      boardRepeats({ text: "Home", em: 0.6, full: true }, ground, far, 1000)
+    ).toBe(false);
+    expect(boardRepeats(undefined, ground, near, 1000)).toBe(false);
   });
 });
 

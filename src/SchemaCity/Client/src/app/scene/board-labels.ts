@@ -173,6 +173,71 @@ export function labelFade(px: number): number {
 }
 
 /**
+ * How solid the print is at rest: readable on the plate and still quieter than the
+ * buildings and the traces.
+ */
+export const BASE_OPACITY = 0.6;
+/**
+ * What is left of a name unrelated to the hovered or selected type, the same share
+ * an unrelated trace keeps of its idle strength.
+ */
+export const DIMMED = 0.15;
+
+export type Interaction = {
+  hovered: string | null;
+  selected: string | null;
+  /** The selection's or the focus's lit set, or null when nothing is lit. */
+  neighbours: Set<string> | null;
+  hoveredNeighbours: Set<string> | null;
+};
+
+/**
+ * How much of its strength a name keeps under the hover and the selection: all of
+ * it at rest and for a related type, `DIMMED` for an unrelated one, and none for the
+ * hovered or selected type itself, whose floating label already prints the name.
+ */
+export function labelLight(id: string, now: Interaction): number {
+  if (id === now.hovered || id === now.selected) return 0;
+  const related = now.neighbours?.has(id) || now.hoveredNeighbours?.has(id);
+  const quiet =
+    now.hovered === null && now.selected === null && now.neighbours === null;
+  return quiet || related ? 1 : DIMMED;
+}
+
+/**
+ * A name's opacity: its rest strength, faded by the level of detail, the light the
+ * hover and selection leave it, the intro's progress, and how far focus mode has
+ * pressed its building flat.
+ */
+export function labelOpacity(
+  px: number,
+  light: number,
+  reveal: number,
+  flatten: number
+): number {
+  return BASE_OPACITY * labelFade(px) * light * reveal * (1 - flatten);
+}
+
+/**
+ * True when the board already prints the whole of a name legibly, which makes a
+ * floating label for it a repeat.
+ */
+export function boardRepeats(
+  printed: BoardText | undefined,
+  ground: { position: { x: number; z: number }; y?: number } | undefined,
+  camera: { x: number; y: number; z: number },
+  viewportHeight: number
+): boolean {
+  if (!(printed?.full && ground)) return false;
+  const anchor = {
+    x: ground.position.x,
+    y: ground.y ?? 0,
+    z: ground.position.z,
+  };
+  return boardTextPx(printed.em, viewportHeight, camera, anchor) >= LOD_SHOW_PX;
+}
+
+/**
  * Whether the names should be turned 180 degrees, from the way the camera faces on
  * the ground. Upright, a name reads west to east with its top to the north, which is
  * right for a camera looking anywhere north of due west or due east. Past that by
@@ -207,22 +272,14 @@ export function labelCorners(
   width: number,
   height: number,
   flipped: boolean
-): number[] {
-  const top = centre.z + footprint / 2 + LABEL_INSET;
-  const corners = [
-    centre.x - width / 2,
-    top,
-    centre.x + width / 2,
-    top,
-    centre.x - width / 2,
-    top + height,
-    centre.x + width / 2,
-    top + height,
-  ];
-  if (!flipped) return corners;
-  return corners.map((value, i) =>
-    i % 2 === 0 ? 2 * centre.x - value : 2 * centre.z - value
-  );
+): [number, number, number, number, number, number, number, number] {
+  // Turning about the centre is negating the offset from it.
+  const turn = flipped ? -1 : 1;
+  const west = centre.x - (width / 2) * turn;
+  const east = centre.x + (width / 2) * turn;
+  const top = centre.z + (footprint / 2 + LABEL_INSET) * turn;
+  const bottom = centre.z + (footprint / 2 + LABEL_INSET + height) * turn;
+  return [west, top, east, top, west, bottom, east, bottom];
 }
 
 /**
