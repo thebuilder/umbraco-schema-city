@@ -269,6 +269,31 @@ describe("findFindings, one rule at a time", () => {
     expect(aliasesFor(mixin, "noTemplate")).toEqual([]);
   });
 
+  it("says nothing about templates when most creatable types have none", () => {
+    const mostlyHeadless = graphOf([
+      node("home", { allowedAsRoot: true }),
+      node("news", { allowedAsRoot: true, templates: [] }),
+      node("event", { allowedAsRoot: true, templates: [] }),
+    ]);
+    expect(aliasesFor(mostlyHeadless, "noTemplate")).toEqual([]);
+  });
+
+  it("leaves the template note off a type already reported as unused", () => {
+    const graph = graphOf([
+      node("home", { allowedAsRoot: true }),
+      node("news", { allowedAsRoot: true, templates: [] }),
+      node("event", { allowedAsRoot: true, templates: [] }),
+      node("about", { allowedAsRoot: true }),
+    ]);
+    expect(aliasesFor(graph, "noTemplate", usageOf(graph))).toEqual([
+      "event",
+      "news",
+    ]);
+    const kinds = kindsFor(graph, "news", usageOf(graph, ["news"]));
+    expect(kinds).toContain("unusedType");
+    expect(kinds).not.toContain("noTemplate");
+  });
+
   it("reports a composition that is only ever composed", () => {
     const graph = graphOf(
       [node("page", { allowedAsRoot: true }), node("seo")],
@@ -376,8 +401,12 @@ describe("findFindings on the seeded medium.json", () => {
     ["dupAliasPage", "duplicateAlias"],
     ["brokenBlockHost", "brokenBlock"],
     ["emptyType", "noProperties"],
-    ["noTemplatePage", "noTemplate"],
   ];
+
+  it("treats the sample as headless and leaves the template note out", () => {
+    // 50 of its 55 creatable types have no template, noTemplatePage among them.
+    expect(aliasesFor(medium, "noTemplate", usage)).toEqual([]);
+  });
 
   it.each(planted)("reports %s as %s", (alias, kind) => {
     const id = medium.nodes.find((candidate) => candidate.alias === alias)?.id;
@@ -415,10 +444,13 @@ describe("findFindings on the seeded medium.json", () => {
  * shapes and prints them; these are the rows that come out.
  *
  * unusedType is every creatable non-element type the usage report leaves at zero,
- * 196 of the 260; the dead ends and mixins below are at zero too and not counted. deadEnd is the 15 orphans, the 2 compositions nothing uses and archive00, the
- * head of a tree no root reaches. pureMixin is the 10 compositions that are used, and
- * complexity is the 20 types carrying 30 properties. There is no unusedElementType
- * row on purpose: the 30 block hosts between them reach all 40 Element Types.
+ * 196 of the 260; the dead ends and mixins below are at zero too and not counted.
+ * deadEnd is the 15 orphans, the 2 compositions nothing uses and archive00, the head
+ * of a tree no root reaches. pureMixin is the 10 compositions that are used, and
+ * complexity is the 20 types carrying 30 properties. The 6 planted types with no
+ * template have no content either, so their unusedType row stands in for that note,
+ * which only shows without a report. There is no unusedElementType row on purpose:
+ * the 30 block hosts between them reach all 40 Element Types.
  */
 const PLANTED = {
   unusedType: 196,
@@ -426,7 +458,6 @@ const PLANTED = {
   duplicateAlias: 4,
   brokenBlock: 3,
   noProperties: 5,
-  noTemplate: 6,
   pureMixin: 10,
   complexity: 20,
 };
@@ -472,6 +503,6 @@ describe("findFindings on the pathological fixture", () => {
 
     const { unusedType, ...rest } = PLANTED;
     expect(unusedType).toBeGreaterThan(0);
-    expect(counts).toEqual(rest);
+    expect(counts).toEqual({ ...rest, noTemplate: 6 });
   });
 });

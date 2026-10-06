@@ -176,7 +176,15 @@ export function findFindings(
   const topTier = (topScore * (COMPLEXITY_TIERS - 1)) / COMPLEXITY_TIERS;
 
   const totalOf = (id: string) => usage?.byType[id]?.total ?? 0;
-  const anyTemplates = nodes.some((node) => node.templates.length > 0);
+  const creatable = (node: SchemaNode) =>
+    node.allowedAsRoot || at(inChild, node.id) > 0;
+  // A schema where most creatable types have no template is headless: the missing
+  // template is the design, and one note per type would bury everything else. More
+  // than half without a template is the cut, simple enough to say in the README.
+  const pages = nodes.filter((node) => !node.isElement && creatable(node));
+  const headless =
+    pages.filter((node) => node.templates.length === 0).length * 2 >
+    pages.length;
   const found: Finding[] = [];
   const add = (
     kind: FindingKind,
@@ -196,13 +204,14 @@ export function findFindings(
   };
 
   for (const node of nodes) {
-    const children = at(inChild, node.id);
     const composers = at(inComposition, node.id);
-    const creatable = node.allowedAsRoot || children > 0;
+    const canCreate = creatable(node);
+    const unused =
+      canCreate && !node.isElement && usage && totalOf(node.id) === 0;
 
     // Only a type an editor can create can have content of its own, so "no content"
     // says nothing about the rest. Those are a dead end or a pure mixin below.
-    if (creatable && !node.isElement && usage && totalOf(node.id) === 0) {
+    if (unused) {
       add(
         "unusedType",
         node,
@@ -221,7 +230,7 @@ export function findFindings(
     // A type nothing composes and nothing can create is a structural dead end, and
     // this one row says so. A type something composes is a mixin doing its job, so
     // it is never a dead end; the pure mixin note below covers it instead.
-    if (!(node.isElement || creatable) && composers === 0) {
+    if (!(node.isElement || canCreate) && composers === 0) {
       add(
         "deadEnd",
         node,
@@ -256,12 +265,11 @@ export function findFindings(
       add("noProperties", node, "No own and no composed properties");
     }
 
-    // Only worth saying on a schema that uses templates at all, and only about a
-    // type an editor can actually create. A headless site has no templates
-    // anywhere, and a composition renders through its users, not on its own.
+    // Only about a type an editor can actually create, since a composition renders
+    // through its users, and not about one the unused row already covers.
     if (
-      anyTemplates &&
-      creatable &&
+      !(headless || unused) &&
+      canCreate &&
       !node.isElement &&
       node.templates.length === 0
     ) {
@@ -272,7 +280,7 @@ export function findFindings(
       );
     }
 
-    if (composers > 0 && !creatable && at(inBlock, node.id) === 0) {
+    if (composers > 0 && !canCreate && at(inBlock, node.id) === 0) {
       add(
         "pureMixin",
         node,
