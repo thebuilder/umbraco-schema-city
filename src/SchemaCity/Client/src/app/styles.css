@@ -598,7 +598,7 @@
   --void: #05090a;
   /* Reading roles for prose panels such as the inspector, where phosphor is kept for
      what can be clicked or is selected. Faint is the dimmest grey that still reads
-     at 4.5:1 on the raised panel. */
+     at 4.5:1 on the panel and on the muted cards inside it. */
   --prose: #dfe9e6;
   --label: #93a7a2;
   --faint: #758b84;

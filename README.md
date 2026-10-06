@@ -52,7 +52,12 @@ for testing the integration.
 Use Search or `⌘K` / `Ctrl+K` to find a type by name, alias, or property alias. Hover a building to
 see its direct connections and the names of connected types. Labels that would overlap stay
 hidden until there is room for them as you zoom in. Click a building to keep its connections visible and open the
-inspector, which shows properties, composition origins, usage counts, and related types.
+inspector. Its header names the type, its role (page, composition or Element Type) and how much
+content uses it. Overview lists the schema checks for the type, its usage, and its related types,
+with content counts once usage has loaded. Properties shows each group with the composition it
+comes from and each property's Data Type. Connections lists every configured connection by kind,
+block and picker targets by property, and the references counted in content separately. Click a
+related type to select it.
 
 Each building is built like a chip on a circuit board. Every slab is one property group, with a
 gap between groups and a thin board where a new tab starts; the lit windows are its properties.
@@ -72,7 +77,8 @@ across all layers, including ones you have switched off.
 | Blocks | Element Types configured as block content or settings |
 | References | Document Types allowed by configured pickers |
 
-Click a connection or use Explain connections in the inspector to see what it represents.
+Click a connection, or use Explain connections at the end of the inspector's Connections tab, to
+see what it represents.
 Open in editor takes you to the selected Document Type in Umbraco.
 
 ### Focus on a neighbourhood
@@ -115,7 +121,8 @@ the schema, so you can explore the model while that request is pending.
 ![The Content count lens with Article selected and its usage totals shown in the inspector.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png)
 
 Configured picker connections and observed references between content items are different data.
-The inspector reports them separately. Usage is a snapshot, cached on the server for one minute;
+The inspector's Connections tab reports them separately, under Picker references and Observed in
+content. Usage is a snapshot, cached on the server for one minute;
 it is not a live dependency check.
 
 ### Use the table
