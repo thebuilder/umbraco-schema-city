@@ -788,10 +788,16 @@ describe("findFindings on the seeded medium.json", () => {
     ["dupAliasPage", "duplicateAlias"],
     ["brokenBlockHost", "brokenBlock"],
     ["emptyType", "noProperties"],
+    ["legacyHub", "deadEnd"],
+    ["legacyHubPage", "unreachableChain"],
+    ["localisedBlockHost", "cultureMismatch"],
+    ["nearDuplicatePage", "nearDuplicateDataType"],
+    ["overloadedTabPage", "overloadedTab"],
+    ["elementSpacer", "emptyBlock"],
   ];
 
   it("treats the sample as headless and leaves the template note out", () => {
-    // 50 of its 55 creatable types have no template, noTemplatePage among them.
+    // 54 of the 59 types an editor can reach have no template, noTemplatePage among them.
     expect(aliasesFor(medium, "noTemplate", usage)).toEqual([]);
   });
 
