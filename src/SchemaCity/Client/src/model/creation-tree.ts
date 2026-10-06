@@ -79,6 +79,25 @@ function link(map: Map<string, string[]>, key: string, value: string) {
   map.set(key, list);
 }
 
+/**
+ * The one sentence under the unreachable heading that says what the list leaves
+ * out, or null when it leaves out nothing.
+ */
+export function exclusionLine({
+  elements,
+  compositions,
+}: CreationTree["excluded"]): string | null {
+  const parts = [
+    elements > 0 ? `${elements} Element Type${elements === 1 ? "" : "s"}` : "",
+    compositions > 0
+      ? `${compositions} composition${compositions === 1 ? "" : "s"}`
+      : "",
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  const one = elements + compositions === 1;
+  return `${parts.join(" and ")} ${one ? "is" : "are"} left out, since editors never create ${one ? "it" : "them"} in the content tree.`;
+}
+
 export type TreeRow = {
   /** The path from the root, so a type under two parents is two rows. */
   key: string;

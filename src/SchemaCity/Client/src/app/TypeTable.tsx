@@ -89,14 +89,14 @@ export function FilterField({
 }) {
   return (
     // biome-ignore lint/a11y/noLabelWithoutControl: the Input is inside this label; the rule does not follow the component.
-    <label className="flex items-center gap-2 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
+    <label className="flex items-center gap-2 font-sans text-label text-xs">
       Filter
       {/* type="text" and our own clear button, because a search field draws the
           browser's blue X, which is unreadable on this background. The button is
           interactive content, so clicking it does not also activate the label. */}
       <span className="relative">
         <Input
-          className="h-8 w-64 min-w-[14rem] bg-secondary px-2 pr-7 text-xs normal-case tracking-normal focus-visible:border-phosphor"
+          className="h-8 w-64 min-w-[14rem] bg-secondary px-2 pr-7 font-sans text-prose text-xs placeholder:text-faint focus-visible:border-phosphor md:text-xs"
           onChange={(event) => onQuery(event.target.value)}
           placeholder="Filter types"
           type="text"
@@ -105,7 +105,7 @@ export function FilterField({
         {query === "" ? null : (
           <button
             aria-label="Clear the filter"
-            className="-translate-y-1/2 absolute top-1/2 right-1 cursor-pointer px-1 text-base text-phosphor-dim leading-none hover:text-phosphor-bright"
+            className="-translate-y-1/2 absolute top-1/2 right-1 cursor-pointer px-1 text-base text-faint leading-none hover:text-phosphor-bright"
             onClick={() => onQuery("")}
             type="button"
           >

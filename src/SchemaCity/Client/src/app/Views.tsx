@@ -75,7 +75,8 @@ export function FlatView({
   neighbourhoodById: Map<string, Neighbourhood>;
 }) {
   const shared = { graph, onQuery, onSelect, query, selected };
-  if (view === "tree") return <CreationTree {...shared} />;
+  if (view === "tree")
+    return <CreationTree {...shared} findings={findings} usage={usage} />;
   if (view === "matrix") return <Matrix {...shared} />;
   if (view === "editor")
     return (
