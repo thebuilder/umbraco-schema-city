@@ -200,7 +200,9 @@ export function findFindings(
     const composers = at(inComposition, node.id);
     const creatable = node.allowedAsRoot || children > 0;
 
-    if (!node.isElement && usage && totalOf(node.id) === 0) {
+    // Only a type an editor can create can have content of its own, so "no content"
+    // says nothing about the rest. Those are a dead end or a pure mixin below.
+    if (creatable && !node.isElement && usage && totalOf(node.id) === 0) {
       add(
         "unusedType",
         node,

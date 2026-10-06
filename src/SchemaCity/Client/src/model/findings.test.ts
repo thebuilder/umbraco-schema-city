@@ -137,6 +137,25 @@ describe("findFindings, one rule at a time", () => {
     expect(kindsFor(graph, "home", usageOf(graph))).not.toContain("unusedType");
   });
 
+  it("leaves a type no editor can create off the unused types", () => {
+    const graph = graphOf(
+      [
+        node("page", { allowedAsRoot: true }),
+        node("news"),
+        node("seo"),
+        node("orphan"),
+      ],
+      [edge("composition", "page", "seo"), edge("allowedChild", "page", "news")]
+    );
+    const usage = usageOf(graph, ["news", "seo", "orphan"]);
+    // A composed mixin never has content of its own.
+    expect(kindsFor(graph, "seo", usage)).toEqual(["pureMixin"]);
+    // A creatable type with no content is still the one worth reading.
+    expect(kindsFor(graph, "news", usage)).toContain("unusedType");
+    // No root, no parent, no composer: the dead end says it, once.
+    expect(kindsFor(graph, "orphan", usage)).toEqual(["deadEnd"]);
+  });
+
   it("reports an Element Type no block editor points at", () => {
     const graph = graphOf(
       [
@@ -332,9 +351,10 @@ describe("findFindings on small.json", () => {
 
   it("leaves the usage rules out until a report arrives", () => {
     expect(named("unusedType")).toEqual([]);
-    expect(named("unusedType", usageOf(small, ["legacyWidget"]))).toEqual([
-      "legacyWidget",
-    ]);
+    // legacyWidget cannot be created, so only articlePage is an unused type.
+    expect(
+      named("unusedType", usageOf(small, ["legacyWidget", "articlePage"]))
+    ).toEqual(["articlePage"]);
   });
 });
 
@@ -394,14 +414,14 @@ describe("findFindings on the seeded medium.json", () => {
  * What the rules make of the pathological fixture, per kind. The generator plants the
  * shapes and prints them; these are the rows that come out.
  *
- * unusedType is every non-element type the usage report leaves at zero, 224 of the
- * 260. deadEnd is the 15 orphans, the 2 compositions nothing uses and archive00, the
+ * unusedType is every creatable non-element type the usage report leaves at zero,
+ * 196 of the 260; the dead ends and mixins below are at zero too and not counted. deadEnd is the 15 orphans, the 2 compositions nothing uses and archive00, the
  * head of a tree no root reaches. pureMixin is the 10 compositions that are used, and
  * complexity is the 20 types carrying 30 properties. There is no unusedElementType
  * row on purpose: the 30 block hosts between them reach all 40 Element Types.
  */
 const PLANTED = {
-  unusedType: 224,
+  unusedType: 196,
   deadEnd: 18,
   duplicateAlias: 4,
   brokenBlock: 3,
