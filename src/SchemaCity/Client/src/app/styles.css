@@ -39,8 +39,10 @@
   --color-amber: var(--amber);
   --color-azure: var(--azure);
   --color-ember: var(--ember);
+  --color-faint: var(--faint);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
+  --color-label: var(--label);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-panel: var(--panel);
@@ -49,8 +51,10 @@
   --color-phosphor: var(--phosphor);
   --color-phosphor-bright: var(--phosphor-bright);
   --color-phosphor-dim: var(--phosphor-dim);
+  --color-prose: var(--prose);
   --color-signal: var(--signal);
   --color-signal-soft: var(--signal-soft);
+  --color-structure: var(--structure);
   --color-violet: var(--violet);
   --color-void: var(--void);
   --color-window-bevel-dark: var(--window-bevel-dark);
@@ -592,6 +596,14 @@
   --signal-soft: #e84970;
   --violet: #b890ff;
   --void: #05090a;
+  /* Reading roles for prose panels such as the inspector, where phosphor is kept for
+     what can be clicked or is selected. Faint is the dimmest grey that still reads
+     at 4.5:1 on the panel and on the muted cards inside it. */
+  --prose: #dfe9e6;
+  --label: #93a7a2;
+  --faint: #758b84;
+  /* The structure traces' near-white, for keys that match them. */
+  --structure: #e9f6f1;
   --window-bevel-dark: #5c7269;
   --window-bevel-light: #e7eeeb;
   --window-border: #263d38;
