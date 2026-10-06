@@ -107,6 +107,17 @@ export function panelSource(panel: EditorPanel): string | null {
   return [...sources][0] ?? null;
 }
 
+/**
+ * The tab the view opens on: the first with a property of the type's own, since
+ * that is what the type adds. A generic tab of folded composed groups says little.
+ */
+export const firstOwnTab = (tabs: EditorTab[]) =>
+  tabs.find((tab) =>
+    tab.panels.some((panel) =>
+      panel.properties.some((property) => !property.fromCompositionId)
+    )
+  ) ?? tabs[0];
+
 const count = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
 

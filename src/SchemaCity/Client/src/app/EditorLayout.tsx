@@ -10,6 +10,7 @@ import {
   editorLabel,
   editorLayout,
   editorSummary,
+  firstOwnTab,
   MIXED,
   panelSource,
 } from "../model/editor-layout";
@@ -73,7 +74,7 @@ export function EditorLayout({
         </Button>
       </div>
     );
-  // Keyed, so each new type opens on its first tab.
+  // Keyed, so each new type opens on the tab where its own properties start.
   return (
     <Layout
       findings={findings.filter((finding) => finding.nodeId === node.id)}
@@ -225,7 +226,7 @@ function Layout({
 }) {
   const tabs = editorLayout(node);
   const tabRow = hasTabRow(tabs);
-  const [open, setOpen] = useState(tabs[0]?.key);
+  const [open, setOpen] = useState(firstOwnTab(tabs)?.key);
   // Composed groups start folded; a key here is one the reader turned the other way.
   const [allComposed, setAllComposed] = useState(false);
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());

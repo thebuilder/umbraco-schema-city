@@ -4,6 +4,7 @@ import {
   editorLabel,
   editorLayout,
   editorSummary,
+  firstOwnTab,
   GENERIC_TAB,
   MIXED,
   panelSource,
@@ -167,4 +168,24 @@ describe("editorSummary", () => {
     );
     expect(editorSummary([])).toBe("No properties");
   });
+});
+
+it("opens on the first tab with a property of the type's own", () => {
+  const tab = (key: string, from: string | null) => ({
+    key,
+    name: key,
+    count: 1,
+    panels: [
+      {
+        key,
+        name: null,
+        properties: [{ fromCompositionId: from } as SchemaProperty],
+      },
+    ],
+  });
+  expect(firstOwnTab([tab("", "seo"), tab("content", null)])?.key).toBe(
+    "content"
+  );
+  expect(firstOwnTab([tab("", "seo")])?.key).toBe("");
+  expect(firstOwnTab([])).toBe(undefined);
 });
