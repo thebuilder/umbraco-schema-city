@@ -334,7 +334,7 @@ describe("findFindings, one rule at a time", () => {
       (candidate) =>
         candidate.kind === "complexity" && candidate.nodeId === "page"
     );
-    expect(finding?.summary).toContain("Complexity 6");
+    expect(finding?.summary).toContain("Score 6");
   });
 
   it("gives every finding a stable id and keeps the order between runs", () => {
@@ -350,6 +350,49 @@ describe("findFindings, one rule at a time", () => {
     expect(
       first.slice(firstNote).every((finding) => finding.severity === "note")
     ).toBe(true);
+  });
+
+  it("says where an unused type can be created, empty branches first", () => {
+    const graph = graphOf(
+      [
+        node("home", { allowedAsRoot: true }),
+        node("landing", { allowedAsRoot: true }),
+        node("news"),
+        node("press"),
+      ],
+      [
+        edge("allowedChild", "home", "news"),
+        edge("allowedChild", "landing", "press"),
+      ]
+    );
+    const rows = findFindings(
+      graph,
+      usageOf(graph, ["landing", "news", "press"])
+    ).filter((finding) => finding.kind === "unusedType");
+    // press sits under an empty landing, so it comes before the alphabet would put it.
+    expect(rows.map((row) => [row.nodeId, row.summary])).toEqual([
+      ["press", "Allowed under landing, which has no content either"],
+      ["landing", "Allowed at root"],
+      ["news", "Allowed under home"],
+    ]);
+    expect(rows[0]?.related).toEqual(["landing"]);
+  });
+
+  it("names the clashing alias and where each copy comes from", () => {
+    const graph = graphOf([
+      node("seoA", { name: "Seo A" }),
+      node("page", {
+        allowedAsRoot: true,
+        groups: [
+          group("seo", [property("seoTitle", "seoA")]),
+          group("own", [property("seoTitle", null)]),
+        ],
+      }),
+    ]);
+    const [finding] = findFindings(graph).filter(
+      (f) => f.kind === "duplicateAlias"
+    );
+    expect(finding?.summary).toBe("seoTitle from Seo A, page");
   });
 
   it("says nothing about an empty graph", () => {
