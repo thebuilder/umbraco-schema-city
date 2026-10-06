@@ -1,4 +1,4 @@
-import type { Finding } from "./findings";
+import { type Finding, KIND_EXPLANATION } from "./findings";
 import type { SchemaGraph, UsageReport } from "./types";
 
 const FORMULA = /^\s*[=+\-@]/;
@@ -38,7 +38,16 @@ export function findingsCsv(
       .map(csv)
       .join(","),
     "",
-    ["Type", "Alias", "Severity", "Finding", "Summary", "Related"]
+    // New columns go on the end, so a sheet built on the old order still lines up.
+    [
+      "Type",
+      "Alias",
+      "Severity",
+      "Finding",
+      "Summary",
+      "Related",
+      "Explanation",
+    ]
       .map(csv)
       .join(","),
     ...findings.map((finding) => {
@@ -50,6 +59,7 @@ export function findingsCsv(
         finding.kind,
         finding.summary,
         related(finding),
+        KIND_EXPLANATION[finding.kind],
       ]
         .map(csv)
         .join(",");

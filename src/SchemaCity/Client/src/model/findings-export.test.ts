@@ -44,7 +44,10 @@ describe("findingsCsv", () => {
     );
 
     expect(output).toContain(
-      '"Page, root",page,problem,brokenBlock,"Blocks, settings\nneed review",missing:deleted-key'
+      '"Page, root",page,problem,brokenBlock,"Blocks, settings\nneed review",missing:deleted-key,A block editor lists an Element Type that no longer exists in the schema.'
+    );
+    expect(output).toContain(
+      "Type,Alias,Severity,Finding,Summary,Related,Explanation\n"
     );
     expect(output).toContain(
       "Usage snapshot,unavailable; usage-dependent findings omitted"
