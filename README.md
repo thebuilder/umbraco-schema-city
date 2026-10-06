@@ -139,8 +139,9 @@ it is not a live dependency check.
 
 ### Use the table
 
-List shows the same types in a searchable, sortable table. Click a column heading to sort it or a
-type to open the inspector. The table works without the 3D canvas.
+List shows the same types in a searchable, sortable table, with each type's role in the city's
+colours and a pink dot beside a type that has a problem finding. Click a column heading to sort it
+or a type to open the inspector. The table works without the 3D canvas.
 
 ![The type list sorted by own property count, largest first.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png)
 
@@ -154,7 +155,9 @@ the allowed-child rules. A type allowed under two parents appears under both. A 
 appears higher in the same branch is marked and not expanded again. Below the tree, a list shows
 Document Types that no root can reach, with the types they are allowed under, so a chain that
 only hangs off another unreachable type is visible. Element Types and compositions that nothing
-can create are left out of that list.
+can create are left out of that list. Once usage has loaded, each row shows its content count and
+types without content are drawn quieter, so the branches where content lives stand out. A pink dot
+marks a type with a problem finding, and its tooltip names the checks.
 
 ![The creation tree from the three root types, with Home selected under Site and the unreachable types below.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/tree.png)
 
@@ -171,11 +174,13 @@ stay distinguishable. Rows are sorted by name; columns sort by usage or by name.
 ### Read a type as an editor sees it
 
 Editor draws the selected type as tabs and groups, in the order the schema lists them, with each
-property's alias, editor, mandatory marker and culture variance. A property from a composition
-names its source. Tab labels carry their property counts. Choose Editor layout in the inspector
-to open a type here.
+property's name, alias, Data Type, mandatory marker and culture variance; the property editor alias
+is on hover. A group from a composition names it once on its header and starts folded, so the
+properties the type adds itself stand out, and the view opens on the first tab that has any of
+them. Expand composed groups opens the folded groups. The type's checks sit above the tabs, and a
+tab over 20 properties is marked. Choose Editor layout in the inspector to open a type here.
 
-![Home in the editor view, with its tabs, groups and the composition each property comes from.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
+![Home in the editor view, opened on the Content tab where its own properties are, with its checks above the tabs.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
 
 ## Compare schema snapshots
 
