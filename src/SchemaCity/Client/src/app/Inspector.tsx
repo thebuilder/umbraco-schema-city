@@ -1,11 +1,12 @@
 import { XIcon } from "lucide-react";
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Finding } from "../model/findings";
 import {
   connectionGroups,
+  contentCountOf,
   type Role,
   roleOf,
   usageLine,
@@ -197,7 +198,12 @@ export function Inspector({
   const role = ROLE[roleOf(node, neighbourhood)];
   const groups = connectionGroups(node, neighbourhood);
   const usageNow = usageState(node, neighbourhood, usageReport, usage);
+  const countOf = useMemo(
+    () => contentCountOf(usageReport, nodesById, edges),
+    [usageReport, nodesById, edges]
+  );
   const tabProps = {
+    countOf,
     groups,
     neighbourhood,
     node,

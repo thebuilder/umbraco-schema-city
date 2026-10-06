@@ -1,7 +1,7 @@
 // What the inspector says about one type, worked out from the graph and the usage
 // report. Pure: no DOM, no React, no three.js.
 import type { Neighbourhood } from "./neighbourhood";
-import type { SchemaNode, TypeUsage, UsageReport } from "./types";
+import type { SchemaEdge, SchemaNode, TypeUsage, UsageReport } from "./types";
 
 export type Role = "page" | "composition" | "element";
 
@@ -125,15 +125,30 @@ export function directUsageRows(usage: TypeUsage): [string, string][] {
 }
 
 /**
- * Content items per type for the chips, once the usage report is in. An Element
- * Type always counts zero, so its chip shows no number rather than a misleading 0.
+ * Content items per type for the chips, once the usage report is in, for the types
+ * that can hold content of their own. An Element Type or a composition nothing can
+ * create always counts zero, so its chip shows no number rather than a misleading
+ * 0. A page type with none keeps its 0, which is worth knowing. The test for a
+ * composition is roleOf's, read from the edges because a chip names any type.
  */
 export function contentCountOf(
   report: UsageReport | undefined,
-  nodesById: Map<string, SchemaNode>
+  nodesById: Map<string, SchemaNode>,
+  edges: SchemaEdge[]
 ): (id: string) => number | undefined {
+  const composed = new Set<string>();
+  const parented = new Set<string>();
+  for (const edge of edges) {
+    if (edge.from === edge.to) continue;
+    if (edge.kind === "composition") composed.add(edge.to);
+    if (edge.kind === "allowedChild") parented.add(edge.to);
+  }
+  const ownsContent = (node: SchemaNode | undefined) =>
+    node !== undefined &&
+    !node.isElement &&
+    (node.allowedAsRoot || parented.has(node.id) || !composed.has(node.id));
   return (id) =>
-    report && !nodesById.get(id)?.isElement
+    report && ownsContent(nodesById.get(id))
       ? (report.byType[id]?.total ?? 0)
       : undefined;
 }

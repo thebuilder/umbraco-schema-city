@@ -4,7 +4,6 @@ import {
   type Chip,
   type ConnectionGroup,
   chips,
-  contentCountOf,
   directUsageRows,
   emptyKindsLine,
   type Field,
@@ -27,6 +26,8 @@ export type TabProps = {
   onSelect: (id: string) => void;
   usageReport?: UsageReport;
   usage: UsageState;
+  /** The content count a type's chip shows, or nothing for a type that holds none. */
+  countOf: (id: string) => number | undefined;
 };
 
 function Section({ children }: { children: ReactNode }) {
@@ -107,13 +108,13 @@ function Usage({ usage }: { usage: UsageState }) {
  * is whatever the tab makes of its fields.
  */
 function GroupSection({
+  countOf,
   group,
   limit,
   nodesById,
   onSelect,
   renderFields,
-  usageReport,
-}: Pick<TabProps, "nodesById" | "onSelect" | "usageReport"> & {
+}: Pick<TabProps, "countOf" | "nodesById" | "onSelect"> & {
   group: ConnectionGroup;
   limit: number;
   renderFields: (fields: Field[]) => ReactNode;
@@ -125,11 +126,7 @@ function GroupSection({
       </Heading>
       {"ids" in group ? (
         <TypeChips
-          chips={chips(
-            group.ids,
-            nodesById,
-            contentCountOf(usageReport, nodesById)
-          )}
+          chips={chips(group.ids, nodesById, countOf)}
           limit={limit}
           onSelect={onSelect}
         />
@@ -286,7 +283,7 @@ export function Connections({
   edges,
   ...props
 }: TabProps & { edges: SchemaEdge[] }) {
-  const { groups, node, nodesById, onSelect, usageReport } = props;
+  const { countOf, groups, node, nodesById, onSelect } = props;
   return (
     <>
       {groups.map((group) => (
@@ -305,11 +302,7 @@ export function Connections({
                   </span>
                 </p>
                 <TypeChips
-                  chips={chips(
-                    field.ids,
-                    nodesById,
-                    contentCountOf(usageReport, nodesById)
-                  )}
+                  chips={chips(field.ids, nodesById, countOf)}
                   limit={6}
                   onSelect={onSelect}
                 />

@@ -174,10 +174,30 @@ describe("contentCountOf", () => {
   ]);
 
   it("counts nothing before the report arrives and nothing for Element Types", () => {
-    expect(contentCountOf(undefined, nodesById)("page")).toBeUndefined();
-    const count = contentCountOf(report({ block: used(0) }), nodesById);
+    expect(contentCountOf(undefined, nodesById, [])("page")).toBeUndefined();
+    const count = contentCountOf(report({ block: used(0) }), nodesById, []);
     expect(count("page")).toBe(0);
     expect(count("block")).toBeUndefined();
+  });
+
+  it("counts a composition only when it can also be created", () => {
+    const types = new Map([
+      ["seo", node("seo")],
+      ["article", node("article")],
+      ["home", node("home")],
+      ["rooted", node("rooted", { allowedAsRoot: true })],
+    ]);
+    const edges: SchemaEdge[] = [
+      { kind: "composition", from: "home", to: "seo" },
+      { kind: "composition", from: "home", to: "article" },
+      { kind: "allowedChild", from: "home", to: "article" },
+      { kind: "composition", from: "home", to: "rooted" },
+    ];
+    const count = contentCountOf(report({ article: used(4) }), types, edges);
+    expect(count("seo")).toBeUndefined();
+    expect(count("article")).toBe(4);
+    expect(count("rooted")).toBe(0);
+    expect(count("home")).toBe(0);
   });
 });
 
