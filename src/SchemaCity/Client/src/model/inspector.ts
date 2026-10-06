@@ -8,12 +8,16 @@ export type Role = "page" | "composition" | "element";
 /**
  * The same rule as `roleOf` in scene/buildings.ts, read from the neighbourhood: a
  * composition is composed by something and can never be created, so the badge and
- * the building always agree.
+ * the building always agree. A type with no edges has no neighbourhood entry, and
+ * is a page.
  */
-export function roleOf(node: SchemaNode, around: Neighbourhood): Role {
+export function roleOf(
+  node: SchemaNode,
+  around: Neighbourhood | undefined
+): Role {
   if (node.isElement) return "element";
-  return around.composedBy.length > 0 &&
-    around.allowedParents.length === 0 &&
+  return (around?.composedBy.length ?? 0) > 0 &&
+    (around?.allowedParents.length ?? 0) === 0 &&
     !node.allowedAsRoot
     ? "composition"
     : "page";

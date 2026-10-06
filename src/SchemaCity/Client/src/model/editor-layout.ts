@@ -90,3 +90,55 @@ function addGroup(tab: EditorTab | undefined, group: PropertyGroup) {
   panel.properties.push(...group.properties);
   tab.count += group.properties.length;
 }
+
+/** Stands in for a composition id when a panel's properties come from several places. */
+export const MIXED = "mixed";
+
+/**
+ * Where a panel's properties come from: the id of the one composition they all come
+ * from, null when they are all the type's own, or MIXED. A panel from one
+ * composition says so once on its header; only a mixed one marks its rows.
+ */
+export function panelSource(panel: EditorPanel): string | null {
+  const sources = new Set(
+    panel.properties.map((property) => property.fromCompositionId)
+  );
+  if (sources.size > 1) return MIXED;
+  return [...sources][0] ?? null;
+}
+
+const count = (n: number, one: string, many = `${one}s`) =>
+  `${n} ${n === 1 ? one : many}`;
+
+/**
+ * The header's one line: "29 properties, 18 own and 11 from 3 compositions, 3 tabs".
+ * Tabs only when the type has a tab row, mandatory only when some are.
+ */
+export function editorSummary(tabs: EditorTab[]): string {
+  const properties = tabs.flatMap((tab) =>
+    tab.panels.flatMap((panel) => panel.properties)
+  );
+  if (properties.length === 0) return "No properties";
+  const sources = new Set(
+    properties.flatMap((property) =>
+      property.fromCompositionId ? [property.fromCompositionId] : []
+    )
+  );
+  const composed = properties.filter(
+    (property) => property.fromCompositionId
+  ).length;
+  const own = properties.length - composed;
+  const from = `from ${count(sources.size, "composition")}`;
+  const mandatory = properties.filter((property) => property.mandatory).length;
+  let origin = `${own} own and ${composed} ${from}`;
+  if (composed === 0) origin = "";
+  else if (own === 0) origin = `all ${from}`;
+  return [
+    count(properties.length, "property", "properties"),
+    origin,
+    tabs.some((tab) => tab.key !== "") ? count(tabs.length, "tab") : "",
+    mandatory > 0 ? `${mandatory} mandatory` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}

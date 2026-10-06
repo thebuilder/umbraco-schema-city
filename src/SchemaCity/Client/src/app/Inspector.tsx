@@ -1,13 +1,11 @@
 import { XIcon } from "lucide-react";
 import { type CSSProperties, useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Finding } from "../model/findings";
 import {
   connectionGroups,
   contentCountOf,
-  type Role,
   roleOf,
   usageLine,
   usageState,
@@ -19,6 +17,7 @@ import type {
   TypeUsage,
   UsageReport,
 } from "../model/types";
+import { READING, ROLE, RoleBadges } from "./InspectorChips";
 import {
   FocusExpansionRow,
   InspectorFocusControls,
@@ -47,22 +46,6 @@ export const inspectorWidthFor = (areaWidth: number) =>
 /** The inset a view under the open panel takes, so nothing slides beneath it. */
 export const INSPECTOR_INSET = "pr-[min(340px,100%)] @min-[1024px]:pr-[520px]";
 const PANEL_WIDTH = "w-[min(340px,100%)] @min-[1024px]:w-[520px]";
-
-const ROLE: Record<
-  Role,
-  { label: string; colour: string; badge: "default" | "azure" | "amber" }
-> = {
-  page: { label: "Page", colour: "var(--phosphor)", badge: "default" },
-  composition: {
-    label: "Composition",
-    colour: "var(--azure)",
-    badge: "azure",
-  },
-  element: { label: "Element Type", colour: "var(--amber)", badge: "amber" },
-};
-
-/** The app's mono, uppercase controls, set in the panel's reading type instead. */
-const READING = "font-sans font-medium normal-case tracking-normal";
 
 const WORDS = /\s+/;
 
@@ -195,7 +178,8 @@ export function Inspector({
   const tab = picked.id === node.id ? picked.tab : "overview";
   const pick = (next: Tab) => setPicked({ id: node.id, tab: next });
 
-  const role = ROLE[roleOf(node, neighbourhood)];
+  const kind = roleOf(node, neighbourhood);
+  const role = ROLE[kind];
   const groups = connectionGroups(node, neighbourhood);
   const usageNow = usageState(node, neighbourhood, usageReport, usage);
   const countOf = useMemo(
@@ -232,19 +216,7 @@ export function Inspector({
               <span className="truncate font-mono text-faint text-xs">
                 {node.alias}
               </span>
-              <Badge className={READING} variant={role.badge}>
-                {role.label}
-              </Badge>
-              {node.allowedAsRoot ? (
-                <Badge className={READING} variant="outline">
-                  Root
-                </Badge>
-              ) : null}
-              {node.variesByCulture ? (
-                <Badge className={READING} variant="outline">
-                  Varies by culture
-                </Badge>
-              ) : null}
+              <RoleBadges node={node} role={kind} />
             </div>
           </div>
           <Button

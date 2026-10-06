@@ -9,6 +9,7 @@ import {
   type FindingKind,
   findFindings,
   findingGroups,
+  problemLabels,
 } from "./findings";
 import type {
   SchemaEdge,
@@ -909,4 +910,21 @@ describe("findFindings on the pathological fixture", () => {
     expect(unusedType).toBeGreaterThan(0);
     expect(counts).toEqual({ ...rest, noTemplate: 6 });
   });
+});
+
+it("labels each type by its problems only, in finding order", () => {
+  const finding = (kind: FindingKind, nodeId: string, problem = true) => ({
+    id: `${kind}:${nodeId}`,
+    kind,
+    severity: problem ? ("problem" as const) : ("note" as const),
+    nodeId,
+    summary: "",
+  });
+  const labels = problemLabels([
+    finding("brokenBlock", "a"),
+    finding("unusedType", "a"),
+    finding("complexity", "b", false),
+  ]);
+  expect(labels.get("a")).toBe("Broken block, Unused type");
+  expect(labels.has("b")).toBe(false);
 });
