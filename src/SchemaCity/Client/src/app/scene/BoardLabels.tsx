@@ -43,6 +43,36 @@ const ELEMENT_TINT = 0.35;
 /** Per name in the atlas: u0, v0, u1, v1, the quad's width and height, and its em. */
 const STRIDE = 7;
 
+/**
+ * The types that have a floating label right now. The label layer rewrites it on
+ * every repaint and bumps `version`, so the board can tell its opacities are stale.
+ */
+export type Floated = { ids: Set<string>; version: number };
+
+/** What the opacities were last written from. */
+type Written = {
+  inputs: object | null;
+  reveal: number;
+  floated: number;
+  camera: THREE.Matrix4;
+};
+
+/** True when nothing the opacities depend on has moved since they were written. */
+function unchanged(
+  last: Written,
+  inputs: object,
+  reveal: number,
+  floated: number,
+  camera: THREE.Matrix4
+): boolean {
+  return (
+    last.inputs === inputs &&
+    last.reveal === reveal &&
+    last.floated === floated &&
+    camera.equals(last.camera)
+  );
+}
+
 type Atlas = {
   texture: THREE.CanvasTexture;
   ids: string[];
@@ -221,6 +251,7 @@ function writeOpacities(
   atlas: Atlas,
   placementsById: Map<string, Placement>,
   light: Float32Array,
+  floated: Set<string>,
   reveal: number,
   camera: THREE.Vector3,
   viewportHeight: number,
@@ -238,7 +269,8 @@ function writeOpacities(
         camera,
         anchor
       ),
-      light[i] as number,
+      // A name floating over its building is not printed under it as well.
+      (light[i] as number) * Number(!floated.has(atlas.ids[i] as string)),
       reveal,
       placement.flatten ?? 0
     );
@@ -315,6 +347,7 @@ export function BoardLabels({
   nodesById,
   placementsById,
   interaction,
+  floated,
   palette,
   reducedMotion,
 }: {
@@ -324,6 +357,8 @@ export function BoardLabels({
   /** Where each building stands right now, through a focus tween as well. */
   placementsById: Map<string, Placement>;
   interaction: Interaction;
+  /** The types with a floating label right now, which print nothing here. */
+  floated: Floated;
   palette: { bright: string; amber: string; mono: string };
   reducedMotion: boolean;
 }) {
@@ -349,9 +384,10 @@ export function BoardLabels({
     () => ({ geometry, placementsById, light, height }),
     [geometry, placementsById, light, height]
   );
-  const written = useRef({
-    inputs: null as typeof inputs | null,
+  const written = useRef<Written>({
+    inputs: null,
     reveal: -1,
+    floated: -1,
     camera: new THREE.Matrix4(),
   });
   // Scratch vectors, so the frame loop allocates nothing.
@@ -369,16 +405,14 @@ export function BoardLabels({
   useFrame((state) => {
     const last = written.current;
     const reveal = revealAt(state.clock.elapsedTime, reducedMotion).links;
-    const still =
-      last.inputs === inputs &&
-      last.reveal === reveal &&
-      camera.matrixWorld.equals(last.camera);
-    if (still) return;
+    if (unchanged(last, inputs, reveal, floated.version, camera.matrixWorld))
+      return;
     writeOpacities(
       geometry,
       atlas,
       placementsById,
       light,
+      floated.ids,
       reveal,
       camera.position,
       height,
@@ -386,6 +420,7 @@ export function BoardLabels({
     );
     last.inputs = inputs;
     last.reveal = reveal;
+    last.floated = floated.version;
     last.camera.copy(camera.matrixWorld);
   });
 

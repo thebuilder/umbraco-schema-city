@@ -40,7 +40,7 @@ import {
   layoutFocus,
 } from "./layout/focus";
 import { describeRelationship, uniqueConnections } from "./relationship";
-import { BoardLabels } from "./scene/BoardLabels";
+import { BoardLabels, type Floated } from "./scene/BoardLabels";
 import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
 import {
   type BoardText,
@@ -999,8 +999,8 @@ const LABEL_CLASS =
  *
  * Every type's name is printed on the board as well, legible once the camera is close
  * enough. A related type whose whole name is already legible there gets no floating
- * label, so the screen never says one name twice. The hovered and selected types keep
- * theirs, and the board drops its print of them instead.
+ * label, so the screen never says one name twice. Every other type that keeps a
+ * floating label has its print left off the board, through `floated`.
  *
  * The layer is built and written to by hand rather than through React, because
  * this runs inside the frame loop and forty spans that only ever change their
@@ -1016,6 +1016,7 @@ function Labels({
   neighbours,
   focusNeighbours,
   boardTexts,
+  floated,
   reducedMotion,
 }: {
   nodesById: Map<string, SchemaNode>;
@@ -1027,6 +1028,8 @@ function Labels({
   neighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
   boardTexts: Map<string, BoardText>;
+  /** Written here every repaint: the types that have a floating label now. */
+  floated: Floated;
   reducedMotion: boolean;
 }) {
   const camera = useThree((state) => state.camera);
@@ -1154,6 +1157,10 @@ function Labels({
         }),
       { charPx: charPx.current, width: size.width, height: size.height }
     );
+    // The board leaves out what floats, so a cut print never sits under the whole name.
+    floated.ids.clear();
+    for (const box of kept) floated.ids.add(box.id);
+    floated.version += 1;
 
     spans.current.forEach((span, index) => {
       const box = kept[index];
@@ -2605,6 +2612,9 @@ export default function Scene({
     () => (hovered ? neighboursOf(graph, hovered) : null),
     [graph, hovered]
   );
+  // The floating labels on screen, which the board leaves out. Shared by reference and
+  // written in the frame loop, so passing it on costs no render.
+  const floated = useMemo<Floated>(() => ({ ids: new Set(), version: 0 }), []);
   const interaction = useMemo(
     () => ({ hovered, selected, neighbours, hoveredNeighbours }),
     [hovered, selected, neighbours, hoveredNeighbours]
@@ -2831,6 +2841,7 @@ export default function Scene({
             placements={placements}
           />
           <BoardLabels
+            floated={floated}
             interaction={interaction}
             nodesById={nodesById}
             palette={palette}
@@ -2840,6 +2851,7 @@ export default function Scene({
           />
           <Labels
             boardTexts={boardTexts}
+            floated={floated}
             focusNeighbours={focusNeighbours}
             heights={heights}
             hovered={hovered}
