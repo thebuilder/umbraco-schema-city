@@ -17,6 +17,10 @@
 //   one hub with 60 children, one child with 12 parents
 //   10 compositions used by 100 types, 2 used by nothing
 //   5 types with no properties, 20 with 30 properties across 6 groups
+//   one empty Element Type a block editor lists (block39)
+//   one tab over 20 properties only once its composition is counted (editorial40)
+//   culture variance with no effect: a variant Element Type in an invariant
+//   host's block editor (block05), and a variant property on an invariant root (root2)
 //   block editors covering every Element Type from 30 hosts, plus 3 broken ones
 //   4 types with a property alias arriving from two compositions
 //   7 Data Types, two named nearly like another (Text String, SEO Toggle)
@@ -324,6 +328,8 @@ for (const [alias, targets] of referencesOf)
 // the property rows they carry vary too.
 const MULTILINGUAL = ["root0", "root1", "hubPage", "page00", "editorial00"];
 for (const alias of MULTILINGUAL) byAlias.get(alias).variesByCulture = true;
+// Its host, editorial05, is invariant, so this Element Type's variance has no effect.
+byAlias.get("block05").variesByCulture = true;
 
 // ------------------------------------------------------------------ properties
 
@@ -421,6 +427,22 @@ for (const alias of mixins.slice(0, 2)) {
   const mixin = byAlias.get(alias);
   mixin.groups[0].properties.push(property(mixin, DUPLICATE_ALIAS));
 }
+
+// The plants below come after the Data Type rotation, so every other type keeps the
+// Data Types it had before they existed.
+// editorial40's Content tab holds 17 of its own, and only the four its composition's
+// Content tab merges in take it over the overloaded tab limit of 20.
+const crowded = byAlias.get("editorial40");
+const crowdedTab = crowded.groups[0].properties;
+crowdedTab.push(
+  ...range(17 - crowdedTab.length, crowdedTab.length).map((i) =>
+    property(crowded, `editorial40Field${pad(i)}`)
+  )
+);
+// An Element Type block editors list, with nothing in it.
+byAlias.get("block39").groups = [];
+// A variant property on a root that does not vary by culture.
+byAlias.get("root2").groups[0].properties[0].variesByCulture = true;
 
 for (const node of nodes)
   node.ownPropertyCount = node.groups.reduce(

@@ -1,6 +1,15 @@
 {
   "generatedAt": "2026-09-03T09:12:00Z",
   "byType": {
+    "a0000000-0000-4000-8000-00000000000a": {
+      "total": 0,
+      "published": 0,
+      "drafts": 0,
+      "trashed": 0,
+      "rootInstances": 0,
+      "cultures": [],
+      "lastEdited": null
+    },
     "a0000000-0000-4000-8000-000000000001": {
       "total": 2,
       "published": 2,

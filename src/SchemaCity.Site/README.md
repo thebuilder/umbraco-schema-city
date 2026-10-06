@@ -37,8 +37,8 @@ environment still writes a generated key into `appsettings.json`; revert that fi
 ## Seed data
 
 `Seed/SchemaSeeder.cs` runs only in Development, on the first boot of an install with no Document
-Types. It creates 78 Document Types: 15 Element Types, 7 compositions, and 56 structure types.
-They use 3 folders, 5 Data Types, 3 templates, 2 languages, and 193 content items. It also plants the findings
+Types. It creates 86 Document Types: 17 Element Types, 7 compositions, and 62 structure types.
+They use 3 folders, 9 Data Types, 3 templates, 2 languages, and 193 content items. It also plants the findings
 listed in `SchemaSeeder.PlantedFindings`. Reset the demo database to seed again.
 
 Every Development boot writes `medium.json` and `medium-usage.json` to

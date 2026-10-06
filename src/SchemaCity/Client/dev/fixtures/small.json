@@ -138,14 +138,28 @@
               "editorAlias": "Umbraco.TextBox",
               "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
               "mandatory": false,
-              "variesByCulture": false,
+              "variesByCulture": true,
               "fromCompositionId": null,
               "targets": []
+            },
+            {
+              "alias": "quotes",
+              "name": "Quotes",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000007",
+              "dataTypeName": "Page Grid",
+              "editorAlias": "Umbraco.BlockGrid",
+              "editorUiAlias": "Umb.PropertyEditorUi.BlockGrid",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                { "nodeId": "b0000000-0000-4000-8000-000000000002", "role": "content" }
+              ]
             }
           ]
         }
       ],
-      "ownPropertyCount": 2,
+      "ownPropertyCount": 3,
       "composedPropertyCount": 0,
       "templates": [
         {
@@ -201,7 +215,8 @@
               "fromCompositionId": null,
               "targets": [
                 { "nodeId": "b0000000-0000-4000-8000-000000000001", "role": "content" },
-                { "nodeId": "b0000000-0000-4000-8000-000000000003", "role": "settings" }
+                { "nodeId": "b0000000-0000-4000-8000-000000000003", "role": "settings" },
+                { "nodeId": "b0000000-0000-4000-8000-000000000004", "role": "content" }
               ]
             }
           ]
@@ -335,7 +350,8 @@
               "fromCompositionId": "a0000000-0000-4000-8000-000000000003",
               "targets": [
                 { "nodeId": "b0000000-0000-4000-8000-000000000001", "role": "content" },
-                { "nodeId": "b0000000-0000-4000-8000-000000000003", "role": "settings" }
+                { "nodeId": "b0000000-0000-4000-8000-000000000003", "role": "settings" },
+                { "nodeId": "b0000000-0000-4000-8000-000000000004", "role": "content" }
               ]
             }
           ]
@@ -424,11 +440,251 @@
               "variesByCulture": true,
               "fromCompositionId": null,
               "targets": []
+            },
+            {
+              "alias": "filter01",
+              "name": "Filter 01",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter02",
+              "name": "Filter 02",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter03",
+              "name": "Filter 03",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter04",
+              "name": "Filter 04",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter05",
+              "name": "Filter 05",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter06",
+              "name": "Filter 06",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter07",
+              "name": "Filter 07",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter08",
+              "name": "Filter 08",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter09",
+              "name": "Filter 09",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter10",
+              "name": "Filter 10",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter11",
+              "name": "Filter 11",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter12",
+              "name": "Filter 12",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter13",
+              "name": "Filter 13",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter14",
+              "name": "Filter 14",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter15",
+              "name": "Filter 15",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter16",
+              "name": "Filter 16",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter17",
+              "name": "Filter 17",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter18",
+              "name": "Filter 18",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter19",
+              "name": "Filter 19",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "filter20",
+              "name": "Filter 20",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000001",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": true,
+              "fromCompositionId": null,
+              "targets": []
             }
           ]
         }
       ],
-      "ownPropertyCount": 1,
+      "ownPropertyCount": 21,
       "composedPropertyCount": 0,
       "templates": [
         {
@@ -592,11 +848,35 @@
               "variesByCulture": false,
               "fromCompositionId": null,
               "targets": []
+            },
+            {
+              "alias": "hideInNav",
+              "name": "Hide in navigation",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000009",
+              "dataTypeName": "SEO Toggle",
+              "editorAlias": "Umbraco.TrueFalse",
+              "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "hideFromSearch",
+              "name": "Hide from search",
+              "dataTypeId": "d0000000-0000-4000-8000-00000000000a",
+              "dataTypeName": "Seo Toggle",
+              "editorAlias": "Umbraco.TrueFalse",
+              "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
             }
           ]
         }
       ],
-      "ownPropertyCount": 1,
+      "ownPropertyCount": 3,
       "composedPropertyCount": 0,
       "templates": [
         {
@@ -606,6 +886,46 @@
           "isDefault": true
         }
       ]
+    },
+    {
+      "id": "a0000000-0000-4000-8000-00000000000a",
+      "alias": "biography",
+      "name": "Biography",
+      "icon": "icon-user",
+      "iconColor": null,
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "Allowed only under Person, which nothing allows, so no root leads here.",
+      "groups": [
+        {
+          "id": "g0000000-0000-4000-8000-000000000010",
+          "alias": "content",
+          "name": "Content",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "biographyText",
+              "name": "Biography text",
+              "dataTypeId": "d0000000-0000-4000-8000-000000000003",
+              "dataTypeName": "Textarea",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 1,
+      "composedPropertyCount": 0,
+      "templates": []
     },
     {
       "id": "b0000000-0000-4000-8000-000000000001",
@@ -668,7 +988,7 @@
       "folderId": "f0000000-0000-4000-8000-000000000001",
       "isElement": true,
       "allowedAsRoot": false,
-      "variesByCulture": false,
+      "variesByCulture": true,
       "variesBySegment": false,
       "description": null,
       "groups": [
@@ -750,6 +1070,23 @@
       "ownPropertyCount": 1,
       "composedPropertyCount": 0,
       "templates": []
+    },
+    {
+      "id": "b0000000-0000-4000-8000-000000000004",
+      "alias": "dividerBlock",
+      "name": "Divider block",
+      "icon": "icon-brick",
+      "iconColor": null,
+      "folderId": "f0000000-0000-4000-8000-000000000001",
+      "isElement": true,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "A content block with no properties at all.",
+      "groups": [],
+      "ownPropertyCount": 0,
+      "composedPropertyCount": 0,
+      "templates": []
     }
   ],
   "edges": [
@@ -759,6 +1096,7 @@
     { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000002", "to": "a0000000-0000-4000-8000-000000000003" },
     { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000003", "to": "a0000000-0000-4000-8000-000000000003" },
     { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000005", "to": "a0000000-0000-4000-8000-000000000004" },
+    { "kind": "allowedChild", "from": "a0000000-0000-4000-8000-000000000008", "to": "a0000000-0000-4000-8000-00000000000a" },
     { "kind": "composition", "from": "a0000000-0000-4000-8000-000000000001", "to": "a0000000-0000-4000-8000-000000000006" },
     { "kind": "composition", "from": "a0000000-0000-4000-8000-000000000003", "to": "a0000000-0000-4000-8000-000000000006" },
     { "kind": "composition", "from": "a0000000-0000-4000-8000-000000000004", "to": "a0000000-0000-4000-8000-000000000006" },
@@ -766,6 +1104,8 @@
     { "kind": "inherits", "from": "a0000000-0000-4000-8000-000000000004", "to": "a0000000-0000-4000-8000-000000000003" },
     { "kind": "block", "from": "a0000000-0000-4000-8000-000000000003", "to": "b0000000-0000-4000-8000-000000000001", "propertyAlias": "blocks", "role": "content" },
     { "kind": "block", "from": "a0000000-0000-4000-8000-000000000003", "to": "b0000000-0000-4000-8000-000000000003", "propertyAlias": "blocks", "role": "settings" },
+    { "kind": "block", "from": "a0000000-0000-4000-8000-000000000003", "to": "b0000000-0000-4000-8000-000000000004", "propertyAlias": "blocks", "role": "content" },
+    { "kind": "block", "from": "a0000000-0000-4000-8000-000000000002", "to": "b0000000-0000-4000-8000-000000000002", "propertyAlias": "quotes", "role": "content" },
     { "kind": "block", "from": "a0000000-0000-4000-8000-000000000004", "to": "b0000000-0000-4000-8000-000000000002", "propertyAlias": "quotes", "role": "content" },
     { "kind": "reference", "from": "a0000000-0000-4000-8000-000000000004", "to": "a0000000-0000-4000-8000-000000000008", "propertyAlias": "author" }
   ]

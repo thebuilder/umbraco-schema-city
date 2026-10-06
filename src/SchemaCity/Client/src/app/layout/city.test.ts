@@ -184,9 +184,9 @@ describe("cityDistricts", () => {
   it("gives the medium fixture one district per top-level folder plus Unfiled", () => {
     expect(summarise(medium)).toEqual([
       { name: "Compositions", kind: "compositions", size: 7 },
-      { name: "Elements", kind: "elements", size: 15 },
-      { name: "Pages", kind: "structure", size: 42 },
-      { name: "Unfiled", kind: "structure", size: 14 },
+      { name: "Elements", kind: "elements", size: 17 },
+      { name: "Pages", kind: "structure", size: 47 },
+      { name: "Unfiled", kind: "structure", size: 15 },
     ]);
   });
 
@@ -194,7 +194,7 @@ describe("cityDistricts", () => {
     const { placements, districts } = cityDistricts(medium);
     const kinds = new Map(districts.map((d) => [d.id, d.kind]));
 
-    expect(placements).toHaveLength(78);
+    expect(placements).toHaveLength(86);
     for (const placement of placements) {
       expect(kinds.get(placement.district)).toBe(placement.districtKind);
     }
@@ -234,8 +234,8 @@ describe("cityDistricts", () => {
     expect(summarise(folderless)).toEqual([
       { name: "Pages", kind: "structure", size: 6 },
       { name: "Compositions", kind: "compositions", size: 1 },
-      { name: "Elements", kind: "elements", size: 3 },
-      { name: "Unplaced", kind: "mixed", size: 2 },
+      { name: "Elements", kind: "elements", size: 4 },
+      { name: "Unplaced", kind: "mixed", size: 3 },
     ]);
   });
 
@@ -487,7 +487,7 @@ describe("layoutCity", () => {
     const unfiled = layoutCity(small).filter((p) => p.district === "unfiled");
     const rows = new Set(unfiled.map((p) => p.position.z));
 
-    expect(unfiled.length).toBe(9);
+    expect(unfiled.length).toBe(10);
     expect(rows.size).toBeGreaterThan(1);
   });
 
