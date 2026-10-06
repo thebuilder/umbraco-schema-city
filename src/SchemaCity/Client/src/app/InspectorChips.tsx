@@ -2,7 +2,7 @@ import { type ReactNode, useState } from "react";
 import type { Chip, Trace } from "../model/inspector";
 
 /** The swatch beside a heading, in the colour the city draws that kind of link. */
-export const TRACE_SWATCH: Record<Trace, string> = {
+const TRACE_SWATCH: Record<Trace, string> = {
   structure: "bg-structure",
   compositions: "bg-azure",
   blocks: "bg-amber",

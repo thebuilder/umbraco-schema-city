@@ -38,7 +38,7 @@ export type ThroughUsage = {
  * that one's own content, which is none; walk composedBy transitively if nested
  * mixins turn up in real schemas.
  */
-export function throughUsage(
+function throughUsage(
   around: Neighbourhood,
   report: UsageReport
 ): ThroughUsage {
@@ -65,27 +65,63 @@ export function throughUsage(
 const items = (count: number) =>
   `${count.toLocaleString()} ${count === 1 ? "item" : "items"}`;
 
-/** The one line under the type's name about how much content it has. */
-export function usageLine(
+/** Which of the usage stories applies to a type, with what it needs to tell it. */
+export type UsageState =
+  | { kind: "loading" | "element" | "none" }
+  | { kind: "direct"; usage: TypeUsage }
+  | { kind: "through"; through: ThroughUsage };
+
+export function usageState(
   node: SchemaNode,
   around: Neighbourhood,
   report: UsageReport | undefined,
   usage: TypeUsage | undefined
-): string {
-  if (!report) return "Content usage has not loaded yet";
-  const total = usage?.total ?? 0;
-  if (total > 0)
-    return `${total.toLocaleString()} content ${total === 1 ? "item" : "items"}, ${(usage?.published ?? 0).toLocaleString()} published`;
+): UsageState {
+  if (!report) return { kind: "loading" };
+  if (usage && usage.total > 0) return { kind: "direct", usage };
   // Block values are stored inside the content that hosts them, so an Element
   // Type is never counted as a content item of its own.
-  if (node.isElement)
-    return "Element Types live inside block values, not as content items";
-  if (around.composedBy.length === 0) return "No content items yet";
-  const through = throughUsage(around, report);
-  const users = `${through.of} ${through.of === 1 ? "type" : "types"} that use it`;
-  return through.total === 0
-    ? `No content of its own, and none through the ${users}`
-    : `No content of its own. ${items(through.total)} through ${through.withContent} of the ${users}`;
+  if (node.isElement) return { kind: "element" };
+  if (around.composedBy.length === 0) return { kind: "none" };
+  return { kind: "through", through: throughUsage(around, report) };
+}
+
+/** The one line under the type's name about how much content it has. */
+export function usageLine(state: UsageState): string {
+  switch (state.kind) {
+    case "loading":
+      return "Content usage has not loaded yet";
+    case "element":
+      return "Element Types live inside block values, not as content items";
+    case "none":
+      return "No content items yet";
+    case "direct":
+      return `${state.usage.total.toLocaleString()} content ${state.usage.total === 1 ? "item" : "items"}, ${state.usage.published.toLocaleString()} published`;
+    default: {
+      const { through } = state;
+      const users = `${through.of} ${through.of === 1 ? "type" : "types"} that use it`;
+      return through.total === 0
+        ? `No content of its own, and none through the ${users}`
+        : `No content of its own. ${items(through.total)} through ${through.withContent} of the ${users}`;
+    }
+  }
+}
+
+/** A type's own usage as label and value rows. */
+export function directUsageRows(usage: TypeUsage): [string, string][] {
+  return [
+    ["Published", usage.published.toLocaleString()],
+    ["Drafts", usage.drafts.toLocaleString()],
+    ["Trashed", usage.trashed.toLocaleString()],
+    ["Root instances", usage.rootInstances.toLocaleString()],
+    [
+      "Cultures",
+      usage.cultures.length > 0 ? usage.cultures.join(", ") : "none",
+    ],
+    // The date half of the timestamp, not a formatted local date, so the panel
+    // reads the same on every machine the backoffice runs on.
+    ["Last edited", usage.lastEdited ? usage.lastEdited.slice(0, 10) : "never"],
+  ];
 }
 
 export type Chip = { id: string; name: string | null; count?: number };

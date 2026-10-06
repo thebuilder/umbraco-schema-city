@@ -3,7 +3,13 @@ import type { PropertyGroup, SchemaNode } from "../model/types";
 
 type Lookup = Map<string, SchemaNode>;
 
-function From({ id, nodesById }: { id: string; nodesById: Lookup }) {
+/**
+ * The composition a group or property comes from. A whole group can come from one
+ * composition, and then the header already says so, so only a property that
+ * differs from its group passes an id.
+ */
+function From({ id, nodesById }: { id: string | null; nodesById: Lookup }) {
+  if (!id) return null;
   return (
     <span className="text-azure text-xs">
       from {nodesById.get(id)?.name ?? "a deleted type"}
@@ -37,12 +43,14 @@ function Rows({
             <p className="truncate font-mono text-2xs text-faint">
               {property.alias}
             </p>
-            {/* A whole group can come from one composition, and then the header
-                already says so, so only a property that differs repeats it. */}
-            {property.fromCompositionId &&
-            property.fromCompositionId !== group.fromCompositionId ? (
-              <From id={property.fromCompositionId} nodesById={nodesById} />
-            ) : null}
+            <From
+              id={
+                property.fromCompositionId === group.fromCompositionId
+                  ? null
+                  : property.fromCompositionId
+              }
+              nodesById={nodesById}
+            />
           </div>
           {/* The Data Type is what an editor recognises; the editor alias behind it
               stays one hover away. */}

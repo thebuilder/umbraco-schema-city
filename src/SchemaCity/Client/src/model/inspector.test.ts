@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   chips,
   connectionGroups,
+  directUsageRows,
   emptyKindsLine,
   observedReferences,
   roleOf,
   usageLine,
+  usageState,
 } from "./inspector";
 import { neighbourhoods } from "./neighbourhood";
 import type { SchemaEdge, SchemaNode, TypeUsage, UsageReport } from "./types";
@@ -62,28 +64,31 @@ const seoEdges: SchemaEdge[] = ["a", "b", "c"].map((from) => ({
   to: "seo",
 }));
 
+const line = (...args: Parameters<typeof usageState>) =>
+  usageLine(usageState(...args));
+
 describe("usageLine", () => {
   const lone = node("x");
   const plain = around([lone], [], "x");
   const seoNode = seo[0] as SchemaNode;
 
   it("says when the usage report has not arrived", () => {
-    expect(usageLine(lone, plain, undefined, undefined)).toBe(
+    expect(line(lone, plain, undefined, undefined)).toBe(
       "Content usage has not loaded yet"
     );
   });
 
   it("counts a type's own content", () => {
-    expect(usageLine(lone, plain, report({}), used(162, 152))).toBe(
+    expect(line(lone, plain, report({}), used(162, 152))).toBe(
       "162 content items, 152 published"
     );
-    expect(usageLine(lone, plain, report({}), used(1))).toBe(
+    expect(line(lone, plain, report({}), used(1))).toBe(
       "1 content item, 1 published"
     );
   });
 
   it("says a type with no content has none", () => {
-    expect(usageLine(lone, plain, report({}), undefined)).toBe(
+    expect(line(lone, plain, report({}), undefined)).toBe(
       "No content items yet"
     );
   });
@@ -91,20 +96,32 @@ describe("usageLine", () => {
   it("does not count an Element Type as content", () => {
     const block = node("block", { isElement: true });
     expect(
-      usageLine(block, around([block], [], "block"), report({}), undefined)
+      line(block, around([block], [], "block"), report({}), undefined)
     ).toBe("Element Types live inside block values, not as content items");
   });
 
   it("sums a composition's content over the types that use it", () => {
     const usage = report({ a: used(160), b: used(28, 18), c: used(0) });
-    expect(
-      usageLine(seoNode, around(seo, seoEdges, "seo"), usage, undefined)
-    ).toBe(
+    expect(line(seoNode, around(seo, seoEdges, "seo"), usage, undefined)).toBe(
       "No content of its own. 188 items through 2 of the 3 types that use it"
     );
     expect(
-      usageLine(seoNode, around(seo, seoEdges, "seo"), report({}), undefined)
+      line(seoNode, around(seo, seoEdges, "seo"), report({}), undefined)
     ).toBe("No content of its own, and none through the 3 types that use it");
+  });
+});
+
+describe("directUsageRows", () => {
+  it("prints the date half of the last edit and none for no cultures", () => {
+    expect(
+      directUsageRows({
+        ...used(3, 2),
+        cultures: [],
+        lastEdited: "2026-09-03T10:00:00Z",
+      })
+    ).toContainEqual(["Last edited", "2026-09-03"]);
+    expect(directUsageRows(used(3))).toContainEqual(["Cultures", "none"]);
+    expect(directUsageRows(used(3))).toContainEqual(["Last edited", "never"]);
   });
 });
 

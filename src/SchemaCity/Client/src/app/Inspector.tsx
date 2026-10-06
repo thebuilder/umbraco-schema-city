@@ -9,6 +9,7 @@ import {
   type Role,
   roleOf,
   usageLine,
+  usageState,
 } from "../model/inspector";
 import type { Neighbourhood } from "../model/neighbourhood";
 import type {
@@ -195,13 +196,14 @@ export function Inspector({
 
   const role = ROLE[roleOf(node, neighbourhood)];
   const groups = connectionGroups(node, neighbourhood);
+  const usageNow = usageState(node, neighbourhood, usageReport, usage);
   const tabProps = {
     groups,
     neighbourhood,
     node,
     nodesById,
     onSelect,
-    usage,
+    usage: usageNow,
     usageReport,
   };
 
@@ -248,9 +250,7 @@ export function Inspector({
             <XIcon />
           </Button>
         </div>
-        <p className="mt-2.5 text-label">
-          {usageLine(node, neighbourhood, usageReport, usage)}
-        </p>
+        <p className="mt-2.5 text-label">{usageLine(usageNow)}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <InspectorFocusControls
             className={READING}
