@@ -8,7 +8,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   FINDING_KINDS,
   FINDING_LABEL,
@@ -19,6 +18,7 @@ import {
 } from "../model/findings";
 import { findingsCsv } from "../model/findings-export";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
+import { READING } from "./InspectorChips";
 
 /**
  * One finding. The group above it carries the kind and what it means, so the row
@@ -36,14 +36,14 @@ function Row({
 }) {
   return (
     <button
-      className="block w-full border-line border-b bg-panel-sunken px-2 py-1.5 text-left hover:border-line-strong hover:bg-accent/60"
+      className="group block w-full border-line/40 border-t px-3 py-1.5 text-left first:border-t-0 hover:bg-accent/50"
       onClick={() => onSelect(finding.nodeId)}
       type="button"
     >
-      <span className="block truncate text-phosphor text-xs">{name}</span>
-      <span className="block text-muted-foreground text-3xs">
-        {finding.summary}
+      <span className="block truncate text-prose group-hover:text-phosphor">
+        {name}
       </span>
+      <span className="block text-label text-xs">{finding.summary}</span>
     </button>
   );
 }
@@ -66,31 +66,36 @@ function Group({
   nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
 }) {
-  const severity = rows[0]?.severity;
+  const problem = rows[0]?.severity === "problem";
   return (
-    <details open={open}>
-      <summary className="flex cursor-pointer items-baseline gap-2 py-1">
-        <span className="font-bold text-3xs text-phosphor uppercase tracking-terminal-xl">
+    <details
+      className={`border-l-2 bg-muted ${problem ? "border-signal" : "border-label"}`}
+      open={open}
+    >
+      <summary className="flex cursor-pointer items-baseline gap-2 px-3 pt-2.5 pb-1">
+        <span
+          className={`font-semibold ${problem ? "text-signal" : "text-label"}`}
+        >
           {FINDING_LABEL[kind]}
         </span>
-        <span className="text-3xs text-phosphor-dim">{rows.length}</span>
+        <span className="font-mono text-2xs text-faint">{rows.length}</span>
         <span
-          className={`ml-auto text-3xs uppercase tracking-terminal ${severity === "problem" ? "text-signal" : "text-phosphor-dim"}`}
+          className={`ml-auto text-xs ${problem ? "text-signal" : "text-faint"}`}
         >
-          {severity}
+          {problem ? "Problem" : "Note"}
         </span>
       </summary>
-      <p className="mb-1 text-3xs text-muted-foreground">
-        {KIND_EXPLANATION[kind]}
-      </p>
-      {rows.map((finding) => (
-        <Row
-          finding={finding}
-          key={finding.id}
-          name={nodesById.get(finding.nodeId)?.name ?? "a deleted type"}
-          onSelect={onSelect}
-        />
-      ))}
+      <p className="px-3 pb-2 text-label text-xs">{KIND_EXPLANATION[kind]}</p>
+      <div className="border-line/40 border-t bg-panel">
+        {rows.map((finding) => (
+          <Row
+            finding={finding}
+            key={finding.id}
+            name={nodesById.get(finding.nodeId)?.name ?? "a deleted type"}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
     </details>
   );
 }
@@ -132,6 +137,12 @@ export function Findings({
   const problems = findings.filter(
     (finding) => finding.severity === "problem"
   ).length;
+  const toggle = (kind: FindingKind) =>
+    setKinds(
+      kinds.includes(kind)
+        ? kinds.filter((picked) => picked !== kind)
+        : [...kinds, kind]
+    );
 
   const pick = (id: string) => {
     onSelect(id);
@@ -163,52 +174,82 @@ export function Findings({
           {findings.length}
         </Badge>
       </SheetTrigger>
-      <SheetContent className="w-full gap-0 p-0 sm:max-w-md">
-        <div className="border-line border-b px-4 py-3">
-          <SheetTitle className="text-sm uppercase tracking-terminal-lg">
+      <SheetContent className="w-full gap-0 p-0 font-sans text-[13px] text-prose leading-normal sm:max-w-md">
+        <div className="border-line border-b px-4 pt-4 pb-3">
+          <SheetTitle className="font-sans font-semibold text-[17px] text-foreground">
             Findings
           </SheetTitle>
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <p className="text-muted-foreground text-xs">
-              {matched.length} matched / {findings.length} total
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <p className="text-label">
+              <span className="font-mono">{findings.length}</span> findings,{" "}
+              <span
+                className={`font-mono ${problems > 0 ? "text-signal" : ""}`}
+              >
+                {problems}
+              </span>{" "}
+              {problems === 1 ? "problem" : "problems"}
+              {matched.length === findings.length ? null : (
+                <>
+                  , <span className="font-mono">{matched.length}</span> shown
+                </>
+              )}
             </p>
-            <Button onClick={exportCsv} size="sm" variant="outline">
+            <Button
+              className={READING}
+              onClick={exportCsv}
+              size="sm"
+              variant="outline"
+            >
               Export CSV
             </Button>
           </div>
           {usage ? null : (
-            <p className="mt-1 text-3xs text-amber">
+            <p className="mt-1 text-faint text-xs">
               Usage snapshot unavailable; usage-dependent checks are omitted.
             </p>
           )}
         </div>
 
         {present.length > 0 ? (
-          <ToggleGroup
+          // Chips like the inspector's: none picked means every kind.
+          <fieldset
             aria-label="Filter findings by kind"
-            // The group primitive paints bg-line under a 1px padding, so the gaps
-            // between chips read as hairlines. That only works while the chips cover
-            // the box: these wrap, and the short last line left the bare bg-line
-            // showing as a lit rectangle. Transparent here, so the chips are the only
-            // thing with a background and the gaps show the panel behind them.
-            className="m-3 flex-wrap bg-transparent"
-            multiple
-            onValueChange={(value) => setKinds(value as FindingKind[])}
-            size="sm"
-            value={kinds}
+            className="flex flex-wrap gap-1 px-4 py-3"
           >
-            {present.map((kind) => (
-              <ToggleGroupItem key={kind} value={kind}>
-                {FINDING_LABEL[kind]} {countOf(kind)}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+            {present.map((kind) => {
+              const on = kinds.includes(kind);
+              const problem = findings.some(
+                (finding) =>
+                  finding.kind === kind && finding.severity === "problem"
+              );
+              return (
+                <button
+                  aria-pressed={on}
+                  className={`inline-flex items-baseline gap-1 border px-1.5 py-0.5 text-xs ${
+                    on
+                      ? "border-phosphor bg-accent text-phosphor-bright"
+                      : "border-line bg-muted text-prose hover:border-phosphor hover:text-phosphor"
+                  }`}
+                  key={kind}
+                  onClick={() => toggle(kind)}
+                  type="button"
+                >
+                  {FINDING_LABEL[kind]}
+                  <span
+                    className={`font-mono text-2xs ${problem ? "text-signal" : "text-faint"}`}
+                  >
+                    {countOf(kind)}
+                  </span>
+                </button>
+              );
+            })}
+          </fieldset>
         ) : null}
 
         <ScrollArea className="min-h-0 flex-1">
-          <div className="space-y-3 px-3 pb-4">
+          <div className="space-y-2 px-4 pb-4">
             {matched.length === 0 ? (
-              <p className="text-muted-foreground text-xs">
+              <p className="text-faint text-xs">
                 {findings.length === 0
                   ? "Nothing to report about this schema."
                   : "No finding of those kinds."}
