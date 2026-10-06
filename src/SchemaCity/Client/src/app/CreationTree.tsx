@@ -10,11 +10,11 @@ import {
   type TreeRow,
   treeRows,
 } from "../model/creation-tree";
-import { type Finding, problemLabels } from "../model/findings";
+import { problemLabels } from "../model/findings";
 import { chips, contentCountOf } from "../model/inspector";
-import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
+import type { SchemaNode } from "../model/types";
 import { FindingDot, Heading, READING, TypeChips } from "./InspectorChips";
-import { FilterField, useMatches } from "./TypeTable";
+import { FilterField, type ListProps, useMatches } from "./TypeTable";
 
 /**
  * Every row key there is to open, found a level at a time until nothing new shows.
@@ -183,23 +183,8 @@ function Unreachable({
   );
 }
 
-export function CreationTree({
-  graph,
-  usage,
-  findings,
-  query,
-  onQuery,
-  selected,
-  onSelect,
-}: {
-  graph: SchemaGraph;
-  usage?: UsageReport;
-  findings: Finding[];
-  query: string;
-  onQuery: (query: string) => void;
-  selected: string | null;
-  onSelect: (id: string) => void;
-}) {
+export function CreationTree(props: ListProps) {
+  const { graph, usage, findings, query, onQuery } = props;
   const tree = useMemo(() => creationTree(graph), [graph]);
   const names = useMemo(
     () => new Map(graph.nodes.map((node) => [node.id, node])),
@@ -220,7 +205,13 @@ export function CreationTree({
     () => treeRows(tree, expanded, matched ?? undefined),
     [tree, expanded, matched]
   );
-  const marks: Marks = { names, selected, onSelect, countOf, problems };
+  const marks: Marks = {
+    names,
+    selected: props.selected,
+    onSelect: props.onSelect,
+    countOf,
+    problems,
+  };
 
   const toggle = (key: string) =>
     setExpanded((was) => {

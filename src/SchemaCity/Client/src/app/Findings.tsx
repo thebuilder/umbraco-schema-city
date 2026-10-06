@@ -13,6 +13,7 @@ import {
   FINDING_LABEL,
   type Finding,
   type FindingKind,
+  type FindingSeverity,
   findingGroups,
   KIND_EXPLANATION,
 } from "../model/findings";
@@ -48,6 +49,15 @@ function Row({
   );
 }
 
+/** Pink for a problem and grey for a note, as the inspector's checks draw them. */
+const TONE: Record<
+  FindingSeverity,
+  { border: string; text: string; word: string }
+> = {
+  problem: { border: "border-signal", text: "text-signal", word: "Problem" },
+  note: { border: "border-label", text: "text-label", word: "Note" },
+};
+
 /**
  * The findings of one kind under a header that says once what they mean. Problems
  * start open and notes closed; picking a note's chip opens it, since that is a
@@ -66,24 +76,15 @@ function Group({
   nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
 }) {
-  const problem = rows[0]?.severity === "problem";
+  const tone = TONE[rows[0]?.severity ?? "note"];
   return (
-    <details
-      className={`border-l-2 bg-muted ${problem ? "border-signal" : "border-label"}`}
-      open={open}
-    >
+    <details className={`border-l-2 bg-muted ${tone.border}`} open={open}>
       <summary className="flex cursor-pointer items-baseline gap-2 px-3 pt-2.5 pb-1">
-        <span
-          className={`font-semibold ${problem ? "text-signal" : "text-label"}`}
-        >
+        <span className={`font-semibold ${tone.text}`}>
           {FINDING_LABEL[kind]}
         </span>
         <span className="font-mono text-2xs text-faint">{rows.length}</span>
-        <span
-          className={`ml-auto text-xs ${problem ? "text-signal" : "text-faint"}`}
-        >
-          {problem ? "Problem" : "Note"}
-        </span>
+        <span className={`ml-auto text-xs ${tone.text}`}>{tone.word}</span>
       </summary>
       <p className="px-3 pb-2 text-label text-xs">{KIND_EXPLANATION[kind]}</p>
       <div className="border-line/40 border-t bg-panel">

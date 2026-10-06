@@ -145,6 +145,18 @@ export function useMatches(graph: SchemaGraph, query: string) {
   }, [graph.nodes, query]);
 }
 
+/** What the List and Tree views are given. */
+export type ListProps = {
+  graph: SchemaGraph;
+  usage?: UsageReport;
+  findings: Finding[];
+  /** The palette's query, so a search survives the switch between views. */
+  query: string;
+  onQuery: (query: string) => void;
+  selected: string | null;
+  onSelect: (id: string) => void;
+};
+
 export function TypeTable({
   graph,
   usage,
@@ -153,16 +165,7 @@ export function TypeTable({
   onQuery,
   selected,
   onSelect,
-}: {
-  graph: SchemaGraph;
-  usage?: UsageReport;
-  findings: Finding[];
-  /** The palette's query, so a search survives the switch between the two views. */
-  query: string;
-  onQuery: (query: string) => void;
-  selected: string | null;
-  onSelect: (id: string) => void;
-}) {
+}: ListProps) {
   const [sort, setSort] = useState<{ key: SortKey; ascending: boolean }>({
     key: "name",
     ascending: true,
