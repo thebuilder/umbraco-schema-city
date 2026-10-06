@@ -67,6 +67,7 @@ const items = (count: number) =>
 
 /** The one line under the type's name about how much content it has. */
 export function usageLine(
+  node: SchemaNode,
   around: Neighbourhood,
   report: UsageReport | undefined,
   usage: TypeUsage | undefined
@@ -75,6 +76,10 @@ export function usageLine(
   const total = usage?.total ?? 0;
   if (total > 0)
     return `${total.toLocaleString()} content ${total === 1 ? "item" : "items"}, ${(usage?.published ?? 0).toLocaleString()} published`;
+  // Block values are stored inside the content that hosts them, so an Element
+  // Type is never counted as a content item of its own.
+  if (node.isElement)
+    return "Element Types live inside block values, not as content items";
   if (around.composedBy.length === 0) return "No content items yet";
   const through = throughUsage(around, report);
   const users = `${through.of} ${through.of === 1 ? "type" : "types"} that use it`;

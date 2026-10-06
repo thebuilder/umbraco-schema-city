@@ -249,7 +249,7 @@ export function Inspector({
           </Button>
         </div>
         <p className="mt-2.5 text-label">
-          {usageLine(neighbourhood, usageReport, usage)}
+          {usageLine(node, neighbourhood, usageReport, usage)}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <InspectorFocusControls

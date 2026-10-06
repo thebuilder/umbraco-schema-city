@@ -63,37 +63,48 @@ const seoEdges: SchemaEdge[] = ["a", "b", "c"].map((from) => ({
 }));
 
 describe("usageLine", () => {
-  const plain = around([node("x")], [], "x");
+  const lone = node("x");
+  const plain = around([lone], [], "x");
+  const seoNode = seo[0] as SchemaNode;
 
   it("says when the usage report has not arrived", () => {
-    expect(usageLine(plain, undefined, undefined)).toBe(
+    expect(usageLine(lone, plain, undefined, undefined)).toBe(
       "Content usage has not loaded yet"
     );
   });
 
   it("counts a type's own content", () => {
-    expect(usageLine(plain, report({}), used(162, 152))).toBe(
+    expect(usageLine(lone, plain, report({}), used(162, 152))).toBe(
       "162 content items, 152 published"
     );
-    expect(usageLine(plain, report({}), used(1))).toBe(
+    expect(usageLine(lone, plain, report({}), used(1))).toBe(
       "1 content item, 1 published"
     );
   });
 
   it("says a type with no content has none", () => {
-    expect(usageLine(plain, report({}), undefined)).toBe(
+    expect(usageLine(lone, plain, report({}), undefined)).toBe(
       "No content items yet"
     );
   });
 
+  it("does not count an Element Type as content", () => {
+    const block = node("block", { isElement: true });
+    expect(
+      usageLine(block, around([block], [], "block"), report({}), undefined)
+    ).toBe("Element Types live inside block values, not as content items");
+  });
+
   it("sums a composition's content over the types that use it", () => {
     const usage = report({ a: used(160), b: used(28, 18), c: used(0) });
-    expect(usageLine(around(seo, seoEdges, "seo"), usage, undefined)).toBe(
+    expect(
+      usageLine(seoNode, around(seo, seoEdges, "seo"), usage, undefined)
+    ).toBe(
       "No content of its own. 188 items through 2 of the 3 types that use it"
     );
-    expect(usageLine(around(seo, seoEdges, "seo"), report({}), undefined)).toBe(
-      "No content of its own, and none through the 3 types that use it"
-    );
+    expect(
+      usageLine(seoNode, around(seo, seoEdges, "seo"), report({}), undefined)
+    ).toBe("No content of its own, and none through the 3 types that use it");
   });
 });
 

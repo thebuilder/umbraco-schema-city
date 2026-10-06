@@ -60,9 +60,10 @@ const contentCount = (report?: UsageReport) => (id: string) =>
 
 function Usage({
   neighbourhood,
+  node,
   usage,
   usageReport,
-}: Pick<TabProps, "neighbourhood" | "usage" | "usageReport">) {
+}: Pick<TabProps, "neighbourhood" | "node" | "usage" | "usageReport">) {
   if (!usageReport) return <Muted>Content usage has not loaded yet.</Muted>;
   if (usage && usage.total > 0)
     return (
@@ -85,7 +86,7 @@ function Usage({
         ]}
       />
     );
-  if (neighbourhood.composedBy.length === 0)
+  if (node.isElement || neighbourhood.composedBy.length === 0)
     return <Muted>No content of this type in the usage snapshot.</Muted>;
   const through = throughUsage(neighbourhood, usageReport);
   if (through.total === 0)
