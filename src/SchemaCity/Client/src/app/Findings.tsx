@@ -14,57 +14,83 @@ import {
   FINDING_LABEL,
   type Finding,
   type FindingKind,
-  type FindingSeverity,
+  KIND_EXPLANATION,
 } from "../model/findings";
 import { findingsCsv } from "../model/findings-export";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
-import { FindingRelations } from "./FindingRelations";
-
-const SEVERITY_TITLE: Record<FindingSeverity, string> = {
-  problem: "Problems",
-  note: "Notes",
-};
 
 /**
- * One finding. Clicking it selects the type it is about, which for a broken block
- * reference is the host type: the missing Element Type has no building to select.
+ * One finding. The group above it carries the kind and what it means, so the row
+ * is the type and what is particular to it. Clicking selects the type, which for a
+ * broken block reference is the host: the missing Element Type has no building.
  */
 function Row({
   finding,
   name,
-  nodesById,
   onSelect,
 }: {
   finding: Finding;
   name: string;
-  nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="w-full border-line border-b bg-panel-sunken px-2 py-1.5 last:border-b hover:border-line-strong hover:bg-accent/60">
-      <button
-        className="w-full text-left"
-        onClick={() => onSelect(finding.nodeId)}
-        type="button"
-      >
-        <span className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-phosphor text-xs">
-            {name}
-          </span>
-          <span className="shrink-0 text-3xs text-phosphor-dim uppercase tracking-terminal">
-            {FINDING_LABEL[finding.kind]}
-          </span>
+    <button
+      className="block w-full border-line border-b bg-panel-sunken px-2 py-1.5 text-left hover:border-line-strong hover:bg-accent/60"
+      onClick={() => onSelect(finding.nodeId)}
+      type="button"
+    >
+      <span className="block truncate text-phosphor text-xs">{name}</span>
+      <span className="block text-muted-foreground text-3xs">
+        {finding.summary}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The findings of one kind under a header that says once what they mean. Problems
+ * start open and notes closed; picking a note's chip opens it, since that is a
+ * request to read it.
+ */
+function Group({
+  kind,
+  open,
+  rows,
+  nodesById,
+  onSelect,
+}: {
+  kind: FindingKind;
+  open: boolean;
+  rows: Finding[];
+  nodesById: Map<string, SchemaNode>;
+  onSelect: (id: string) => void;
+}) {
+  const severity = rows[0]?.severity;
+  return (
+    <details open={open}>
+      <summary className="flex cursor-pointer items-baseline gap-2 py-1">
+        <span className="font-bold text-3xs text-phosphor uppercase tracking-terminal-xl">
+          {FINDING_LABEL[kind]}
         </span>
-        <span className="block text-muted-foreground text-3xs">
-          {finding.summary}
+        <span className="text-3xs text-phosphor-dim">{rows.length}</span>
+        <span
+          className={`ml-auto text-3xs uppercase tracking-terminal ${severity === "problem" ? "text-signal" : "text-phosphor-dim"}`}
+        >
+          {severity}
         </span>
-      </button>
-      <FindingRelations
-        finding={finding}
-        nodesById={nodesById}
-        onSelect={onSelect}
-      />
-    </div>
+      </summary>
+      <p className="mb-1 text-3xs text-muted-foreground">
+        {KIND_EXPLANATION[kind]}
+      </p>
+      {rows.map((finding) => (
+        <Row
+          finding={finding}
+          key={finding.id}
+          name={nodesById.get(finding.nodeId)?.name ?? "a deleted type"}
+          onSelect={onSelect}
+        />
+      ))}
+    </details>
   );
 }
 
@@ -99,6 +125,19 @@ export function Findings({
     kinds.length === 0
       ? findings
       : findings.filter((finding) => kinds.includes(finding.kind));
+  // Problems first, then the bigger group first, then chip order. findFindings
+  // already sorts rows inside a kind strongest first, so grouping keeps that.
+  const groups = FINDING_KINDS.map((kind) => ({
+    kind,
+    rows: matched.filter((finding) => finding.kind === kind),
+  }))
+    .filter((group) => group.rows.length > 0)
+    .sort(
+      (a, b) =>
+        Number(a.rows[0]?.severity === "note") -
+          Number(b.rows[0]?.severity === "note") ||
+        b.rows.length - a.rows.length
+    );
   const problems = findings.filter(
     (finding) => finding.severity === "problem"
   ).length;
@@ -184,30 +223,16 @@ export function Findings({
                   : "No finding of those kinds."}
               </p>
             ) : null}
-            {(["problem", "note"] as const).map((severity) => {
-              const rows = matched.filter(
-                (finding) => finding.severity === severity
-              );
-              if (rows.length === 0) return null;
-              return (
-                <section key={severity}>
-                  <h3 className="mb-1 font-bold text-3xs text-phosphor-dim uppercase tracking-terminal-xl">
-                    {SEVERITY_TITLE[severity]} ({rows.length})
-                  </h3>
-                  {rows.map((finding) => (
-                    <Row
-                      finding={finding}
-                      key={finding.id}
-                      name={
-                        nodesById.get(finding.nodeId)?.name ?? "a deleted type"
-                      }
-                      nodesById={nodesById}
-                      onSelect={pick}
-                    />
-                  ))}
-                </section>
-              );
-            })}
+            {groups.map(({ kind, rows }) => (
+              <Group
+                key={kind}
+                kind={kind}
+                nodesById={nodesById}
+                onSelect={pick}
+                open={rows[0]?.severity === "problem" || kinds.includes(kind)}
+                rows={rows}
+              />
+            ))}
           </div>
         </ScrollArea>
       </SheetContent>
