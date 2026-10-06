@@ -234,8 +234,8 @@ describe("cityDistricts", () => {
     expect(summarise(folderless)).toEqual([
       { name: "Pages", kind: "structure", size: 6 },
       { name: "Compositions", kind: "compositions", size: 1 },
-      { name: "Elements", kind: "elements", size: 3 },
-      { name: "Unplaced", kind: "mixed", size: 2 },
+      { name: "Elements", kind: "elements", size: 4 },
+      { name: "Unplaced", kind: "mixed", size: 3 },
     ]);
   });
 
@@ -487,7 +487,7 @@ describe("layoutCity", () => {
     const unfiled = layoutCity(small).filter((p) => p.district === "unfiled");
     const rows = new Set(unfiled.map((p) => p.position.z));
 
-    expect(unfiled.length).toBe(9);
+    expect(unfiled.length).toBe(10);
     expect(rows.size).toBeGreaterThan(1);
   });
 

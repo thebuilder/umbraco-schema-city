@@ -753,6 +753,14 @@ describe("findFindings on small.json", () => {
     expect(named("pureMixin")).toEqual(["seoComposition"]);
   });
 
+  it("finds one planted example of each newer check", () => {
+    expect(named("unreachableChain")).toEqual(["biography"]);
+    expect(named("cultureMismatch")).toEqual(["landingPage"]);
+    expect(named("nearDuplicateDataType")).toEqual(["tagPage"]);
+    expect(named("overloadedTab")).toEqual(["newsListing"]);
+    expect(named("emptyBlock")).toEqual(["dividerBlock"]);
+  });
+
   it("leaves the usage rules out until a report arrives", () => {
     expect(named("unusedType")).toEqual([]);
     // legacyWidget cannot be created, so only articlePage is an unused type.
