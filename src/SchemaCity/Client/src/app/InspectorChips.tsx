@@ -20,13 +20,36 @@ export const ROLE: Record<
   element: { label: "Element Type", colour: "var(--amber)", badge: "amber" },
 };
 
+/**
+ * The role as a colour key: the swatch in the colour the city paints that role,
+ * quiet enough to sit on every row of a list where a badge would shout.
+ */
+export function RoleKey({ role }: { role: Role }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-label text-xs">
+      <span
+        aria-hidden
+        className="size-2 shrink-0"
+        style={{ background: ROLE[role].colour }}
+      />
+      {ROLE[role].label}
+    </span>
+  );
+}
+
+function RoleBadge({ role }: { role: Role }) {
+  return (
+    <Badge className={READING} variant={ROLE[role].badge}>
+      {ROLE[role].label}
+    </Badge>
+  );
+}
+
 /** The role badge, then Root and culture variance when the type has them. */
 export function RoleBadges({ node, role }: { node: SchemaNode; role: Role }) {
   return (
     <>
-      <Badge className={READING} variant={ROLE[role].badge}>
-        {ROLE[role].label}
-      </Badge>
+      <RoleBadge role={role} />
       {node.allowedAsRoot ? (
         <Badge className={READING} variant="outline">
           Root

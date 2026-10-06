@@ -89,5 +89,5 @@ export function FlatView({
         selected={selected}
       />
     );
-  return <TypeTable {...shared} usage={usage} />;
+  return <TypeTable {...shared} findings={findings} usage={usage} />;
 }

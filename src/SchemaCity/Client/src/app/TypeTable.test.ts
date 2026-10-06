@@ -43,7 +43,7 @@ test("a row carries what the table shows about a type", () => {
     id: "home",
     name: "Home",
     alias: "home",
-    element: false,
+    role: "page",
     root: true,
     own: 3,
     composed: 0,
@@ -51,7 +51,7 @@ test("a row carries what the table shows about a type", () => {
     children: 2,
     usage: null,
   });
-  expect(rows[1].element).toBe(true);
+  expect(rows[1].role).toBe("element");
 });
 
 test("usage is a count when the report is in, and absent when it is not", () => {
@@ -84,4 +84,6 @@ test("clicking a header sorts by it, and clicking it again turns it round", () =
   expect(names("own", false)).toEqual(["Home", "Article", "Card"]);
   // Equal numbers keep the name order, so the table never shuffles under a click.
   expect(names("children", true)).toEqual(["Article", "Card", "Home"]);
+  // A role sorts as text, by name inside it.
+  expect(names("role", true)).toEqual(["Card", "Article", "Home"]);
 });

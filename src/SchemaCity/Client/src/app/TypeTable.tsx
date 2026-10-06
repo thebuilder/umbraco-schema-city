@@ -3,14 +3,18 @@
 // it, and the same search that feeds the palette filters it.
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { type Finding, problemLabels } from "../model/findings";
+import { type Role, roleOf } from "../model/inspector";
+import { neighbourhoods } from "../model/neighbourhood";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
+import { FindingDot, RoleKey } from "./InspectorChips";
 
 export type TypeRow = {
   id: string;
   name: string;
   alias: string;
-  element: boolean;
+  role: Role;
   root: boolean;
   own: number;
   composed: number;
@@ -28,12 +32,13 @@ export function typeRows(graph: SchemaGraph, usage?: UsageReport): TypeRow[] {
     if (edge.kind !== "allowedChild") continue;
     children.set(edge.from, (children.get(edge.from) ?? 0) + 1);
   }
+  const around = neighbourhoods(graph);
 
   return graph.nodes.map((node) => ({
     id: node.id,
     name: node.name,
     alias: node.alias,
-    element: node.isElement,
+    role: roleOf(node, around.get(node.id)),
     root: node.allowedAsRoot,
     own: node.ownPropertyCount,
     composed: node.composedPropertyCount,
@@ -43,7 +48,7 @@ export function typeRows(graph: SchemaGraph, usage?: UsageReport): TypeRow[] {
 }
 
 /**
- * Sorted by one column. Text sorts by name, everything else by number, with a type
+ * Sorted by one column. Text sorts as text, everything else by number, with a type
  * the usage report says nothing about at the bottom either way. Ties fall back to
  * the name, so the order is stable however often you click a header.
  */
@@ -59,9 +64,9 @@ export function sortRows(
     return Number.NEGATIVE_INFINITY;
   };
   const compare = (a: TypeRow, b: TypeRow) =>
-    key === "name" || key === "alias"
+    (typeof a[key] === "string"
       ? String(a[key]).localeCompare(String(b[key]))
-      : number(a) - number(b) || a.name.localeCompare(b.name);
+      : number(a) - number(b)) || a.name.localeCompare(b.name);
 
   return [...rows].sort((a, b) => (ascending ? compare(a, b) : -compare(a, b)));
 }
@@ -69,7 +74,7 @@ export function sortRows(
 const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "name", label: "Name" },
   { key: "alias", label: "Alias" },
-  { key: "element", label: "Element" },
+  { key: "role", label: "Role" },
   { key: "root", label: "Root" },
   { key: "own", label: "Own", numeric: true },
   { key: "composed", label: "Composed", numeric: true },
@@ -77,7 +82,18 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "usage", label: "Content", numeric: true },
 ];
 
-const CELL = "border-line border-b px-2 py-1.5 text-left align-top";
+const CELL = "border-line/60 border-b px-2 py-1.5 text-left align-baseline";
+
+/** A count in mono, faint at zero so the counts that say something stand out. */
+function Count({ value }: { value: number | null }) {
+  return (
+    <td
+      className={`${CELL} text-right font-mono text-xs ${value ? "text-prose" : "text-faint"}`}
+    >
+      {value?.toLocaleString()}
+    </td>
+  );
+}
 
 /** The filter box the 2D views share, fed by the palette's query. */
 export function FilterField({
@@ -132,6 +148,7 @@ export function useMatches(graph: SchemaGraph, query: string) {
 export function TypeTable({
   graph,
   usage,
+  findings,
   query,
   onQuery,
   selected,
@@ -139,6 +156,7 @@ export function TypeTable({
 }: {
   graph: SchemaGraph;
   usage?: UsageReport;
+  findings: Finding[];
   /** The palette's query, so a search survives the switch between the two views. */
   query: string;
   onQuery: (query: string) => void;
@@ -151,6 +169,7 @@ export function TypeTable({
   });
 
   const rows = useMemo(() => typeRows(graph, usage), [graph, usage]);
+  const problems = useMemo(() => problemLabels(findings), [findings]);
   // The same ranking the palette uses, kept only as a set: the table's own sort
   // decides the order, and searchNodes decides what is in it.
   const matched = useMatches(graph, query);
@@ -174,16 +193,17 @@ export function TypeTable({
     }));
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-background font-sans text-[13px] text-prose leading-normal">
       <div className="flex items-center gap-3 border-line border-b px-4 py-2">
         <FilterField onQuery={onQuery} query={query} />
-        <p className="text-muted-foreground text-2xs">
-          {shown.length} of {rows.length} types
+        <p className="text-label text-xs">
+          <span className="font-mono">{shown.length}</span> of{" "}
+          <span className="font-mono">{rows.length}</span> types
         </p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full border-collapse font-mono text-xs">
+        <table className="w-full border-collapse">
           <caption className="sr-only">
             Every Document Type in the schema. Choosing a row opens it in the
             inspector.
@@ -199,65 +219,70 @@ export function TypeTable({
                         : "descending"
                       : "none"
                   }
-                  className={`${CELL} border-line-strong font-bold text-2xs text-phosphor-dim uppercase tracking-terminal ${
+                  className={`${CELL} border-line font-medium text-label text-xs ${
                     column.numeric ? "text-right" : ""
                   }`}
                   key={column.key}
                   scope="col"
                 >
                   <button
-                    className="uppercase hover:text-phosphor-bright"
+                    className={`hover:text-phosphor ${sort.key === column.key ? "text-prose" : ""}`}
                     onClick={() => toggle(column.key)}
                     type="button"
                   >
                     {column.label}
-                    {sort.key === column.key
-                      ? sort.ascending
-                        ? " ▲"
-                        : " ▼"
-                      : ""}
+                    {sort.key === column.key ? (
+                      <span className="text-faint">
+                        {sort.ascending ? " ▲" : " ▼"}
+                      </span>
+                    ) : null}
                   </button>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {shown.map((row) => (
-              <tr
-                className={
-                  row.id === selected
-                    ? "bg-accent text-phosphor-bright"
-                    : "hover:bg-accent/50"
-                }
-                key={row.id}
-                onClick={() => onSelect(row.id)}
-              >
-                <th className={`${CELL} font-normal`} scope="row">
-                  <button
-                    className="text-left text-phosphor hover:text-phosphor-bright hover:underline"
-                    onClick={() => onSelect(row.id)}
-                    type="button"
-                  >
-                    {row.name}
-                  </button>
-                </th>
-                <td className={`${CELL} text-phosphor-dim`}>{row.alias}</td>
-                <td className={CELL}>{row.element ? "Element" : ""}</td>
-                <td className={CELL}>{row.root ? "Root" : ""}</td>
-                <td className={`${CELL} text-right`}>{row.own}</td>
-                <td className={`${CELL} text-right`}>{row.composed}</td>
-                <td className={`${CELL} text-right`}>{row.children}</td>
-                {usage ? (
-                  <td className={`${CELL} text-right`}>
-                    {row.usage?.toLocaleString()}
+            {shown.map((row) => {
+              const on = row.id === selected;
+              const flagged = problems.get(row.id);
+              return (
+                <tr
+                  className={on ? "bg-accent" : "hover:bg-accent/50"}
+                  key={row.id}
+                  onClick={() => onSelect(row.id)}
+                >
+                  <th className={`${CELL} font-normal`} scope="row">
+                    <span className="flex items-center gap-1.5">
+                      <button
+                        className={`text-left hover:text-phosphor hover:underline ${on ? "text-phosphor-bright" : "text-prose"}`}
+                        onClick={() => onSelect(row.id)}
+                        type="button"
+                      >
+                        {row.name}
+                      </button>
+                      {flagged ? <FindingDot title={flagged} /> : null}
+                    </span>
+                  </th>
+                  <td className={`${CELL} font-mono text-faint text-xs`}>
+                    {row.alias}
                   </td>
-                ) : null}
-              </tr>
-            ))}
+                  <td className={CELL}>
+                    <RoleKey role={row.role} />
+                  </td>
+                  <td className={`${CELL} text-label text-xs`}>
+                    {row.root ? "Root" : ""}
+                  </td>
+                  <Count value={row.own} />
+                  <Count value={row.composed} />
+                  <Count value={row.children} />
+                  {usage ? <Count value={row.usage} /> : null}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {shown.length === 0 ? (
-          <p className="px-4 py-6 text-muted-foreground text-xs">
+          <p className="px-4 py-6 text-faint text-xs">
             No type or property matches “{query}”.
           </p>
         ) : null}
