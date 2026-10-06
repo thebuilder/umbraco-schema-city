@@ -58,12 +58,12 @@ export type Finding = {
 export const FINDING_KINDS: readonly FindingKind[] = [
   "brokenBlock",
   "duplicateAlias",
-  "emptyBlock",
   "cultureMismatch",
   "unreachableChain",
   "deadEnd",
   "unusedElementType",
   "unusedType",
+  "emptyBlock",
   "overloadedTab",
   "nearDuplicateDataType",
   "noProperties",
@@ -115,7 +115,7 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
     "An editor can create these Document Types, but the usage snapshot counts no content of them. Custom code, migrations and external consumers can still depend on a type.",
   overloadedTab: `One tab, or one group on a type without tabs, holds more than ${TAB_LIMIT} properties. Composed properties count, merged the way the Editor view shows them.`,
   nearDuplicateDataType:
-    "Properties here use a Data Type whose name matches another Data Type once case, spaces, hyphens and underscores are ignored. The two can differ in configuration. Only Data Types that some property uses are compared.",
+    "Data Types whose names match once case, spaces, hyphens and underscores are ignored. They can differ in configuration. Each set is one row, on a type that uses the least-used of them, and the related types are every other type that uses any of them. Only own properties count, so a composed property counts on its composition.",
   noProperties: "These types have no own and no composed properties.",
   complexity: `In the highest of ${COMPLEXITY_TIERS} complexity tiers in this schema. The score is own and composed properties, plus twice the compositions, plus distinct block targets.`,
   pureMixin:
@@ -127,7 +127,7 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
 const SEVERITY: Record<FindingKind, FindingSeverity> = {
   brokenBlock: "problem",
   duplicateAlias: "problem",
-  emptyBlock: "problem",
+  emptyBlock: "note",
   cultureMismatch: "problem",
   unreachableChain: "problem",
   deadEnd: "problem",
@@ -281,8 +281,10 @@ export function findFindings(
   const headless =
     pages.filter((node) => node.templates.length === 0).length * 2 >
     pages.length;
-  const twins = dataTypeTwins(nodes);
   const nameOf = new Map(nodes.map((node) => [node.id, node.name]));
+  const byName = (a: string, b: string) =>
+    (nameOf.get(a) ?? a).localeCompare(nameOf.get(b) ?? b);
+  const twins = dataTypeTwins(nodes, byName);
   const names = (ids: string[]) => list(ids.map((id) => nameOf.get(id) ?? id));
   // Without a report the row has nothing usage-based to add, so it says nothing.
   const content = (id: string) => {
@@ -454,16 +456,15 @@ export function findFindings(
         );
     }
 
-    const nearDuplicates = twins(node);
-    if (nearDuplicates.length > 0) {
+    const twin = twins.get(node.id);
+    if (twin)
       add(
         "nearDuplicateDataType",
         node,
-        nearDuplicates.map((twin) => twin.summary).join("; "),
-        undefined,
-        nearDuplicates.reduce((sum, twin) => sum + twin.properties, 0)
+        twin.summary,
+        twin.related,
+        twin.properties
       );
-    }
 
     const overloaded = overloadedTabs(node);
     if (overloaded.length > 0) {
@@ -606,40 +607,81 @@ const normalName = (name: string) => name.toLowerCase().replace(SEPARATORS, "");
  * properties whose Data Type shares a normalised name with another Data Type.
  * Composed properties are left to the composition, so a shared mixin is one row.
  */
-function dataTypeTwins(nodes: SchemaNode[]) {
-  const byName = new Map<string, Map<string, string>>();
-  for (const node of nodes)
-    for (const property of propertiesOf(node)) {
-      if (!property.dataTypeName) continue;
-      const key = normalName(property.dataTypeName);
-      const ids = byName.get(key) ?? new Map<string, string>();
-      ids.set(property.dataTypeId, property.dataTypeName);
-      byName.set(key, ids);
-    }
+type DataTypeUse = { name: string; properties: number; types: Set<string> };
 
-  return (node: SchemaNode) => {
-    const used = new Map<string, { aliases: string[]; ids: Set<string> }>();
+/** Own properties per Data Type, gathered under the normalised Data Type name. */
+function dataTypeSets(nodes: SchemaNode[]) {
+  const sets = new Map<string, Map<string, DataTypeUse>>();
+  for (const node of nodes)
     for (const property of propertiesOf(node)) {
       if (property.fromCompositionId || !property.dataTypeName) continue;
       const key = normalName(property.dataTypeName);
-      if ((byName.get(key)?.size ?? 0) < 2) continue;
-      const entry = used.get(key) ?? { aliases: [], ids: new Set<string>() };
-      entry.aliases.push(property.alias);
-      entry.ids.add(property.dataTypeId);
-      used.set(key, entry);
-    }
-    return [...used].map(([key, { aliases, ids }]) => {
-      const all = byName.get(key) ?? new Map<string, string>();
-      const here = [...ids].map((id) => all.get(id) ?? id);
-      const others = [...all]
-        .filter(([id]) => !ids.has(id))
-        .map(([, name]) => (here.includes(name) ? `another ${name}` : name));
-      return {
-        properties: aliases.length,
-        summary: `${list(aliases)} ${aliases.length === 1 ? "uses" : "use"} ${here.join(" and ")}${others.length > 0 ? `, next to ${others.join(" and ")}` : ""}`,
+      const set = sets.get(key) ?? new Map<string, DataTypeUse>();
+      const use = set.get(property.dataTypeId) ?? {
+        name: property.dataTypeName,
+        properties: 0,
+        types: new Set<string>(),
       };
+      use.properties++;
+      use.types.add(node.id);
+      set.set(property.dataTypeId, use);
+      sets.set(key, set);
+    }
+  return [...sets.values()].filter((set) => set.size > 1);
+}
+
+/**
+ * Sets of Data Types whose names match once normalised, keyed by the type that
+ * carries the set's row. That is a type using the least-used Data Type of the set,
+ * since the odd one out is usually the one to fold into the others. One row per set
+ * rather than per type, because a twin that most of the schema uses would otherwise
+ * put a row on nearly every type and bury the rest of the drawer. A type that
+ * anchors two sets gets one row covering both.
+ */
+function dataTypeTwins(
+  nodes: SchemaNode[],
+  byName: (a: string, b: string) => number
+) {
+  const rows = new Map<
+    string,
+    { summary: string; related: string[]; properties: number }
+  >();
+  for (const set of dataTypeSets(nodes)) {
+    const uses = [...set].sort(
+      ([, a], [, b]) =>
+        a.properties - b.properties ||
+        a.types.size - b.types.size ||
+        a.name.localeCompare(b.name)
+    );
+    const names = uses.map(([, use]) => use.name);
+    const label = ([id, use]: [string, DataTypeUse]) =>
+      names.indexOf(use.name) === names.lastIndexOf(use.name)
+        ? use.name
+        : `${use.name} (${id.slice(0, 8)})`;
+    const anchor = [...(uses[0]?.[1].types ?? [])].sort(byName)[0] ?? "";
+    const others = uses.flatMap(([, use]) => [...use.types]);
+    const before = rows.get(anchor);
+    rows.set(anchor, {
+      summary: [
+        before?.summary,
+        uses
+          .map(
+            (use) =>
+              `${label(use)}: ${plural(use[1].properties, "property", "properties")} on ${plural(use[1].types.size, "type")}`
+          )
+          .join(", "),
+      ]
+        .filter(Boolean)
+        .join("; "),
+      related: [...new Set([...(before?.related ?? []), ...others])]
+        .filter((id) => id !== anchor)
+        .sort(byName),
+      properties:
+        (before?.properties ?? 0) +
+        uses.reduce((sum, [, use]) => sum + use.properties, 0),
     });
-  };
+  }
+  return rows;
 }
 
 /**

@@ -109,11 +109,13 @@ headless by design, and on a type already reported as unused.
 - Unreachable chain: a type with allowed parents, none of which a root can reach.
 - Culture mismatch: an invariant type with a property that varies by culture, or with a block
   editor that lists an Element Type that varies by culture.
-- Near-duplicate Data Type: own properties on a Data Type whose name matches another one once case,
-  spaces, hyphens and underscores are ignored.
+- Near-duplicate Data Type: Data Types whose names match once case, spaces, hyphens and
+  underscores are ignored. Each set is one note, on a type that uses the least-used of them, and
+  lists every other type that uses any of them.
 - Overloaded tab: a tab, or a group on a type without tabs, with more than 20 properties, composed
   ones included.
-- Empty block: an Element Type offered as a content block that has no properties.
+- Empty block: an Element Type offered as a content block that has no properties. It is a note,
+  because a divider or spacer block is often empty on purpose.
 
 ![Findings grouped by kind with broken blocks and duplicate aliases first, each row naming its own evidence.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
 

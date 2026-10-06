@@ -566,16 +566,14 @@ describe("findFindings, one rule at a time", () => {
         groups: [group("content", [toggle("title", "dt-3", "Textstring")])],
       }),
     ]);
-    expect(aliasesFor(graph, "nearDuplicateDataType")).toEqual([
-      "news",
-      "page",
-    ]);
-    expect(summaryOf(graph, "nearDuplicateDataType", "page")?.summary).toBe(
-      "hideInNav, hideFromSearch use SEO Toggle and Seo_Toggle"
+    // One row for the set, on page, the only type using the less-used Seo_Toggle,
+    // with news among the related types.
+    expect(aliasesFor(graph, "nearDuplicateDataType")).toEqual(["page"]);
+    const finding = summaryOf(graph, "nearDuplicateDataType", "page");
+    expect(finding?.summary).toBe(
+      "Seo_Toggle: 1 property on 1 type, SEO Toggle: 2 properties on 2 types"
     );
-    expect(summaryOf(graph, "nearDuplicateDataType", "news")?.summary).toBe(
-      "noIndex uses SEO Toggle, next to Seo_Toggle"
-    );
+    expect(finding?.related).toEqual(["news"]);
   });
 
   it("leaves one Data Type used everywhere, and composed properties, alone", () => {
@@ -600,16 +598,15 @@ describe("findFindings, one rule at a time", () => {
       ],
       [edge("composition", "page", "seo")]
     );
-    // dt-1 and dt-2 share the exact name, so page's own title is reported, while
-    // its composed metaTitle is left to seo.
-    expect(aliasesFor(graph, "nearDuplicateDataType")).toEqual([
-      "news",
-      "page",
-      "seo",
-    ]);
-    expect(summaryOf(graph, "nearDuplicateDataType", "page")?.summary).toBe(
-      "title uses Textstring, next to another Textstring"
+    // dt-1 and dt-2 share the exact name. page's composed metaTitle counts on seo,
+    // so dt-2 is the less-used one and its row sits on seo, with the key telling the
+    // two Textstrings apart.
+    expect(aliasesFor(graph, "nearDuplicateDataType")).toEqual(["seo"]);
+    const finding = summaryOf(graph, "nearDuplicateDataType", "seo");
+    expect(finding?.summary).toBe(
+      "Textstring (dt-2): 1 property on 1 type, Textstring (dt-1): 2 properties on 2 types"
     );
+    expect(finding?.related).toEqual(["news", "page"]);
     const single = graphOf([
       node("news", {
         allowedAsRoot: true,
@@ -722,12 +719,12 @@ describe("findFindings, one rule at a time", () => {
     expect(FINDING_KINDS.slice(0, 8)).toEqual([
       "brokenBlock",
       "duplicateAlias",
-      "emptyBlock",
       "cultureMismatch",
       "unreachableChain",
       "deadEnd",
       "unusedElementType",
       "unusedType",
+      "emptyBlock",
     ]);
   });
 
@@ -846,8 +843,8 @@ describe("findFindings on the seeded medium.json", () => {
  * without a report. There is no unusedElementType row on purpose: the 30 block hosts
  * between them reach all 40 Element Types.
  *
- * nearDuplicateDataType is every type with an own property on Text String, Textstring,
- * SEO Toggle or Seo Toggle, which the Data Type rotation puts on 279 of the 300.
+ * nearDuplicateDataType is one row per set: Text String with Textstring, and SEO Toggle
+ * with Seo Toggle. Per type it was 279 of the 300, which is why it is per set.
  * emptyBlock is block39, overloadedTab is editorial40,
  * and cultureMismatch is editorial05 hosting the variant block05, and root2.
  */
@@ -860,7 +857,7 @@ const PLANTED = {
   deadEnd: 18,
   unusedType: 164,
   overloadedTab: 1,
-  nearDuplicateDataType: 279,
+  nearDuplicateDataType: 2,
   noProperties: 5,
   complexity: 20,
   pureMixin: 10,
