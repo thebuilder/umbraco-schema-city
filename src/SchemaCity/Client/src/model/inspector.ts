@@ -214,7 +214,8 @@ export function connectionGroups(
     targets.map((group) => ({
       propertyAlias: group.propertyAlias,
       dataType: dataTypeOf.get(group.propertyAlias) ?? null,
-      ids: group.ids,
+      // The same Element Type as block content and as settings is one chip.
+      ids: [...new Set(group.ids)],
     }));
   const byField: Record<FieldKind, Field[]> = {
     blockTargets: fields(around.blockTargets),

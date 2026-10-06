@@ -42,7 +42,7 @@ export function FindingRelations({
   const shown = related.slice(0, limit);
   const hidden = related.length - shown.length;
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-x-2 text-3xs text-phosphor-dim">
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-faint text-xs">
       <span>Related:</span>
       {shown.map((id) => (
         <RelatedLink
@@ -54,11 +54,11 @@ export function FindingRelations({
       ))}
       {hidden > 0 ? (
         <button
-          className="hover:text-phosphor hover:underline"
+          className="text-phosphor hover:text-phosphor-bright hover:underline"
           onClick={() => setLimit(related.length)}
           type="button"
         >
-          +{hidden} more
+          + {hidden} more
         </button>
       ) : null}
     </div>
