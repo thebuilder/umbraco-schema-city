@@ -1,5 +1,9 @@
 import { Fragment, type ReactNode } from "react";
-import { FINDING_LABEL, type Finding } from "../model/findings";
+import {
+  FINDING_LABEL,
+  type Finding,
+  KIND_EXPLANATION,
+} from "../model/findings";
 import type { Neighbourhood } from "../model/neighbourhood";
 import type { SchemaEdge, SchemaNode, UsageReport } from "../model/types";
 import { FindingRelations } from "./FindingRelations";
@@ -143,7 +147,10 @@ export function InspectorDiagnostics({
             {findings.map((finding) => (
               <li className="border-line border-l-2 pl-2" key={finding.id}>
                 <p className="text-phosphor text-xs">
-                  <span className="text-phosphor-dim uppercase tracking-terminal">
+                  <span
+                    className="text-phosphor-dim uppercase tracking-terminal"
+                    title={KIND_EXPLANATION[finding.kind]}
+                  >
                     {finding.severity} · {FINDING_LABEL[finding.kind]}
                   </span>{" "}
                   {finding.summary}

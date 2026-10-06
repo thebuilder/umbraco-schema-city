@@ -137,6 +137,25 @@ describe("findFindings, one rule at a time", () => {
     expect(kindsFor(graph, "home", usageOf(graph))).not.toContain("unusedType");
   });
 
+  it("leaves a type no editor can create off the unused types", () => {
+    const graph = graphOf(
+      [
+        node("page", { allowedAsRoot: true }),
+        node("news"),
+        node("seo"),
+        node("orphan"),
+      ],
+      [edge("composition", "page", "seo"), edge("allowedChild", "page", "news")]
+    );
+    const usage = usageOf(graph, ["news", "seo", "orphan"]);
+    // A composed mixin never has content of its own.
+    expect(kindsFor(graph, "seo", usage)).toEqual(["pureMixin"]);
+    // A creatable type with no content is still the one worth reading.
+    expect(kindsFor(graph, "news", usage)).toContain("unusedType");
+    // No root, no parent, no composer: the dead end says it, once.
+    expect(kindsFor(graph, "orphan", usage)).toEqual(["deadEnd"]);
+  });
+
   it("reports an Element Type no block editor points at", () => {
     const graph = graphOf(
       [
@@ -250,6 +269,31 @@ describe("findFindings, one rule at a time", () => {
     expect(aliasesFor(mixin, "noTemplate")).toEqual([]);
   });
 
+  it("says nothing about templates when most creatable types have none", () => {
+    const mostlyHeadless = graphOf([
+      node("home", { allowedAsRoot: true }),
+      node("news", { allowedAsRoot: true, templates: [] }),
+      node("event", { allowedAsRoot: true, templates: [] }),
+    ]);
+    expect(aliasesFor(mostlyHeadless, "noTemplate")).toEqual([]);
+  });
+
+  it("leaves the template note off a type already reported as unused", () => {
+    const graph = graphOf([
+      node("home", { allowedAsRoot: true }),
+      node("news", { allowedAsRoot: true, templates: [] }),
+      node("event", { allowedAsRoot: true, templates: [] }),
+      node("about", { allowedAsRoot: true }),
+    ]);
+    expect(aliasesFor(graph, "noTemplate", usageOf(graph))).toEqual([
+      "event",
+      "news",
+    ]);
+    const kinds = kindsFor(graph, "news", usageOf(graph, ["news"]));
+    expect(kinds).toContain("unusedType");
+    expect(kinds).not.toContain("noTemplate");
+  });
+
   it("reports a composition that is only ever composed", () => {
     const graph = graphOf(
       [node("page", { allowedAsRoot: true }), node("seo")],
@@ -290,7 +334,7 @@ describe("findFindings, one rule at a time", () => {
       (candidate) =>
         candidate.kind === "complexity" && candidate.nodeId === "page"
     );
-    expect(finding?.summary).toContain("Complexity 6");
+    expect(finding?.summary).toContain("Score 6");
   });
 
   it("gives every finding a stable id and keeps the order between runs", () => {
@@ -306,6 +350,49 @@ describe("findFindings, one rule at a time", () => {
     expect(
       first.slice(firstNote).every((finding) => finding.severity === "note")
     ).toBe(true);
+  });
+
+  it("says where an unused type can be created, empty branches first", () => {
+    const graph = graphOf(
+      [
+        node("home", { allowedAsRoot: true }),
+        node("landing", { allowedAsRoot: true }),
+        node("news"),
+        node("press"),
+      ],
+      [
+        edge("allowedChild", "home", "news"),
+        edge("allowedChild", "landing", "press"),
+      ]
+    );
+    const rows = findFindings(
+      graph,
+      usageOf(graph, ["landing", "news", "press"])
+    ).filter((finding) => finding.kind === "unusedType");
+    // press sits under an empty landing, so it comes before the alphabet would put it.
+    expect(rows.map((row) => [row.nodeId, row.summary])).toEqual([
+      ["press", "Allowed under landing, which has no content either"],
+      ["landing", "Allowed at root"],
+      ["news", "Allowed under home"],
+    ]);
+    expect(rows[0]?.related).toEqual(["landing"]);
+  });
+
+  it("names the clashing alias and where each copy comes from", () => {
+    const graph = graphOf([
+      node("seoA", { name: "Seo A" }),
+      node("page", {
+        allowedAsRoot: true,
+        groups: [
+          group("seo", [property("seoTitle", "seoA")]),
+          group("own", [property("seoTitle", null)]),
+        ],
+      }),
+    ]);
+    const [finding] = findFindings(graph).filter(
+      (f) => f.kind === "duplicateAlias"
+    );
+    expect(finding?.summary).toBe("seoTitle from Seo A, page");
   });
 
   it("says nothing about an empty graph", () => {
@@ -332,9 +419,10 @@ describe("findFindings on small.json", () => {
 
   it("leaves the usage rules out until a report arrives", () => {
     expect(named("unusedType")).toEqual([]);
-    expect(named("unusedType", usageOf(small, ["legacyWidget"]))).toEqual([
-      "legacyWidget",
-    ]);
+    // legacyWidget cannot be created, so only articlePage is an unused type.
+    expect(
+      named("unusedType", usageOf(small, ["legacyWidget", "articlePage"]))
+    ).toEqual(["articlePage"]);
   });
 });
 
@@ -356,8 +444,12 @@ describe("findFindings on the seeded medium.json", () => {
     ["dupAliasPage", "duplicateAlias"],
     ["brokenBlockHost", "brokenBlock"],
     ["emptyType", "noProperties"],
-    ["noTemplatePage", "noTemplate"],
   ];
+
+  it("treats the sample as headless and leaves the template note out", () => {
+    // 50 of its 55 creatable types have no template, noTemplatePage among them.
+    expect(aliasesFor(medium, "noTemplate", usage)).toEqual([]);
+  });
 
   it.each(planted)("reports %s as %s", (alias, kind) => {
     const id = medium.nodes.find((candidate) => candidate.alias === alias)?.id;
@@ -394,19 +486,21 @@ describe("findFindings on the seeded medium.json", () => {
  * What the rules make of the pathological fixture, per kind. The generator plants the
  * shapes and prints them; these are the rows that come out.
  *
- * unusedType is every non-element type the usage report leaves at zero, 224 of the
- * 260. deadEnd is the 15 orphans, the 2 compositions nothing uses and archive00, the
- * head of a tree no root reaches. pureMixin is the 10 compositions that are used, and
- * complexity is the 20 types carrying 30 properties. There is no unusedElementType
- * row on purpose: the 30 block hosts between them reach all 40 Element Types.
+ * unusedType is every creatable non-element type the usage report leaves at zero,
+ * 196 of the 260; the dead ends and mixins below are at zero too and not counted.
+ * deadEnd is the 15 orphans, the 2 compositions nothing uses and archive00, the head
+ * of a tree no root reaches. pureMixin is the 10 compositions that are used, and
+ * complexity is the 20 types carrying 30 properties. The 6 planted types with no
+ * template have no content either, so their unusedType row stands in for that note,
+ * which only shows without a report. There is no unusedElementType row on purpose:
+ * the 30 block hosts between them reach all 40 Element Types.
  */
 const PLANTED = {
-  unusedType: 224,
+  unusedType: 196,
   deadEnd: 18,
   duplicateAlias: 4,
   brokenBlock: 3,
   noProperties: 5,
-  noTemplate: 6,
   pureMixin: 10,
   complexity: 20,
 };
@@ -452,6 +546,6 @@ describe("findFindings on the pathological fixture", () => {
 
     const { unusedType, ...rest } = PLANTED;
     expect(unusedType).toBeGreaterThan(0);
-    expect(counts).toEqual(rest);
+    expect(counts).toEqual({ ...rest, noTemplate: 6 });
   });
 });

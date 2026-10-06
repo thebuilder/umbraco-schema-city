@@ -25,6 +25,10 @@ export type Finding = {
   severity: FindingSeverity;
   /** The type the finding is about, and the one a row selects. */
   nodeId: string;
+  /**
+   * What is particular to this row: which types can create it, how many compose
+   * it, which aliases clash. What the kind means is in KIND_EXPLANATION, said once.
+   */
   summary: string;
   /**
    * The other types the finding names. A broken block reference puts the missing
@@ -58,6 +62,29 @@ export const FINDING_LABEL: Record<FindingKind, string> = {
   complexity: "Complexity",
 };
 
+/** How many complexity tiers the scores are cut into. Only the top one is a finding. */
+const COMPLEXITY_TIERS = 5;
+
+/** What every finding of a kind means, shown once per group rather than per row. */
+export const KIND_EXPLANATION: Record<FindingKind, string> = {
+  unusedType:
+    "An editor can create these Document Types, but the usage snapshot counts no content of them. Custom code, migrations and external consumers can still depend on a type.",
+  unusedElementType:
+    "No block editor configuration lists these Element Types. Stored block values and custom code can still use them.",
+  deadEnd:
+    "Not allowed at root, not allowed under any type, not an Element Type, and nothing composes them, so an editor cannot create content with these types.",
+  duplicateAlias:
+    "A property alias arrives from more than one composition. The editor that results cannot save both values.",
+  brokenBlock:
+    "A block editor lists an Element Type that no longer exists in the schema.",
+  noProperties: "These types have no own and no composed properties.",
+  noTemplate:
+    "An editor can create these types, but no template is allowed. Check whether they are meant to render on their own.",
+  pureMixin:
+    "Used only as compositions and never created on their own. Usually intended; listed so the mixins are easy to find.",
+  complexity: `In the highest of ${COMPLEXITY_TIERS} complexity tiers in this schema. The score is own and composed properties, plus twice the compositions, plus distinct block targets.`,
+};
+
 const SEVERITY: Record<FindingKind, FindingSeverity> = {
   unusedType: "problem",
   unusedElementType: "problem",
@@ -74,9 +101,6 @@ const SEVERITY: Record<FindingKind, FindingSeverity> = {
 const NEEDS_USAGE: ReadonlySet<FindingKind> = new Set<FindingKind>([
   "unusedType",
 ]);
-
-/** How many complexity tiers the scores are cut into. Only the top one is a finding. */
-const COMPLEXITY_TIERS = 5;
 
 /** `own + composed properties + 2 * compositions + distinct block targets`. */
 function complexityScore(
@@ -114,7 +138,8 @@ export function findFindings(
   const known = new Set(nodes.map((node) => node.id));
   const edges = graph.edges ?? [];
 
-  const inChild = counter();
+  const parentsOf = new Map<string, string[]>();
+  const blockHosts = new Set<string>();
   const inComposition = counter();
   const inBlock = counter();
   const outComposition = counter();
@@ -130,7 +155,7 @@ export function findFindings(
   for (const edge of edges) {
     switch (edge.kind) {
       case "allowedChild":
-        bump(inChild, edge.to);
+        parentsOf.set(edge.to, [...(parentsOf.get(edge.to) ?? []), edge.from]);
         break;
       case "composition":
         bump(inComposition, edge.to);
@@ -141,6 +166,7 @@ export function findFindings(
         ]);
         break;
       case "block": {
+        blockHosts.add(edge.from);
         if (!known.has(edge.to)) {
           const found = missingBlocks.get(edge.from) ?? [];
           found.push({ propertyAlias: edge.propertyAlias ?? "", to: edge.to });
@@ -176,15 +202,43 @@ export function findFindings(
   const topTier = (topScore * (COMPLEXITY_TIERS - 1)) / COMPLEXITY_TIERS;
 
   const totalOf = (id: string) => usage?.byType[id]?.total ?? 0;
-  const anyTemplates = nodes.some((node) => node.templates.length > 0);
+  const creatable = (node: SchemaNode) =>
+    node.allowedAsRoot || parentsOf.has(node.id);
+  // A schema where most creatable types have no template is headless: the missing
+  // template is the design, and one note per type would bury everything else. More
+  // than half without a template is the cut, simple enough to say in the README.
+  const pages = nodes.filter((node) => !node.isElement && creatable(node));
+  const headless =
+    pages.filter((node) => node.templates.length === 0).length * 2 >
+    pages.length;
+  const nameOf = new Map(nodes.map((node) => [node.id, node.name]));
+  const names = (ids: string[]) => {
+    const shown = ids.slice(0, 3).map((id) => nameOf.get(id) ?? id);
+    const rest = ids.length - shown.length;
+    return rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
+  };
+  // Without a report the row has nothing usage-based to add, so it says nothing.
+  const content = (id: string) => {
+    if (!usage) return "";
+    const total = totalOf(id);
+    return total === 0
+      ? "No content in the usage snapshot"
+      : `${plural(total, "content item")} in the usage snapshot`;
+  };
+
   const found: Finding[] = [];
+  // Inside a kind, rows run strongest case first by this number, then by name. Each
+  // rule sets it where it has a reason to; the rest stay at 0 and sort by name.
+  const strength = new Map<string, number>();
   const add = (
     kind: FindingKind,
     node: SchemaNode,
     summary: string,
-    related?: string[]
+    related?: string[],
+    weight = 0
   ) => {
     if (!usage && NEEDS_USAGE.has(kind)) return;
+    strength.set(`${kind}:${node.id}`, weight);
     found.push({
       id: `${kind}:${node.id}`,
       kind,
@@ -196,15 +250,31 @@ export function findFindings(
   };
 
   for (const node of nodes) {
-    const children = at(inChild, node.id);
     const composers = at(inComposition, node.id);
-    const creatable = node.allowedAsRoot || children > 0;
+    const canCreate = creatable(node);
+    const unused =
+      canCreate && !node.isElement && usage && totalOf(node.id) === 0;
 
-    if (!node.isElement && usage && totalOf(node.id) === 0) {
+    // Only a type an editor can create can have content of its own, so "no content"
+    // says nothing about the rest. Those are a dead end or a pure mixin below.
+    if (unused) {
+      const parents = parentsOf.get(node.id) ?? [];
+      // Every place it could be created is itself empty, so the whole branch is
+      // unused rather than this one type being passed over. Strongest first.
+      const emptyBranch =
+        !node.allowedAsRoot && parents.every((id) => totalOf(id) === 0);
+      const where = [
+        node.allowedAsRoot ? "at root" : "",
+        parents.length > 0 ? `under ${names(parents)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" and ");
       add(
         "unusedType",
         node,
-        "The usage snapshot reports no content instances for this Document Type"
+        `Allowed ${where}${emptyBranch ? EMPTY_BRANCH(parents.length) : ""}`,
+        parents,
+        emptyBranch ? 1 : 0
       );
     }
 
@@ -212,18 +282,25 @@ export function findFindings(
       add(
         "unusedElementType",
         node,
-        "No block editor configuration points at this Element Type"
+        blockHosts.size > 0
+          ? `Could be listed by the block editors on ${plural(blockHosts.size, "type")}`
+          : "No type in this schema has a block editor"
       );
     }
 
     // A type nothing composes and nothing can create is a structural dead end, and
     // this one row says so. A type something composes is a mixin doing its job, so
     // it is never a dead end; the pure mixin note below covers it instead.
-    if (!(node.isElement || creatable) && composers === 0) {
+    if (!(node.isElement || canCreate) && composers === 0) {
       add(
         "deadEnd",
         node,
-        "No root, no allowed parent, not an element, and nothing composes it"
+        content(node.id) ||
+          plural(
+            node.ownPropertyCount + node.composedPropertyCount,
+            "property",
+            "properties"
+          )
       );
     }
 
@@ -232,8 +309,11 @@ export function findFindings(
       add(
         "duplicateAlias",
         node,
-        `${duplicates.map((duplicate) => duplicate.alias).join(", ")} arrives from more than one place, which breaks editing`,
-        duplicates.flatMap((duplicate) => duplicate.origins)
+        duplicates
+          .map(({ alias, origins }) => `${alias} from ${names(origins)}`)
+          .join("; "),
+        duplicates.flatMap((duplicate) => duplicate.origins),
+        duplicates.length
       );
     }
 
@@ -246,36 +326,45 @@ export function findFindings(
         "brokenBlock",
         node,
         `${aliases || "A block editor"} points at ${broken.length} Element Type${broken.length === 1 ? "" : "s"} that no longer exist${broken.length === 1 ? "s" : ""}`,
-        broken.map((block) => block.to)
+        broken.map((block) => block.to),
+        broken.length
       );
     }
 
     if (node.ownPropertyCount + node.composedPropertyCount === 0) {
-      add("noProperties", node, "No own and no composed properties");
-    }
-
-    // Only worth saying on a schema that uses templates at all, and only about a
-    // type an editor can actually create. A headless site has no templates
-    // anywhere, and a composition renders through its users, not on its own.
-    if (
-      anyTemplates &&
-      creatable &&
-      !node.isElement &&
-      node.templates.length === 0
-    ) {
       add(
-        "noTemplate",
+        "noProperties",
         node,
-        "No template is allowed; check whether this type is intended for template rendering"
+        content(node.id) || "No own and no composed properties"
       );
     }
 
-    if (composers > 0 && !creatable && at(inBlock, node.id) === 0) {
+    // Only about a type an editor can actually create, since a composition renders
+    // through its users, and not about one the unused row already covers.
+    if (
+      !(headless || unused) &&
+      canCreate &&
+      !node.isElement &&
+      node.templates.length === 0
+    ) {
+      // Content that has no template to render through is the case to read first.
+      add(
+        "noTemplate",
+        node,
+        content(node.id) || "No template allowed",
+        undefined,
+        totalOf(node.id)
+      );
+    }
+
+    if (composers > 0 && !canCreate && at(inBlock, node.id) === 0) {
+      // A mixin only one or two types compose is the one worth folding back in.
       add(
         "pureMixin",
         node,
-        `Composed by ${composers} type${composers === 1 ? "" : "s"}, and never created on its own`,
-        composedBy.get(node.id)
+        `Composed by ${plural(composers, "type")}`,
+        composedBy.get(node.id),
+        -composers
       );
     }
 
@@ -284,20 +373,32 @@ export function findFindings(
       add(
         "complexity",
         node,
-        `Complexity ${score}, the top tier of ${COMPLEXITY_TIERS} in this schema`
+        `Score ${score}: ${node.ownPropertyCount} own and ${node.composedPropertyCount} composed properties, ${plural(at(outComposition, node.id), "composition")}, ${plural(blockTargets.get(node.id)?.size ?? 0, "block target")}`,
+        undefined,
+        score
       );
     }
   }
 
-  const aliasOf = new Map(nodes.map((node) => [node.id, node.alias]));
   const rank = (finding: Finding) => FINDING_KINDS.indexOf(finding.kind);
+  const strengthOf = (finding: Finding) => strength.get(finding.id) ?? 0;
   return found.sort(
     (a, b) =>
       (a.severity === b.severity ? 0 : a.severity === "problem" ? -1 : 1) ||
       rank(a) - rank(b) ||
-      (aliasOf.get(a.nodeId) ?? "").localeCompare(aliasOf.get(b.nodeId) ?? "")
+      strengthOf(b) - strengthOf(a) ||
+      (nameOf.get(a.nodeId) ?? "").localeCompare(nameOf.get(b.nodeId) ?? "") ||
+      a.nodeId.localeCompare(b.nodeId)
   );
 }
+
+const EMPTY_BRANCH = (parents: number) =>
+  parents === 1
+    ? ", which has no content either"
+    : ", none of which has content";
+
+const plural = (count: number, one: string, many = `${one}s`) =>
+  `${count} ${count === 1 ? one : many}`;
 
 /**
  * Property aliases the type gets from more than one place, with the compositions
