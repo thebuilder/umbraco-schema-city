@@ -74,8 +74,10 @@ export function ExplainConnections({
   return (
     <details className="py-3.5">
       <summary className="cursor-pointer text-phosphor text-xs hover:text-phosphor-bright">
-        Explain {connections.length}{" "}
-        {connections.length === 1 ? "connection" : "connections"}
+        {/* Links, not types: a type reached through two properties, or as both
+            block content and settings, is one chip above and two links here. */}
+        Explain connections ({connections.length}{" "}
+        {connections.length === 1 ? "link" : "links"})
       </summary>
       <ul className="mt-2 space-y-2">
         {connections.map((edge) => {
