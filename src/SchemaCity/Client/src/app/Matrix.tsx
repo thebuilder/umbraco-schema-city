@@ -11,14 +11,14 @@ import {
   sortColumns,
 } from "../model/matrix";
 import type { SchemaGraph } from "../model/types";
+import { READING } from "./InspectorChips";
 import { FilterField, useMatches } from "./TypeTable";
 
 type Kind = "compositions" | "dataTypes";
 type ColumnSort = "usage" | "name";
 
-const LABEL =
-  "font-bold text-2xs text-phosphor-dim uppercase tracking-terminal";
-const CELL = "border-line border-r border-b";
+const LABEL = "font-sans font-medium text-label text-xs";
+const CELL = "border-line/60 border-r border-b";
 
 function Switch<Value extends string>({
   label,
@@ -44,7 +44,7 @@ function Switch<Value extends string>({
         variant="outline"
       >
         {options.map(([option, text]) => (
-          <ToggleGroupItem key={option} value={option}>
+          <ToggleGroupItem className={READING} key={option} value={option}>
             {text}
           </ToggleGroupItem>
         ))}
@@ -78,9 +78,9 @@ export function Matrix({
 
   const composition = (use: CompositionUse) =>
     use.via === null ? (
-      <span className="text-azure">●</span>
+      <span className="text-azure text-sm">●</span>
     ) : (
-      <span className="text-azure/70">○</span>
+      <span className="text-azure/70 text-sm">○</span>
     );
   const compositionTitle = (use: CompositionUse) =>
     use.via === null
@@ -88,7 +88,7 @@ export function Matrix({
       : `through ${names.get(use.via) ?? "another composition"}`;
 
   return (
-    <div className="flex h-full flex-col bg-background">
+    <div className="flex h-full flex-col bg-background font-sans text-[13px] text-prose leading-normal">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-line border-b px-4 py-2">
         <Switch
           label="Matrix"
@@ -117,14 +117,22 @@ export function Matrix({
           data={compositions}
           empty="No type uses a composition."
           matched={matched}
-          note="● composed directly, ○ through another composition. Inheriting from a parent counts as a direct composition, as Umbraco models it. The column total counts the types that use it."
+          note={
+            <>
+              <span className="text-azure">●</span> composed directly,{" "}
+              <span className="text-azure/70">○</span> through another
+              composition. Inheriting from a parent counts as a direct
+              composition, as Umbraco models it. The column total counts the
+              types that use it.
+            </>
+          }
           onSelect={onSelect}
           selected={selected}
           title={compositionTitle}
         />
       ) : (
         <Grid
-          cell={(count) => count}
+          cell={(count) => <span className="font-mono text-xs">{count}</span>}
           columnSort={columnSort}
           data={dataTypes}
           empty="No type has properties of its own."
@@ -159,7 +167,7 @@ function Grid<Cell>({
   matched: ReadonlySet<string> | null;
   selected: string | null;
   onSelect: (id: string) => void;
-  note: string;
+  note: ReactNode;
   empty: string;
 }) {
   const columns = useMemo(
@@ -172,14 +180,15 @@ function Grid<Cell>({
 
   return (
     <>
-      <p className="border-line border-b px-4 py-1.5 text-2xs text-muted-foreground">
-        {note} {rows.length} of {data.rows.length} types.
+      <p className="border-line border-b px-4 py-1.5 text-label text-xs">
+        {note} <span className="font-mono">{rows.length}</span> of{" "}
+        <span className="font-mono">{data.rows.length}</span> types.
       </p>
       <div className="min-h-0 flex-1 overflow-auto">
         {data.rows.length === 0 ? (
-          <p className="px-4 py-6 text-muted-foreground text-xs">{empty}</p>
+          <p className="px-4 py-6 text-faint text-xs">{empty}</p>
         ) : (
-          <table className="border-separate border-spacing-0 font-mono text-xs">
+          <table className="border-separate border-spacing-0">
             <caption className="sr-only">
               Types by column. Choosing a row opens the type in the inspector.
             </caption>
@@ -203,10 +212,10 @@ function Grid<Cell>({
                     {/* Vertical, so a long editor alias costs height once instead
                         of width in every row. */}
                     <span className="inline-block rotate-180 text-left [writing-mode:vertical-rl]">
-                      <span className="block max-h-48 truncate text-phosphor">
+                      <span className="block max-h-48 truncate text-prose text-xs">
                         {column.label}
                       </span>
-                      <span className="block max-h-48 truncate text-3xs text-phosphor-dim">
+                      <span className="block max-h-48 truncate font-mono text-2xs text-faint">
                         {column.detail} · {column.total}
                       </span>
                     </span>
@@ -231,7 +240,7 @@ function Grid<Cell>({
                       scope="row"
                     >
                       <button
-                        className="block max-w-full truncate text-left text-phosphor hover:text-phosphor-bright hover:underline"
+                        className={`block max-w-full truncate text-left hover:text-phosphor hover:underline ${on ? "text-phosphor-bright" : "text-prose"}`}
                         onClick={() => onSelect(row.id)}
                         title={row.alias}
                         type="button"
