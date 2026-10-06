@@ -14,6 +14,7 @@ import {
   FINDING_LABEL,
   type Finding,
   type FindingKind,
+  findingGroups,
   KIND_EXPLANATION,
 } from "../model/findings";
 import { findingsCsv } from "../model/findings-export";
@@ -125,19 +126,9 @@ export function Findings({
     kinds.length === 0
       ? findings
       : findings.filter((finding) => kinds.includes(finding.kind));
-  // Problems first, then the bigger group first, then chip order. findFindings
-  // already sorts rows inside a kind strongest first, so grouping keeps that.
-  const groups = FINDING_KINDS.map((kind) => ({
-    kind,
-    rows: matched.filter((finding) => finding.kind === kind),
-  }))
-    .filter((group) => group.rows.length > 0)
-    .sort(
-      (a, b) =>
-        Number(a.rows[0]?.severity === "note") -
-          Number(b.rows[0]?.severity === "note") ||
-        b.rows.length - a.rows.length
-    );
+  // findFindings already sorts rows inside a kind strongest first, so grouping
+  // keeps that.
+  const groups = findingGroups(matched);
   const problems = findings.filter(
     (finding) => finding.severity === "problem"
   ).length;
