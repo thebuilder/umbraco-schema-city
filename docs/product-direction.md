@@ -7,8 +7,9 @@ needed to act on it.
 ## What works today
 
 Buildings represent Document Types, floors represent property groups, and connections represent
-schema relationships. Districts group types by folder and role. Usage is loaded separately from
-the schema and changes colours, not building positions.
+schema relationships. Districts follow what an editor can create under each root by default, or the
+schema's folders. Usage is loaded separately from the schema and changes colours, not building
+positions.
 
 The current app supports:
 
