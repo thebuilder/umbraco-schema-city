@@ -79,6 +79,56 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
 
 const CELL = "border-line border-b px-2 py-1.5 text-left align-top";
 
+/** The filter box the 2D views share, fed by the palette's query. */
+export function FilterField({
+  query,
+  onQuery,
+}: {
+  query: string;
+  onQuery: (query: string) => void;
+}) {
+  return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: the Input is inside this label; the rule does not follow the component.
+    <label className="flex items-center gap-2 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
+      Filter
+      {/* type="text" and our own clear button, because a search field draws the
+          browser's blue X, which is unreadable on this background. The button is
+          interactive content, so clicking it does not also activate the label. */}
+      <span className="relative">
+        <Input
+          className="h-8 w-64 min-w-[14rem] bg-secondary px-2 pr-7 text-xs normal-case tracking-normal focus-visible:border-phosphor"
+          onChange={(event) => onQuery(event.target.value)}
+          placeholder="Filter types"
+          type="text"
+          value={query}
+        />
+        {query === "" ? null : (
+          <button
+            aria-label="Clear the filter"
+            className="-translate-y-1/2 absolute top-1/2 right-1 cursor-pointer px-1 text-base text-phosphor-dim leading-none hover:text-phosphor-bright"
+            onClick={() => onQuery("")}
+            type="button"
+          >
+            ×
+          </button>
+        )}
+      </span>
+    </label>
+  );
+}
+
+/** Ids of the types the query matches, or null for an empty query. */
+export function useMatches(graph: SchemaGraph, query: string) {
+  return useMemo(() => {
+    if (query.trim() === "") return null;
+    return new Set(
+      searchNodes(graph.nodes, query, graph.nodes.length).map(
+        (hit) => hit.node.id
+      )
+    );
+  }, [graph.nodes, query]);
+}
+
 export function TypeTable({
   graph,
   usage,
@@ -103,14 +153,7 @@ export function TypeTable({
   const rows = useMemo(() => typeRows(graph, usage), [graph, usage]);
   // The same ranking the palette uses, kept only as a set: the table's own sort
   // decides the order, and searchNodes decides what is in it.
-  const matched = useMemo(() => {
-    if (query.trim() === "") return null;
-    return new Set(
-      searchNodes(graph.nodes, query, graph.nodes.length).map(
-        (hit) => hit.node.id
-      )
-    );
-  }, [graph.nodes, query]);
+  const matched = useMatches(graph, query);
   const shown = useMemo(
     () =>
       sortRows(
@@ -133,32 +176,7 @@ export function TypeTable({
   return (
     <div className="flex h-full flex-col bg-background">
       <div className="flex items-center gap-3 border-line border-b px-4 py-2">
-        {/* biome-ignore lint/a11y/noLabelWithoutControl: the Input is inside this label; the rule does not follow the component. */}
-        <label className="flex items-center gap-2 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
-          Filter
-          {/* type="text" and our own clear button, because a search field draws the
-              browser's blue X, which is unreadable on this background. The button is
-              interactive content, so clicking it does not also activate the label. */}
-          <span className="relative">
-            <Input
-              className="h-8 w-64 min-w-[14rem] bg-secondary px-2 pr-7 text-xs normal-case tracking-normal focus-visible:border-phosphor"
-              onChange={(event) => onQuery(event.target.value)}
-              placeholder="Filter types"
-              type="text"
-              value={query}
-            />
-            {query === "" ? null : (
-              <button
-                aria-label="Clear the filter"
-                className="-translate-y-1/2 absolute top-1/2 right-1 cursor-pointer px-1 text-base text-phosphor-dim leading-none hover:text-phosphor-bright"
-                onClick={() => onQuery("")}
-                type="button"
-              >
-                ×
-              </button>
-            )}
-          </span>
-        </label>
+        <FilterField onQuery={onQuery} query={query} />
         <p className="text-muted-foreground text-2xs">
           {shown.length} of {rows.length} types
         </p>

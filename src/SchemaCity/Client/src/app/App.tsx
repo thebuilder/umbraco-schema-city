@@ -36,8 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
   TooltipContent,
@@ -62,8 +60,14 @@ import {
   lensScale,
   type Ramp,
 } from "./scene/lens";
-import { TypeTable } from "./TypeTable";
-import { parseUrl, type UrlState, urlToWrite, type View } from "./url";
+import {
+  FLAT_VIEWS,
+  parseUrl,
+  type UrlState,
+  urlToWrite,
+  type View,
+} from "./url";
+import { FlatView, VIEW_TABS, ViewSwitcher } from "./Views";
 
 /** The tag names whose own keyboard handling wins over the shortcut keys. */
 const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
@@ -149,20 +153,38 @@ function Legend() {
           <LegendRow mark={<Tint className="bg-phosphor" />}>
             Own property group
           </LegendRow>
-          <LegendRow mark={<Tint className="bg-phosphor/45" />}>
-            Composed group
+          <LegendRow
+            mark={<Tint className="border border-azure bg-azure/35" />}
+          >
+            Composed group; a building of only these is a composition
           </LegendRow>
           <LegendRow mark={<Tint className="bg-amber" />}>
             Element Type, until a lens is on
           </LegendRow>
+          <LegendRow
+            mark={
+              <Tint className="border border-phosphor bg-phosphor-bright" />
+            }
+          >
+            Lit lid: the type has a template
+          </LegendRow>
+          <LegendRow mark={<span className="size-1.5 bg-phosphor-bright" />}>
+            Roof dot: varies by culture, a second by segment
+          </LegendRow>
           <LegendRow mark={<Tint className="bg-phosphor-dim" />}>
             Root plaza
           </LegendRow>
-          <LegendRow mark={<Tint className="bg-signal" />}>Selected</LegendRow>
+          <LegendRow mark={<Tint className="border-2 border-signal" />}>
+            Selected
+          </LegendRow>
         </ul>
         <p className="mt-2 text-muted-foreground text-xs">
-          One floor per property group; windows represent properties. A wider
-          footprint means more own properties. Height is not a complexity score.
+          One slab per property group, with a gap between groups and a thin
+          board where a new tab starts; windows represent properties. Pins on
+          the base count direct connections: allowed parents on the north edge,
+          allowed children on the south, links out on the east and links in on
+          the west. A wider footprint means more own properties. Height is not a
+          complexity score.
         </p>
       </section>
 
@@ -282,9 +304,6 @@ export function App({
   const [focusDepth, setFocusDepth] = useState(1);
   const [baseline, setBaseline] = useState<SchemaGraph | null>(null);
   const [comparisonOpen, setComparisonOpen] = useState(false);
-  const lastCamera = useRef<"city" | "top">(
-    start.view === "top" ? "top" : "city"
-  );
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
@@ -345,15 +364,10 @@ export function App({
         setLayers((on) => withLayer(on, layer));
         return;
       }
-      // Turning either view off goes back to the city, the way the toolbar's two
-      // toggles do.
+      // A view key pressed again goes back to the city.
       const key = event.key.toLowerCase();
-      if (key === "l")
-        setView((at) => (at === "list" ? lastCamera.current : "list"));
-      if (key === "e") {
-        lastCamera.current = lastCamera.current === "top" ? "city" : "top";
-        setView(lastCamera.current);
-      }
+      const tab = VIEW_TABS.find((candidate) => candidate.key === key);
+      if (tab) setView((at) => (at === tab.value ? "city" : tab.value));
       // Leaving focus already flies back to the whole city, so Home only asks for a
       // fresh framing when there is no focus to leave.
       if (key === "home") {
@@ -459,6 +473,7 @@ export function App({
     [graph, focus, focusDepth, focusCount]
   );
   const selectedNode = selected ? nodesById.get(selected) : undefined;
+  const flat = FLAT_VIEWS.includes(view);
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
 
   const openPalette = (open: boolean) => {
@@ -542,37 +557,7 @@ export function App({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Both camera modes keep the same city coordinates. */}
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className="font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
-              Camera
-            </span>
-            <ToggleGroup
-              aria-label="Camera"
-              onValueChange={(value) => {
-                lastCamera.current = value[0] === "top" ? "top" : "city";
-                setView(lastCamera.current);
-              }}
-              size="sm"
-              value={[
-                (view === "list" ? lastCamera.current : view) === "top"
-                  ? "top"
-                  : "iso",
-              ]}
-              variant="outline"
-            >
-              <ToggleGroupItem value="iso">Iso</ToggleGroupItem>
-              <ToggleGroupItem value="top">Top down</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-          <Toggle
-            onPressedChange={(on) => setView(on ? "list" : lastCamera.current)}
-            pressed={view === "list"}
-            size="sm"
-            variant="outline"
-          >
-            List
-          </Toggle>
+          <ViewSwitcher onView={setView} view={view} />
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* A disabled trigger swallows its own pointer events, and with them
@@ -680,7 +665,7 @@ export function App({
               the same reason. It covers its own box and nothing else, so the ground
               under it is the only pick the canvas loses. The list view colours
               nothing by lens, so it gets no legend over its first row. */}
-          {scale && view !== "list" ? (
+          {scale && !flat ? (
             <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
               <span className="font-bold uppercase tracking-terminal">
                 {LENS_LABEL[lens]}
@@ -695,20 +680,21 @@ export function App({
           ) : null}
           {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
-          {view === "list" ? null : (
-            <ComparisonLegend comparison={comparison} />
-          )}
-          {view === "list" ? (
-            // The inspector is an overlay, so the table is inset by its width while
+          {flat ? null : <ComparisonLegend comparison={comparison} />}
+          {flat ? (
+            // The inspector is an overlay, so the view is inset by its width while
             // it is open rather than sliding under it.
             <div className={`absolute inset-0 ${selectedNode ? "pr-80" : ""}`}>
-              <TypeTable
+              <FlatView
                 graph={graph}
+                nodesById={nodesById}
+                onPick={() => setPaletteOpen(true)}
                 onQuery={setQuery}
                 onSelect={setSelected}
                 query={query}
                 selected={selected}
                 usage={usage}
+                view={view}
               />
             </div>
           ) : nodes.length === 0 ? (
@@ -733,7 +719,6 @@ export function App({
                 <Scene
                   baseline={baseline}
                   comparison={comparison}
-                  explore={view === "top"}
                   focus={focus}
                   focusDepth={focusDepth}
                   graph={graph}
@@ -756,6 +741,7 @@ export function App({
             <Inspector
               canExpandFocus={canExpandFocus}
               edges={graph.edges}
+              editorLayoutOpen={view === "editor"}
               findings={findings.filter(
                 (finding) => finding.nodeId === selectedNode.id
               )}
@@ -767,6 +753,7 @@ export function App({
               node={selectedNode}
               nodesById={nodesById}
               onClose={done}
+              onEditorLayout={() => setView("editor")}
               onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
               onOpenType={onOpenType}
               onSelect={followLink}

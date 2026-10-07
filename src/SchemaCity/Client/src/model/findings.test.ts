@@ -47,6 +47,7 @@ const property = (
   alias,
   name: alias,
   dataTypeId: "dt",
+  dataTypeName: null,
   editorAlias: "Umbraco.TextBox",
   editorUiAlias: null,
   mandatory: false,

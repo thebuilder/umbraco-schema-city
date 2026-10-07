@@ -10,14 +10,16 @@ import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import { LENSES, type Lens } from "./scene/lens";
 
 /**
- * Which view is on screen. `city` is the isometric map, `top` is the same city
- * viewed directly from above, and `list` is the table that replaces the canvas.
- * One value rather than a flag each, because the list has no camera and the camera
- * has no table.
+ * Which view is on screen. `city` is the 3D map and the rest are the 2D views that
+ * replace the canvas. One value rather than a flag each, because those views have no
+ * camera and the camera has no table.
  */
-export type View = "city" | "top" | "list";
+export type View = "city" | "list" | "tree" | "matrix" | "editor";
 
-const VIEWS: readonly View[] = ["city", "top", "list"];
+/** The views drawn without the 3D canvas. */
+export const FLAT_VIEWS: readonly View[] = ["list", "tree", "matrix", "editor"];
+
+const VIEWS: readonly View[] = ["city", ...FLAT_VIEWS];
 
 export type UrlState = {
   /** Alias of the type the view is about, or null when nothing is selected. */
@@ -54,12 +56,9 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
     // existed, both read as no lens rather than as an error.
     lens: LENSES.find((candidate) => candidate === lens) ?? "none",
     // A view name the app does not have reads as the city, the same way an unknown
-    // lens reads as no lens.
-    view:
-      params.get("view") === "explore"
-        ? "top"
-        : (VIEWS.find((candidate) => candidate === params.get("view")) ??
-          "city"),
+    // lens reads as no lens. That covers `top` and `explore`, the camera modes older
+    // links carry, which were only ever other angles on the same city.
+    view: VIEWS.find((candidate) => candidate === params.get("view")) ?? "city",
   };
 }
 

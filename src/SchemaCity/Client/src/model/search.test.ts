@@ -6,6 +6,7 @@ const property = (alias: string): SchemaProperty => ({
   alias,
   name: alias,
   dataTypeId: "dt",
+  dataTypeName: "Textstring",
   editorAlias: "Umbraco.TextBox",
   editorUiAlias: "Umb.PropertyEditorUi.TextBox",
   mandatory: false,

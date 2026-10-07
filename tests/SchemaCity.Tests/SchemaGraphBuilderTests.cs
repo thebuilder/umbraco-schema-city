@@ -163,7 +163,10 @@ public class SchemaGraphBuilderTests
         var dataType = new FakeDataType(new BlockListConfiguration
         {
             Blocks = [new() { ContentElementTypeKey = elementKey }],
-        });
+        })
+        {
+            Name = "Page Blocks",
+        };
 
         Guid hostKey = Guid.Parse("10101010-1010-1010-1010-101010101010");
         ContentType host = NewContentType(1401, hostKey, "home", "Home", parentId: -1);
@@ -172,6 +175,7 @@ public class SchemaGraphBuilderTests
         SchemaGraph graph = SchemaGraphBuilder.BuildGraph([host, element], [], [dataType]);
         SchemaNode hostNode = Assert.Single(graph.Nodes, n => n.Alias == "home");
         SchemaProperty bodyProperty = hostNode.Groups.SelectMany(g => g.Properties).Single();
+        Assert.Equal("Page Blocks", bodyProperty.DataTypeName);
 
         SchemaTarget target = Assert.Single(bodyProperty.Targets);
         Assert.Equal(elementKey.ToString(), target.NodeId);

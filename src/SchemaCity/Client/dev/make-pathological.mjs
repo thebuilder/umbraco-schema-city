@@ -19,6 +19,7 @@
 //   5 types with no properties, 20 with 30 properties across 6 groups
 //   block editors covering every Element Type from 30 hosts, plus 3 broken ones
 //   4 types with a property alias arriving from two compositions
+//   7 Data Types, two named nearly like another (Text String, SEO Toggle)
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -74,12 +75,27 @@ const COLORS = [
   "color-orange",
   null,
 ];
+// [editor alias, UI alias, Data Type name, key seed]. The last two repeat an editor
+// under a name one keystroke away from an existing one, the way a second Data Type
+// gets made by someone who did not find the first.
 const EDITORS = [
-  ["Umbraco.TextBox", "Umb.PropertyEditorUi.TextBox"],
-  ["Umbraco.TextArea", "Umb.PropertyEditorUi.TextArea"],
-  ["Umbraco.TrueFalse", "Umb.PropertyEditorUi.Toggle"],
-  ["Umbraco.MediaPicker3", "Umb.PropertyEditorUi.MediaPicker"],
-  ["Umbraco.DateTime", "Umb.PropertyEditorUi.DatePicker"],
+  ["Umbraco.TextBox", "Umb.PropertyEditorUi.TextBox", "Textstring"],
+  ["Umbraco.TextArea", "Umb.PropertyEditorUi.TextArea", "Textarea"],
+  ["Umbraco.TrueFalse", "Umb.PropertyEditorUi.Toggle", "Seo Toggle"],
+  ["Umbraco.MediaPicker3", "Umb.PropertyEditorUi.MediaPicker", "Image Picker"],
+  ["Umbraco.DateTime", "Umb.PropertyEditorUi.DatePicker", "Date Picker"],
+  [
+    "Umbraco.TextBox",
+    "Umb.PropertyEditorUi.TextBox",
+    "Text String",
+    "Text String",
+  ],
+  [
+    "Umbraco.TrueFalse",
+    "Umb.PropertyEditorUi.Toggle",
+    "SEO Toggle",
+    "SEO Toggle",
+  ],
 ];
 
 // ------------------------------------------------------------------ folders
@@ -313,12 +329,13 @@ for (const alias of MULTILINGUAL) byAlias.get(alias).variesByCulture = true;
 
 let propertyIndex = 0;
 function property(owner, alias, extra = {}) {
-  const [editorAlias, editorUiAlias] =
+  const [editorAlias, editorUiAlias, dataTypeName, key = editorAlias] =
     EDITORS[propertyIndex++ % EDITORS.length];
   return {
     alias,
     name: titleOf(alias),
-    dataTypeId: guid(`datatype/${editorAlias}`),
+    dataTypeId: guid(`datatype/${key}`),
+    dataTypeName,
     editorAlias,
     editorUiAlias,
     mandatory: propertyIndex % 5 === 0,

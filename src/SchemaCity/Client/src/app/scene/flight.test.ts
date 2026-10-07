@@ -3,23 +3,21 @@ import {
   approach,
   desiredVelocity,
   FLY_SPEED,
+  flySpeed,
   groundAxes,
-  panSpeed,
   translateFlightEndpoints,
-  turnedOffset,
-  turnRates,
 } from "./flight";
 
-/** The isometric camera's own pose: standing south-east of the city, looking at it. */
+/** The default framing's pose: standing south-east of the city, looking at it. */
 const ISO = { from: { x: 10, y: 10, z: 10 }, to: { x: 0, y: 0, z: 0 } };
 
 const held = (...codes: string[]) => new Set(codes);
 
-test("W pans the view up the screen, whichever way the camera is turned", () => {
+test("W flies the way the camera faces, whichever way it is turned", () => {
   for (const angle of [0, Math.PI / 4, Math.PI, -2.2]) {
     const from = { x: Math.sin(angle) * 10, y: 10, z: Math.cos(angle) * 10 };
     const axes = groundAxes(from, { x: 0, y: 0, z: 0 });
-    const velocity = desiredVelocity(held("KeyW"), axes, 10, "pan");
+    const velocity = desiredVelocity(held("KeyW"), axes, 10);
     // Up the screen along the ground is the view direction flattened, so the camera
     // moving that way closes on the point it was looking at.
     const closing = { x: from.x + velocity.x, z: from.z + velocity.z };
@@ -30,10 +28,10 @@ test("W pans the view up the screen, whichever way the camera is turned", () => 
   }
 });
 
-test("D pans right of the screen and A the other way", () => {
+test("D flies right of the screen and A the other way", () => {
   const axes = groundAxes(ISO.from, ISO.to);
-  const right = desiredVelocity(held("KeyD"), axes, 10, "pan");
-  const left = desiredVelocity(held("KeyA"), axes, 10, "pan");
+  const right = desiredVelocity(held("KeyD"), axes, 10);
+  const left = desiredVelocity(held("KeyA"), axes, 10);
   expect(right.x).toBeCloseTo(-left.x);
   expect(right.z).toBeCloseTo(-left.z);
   // Screen-right is a quarter turn clockwise from screen-up, which for this camera
@@ -42,52 +40,40 @@ test("D pans right of the screen and A the other way", () => {
   expect(right.z).toBeCloseTo(-10 / Math.SQRT2);
 });
 
-test("the arrows pan in isometric and do nothing to movement in Explore", () => {
+test("the arrows pan the same way as W, A, S and D", () => {
   const axes = groundAxes(ISO.from, ISO.to);
-  const arrows = desiredVelocity(held("ArrowUp"), axes, 10, "pan");
-  const keys = desiredVelocity(held("KeyW"), axes, 10, "pan");
-  expect(arrows).toEqual(keys);
-  expect(desiredVelocity(held("ArrowUp"), axes, 10, "fly")).toEqual({
-    x: 0,
-    y: 0,
-    z: 0,
-  });
+  expect(desiredVelocity(held("ArrowUp", "ArrowLeft"), axes, 10)).toEqual(
+    desiredVelocity(held("KeyW", "KeyA"), axes, 10)
+  );
+  // An arrow and its letter held together are one push, not two.
+  expect(desiredVelocity(held("ArrowUp", "KeyW"), axes, 10)).toEqual(
+    desiredVelocity(held("KeyW"), axes, 10)
+  );
 });
 
 test("a diagonal is no faster than one key, and holding both ways stands still", () => {
   const axes = groundAxes(ISO.from, ISO.to);
-  const diagonal = desiredVelocity(
-    held("KeyW", "KeyD"),
-    axes,
-    FLY_SPEED,
-    "fly"
-  );
+  const diagonal = desiredVelocity(held("KeyW", "KeyD"), axes, FLY_SPEED);
   expect(Math.hypot(diagonal.x, diagonal.y, diagonal.z)).toBeCloseTo(FLY_SPEED);
-  expect(desiredVelocity(held("KeyW", "KeyS"), axes, FLY_SPEED, "fly")).toEqual(
-    {
-      x: 0,
-      y: 0,
-      z: 0,
-    }
-  );
-});
-
-test("R rises and F descends, in Explore only", () => {
-  const axes = groundAxes(ISO.from, ISO.to);
-  expect(desiredVelocity(held("KeyR"), axes, 10, "fly").y).toBeCloseTo(10);
-  expect(desiredVelocity(held("KeyF"), axes, 10, "fly").y).toBeCloseTo(-10);
-  expect(desiredVelocity(held("KeyR"), axes, 10, "pan")).toEqual({
+  expect(desiredVelocity(held("KeyW", "KeyS"), axes, FLY_SPEED)).toEqual({
     x: 0,
     y: 0,
     z: 0,
   });
 });
 
-test("a pan covers the same screen distance at any zoom", () => {
-  // Two seconds held at two zooms a factor of eight apart.
-  const near = panSpeed(24) * 2 * 24;
-  const far = panSpeed(3) * 2 * 3;
-  expect(near).toBeCloseTo(far);
+test("R rises and F descends", () => {
+  const axes = groundAxes(ISO.from, ISO.to);
+  expect(desiredVelocity(held("KeyR"), axes, 10).y).toBeCloseTo(10);
+  expect(desiredVelocity(held("KeyF"), axes, 10).y).toBeCloseTo(-10);
+});
+
+test("flying speeds up with distance and never drops below the floor", () => {
+  expect(flySpeed(0)).toBe(FLY_SPEED);
+  expect(flySpeed(400)).toBeGreaterThan(flySpeed(200));
+  // Twice as far out is twice as fast, so a key covers about the same share of the
+  // screen from the overview as from halfway in.
+  expect(flySpeed(400) / flySpeed(200)).toBeCloseTo(2);
 });
 
 test("velocity eases in and out at the same rate whatever the frame rate", () => {
@@ -102,26 +88,6 @@ test("velocity eases in and out at the same rate whatever the frame rate", () =>
   // And it is most of the way there by then, rather than still ramping up.
   expect(step(30, 1 / 60)).toBeGreaterThan(19);
   expect(approach(20, 0, 1 / 60)).toBeLessThan(20);
-});
-
-test("the arrows turn left, right, up and down", () => {
-  expect(turnRates(held("ArrowLeft"))).toEqual({ yaw: 1, pitch: 0 });
-  expect(turnRates(held("ArrowRight", "ArrowDown"))).toEqual({
-    yaw: -1,
-    pitch: -1,
-  });
-  expect(turnRates(held("KeyW"))).toEqual({ yaw: 0, pitch: 0 });
-});
-
-test("a turn keeps the camera where it is and holds its distance", () => {
-  const offset = { x: 0, y: 6, z: 10 };
-  const turned = turnedOffset(offset, 0.3, 0.1, Math.PI / 2);
-  expect(Math.hypot(turned.x, turned.y, turned.z)).toBeCloseTo(
-    Math.hypot(0, 6, 10)
-  );
-  // Yawing left swings the target to the left of the view, which is the offset
-  // rotating the other way about the camera.
-  expect(turned.x).toBeGreaterThan(0);
 });
 
 test("panning rebases an in-flight transition without changing its orientation", () => {
@@ -180,18 +146,4 @@ test("panning rebases an in-flight transition without changing its orientation",
       prior.position.z - prior.target.z
     );
   }
-});
-
-test("pitch stops at the horizon and short of straight down", () => {
-  const radius = Math.hypot(0, 6, 10);
-  // Looking up, which the controls stop at a polar angle of 90 degrees: past it the
-  // view would swing under the ground. The offset ends level with the camera.
-  const up = turnedOffset({ x: 0, y: 6, z: 10 }, 0, 4, Math.PI / 2);
-  expect(up.y).toBeGreaterThan(0);
-  expect(up.y / radius).toBeLessThan(0.03);
-  // Looking down stops a hair short of the pole, where an azimuth has nothing left
-  // to rotate.
-  const down = turnedOffset({ x: 0, y: 6, z: 10 }, 0, -4, Math.PI / 2);
-  expect(down.y).toBeCloseTo(radius, 1);
-  expect(down.z).toBeGreaterThan(0);
 });

@@ -3,14 +3,7 @@
 // Pure: no three.js, no React, no DOM.
 import type { EdgeKind, SchemaEdge } from "../../model/types";
 import type { Placement } from "../layout/city";
-import {
-  linkLaneKey,
-  linkLanes,
-  type RoadGrid,
-  roadGrid,
-  routeLaneOffset,
-  routePoints,
-} from "./roads";
+import { planRoutes } from "./roads";
 
 export type Layer = "structure" | "compositions" | "blocks" | "references";
 
@@ -54,11 +47,14 @@ const DASH_OFF = 0.4;
 
 /**
  * One flat xyz line-segment list for every edge in `layer`, plus the vertex range
- * each edge occupies so the scene can fade one edge without rebuilding anything.
+ * each run occupies so the scene can fade one edge without rebuilding anything.
  *
- * Compositions arch over the roofs. Blocks and references drop off their roof, cross
- * the city along the same streets the roads run, and rise to the other roof, so all
- * four layers agree about where the ground is walkable. References are dashed.
+ * Compositions arch over the roofs. Blocks and references drop off their roof and
+ * run the streets in lanes planned together with the roads, so no two ground layers
+ * ever share a lane, and rise to the other roof. A block run leaving one host is one
+ * trace however many Element Types it forks to, and the run arriving at one Element
+ * Type is one trace however many hosts feed it; each lists every edge it carries.
+ * References are dashed.
  */
 export function buildLinkGeometry(
   layer: Exclude<Layer, "structure">,
@@ -66,37 +62,88 @@ export function buildLinkGeometry(
   anchors: Map<string, Anchor>,
   placements: Map<string, Placement>
 ): { positions: Float32Array; ranges: LinkRange[] } {
+  if (layer === "compositions") return buildArcs(edges, anchors);
+
   const positions: number[] = [];
   const ranges: LinkRange[] = [];
-  const lanes = linkLanes(edges);
+  const kind = layer === "blocks" ? "block" : "reference";
+  const y = layer === "references" ? REFERENCE_Y : BLOCK_Y;
+  const line = (a: Anchor, b: Anchor) => {
+    if (layer === "references") pushDashes(positions, a, b);
+    else positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+  };
+  const { routes, segments } = planRoutes(placements, edges);
+
+  for (const segment of segments) {
+    if (segment.edges[0]?.kind !== kind) continue;
+    const start = positions.length / 3;
+    line(
+      { x: segment.x0, y, z: segment.z0 },
+      { x: segment.x1, y, z: segment.z1 }
+    );
+    ranges.push({
+      edges: segment.edges,
+      start,
+      count: positions.length / 3 - start,
+    });
+  }
+
+  // The drop off a roof to the street and the rise to the other roof. Every link
+  // leaving one face of a host drops from the same roof to the same point, so the
+  // drop is drawn once and carries each of them, and the same goes for a rise.
+  const ends = new Map<string, { a: Anchor; b: Anchor; edges: SchemaEdge[] }>();
+  const end = (key: string, a: Anchor, b: Anchor, edge: SchemaEdge) => {
+    const found = ends.get(key);
+    if (found) found.edges.push(edge);
+    else ends.set(key, { a, b, edges: [edge] });
+  };
+  for (const { edge, points } of routes) {
+    if (edge.kind !== kind) continue;
+    const from = anchors.get(edge.from);
+    const to = anchors.get(edge.to);
+    const [first] = points;
+    const last = points[points.length - 1];
+    if (!(from && to && first && last)) continue;
+    end(`${edge.from}|${first.x}|${first.z}`, from, { ...first, y }, edge);
+    end(`${edge.to}|${last.x}|${last.z}`, { ...last, y }, to, edge);
+  }
+  for (const { a, b, edges: carried } of ends.values()) {
+    const start = positions.length / 3;
+    line(a, b);
+    ranges.push({ edges: carried, start, count: positions.length / 3 - start });
+  }
+
+  return { positions: new Float32Array(positions), ranges };
+}
+
+/**
+ * Every composition and inheritance as an arc over the roofs. An inherited parent
+ * arrives as both an inherits and a composition edge. The inheritance is the
+ * stronger fact, and the scene draws it brighter, so the composition twin is dropped
+ * whichever order the two came in.
+ */
+function buildArcs(
+  edges: SchemaEdge[],
+  anchors: Map<string, Anchor>
+): { positions: Float32Array; ranges: LinkRange[] } {
+  const positions: number[] = [];
+  const ranges: LinkRange[] = [];
   const drawn = new Set<string>();
-  const grid = layer === "compositions" ? null : roadGrid(placements.values());
-  // An inherited parent arrives as both an inherits and a composition edge. The
-  // inheritance is the stronger fact, and the scene draws it brighter, so the
-  // composition twin is dropped whichever order the two came in.
-  const inherited =
-    layer === "compositions"
-      ? new Set(
-          edges
-            .filter((edge) => edge.kind === "inherits")
-            .map((edge) => `${edge.from}|${edge.to}`)
-        )
-      : null;
+  const inherited = new Set(
+    edges
+      .filter((edge) => edge.kind === "inherits")
+      .map((edge) => `${edge.from}|${edge.to}`)
+  );
+  const key = (edge: SchemaEdge) => `${edge.kind}|${edge.from}|${edge.to}`;
 
   for (const edge of [...edges].sort(
     (a, b) =>
-      linkLaneKey(a).localeCompare(linkLaneKey(b)) ||
+      key(a).localeCompare(key(b)) ||
       (a.propertyAlias ?? "").localeCompare(b.propertyAlias ?? "")
   )) {
-    if (LAYER_OF[edge.kind] !== layer) continue;
-    if (
-      edge.kind === "composition" &&
-      inherited?.has(`${edge.from}|${edge.to}`)
-    )
+    if (LAYER_OF[edge.kind] !== "compositions") continue;
+    if (edge.kind === "composition" && inherited.has(`${edge.from}|${edge.to}`))
       continue;
-    // Two block properties on one type pointing at the same Element Type are one
-    // line, not two drawn on top of each other. That is 38 of the seeded schema's
-    // 340 block edges, and the inspector is where the property aliases are read.
     const pair = `${edge.from}|${edge.to}`;
     if (drawn.has(pair) || edge.from === edge.to) continue;
     const from = anchors.get(edge.from);
@@ -105,69 +152,20 @@ export function buildLinkGeometry(
     drawn.add(pair);
 
     const start = positions.length / 3;
-    if (grid) {
-      const path = groundPath(
-        grid,
-        from,
-        to,
-        placements.get(edge.from),
-        placements.get(edge.to),
-        layer === "references" ? REFERENCE_Y : BLOCK_Y,
-        lanes.get(linkLaneKey(edge)) ?? 0
-      );
-      for (let i = 1; i < path.length; i++) {
-        const a = path[i - 1] as Anchor;
-        const b = path[i] as Anchor;
-        if (layer === "references") pushDashes(positions, a, b);
-        else positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
-      }
-    } else {
-      // A quadratic curve only travels half way to its control point, so the
-      // control is put twice as far out as the height the curve should reach.
-      const apex = (height: number) => 2 * height - (from.y + to.y) / 2;
-      const length = Math.max(1, Math.hypot(to.x - from.x, to.z - from.z));
-      const control = {
-        x: (from.x + to.x) / 2 + ((to.z - from.z) / length) * 1.1,
-        y: apex(Math.max(from.y, to.y) + ARCH),
-        z: (from.z + to.z) / 2 + ((from.x - to.x) / length) * 1.1,
-      };
-      pushCurve(positions, from, control, to);
-    }
+    // A quadratic curve only travels half way to its control point, so the
+    // control is put twice as far out as the height the curve should reach.
+    const apex = (height: number) => 2 * height - (from.y + to.y) / 2;
+    const length = Math.max(1, Math.hypot(to.x - from.x, to.z - from.z));
+    const control = {
+      x: (from.x + to.x) / 2 + ((to.z - from.z) / length) * 1.1,
+      y: apex(Math.max(from.y, to.y) + ARCH),
+      z: (from.z + to.z) / 2 + ((from.x - to.x) / length) * 1.1,
+    };
+    pushCurve(positions, from, control, to);
     ranges.push({ edges: [edge], start, count: positions.length / 3 - start });
   }
 
   return { positions: new Float32Array(positions), ranges };
-}
-
-/**
- * Roof, down to the street, along the streets to the other building's column, then
- * up to its roof. It is the road route with a height on it, so a block link and the
- * road under it turn the same corners instead of crossing at an angle.
- */
-function groundPath(
-  grid: RoadGrid,
-  from: Anchor,
-  to: Anchor,
-  fromPlacement: Placement | undefined,
-  toPlacement: Placement | undefined,
-  y: number,
-  lane: number
-): Anchor[] {
-  if (!(fromPlacement && toPlacement)) return [from, to];
-  return [
-    from,
-    ...routePoints(
-      grid,
-      fromPlacement,
-      toPlacement,
-      routeLaneOffset(grid, fromPlacement, toPlacement, lane)
-    ).map((point) => ({
-      x: point.x,
-      y,
-      z: point.z,
-    })),
-    to,
-  ];
 }
 
 /** A quadratic curve as `SEGMENTS` joined segments. */

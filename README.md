@@ -54,6 +54,14 @@ see its direct connections and the names of connected types. Labels that would o
 hidden until there is room for them as you zoom in. Click a building to keep its connections visible and open the
 inspector, which shows properties, composition origins, usage counts, and related types.
 
+Each building is built like a chip on a circuit board. Every slab is one property group, with a
+gap between groups and a thin board where a new tab starts; the lit windows are its properties.
+Composed groups are translucent azure, and a composition that no content can be created from is
+made of those shells alone. Element Types are low amber blocks. Pins along the base count direct
+connections: allowed parents on the north edge, allowed children on the south, other links out on
+the east and in on the west. A lit lid means the type has a template, and a dot on the roof means
+it varies by culture (a second dot: by segment). The Legend button lists these.
+
 Layer switches control the background overview. Hover and selection reveal direct connections
 across all layers, including ones you have switched off.
 
@@ -108,6 +116,39 @@ type to open the inspector. The table works without the 3D canvas.
 
 ![The type list sorted by own property count, largest first.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png)
 
+The view switcher in the toolbar chooses between City, List, Tree, Matrix and Editor. The choice is
+kept in the URL, and every view except City works without the 3D canvas.
+
+### Follow the creation tree
+
+Tree starts at each type allowed at root and lists what an editor can create under it, following
+the allowed-child rules. A type allowed under two parents appears under both. A type that already
+appears higher in the same branch is marked and not expanded again. Below the tree, a list shows
+Document Types that no root can reach, with the types they are allowed under, so a chain that
+only hangs off another unreachable type is visible. Element Types and compositions that nothing
+can create are left out of that list.
+
+![The creation tree from the three root types, with Home selected under Site and the unreachable types below.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/tree.png)
+
+### Compare types in a matrix
+
+Matrix has two grids. Compositions shows which types use which compositions, and marks a
+composition that arrives through another one. Data Types shows how many of each type's own
+properties use each Data Type. Each column is headed by the Data Type name, with the property
+editor alias and the start of the Data Type key below it, so two Data Types with similar names
+stay distinguishable. Rows are sorted by name; columns sort by usage or by name.
+
+![The compositions matrix, with Seo Composition used by most page types.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/matrix.png)
+
+### Read a type as an editor sees it
+
+Editor draws the selected type as tabs and groups, in the order the schema lists them, with each
+property's alias, editor, mandatory marker and culture variance. A property from a composition
+names its source. Tab labels carry their property counts. Choose Editor layout in the inspector
+to open a type here.
+
+![Home in the editor view, with its tabs, groups and the composition each property comes from.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
+
 ## Compare schema snapshots
 
 Open Compare and export the current schema before making a change. Later, import that JSON file
@@ -118,28 +159,32 @@ Matched buildings keep their baseline positions. New types appear on separate ad
 Comparison covers schema configuration only. It does not compare content usage or dependencies
 in custom code. Snapshot import is for review and does not apply changes to Umbraco.
 
-Outside comparison mode, layouts are deterministic for the same schema. Adding or removing types
-can rearrange the city; manual pinning is not available.
+Outside comparison mode, layouts are deterministic for the same schema. Each top-level folder is a
+district, and a district's place and the order of its loose types follow their connections: an
+Element Type sits under the pages that use it, a composition over the pages that compose it. So
+adding or removing types, or connections between them, can rearrange the city; manual pinning is
+not available.
 
 ## Navigate the city
 
-Iso and Top down use the same world coordinates. Pan and zoom in either view; keyboard movement
-continues while the camera changes angle. The brief opening animation respects reduced-motion
-preferences.
-
-![The same schema in Top down view with structure connections.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/top-down.png)
+The city stands in a 3D world with a sky, a horizon and a ground that runs out to it. It opens on a
+raised three-quarter view of the whole city, and from there you can orbit, pan, dolly toward any
+point and come down to street level. Focusing a type, leaving focus and Home fly the camera to the
+new framing. The establishing flight plays on the first visit in a browser only. The brief
+opening animation and that flight respect reduced-motion preferences.
 
 | Action | Control |
 | --- | --- |
-| Pan | Drag, WASD, or arrow keys |
-| Pan faster | Hold Shift with a movement key |
-| Zoom | Mouse wheel |
-| Switch camera | E or the Iso / Top down buttons |
+| Orbit | Drag |
+| Move toward the cursor, or away | Mouse wheel |
+| Pan along the ground | Right-drag, W, A, S, D or arrow keys |
+| Rise and descend | R, F |
+| Move faster | Hold Shift with a movement key |
 | Focus selected type | Enter |
 | Leave focus, then clear selection | Escape |
 | Reframe the city or leave focus | Home |
 | Toggle connection layers | 1, 2, 3, 4 |
-| Switch list view | L |
+| Switch to List, Tree, Matrix or Editor, or back to the city | L, T, M, E |
 | Search | ⌘K / Ctrl+K |
 | Show controls | ? |
 

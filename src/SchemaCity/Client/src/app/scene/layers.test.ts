@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SchemaEdge } from "../../model/types";
 import type { Placement } from "../layout/city";
 import { type Anchor, buildLinkGeometry } from "./layers";
-import { linkLanes } from "./roads";
+import { planRoads } from "./roads";
 
 // Two rows nine units apart, so there is one street between them at z = 5.5.
 const placements = new Map<string, Placement>([
@@ -85,15 +85,7 @@ describe("buildLinkGeometry", () => {
     );
   });
 
-  it("keeps dense ground-link channels distinct and independent of duplicate property order", () => {
-    const edges = Array.from({ length: 200 }, (_, index) =>
-      edge("block", `p${index}`, "target")
-    );
-    const lanes = linkLanes(edges);
-    expect(new Set(lanes.values()).size).toBe(200);
-    expect([...lanes.values()].every((lane) => lane > -1 && lane < 0)).toBe(
-      true
-    );
+  it("draws the same links whatever order duplicate properties arrive in", () => {
     const duplicate = [
       edge("block", "a", "b", "first"),
       edge("block", "a", "b", "second"),
@@ -101,7 +93,6 @@ describe("buildLinkGeometry", () => {
     expect(buildLinkGeometry("blocks", duplicate, anchors, placements)).toEqual(
       buildLinkGeometry("blocks", [...duplicate].reverse(), anchors, placements)
     );
-    expect(linkLanes([...edges, edges[0]])).toEqual(lanes);
   });
 
   it("draws nothing for an empty edge list", () => {
@@ -122,15 +113,18 @@ describe("buildLinkGeometry", () => {
       edge("reference", "a", "b"),
       edge("allowedChild", "a", "b"),
     ];
-    expect(
-      buildLinkGeometry("compositions", edges, anchors, placements).ranges
-    ).toHaveLength(1);
-    expect(
-      buildLinkGeometry("blocks", edges, anchors, placements).ranges
-    ).toHaveLength(1);
-    expect(
-      buildLinkGeometry("references", edges, anchors, placements).ranges
-    ).toHaveLength(1);
+    // A ground link is several runs, a drop and a rise, each its own range, so what
+    // is counted is the edges the ranges carry.
+    const kinds = (layer: "compositions" | "blocks" | "references") => [
+      ...new Set(
+        buildLinkGeometry(layer, edges, anchors, placements).ranges.flatMap(
+          (range) => range.edges.map((carried) => carried.kind)
+        )
+      ),
+    ];
+    expect(kinds("compositions")).toEqual(["composition"]);
+    expect(kinds("blocks")).toEqual(["block"]);
+    expect(kinds("references")).toEqual(["reference"]);
   });
 
   it("skips an edge whose end has no placement", () => {
@@ -199,13 +193,10 @@ describe("buildLinkGeometry", () => {
     );
     // The route drops off a's roof onto the street between the two rows, runs along
     // it to b's column, then rises, so the same corners the road turns show up here.
+    // Alone on the street, it takes the street's middle lane at z = 5.5.
     const street: number[] = [];
     for (let i = 0; i < positions.length; i += 3) {
-      // Blocks use their own side of the street, clear of the central road.
-      if (
-        (positions[i + 2] as number) > 1.1 &&
-        (positions[i + 2] as number) < 5.5
-      )
+      if (Math.abs((positions[i + 2] as number) - 5.5) < 1e-6)
         street.push(positions[i] as number);
     }
     expect(Math.min(...street)).toBeCloseTo(0, 6);
@@ -213,13 +204,56 @@ describe("buildLinkGeometry", () => {
   });
 
   it("draws one line for two block properties pointing at the same type", () => {
-    const { ranges } = buildLinkGeometry(
+    const two = buildLinkGeometry(
       "blocks",
       [edge("block", "a", "b", "hero"), edge("block", "a", "b", "body")],
       anchors,
       placements
     );
-    expect(ranges).toHaveLength(1);
+    const one = buildLinkGeometry(
+      "blocks",
+      [edge("block", "a", "b", "body")],
+      anchors,
+      placements
+    );
+    expect(two.positions).toEqual(one.positions);
+    expect(two.ranges.every((range) => range.edges.length === 1)).toBe(true);
+  });
+
+  it("gives a road, a block link and a reference on one street three lanes", () => {
+    const edges = [
+      edge("allowedChild", "a", "b"),
+      edge("block", "a", "b"),
+      edge("reference", "a", "b"),
+    ];
+    const laneOf = (layer: "blocks" | "references") => {
+      const { positions } = buildLinkGeometry(
+        layer,
+        edges,
+        anchors,
+        placements
+      );
+      // The run along the street is the one segment whose ends share a z.
+      for (let i = 0; i < positions.length; i += 6)
+        if (
+          positions[i + 2] === positions[i + 5] &&
+          positions[i] !== positions[i + 3]
+        )
+          return positions[i + 2] as number;
+      return Number.NaN;
+    };
+    const road = planRoads(placements, edges).find(
+      (segment) => segment.z0 === segment.z1
+    )?.z0 as number;
+    const lanes = [road, laneOf("blocks"), laneOf("references")];
+    // Structure first, then blocks, then references, north to south.
+    expect([...lanes].sort((x, y) => x - y)).toEqual(lanes);
+    expect(new Set(lanes).size).toBe(3);
+    // All three stay inside the street between the rows.
+    for (const lane of lanes) {
+      expect(lane).toBeGreaterThan(1);
+      expect(lane).toBeLessThan(10);
+    }
   });
 
   it("draws one arc for an inherited parent, and it is the inherits edge", () => {
