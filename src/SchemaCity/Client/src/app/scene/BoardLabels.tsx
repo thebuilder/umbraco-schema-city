@@ -13,6 +13,7 @@ import {
   boardTextPx,
   COURTYARD_SEGMENTS,
   courtyard,
+  type Edge,
   FADE_SECONDS,
   type Fades,
   fittedFontPx,
@@ -159,7 +160,8 @@ function buildAtlas(
   nodesById: Map<string, SchemaNode>,
   font: string,
   ratio: number,
-  gl: THREE.WebGLRenderer
+  gl: THREE.WebGLRenderer,
+  islands: ReadonlyMap<string, Rect>
 ): Atlas {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d") as CanvasRenderingContext2D;
@@ -170,7 +172,8 @@ function buildAtlas(
   const decided = printsFor(
     placements,
     (id) => nodesById.get(id)?.name,
-    measure
+    measure,
+    islands
   );
 
   const planned = [...decided].flatMap(([id, sized]) =>
@@ -701,7 +704,8 @@ function repaint(inputs: Inputs, frame: Frame, floated: Set<string>): boolean {
 function useNameMesh(
   placements: readonly Placement[],
   nodesById: Map<string, SchemaNode>,
-  palette: { bright: string; amber: string; dim: string; mono: string }
+  palette: { bright: string; amber: string; dim: string; mono: string },
+  islands: ReadonlyMap<string, Rect>
 ) {
   const gl = useThree((state) => state.gl);
   const ratio = useThree((state) => state.viewport.dpr);
@@ -721,9 +725,9 @@ function useNameMesh(
   }, [fontsReady]);
 
   const atlas = useMemo(
-    () => buildAtlas(placements, nodesById, palette.mono, ratio, gl),
+    () => buildAtlas(placements, nodesById, palette.mono, ratio, gl, islands),
     // fontsReady is a trigger: the same inputs rasterise differently once it flips.
-    [placements, nodesById, palette.mono, ratio, gl, fontsReady]
+    [placements, nodesById, palette.mono, ratio, gl, islands, fontsReady]
   );
   useEffect(() => () => atlas.texture.dispose(), [atlas]);
   const geometry = useMemo(
@@ -897,6 +901,8 @@ export function BoardLabels({
   traces,
   boardColours,
   textScale,
+  islands,
+  edges,
 }: {
   /** The city's own placements, which decide every print and its size. */
   cityPlacements: readonly Placement[];
@@ -918,11 +924,16 @@ export function BoardLabels({
   boardColours: Map<string, THREE.Color>;
   /** How many times the usual pixels a board targets for its print size, 1.4 when presenting. */
   textScale: number;
+  /** Each district's board, which its names keep the narrowest of their prints on. */
+  islands: ReadonlyMap<string, Rect>;
+  /** Each district's board and its fingers, which its names stay on; none in focus mode. */
+  edges: ReadonlyMap<string, Edge> | undefined;
 }) {
   const { atlas, geometry, material, courtyards, lineMaterial } = useNameMesh(
     cityPlacements,
     nodesById,
-    palette
+    palette,
+    islands
   );
   const { knockouts, knockoutMaterial } = useKnockouts(
     cityPlacements,
@@ -942,9 +953,10 @@ export function BoardLabels({
         settled,
         atlas.sizes,
         (id) => usage?.byType[id]?.total ?? 0,
-        (rect) => traceAt(rect).length > 0
+        (rect) => traceAt(rect).length > 0,
+        edges
       ),
-    [settled, atlas, usage, traceAt]
+    [settled, atlas, usage, traceAt, edges]
   );
 
   const inputs = useMemo(

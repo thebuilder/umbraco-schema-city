@@ -2707,6 +2707,14 @@ export default function Scene({
     }
     return map;
   }, [routed]);
+  // Each district's board, padding included.
+  const islands = useMemo(
+    () =>
+      new Map(
+        city.districts.map((district) => [district.id, islandOf(district)])
+      ),
+    [city]
+  );
   // Where the drawn ground traces turn, for the vias, and where they leave their
   // board for another, for the gold fingers. Read off the plan the traces draw from,
   // which is kept per placement map and edge list, so this routes nothing again.
@@ -2716,23 +2724,35 @@ export default function Scene({
     const routes = planRoutes(routed.placementsById, drawnEdges)
       .routes.filter(({ edge }) => active.has(LAYER_OF[edge.kind]))
       .map(({ edge, points }) => ({ from: edge.from, to: edge.to, points }));
-    const islands = new Map(
-      city.districts.map((district) => [district.id, islandOf(district)])
-    );
+    const fingers =
+      focus === null
+        ? edgeFingers(
+            routes,
+            (id) => routed.placementsById.get(id)?.district,
+            islands
+          )
+        : [];
     return {
       // The runs a printed name keeps off where it can.
       traces: tracesOf(routes, (id) => routed.placementsById.get(id)?.position),
       vias: traceVias(routes),
-      fingers:
+      fingers,
+      // The boards the printed names stay on. A focus lays its neighbourhood out on
+      // an island of its own, off these boards, so it keeps to none of them.
+      edges:
         focus === null
-          ? edgeFingers(
-              routes,
-              (id) => routed.placementsById.get(id)?.district,
-              islands
+          ? new Map(
+              [...islands].map(([id, island]) => [
+                id,
+                {
+                  island,
+                  fingers: fingers.filter((finger) => finger.district === id),
+                },
+              ])
             )
-          : [],
+          : undefined,
     };
-  }, [routed, drawnEdges, active, focus, city]);
+  }, [routed, drawnEdges, active, focus, islands]);
 
   const boardColours = useMemo(
     () =>
@@ -2950,8 +2970,10 @@ export default function Scene({
           <BoardLabels
             boardColours={boardColours}
             cityPlacements={city.placements}
+            edges={boardMarks.edges}
             floated={floated}
             interaction={interaction}
+            islands={islands}
             nodesById={nodesById}
             palette={palette}
             placementsById={placementsById}
