@@ -61,7 +61,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       },
       {
         keys: ["Home"],
-        does: "Reframe the city, or leave focus. The Reset view button does the same",
+        does: "Reframe the city, or leave focus. Reset view in the footer does the same",
       },
     ],
   },
@@ -81,13 +81,36 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { keys: ["L"], does: "List view, or back to the city" },
       { keys: ["T"], does: "Creation tree view, or back to the city" },
       { keys: ["M"], does: "Matrix view, or back to the city" },
-      { keys: ["E"], does: "Editor view, or back to the city" },
-      { keys: ["I"], does: "Impact view, or back to the city" },
+      {
+        keys: ["E"],
+        does: "The selected type's Editor page, or back to the view it came from",
+      },
+      {
+        keys: ["I"],
+        does: "The selected type's Impact page, or back to the view it came from",
+      },
       {
         keys: ["P"],
         does: "Present: full screen, larger type, and a caption card for the selected type",
       },
       { keys: ["?"], does: "Show this page" },
+    ],
+  },
+  {
+    title: "Where things are",
+    rows: [
+      {
+        keys: ["Header"],
+        does: "The views over the whole schema, City, List, Tree, Matrix and Data Types, then Search, Findings, Compare and this page",
+      },
+      {
+        keys: ["Inspector"],
+        does: "The pages about one type, Editor and Impact, open from its buttons. A line over the page leads back to the view you came from",
+      },
+      {
+        keys: ["Footer"],
+        does: "When the schema and the usage were read, the City's own tools, and Present",
+      },
     ],
   },
   {
@@ -99,8 +122,8 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       },
       { keys: ["Open in editor"], does: "Opens the Document Type editor" },
       {
-        keys: ["Editor layout"],
-        does: "Shows the type's tabs, groups and properties as an editor sees them",
+        keys: ["Editor"],
+        does: "In the inspector: the type's tabs, groups and properties as an editor sees them",
       },
       { keys: ["Findings"], does: "Opens the drawer of problems and notes" },
       {
@@ -113,9 +136,12 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       },
       {
         keys: ["Impact"],
-        does: "Traces what a change to a type or one of its properties reaches, with each path in words, and copies it as Markdown or saves it as CSV",
+        does: "In the inspector: traces what a change to the type or one of its properties reaches, with each path in words, and copies it as Markdown or saves it as CSV",
       },
-      { keys: ["Lens"], does: "Recolours the city by usage" },
+      {
+        keys: ["Layers", "Group", "Lens"],
+        does: "In the footer, in the City: which relationships are drawn, how the districts are cut, and a recolouring by usage. Narrow, they fold into City tools",
+      },
       {
         keys: ["Compare"],
         does: "Exports this schema, or imports a snapshot as a baseline and lists what changed since",
@@ -227,7 +253,7 @@ export function Help({
                 grey dot in the List, the Tree and the Data Types list, counts
                 and the problem mark for open findings only, and its check
                 greyed out after the open ones. The Unused lens and the Editor
-                layout's flags ignore it. The decision belongs to the type as it
+                page's flags ignore it. The decision belongs to the type as it
                 is now: change the type and the finding opens again, marked as
                 reopened. Decisions are kept in Umbraco's key-value table, apart
                 from the schema, and Undo removes one.
@@ -237,7 +263,7 @@ export function Help({
                 separate snapshot that the server keeps for one minute. It
                 counts the content items of each type, published, drafts and
                 trashed items included, and the references between them. The
-                Findings drawer says when each snapshot was taken.
+                footer and the Findings drawer say when each was taken.
               </p>
               <p>
                 Compare lists causes: the types with an edit of their own. The
