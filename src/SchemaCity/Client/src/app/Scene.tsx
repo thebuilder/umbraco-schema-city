@@ -2386,6 +2386,21 @@ function boardMarksOf(
   };
 }
 
+/**
+ * The focus the city shows. A link that opens on a focus builds the city first and
+ * gathers the neighbourhood once the opening is done, the way a click on Focus does,
+ * rather than building straight into the focus layout. Back from a 2D view the city
+ * keeps its pose instead, and any other focus shows at once.
+ */
+function useLinkedFocus(
+  asked: string | null,
+  graph: object,
+  boot: BootPhase
+): string | null {
+  const [linked] = useState(() => (kept.has(graph) ? null : asked));
+  return linked !== null && linked === asked && boot !== "done" ? null : asked;
+}
+
 export default function Scene({
   graph,
   grouping = "structure",
@@ -2396,7 +2411,7 @@ export default function Scene({
   focusDepth = 1,
   scale,
   selected,
-  focus,
+  focus: asked,
   layers,
   icons,
   inspectorOpen = false,
@@ -2453,6 +2468,7 @@ export default function Scene({
   const [bootPhase, setBootPhase] = useState<BootPhase>(
     reducedMotion ? "done" : "trace"
   );
+  const focus = useLinkedFocus(asked, graph, bootPhase);
   const [connectionPick, setConnectionPick] = useState<ConnectionPick | null>(
     null
   );
