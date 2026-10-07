@@ -191,7 +191,11 @@ export function clearOfEdge(
     rect.maxZ > island.maxZ - PRINT_MARGIN
   )
     return false;
-  if (holeSpots(island).some((hole) => distanceTo(rect, hole.x, hole.z) < HOLE_CLEAR))
+  if (
+    holeSpots(island).some(
+      (hole) => distanceTo(rect, hole.x, hole.z) < HOLE_CLEAR
+    )
+  )
     return false;
   return fingers.every((finger) => {
     const part = fingerRect(finger);

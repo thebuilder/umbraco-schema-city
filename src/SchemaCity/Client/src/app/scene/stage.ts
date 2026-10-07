@@ -153,9 +153,13 @@ export const STAMP_CAP = 4;
 
 /**
  * Smallest cap height a district's name shrinks to on a narrow board. Under it the
- * name is left off rather than printed over a hole or past the edge.
+ * name is left off rather than printed over a hole or past the edge. A board that
+ * narrow holds one or two buildings, and a district named after its root type is
+ * named again by that type's own print. Three quarters of a unit keeps "UNREACHABLE"
+ * on the small fixture's board, which is the narrowest that names something no print
+ * does.
  */
-export const STAMP_MIN_CAP = 1;
+export const STAMP_MIN_CAP = 0.75;
 
 /**
  * Ground between the name and every edge of its board: past the plated rings in the

@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
 import {
   clearOfEdge,
-  type Finger,
   FINGER_REACH,
+  type Finger,
   PRINT_MARGIN,
   RING_RADIUS,
 } from "./board";
@@ -111,8 +111,12 @@ test("a district's name prints in the band along the south edge of its island", 
   expect(stamp.height).toBeCloseTo(STAMP_CAP);
   expect(stamp.width / stamp.height).toBeCloseTo(7);
   // Inset from the south and west edges by more than a hole ring's diameter.
-  expect(stamp.minX - island.minX).toBeGreaterThan(RING_RADIUS * 2 + PRINT_MARGIN);
-  expect(island.maxZ - stamp.maxZ).toBeGreaterThan(RING_RADIUS * 2 + PRINT_MARGIN);
+  expect(stamp.minX - island.minX).toBeGreaterThan(
+    RING_RADIUS * 2 + PRINT_MARGIN
+  );
+  expect(island.maxZ - stamp.maxZ).toBeGreaterThan(
+    RING_RADIUS * 2 + PRINT_MARGIN
+  );
   // And past a finger's reach, so a lane leaving by either edge never meets it.
   expect(stamp.minX - island.minX).toBeGreaterThan(FINGER_REACH + PRINT_MARGIN);
   // The whole of it inside the band, so no row can ever stand over a letter.
