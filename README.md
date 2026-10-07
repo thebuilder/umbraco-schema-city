@@ -253,8 +253,10 @@ available.
 The city stands in a 3D world with a sky, a horizon and a ground that runs out to it. It opens on a
 raised three-quarter view of the whole city, and from there you can orbit, pan, dolly toward any
 point and come down to street level. Focusing a type, leaving focus and Home fly the camera to the
-new framing. The establishing flight plays on the first visit in a browser only. The brief
-opening animation, that flight, and the dialogs and drawers respect reduced-motion preferences.
+new framing. The establishing flight plays on the first visit in a browser only, along with a
+short hint over the canvas. If you lose the city, Reset view in the canvas corner frames it again.
+The brief opening animation, that flight, and the dialogs and drawers respect reduced-motion
+preferences.
 
 The toolbar, the panels and the 2D views work from the keyboard; use Search or the List view to
 pick a type without the mouse. Arrow keys move between the view switcher's views and between
@@ -267,12 +269,12 @@ the city as a table.
 | --- | --- |
 | Orbit | Drag |
 | Move toward the cursor, or away | Mouse wheel |
-| Pan along the ground | Right-drag, W, A, S, D or arrow keys |
+| Pan along the ground | Right-drag, Shift-drag (works on a trackpad), W, A, S, D or arrow keys |
 | Rise and descend | R, F |
 | Move faster | Hold Shift with a movement key |
 | Focus selected type | Enter |
 | Leave focus, then clear selection | Escape |
-| Reframe the city or leave focus | Home |
+| Reframe the city or leave focus | Home, or the Reset view button on the canvas |
 | Toggle connection layers | 1, 2, 3, 4 |
 | Switch to List, Tree, Matrix or Editor, or back to the city | L, T, M, E |
 | Search | ⌘K / Ctrl+K |

@@ -26,6 +26,7 @@ import type {
   SchemaNode,
   UsageReport,
 } from "../model/types";
+import { Button } from "@/components/ui/button";
 import { inspectorWidthFor } from "./Inspector";
 import {
   type CityBounds,
@@ -2013,6 +2014,89 @@ function Flight({
   return null;
 }
 
+/** Set once the reader has dismissed the first-visit hint or touched the city. */
+const HINT_SEEN_KEY = "schema-city:hint-seen";
+
+function hintSeen(): boolean {
+  try {
+    return localStorage.getItem(HINT_SEEN_KEY) !== null;
+  } catch {
+    // Blocked storage shows the hint again, which is harmless.
+    return false;
+  }
+}
+
+/**
+ * The way back for a reader who is lost, over the bottom-left of the canvas: a
+ * Reset view button that does what Home does, for the laptops that have no Home
+ * key, and on the first visit a hint that says it is there. The hint goes with its
+ * close button or the first press, scroll or key on the city.
+ */
+function CanvasOverlay({
+  host,
+  onReset,
+  raised,
+}: {
+  host: RefObject<HTMLDivElement | null>;
+  onReset: () => void;
+  /** Whether the comparison legend holds the corner, so this sits above it. */
+  raised: boolean;
+}) {
+  const [hint, setHint] = useState(() => !hintSeen());
+  const dismiss = () => {
+    setHint(false);
+    try {
+      localStorage.setItem(HINT_SEEN_KEY, "1");
+    } catch {
+      // Blocked storage only means the hint comes back next time.
+    }
+  };
+
+  useEffect(() => {
+    const element = host.current;
+    if (!(hint && element)) return;
+    const events = ["pointerdown", "wheel", "keydown"] as const;
+    for (const type of events)
+      element.addEventListener(type, dismiss, { capture: true, passive: true });
+    return () => {
+      for (const type of events)
+        element.removeEventListener(type, dismiss, { capture: true });
+    };
+  }, [hint, host]);
+
+  return (
+    <div
+      className={`absolute left-3 z-10 flex flex-col items-start gap-2 ${raised ? "bottom-14" : "bottom-3"}`}
+    >
+      {hint ? (
+        <div className="flex max-w-72 items-start gap-2 border border-line bg-panel py-2 pr-1 pl-3 text-2xs text-phosphor leading-relaxed shadow-panel">
+          <p>
+            Drag to orbit, scroll to zoom, click a building. Lost? Reset view.
+          </p>
+          <button
+            aria-label="Dismiss the hint"
+            className="shrink-0 px-1.5 text-phosphor-bright"
+            onClick={dismiss}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+      <Button
+        aria-keyshortcuts="Home"
+        aria-label="Reset view, framing the whole city again"
+        className="bg-panel"
+        onClick={onReset}
+        size="sm"
+        variant="outline"
+      >
+        Reset view
+      </Button>
+    </div>
+  );
+}
+
 function ComparisonMarks({
   comparison,
   placements,
@@ -2080,6 +2164,7 @@ export default function Scene({
   icons,
   inspectorOpen = false,
   reframe = 0,
+  onReset,
   onSelect,
   onFocus,
 }: {
@@ -2109,6 +2194,8 @@ export default function Scene({
    * the camera has to answer Home a second time from wherever the reader took it.
    */
   reframe?: number;
+  /** What Home does, for the Reset view button over the canvas. */
+  onReset?: () => void;
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
 }) {
@@ -2657,6 +2744,13 @@ export default function Scene({
           />
           <Controls span={span} />
         </Canvas>
+      ) : null}
+      {onReset ? (
+        <CanvasOverlay
+          host={host}
+          onReset={onReset}
+          raised={Boolean(baseline && comparison)}
+        />
       ) : null}
     </div>
   );

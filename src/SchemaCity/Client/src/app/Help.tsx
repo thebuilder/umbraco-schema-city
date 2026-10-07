@@ -22,7 +22,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     title: "Mouse",
     rows: [
       { keys: ["Drag"], does: "Orbit the camera around the city" },
-      { keys: ["Right-drag"], does: "Pan along the ground" },
+      {
+        keys: ["Right-drag", "Shift-drag"],
+        does: "Pan along the ground. Shift-drag works on a trackpad",
+      },
       {
         keys: ["Scroll"],
         does: "Move toward the point under the cursor, or away",
@@ -51,7 +54,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         keys: ["Shift"],
         does: "Hold alongside any of these to go twice as fast",
       },
-      { keys: ["Home"], does: "Reframe the city" },
+      {
+        keys: ["Home"],
+        does: "Reframe the city, or leave focus. The Reset view button does the same",
+      },
     ],
   },
   {

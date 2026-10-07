@@ -178,6 +178,13 @@ export function App({
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
 
+  // Home, and the Reset view button over the city. Leaving focus already flies back
+  // to the whole city, so it only asks for a fresh framing with no focus to leave.
+  const resetView = () => {
+    if (focus) setFocus(null);
+    else setReframe((count) => count + 1);
+  };
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
@@ -230,12 +237,7 @@ export function App({
       const key = event.key.toLowerCase();
       const tab = VIEW_TABS.find((candidate) => candidate.key === key);
       if (tab) setView((at) => (at === tab.value ? "city" : tab.value));
-      // Leaving focus already flies back to the whole city, so Home only asks for a
-      // fresh framing when there is no focus to leave.
-      if (key === "home") {
-        if (focus) setFocus(null);
-        else setReframe((count) => count + 1);
-      }
+      if (key === "home") resetView();
       if (key === "?") setHelpOpen(true);
     };
     // Keyboard events cross the shadow boundary, so one document listener covers
@@ -661,6 +663,7 @@ export function App({
                   layers={layers}
                   onFocus={enterFocus}
                   onSelect={(id) => (id === null ? done() : setSelected(id))}
+                  onReset={resetView}
                   reframe={reframe}
                   scale={scale}
                   selected={selected}
