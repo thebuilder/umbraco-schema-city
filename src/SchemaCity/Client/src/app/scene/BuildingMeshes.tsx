@@ -184,10 +184,31 @@ totalEmissiveRadiance += diffuseColor.rgb * (bodyGlow + edgeGlow * edgeLine);`
   return material;
 }
 
-const BOX = new THREE.BoxGeometry();
-const PLANE = new THREE.PlaneGeometry();
-// cylinderGeometry's default radius is 1, so a plaza scales by its radius directly.
-const DISC = new THREE.CylinderGeometry(1, 1, 1, 24);
+/**
+ * The unit shapes every instance scales, made per mount and disposed with it. Shared
+ * at module level, each renderer that drew them left a dispose listener on them, and
+ * a remounted canvas kept its old renderer and its lost context alive through it.
+ */
+function useUnitShapes() {
+  const shapes = useMemo(
+    () => ({
+      box: new THREE.BoxGeometry(),
+      plane: new THREE.PlaneGeometry(),
+      // A radius of 1, so a plaza scales by its radius directly.
+      disc: new THREE.CylinderGeometry(1, 1, 1, 24),
+    }),
+    []
+  );
+  useEffect(
+    () => () => {
+      shapes.box.dispose();
+      shapes.plane.dispose();
+      shapes.disc.dispose();
+    },
+    [shapes]
+  );
+  return shapes;
+}
 /** One transform written through for every instance. Each placer sets all of it. */
 const SCRATCH = new THREE.Object3D();
 
@@ -511,6 +532,7 @@ export function Buildings({
   onHover: (id: string | null) => void;
 }) {
   const meshes = useRef<Meshes>(new Map());
+  const shapes = useUnitShapes();
   const { materials, plain } = useBuildingMaterials(reducedMotion);
   const parts = useMemo(
     () => partsOf(cells, windows, plazas, placements, heights),
@@ -533,7 +555,7 @@ export function Buildings({
         <Instances
           castShadow={LOOKS[kind].castShadow}
           count={parts.byKind[kind].length}
-          geometry={BOX}
+          geometry={shapes.box}
           held={held}
           key={`${kind}|${parts.byKind[kind].length}`}
           material={materials.get(kind)}
@@ -544,14 +566,14 @@ export function Buildings({
       ))}
       <Instances
         count={windows.length}
-        geometry={PLANE}
+        geometry={shapes.plane}
         held={held}
         material={plain.window}
         slot="window"
       />
       <Instances
         count={plazas.length}
-        geometry={DISC}
+        geometry={shapes.disc}
         held={held}
         material={plain.plaza}
         slot="plaza"
@@ -608,8 +630,15 @@ function HitTargets({
   );
 }
 
-const OUTLINE_POSITIONS = new THREE.EdgesGeometry(BOX).getAttribute("position")
-  .array as Float32Array;
+/** A unit box's twelve edges as line segment ends, read once and kept as plain data. */
+const OUTLINE_POSITIONS = (() => {
+  const box = new THREE.BoxGeometry();
+  const edges = new THREE.EdgesGeometry(box);
+  const positions = Float32Array.from(edges.getAttribute("position").array);
+  edges.dispose();
+  box.dispose();
+  return positions;
+})();
 
 /**
  * A box of screen-space lines around one building, after fsn's selection and aim
