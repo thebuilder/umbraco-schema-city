@@ -80,6 +80,12 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 
     private const string SecondCulture = "da-DK";
 
+    /// <summary>
+    /// Every timestamp in the exported fixtures. Fixed so a boot alone does not change the files, and
+    /// a realistic date rather than the epoch so the demo never says "Last edited 1970-01-01".
+    /// </summary>
+    private static readonly DateTimeOffset FixtureDate = new(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
+
     private static readonly JsonSerializerOptions FixtureJson = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -758,8 +764,8 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// <summary>
     /// Writes what the two endpoints return to Client/dev/fixtures/medium.json and
     /// medium-usage.json, so the dev harness renders a real schema and its real counts. The two
-    /// timestamps are pinned, otherwise every boot would rewrite the files and dirty the working
-    /// tree. LastEdited is pinned per row rather than in the seeder, because fixing the real dates
+    /// timestamps are pinned to <see cref="FixtureDate"/>, otherwise every boot would rewrite the
+    /// files and dirty the working tree. LastEdited is pinned per row rather than in the seeder, because fixing the real dates
     /// would mean writing umbracoContentVersion.versionDate behind the content service's back.
     /// </summary>
     private async Task ExportFixtureAsync()
@@ -793,16 +799,16 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             await _dataTypeService.GetAllAsync());
 
         string path = Path.Combine(directory, "medium.json");
-        System.IO.File.WriteAllText(path, JsonSerializer.Serialize(graph with { GeneratedAt = DateTimeOffset.UnixEpoch }, FixtureJson));
+        System.IO.File.WriteAllText(path, JsonSerializer.Serialize(graph with { GeneratedAt = FixtureDate }, FixtureJson));
         _logger.LogInformation("Schema City seeder: wrote {Nodes} nodes to {Path}.", graph.Nodes.Count, path);
 
         UsageReport usage = _usageCollector.Query();
         UsageReport pinned = usage with
         {
-            GeneratedAt = DateTimeOffset.UnixEpoch,
+            GeneratedAt = FixtureDate,
             ByType = usage.ByType.ToDictionary(
                 row => row.Key,
-                row => row.Value.LastEdited is null ? row.Value : row.Value with { LastEdited = DateTime.UnixEpoch }),
+                row => row.Value.LastEdited is null ? row.Value : row.Value with { LastEdited = FixtureDate.UtcDateTime }),
         };
 
         string usagePath = Path.Combine(directory, "medium-usage.json");

@@ -1,5 +1,6 @@
 // What the inspector says about one type, worked out from the graph and the usage
 // report. Pure: no DOM, no React, no three.js.
+import { dayOf } from "./dates";
 import type { Neighbourhood } from "./neighbourhood";
 import type { SchemaEdge, SchemaNode, TypeUsage, UsageReport } from "./types";
 
@@ -127,9 +128,11 @@ export function directUsageRows(usage: TypeUsage): [string, string][] {
       "Cultures",
       usage.cultures.length > 0 ? usage.cultures.join(", ") : "none",
     ],
-    // The date half of the timestamp, not a formatted local date, so the panel
-    // reads the same on every machine the backoffice runs on.
-    ["Last edited", usage.lastEdited ? usage.lastEdited.slice(0, 10) : "never"],
+    // An epoch date is a placeholder, not an edit, so it reads as unknown.
+    [
+      "Last edited",
+      usage.lastEdited ? (dayOf(usage.lastEdited) ?? "unknown") : "never",
+    ],
   ];
 }
 

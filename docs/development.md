@@ -110,8 +110,9 @@ Usage is cached for one minute. Append `?refresh=true` to bypass that cache. The
 routes directly through `Client/src/api.ts`; there is no generated API client.
 
 The standalone fixtures are under `Client/dev/fixtures/`. A Development boot of the demo site
-exports `medium.json` and `medium-usage.json` from the seeded installation. Their timestamps are
-fixed for reproducible diffs, so 1970 dates in demo screenshots are fixture data.
+exports `medium.json` and `medium-usage.json` from the seeded installation. Every timestamp in
+them is pinned to 2026-09-01 12:00 UTC for reproducible diffs, so that date in demo screenshots is
+fixture data.
 
 ## Build a local package
 

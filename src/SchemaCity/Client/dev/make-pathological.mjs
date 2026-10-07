@@ -5,7 +5,7 @@
 // the plan below changed.
 //
 // Deterministic the same two ways the seeder's medium.json export is: ids are
-// name-based guids over the alias, and both timestamps are pinned to the epoch. The
+// name-based guids over the alias, and every timestamp is pinned to 2026-09-01. The
 // only pseudo-randomness is one LCG, seeded, used for usage counts where a flat
 // number would make the usage lens useless.
 //
@@ -29,7 +29,8 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const EPOCH = "1970-01-01T00:00:00+00:00";
+// A fixed, realistic date for every timestamp, so the demo never says 1970.
+const FIXTURE_DATE = "2026-09-01T12:00:00+00:00";
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 /**
@@ -538,7 +539,7 @@ function fill(alias, total) {
       : node.variesByCulture
         ? ["en-US", "da-DK"]
         : ["en-US"],
-    lastEdited: EPOCH,
+    lastEdited: FIXTURE_DATE,
   };
 }
 for (const alias of busy) fill(alias, between(120, 940));
@@ -573,8 +574,17 @@ edges.sort(
 const write = (name, value) =>
   writeFileSync(join(FIXTURES, name), `${JSON.stringify(value, null, 2)}\n`);
 
-write("pathological.json", { generatedAt: EPOCH, folders, nodes, edges });
-write("pathological-usage.json", { generatedAt: EPOCH, byType, references });
+write("pathological.json", {
+  generatedAt: FIXTURE_DATE,
+  folders,
+  nodes,
+  edges,
+});
+write("pathological-usage.json", {
+  generatedAt: FIXTURE_DATE,
+  byType,
+  references,
+});
 
 // ------------------------------------------------------------------ what was planted
 
