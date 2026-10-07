@@ -631,6 +631,16 @@ Done 2026-10-07 on `m9/compare`, after a tech lead verifying staging got "1 adde
 - Export: Copy as Markdown and Export CSV (`schema-city-changes-<host>-<day>.csv`), both with the plan; snapshots now record `host`, optional on import.
 - Later: a planned set that survives a reload, and grouping by Data Type when one Data Type edit changes several properties.
 
+### M9, Review decisions (small)
+
+Done 2026-10-07 on `m9/review-decisions`, after a developer cleaning up an inherited site asked for a way to mark findings as reviewed so the list of 67 shrinks to what still needs attention.
+
+- Contract: every `SchemaNode` and `SchemaDataType` carries `fingerprint`, the first 16 hex digits of a SHA-256 over the record as camelCase JSON plus, for a node, every edge in or out of it. Computed in `SchemaGraphBuilder.BuildGraph`, so the client reads the same value the server checks. Stable across restarts on the seeded site (132 of 132), pinned in a test.
+- Storage: `DecisionStore` over `IKeyValueService`, one `umbracoKeyValue` row per finding under `SchemaCity.Decision.<findingId>` with the decision as JSON (finding id, status `intentional`, reason, user name and key, date, fingerprint). No migration; the value column is `nvarchar(max)`. Undo blanks the row, because the service has no delete.
+- API: `GET decisions`, `PUT decisions/{findingId}` with `{ reason, fingerprint }`, `DELETE decisions/{findingId}`, Settings section access like the other two. 400 for a malformed id, a reason that is empty or over 500 characters after trimming, or a subject that no longer exists; 409 when the fingerprint is stale. Not a 404 for the missing subject: the Management API replaces a 404's problem title.
+- Client: `model/review.ts` matches decisions to findings and marks a stale one reopened; `app/Review.tsx` holds the store hook and the control used by the drawer, the inspector's checks and the Data Type page. Hide reviewed is on by default, the header reads "67 findings, 1 reviewed, 66 open", the toolbar badge counts open findings, and a row decided while the drawer is open stays until it closes. CSV gains Status, Reason, Decided by, Decided at and Reopened at the end. The harness keeps decisions in memory.
+- Checked end to end on the seeded site, 17.6.2: recorded through the API and the UI, persisted across a restart, a property rename on Broken Block Host reopened its decision and made a save from the stale page answer 409 with the typed reason kept, and a fresh decision and Undo round-tripped.
+
 ### Later, explicitly not v1
 
 - Content mode: instances of a type as a tree, entered from a building.

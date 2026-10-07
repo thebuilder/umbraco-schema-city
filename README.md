@@ -129,7 +129,8 @@ it with its related types. The drawer's header says when the schema was read and
 counted. Export CSV saves the filtered results as one header row and one row per finding, ready for
 an Excel or Jira import: the kind, the type with its key, folder, content counts and backoffice
 path, the detail, explanation and next step, related types by name, the filter used, and the schema
-and usage snapshot dates, then the Data Types the finding names. For an unused type, the Unused
+and usage snapshot dates, then the Data Types the finding names, then its review status, reason,
+who decided, when, and whether it reopened. For an unused type, the Unused
 branch root column names its topmost unused ancestor, so a branch of unused types can go in one
 ticket. A finding about a Data Type alone leaves the type columns blank and gives the Data Type's
 backoffice path.
@@ -168,6 +169,35 @@ no counted content in the usage snapshot. An unused Element Type has no configur
 use in the schema snapshot and, once usage has loaded, no stored block counted either; a count that
 stopped early says so. Custom code, migrations, external consumers, and media or member values can
 still depend on either.
+
+#### Mark a finding as intentional
+
+Some findings are deliberate: a spacer block with no properties, a mixin kept for one type, a
+type an import still reads. Mark as intentional on a row, in the inspector's checks or on a Data
+Type's page, asks for a reason of up to 500 characters and records it with your name and the
+date. The row then reads "Intentional:" with the reason, and Undo removes the decision. Hide
+reviewed, on by default, takes decided rows out of the drawer, so the list shrinks to what still
+needs attention, and the header counts both, for example "67 findings, 12 reviewed, 55 open". A
+row you decide stays in view until the drawer closes.
+
+![A broken block marked as intentional with its reason and Undo, and the reason form open on a duplicate alias.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/review.png)
+
+A decision is tied to the schema as it was when it was made. The graph carries a fingerprint for
+every Document Type and Data Type: a hash of its record, its groups and properties, its templates,
+and every connection in or out of it, allowed children, compositions and block targets included.
+The decision stores the fingerprint of the type or Data Type the finding is about. When that type
+changes, its fingerprint changes, and the finding is open again, shown with the old decision and
+"Reopened: the type changed since this was decided." Renaming the type or a Data Type it uses
+reopens it too; the check errs towards asking again. Saving checks the fingerprint on the server,
+so a decision is never recorded against a type that changed after the page loaded.
+
+Decisions are app data, not schema. They are kept in Umbraco's key-value table
+(`umbracoKeyValue`), one row per finding under `SchemaCity.Decision.<finding id>`, as JSON, so
+the package needs no migration and nothing in the Document Types, Data Types or content changes.
+Undo empties the row rather than deleting it, because Umbraco's key-value service has no delete.
+They are shared by everyone who opens Schema City on that site and do not travel with a schema
+snapshot or uSync. Recording and undoing need the same Settings section access as the rest of the
+extension.
 
 ### Check content usage
 

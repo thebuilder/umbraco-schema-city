@@ -156,6 +156,27 @@ const shots = [
       await wait(900);
     },
   },
+  // One finding marked as intentional and the reason form open on the next. The
+  // harness keeps decisions in memory, so the shot records them itself.
+  {
+    name: "review",
+    query: "?layers=structure",
+    async after() {
+      await clickButton("/^Findings/i");
+      await wait(900);
+      await clickButton("/^Mark as intentional/i");
+      await send("Input.insertText", {
+        text: "Waiting on the block library rewrite, which removes this editor.",
+      });
+      await clickButton("/^Save$/i");
+      await wait(400);
+      await clickButton("/^Mark as intentional/i");
+      await send("Input.insertText", {
+        text: "The importer maps both seoTitle sources on purpose.",
+      });
+      await wait(400);
+    },
+  },
   // The Content count lens with Article selected, so the inspector prints its usage.
   { name: "lens", query: "?type=article&lens=count&layers=structure" },
   // The table, sorted by own properties, most first. The first click sorts ascending.

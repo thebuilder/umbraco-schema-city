@@ -214,6 +214,14 @@ export function Help({
                 a reason to investigate, not an instruction to delete.
               </p>
               <p>
+                Mark as intentional records why a finding is deliberate, with
+                your name and the date, and Hide reviewed takes it out of the
+                drawer. The decision belongs to the type as it is now: change
+                the type and the finding opens again, marked as reopened.
+                Decisions are kept in Umbraco's key-value table, apart from the
+                schema, and Undo removes one.
+              </p>
+              <p>
                 The schema is read when the page loads. Content usage is a
                 separate snapshot that the server keeps for one minute. It
                 counts the content items of each type, published, drafts and
