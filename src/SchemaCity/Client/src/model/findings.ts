@@ -741,7 +741,11 @@ function overloadedTabs(node: SchemaNode) {
   const boxes =
     tabs.length === 1 && only?.key === ""
       ? only.panels.map((panel) => ({
-          label: panel.name === null ? "Ungrouped" : `${panel.name} group`,
+          // The backend's synthetic "No group" would read "No group group".
+          label:
+            panel.name === null || panel.key.endsWith("/no-group")
+              ? "Ungrouped"
+              : `${panel.name} group`,
           count: panel.properties.length,
         }))
       : tabs.map((tab) => ({ label: `${tab.name} tab`, count: tab.count }));

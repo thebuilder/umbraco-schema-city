@@ -783,6 +783,15 @@ describe("findFindings, one rule at a time", () => {
         node("home", { allowedAsRoot: true }),
         node("noSettings", { isElement: true, ownPropertyCount: 0 }),
         node("spare", { isElement: true, ownPropertyCount: 0 }),
+    const loose = graphOf([
+      node("loose", {
+        allowedAsRoot: true,
+        groups: [{ ...group("no-group", many("item", 21)), name: "No group" }],
+      }),
+    ]);
+    expect(summaryOf(loose, "overloadedTab", "loose")?.summary).toBe(
+      "Ungrouped holds 21 properties"
+    );
       ],
       [
         {
