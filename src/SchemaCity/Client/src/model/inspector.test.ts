@@ -86,6 +86,9 @@ describe("usageLine", () => {
     expect(line(lone, plain, report({}), used(1))).toBe(
       "1 content item, 1 published"
     );
+    expect(
+      line(lone, plain, report({}), { ...used(162, 152), trashed: 5 })
+    ).toBe("162 content items, 152 published, including 5 trashed");
   });
 
   it("says a type with no content has none", () => {

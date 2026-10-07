@@ -70,6 +70,10 @@ function throughUsage(
 const items = (count: number) =>
   `${count.toLocaleString()} ${count === 1 ? "item" : "items"}`;
 
+/** Totals count the recycle bin too, so the line says so rather than hiding it. */
+const trashedNote = (trashed: number) =>
+  trashed > 0 ? `, including ${trashed.toLocaleString()} trashed` : "";
+
 /** Which of the usage stories applies to a type, with what it needs to tell it. */
 export type UsageState =
   | { kind: "loading" | "element" | "none" }
@@ -101,13 +105,13 @@ export function usageLine(state: UsageState): string {
     case "none":
       return "No content items yet";
     case "direct":
-      return `${state.usage.total.toLocaleString()} content ${state.usage.total === 1 ? "item" : "items"}, ${state.usage.published.toLocaleString()} published`;
+      return `${state.usage.total.toLocaleString()} content ${state.usage.total === 1 ? "item" : "items"}, ${state.usage.published.toLocaleString()} published${trashedNote(state.usage.trashed)}`;
     default: {
       const { through } = state;
       const users = `${through.of} ${through.of === 1 ? "type" : "types"} that use it`;
       return through.total === 0
         ? `No content of its own, and none through the ${users}`
-        : `No content of its own. ${items(through.total)} through ${through.withContent} of the ${users}`;
+        : `No content of its own. ${items(through.total)} through ${through.withContent} of the ${users}${trashedNote(through.trashed)}`;
     }
   }
 }
