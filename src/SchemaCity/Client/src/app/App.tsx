@@ -277,7 +277,6 @@ export function App({
     panelInset,
     panelOpen,
     closeInspector,
-    putDown: presentingPutDown,
   } = usePresentation(start.present, () => setReframe((count) => count + 1));
 
   // Home, and the Reset view button over the city. Leaving focus already flies back
@@ -499,16 +498,15 @@ export function App({
   };
 
   /**
-   * Done with this node: closing the inspector and clicking bare ground both leave
-   * focus and clear the selection in one step, because either one is the reader
-   * putting the type down. Escape keeps its two steps, which is how you leave focus
-   * and go on reading the type you were focused on.
+   * Done with this node: closing the inspector or the caption card, or clicking bare
+   * ground, clears the selection and keeps focus. The neighbourhood is what the
+   * reader set up, and a stray click on the ground should not tear it down; Leave
+   * focus, Escape, Home and Show all are the ways out of it.
    */
-  const done = () => {
-    setFocus(null);
+  const putDown = () => {
+    setDetails(false);
     setSelected(null);
   };
-  const putDown = presentingPutDown(done, () => setSelected(null));
 
   const toggleFocus = () => {
     if (!selected) return;
@@ -821,7 +819,7 @@ export function App({
               // The inspector is an overlay, so the view is inset by its width while
               // it is open rather than sliding under it.
               <div
-                className={`absolute inset-0 isolate outline-none [zoom:var(--present,1)] ${selectedNode ? panelInset : ""}`}
+                className={`absolute inset-0 isolate pb-(--caption-space) outline-none [zoom:var(--present,1)] ${selectedNode ? panelInset : ""}`}
                 data-focus-home
                 tabIndex={-1}
               >
@@ -921,6 +919,7 @@ export function App({
                 usageReport: usage,
                 focused: focus === selected,
                 raised: changeLegendShown,
+                docked: flat,
                 onToggleFocus: toggleFocus,
                 onDetails: () => setDetails(true),
                 onClose: putDown,
@@ -944,7 +943,7 @@ export function App({
                   neighbourhood={neighbourhood}
                   node={selectedNode}
                   nodesById={nodesById}
-                  onClose={closeInspector(done)}
+                  onClose={closeInspector(putDown)}
                   onEditorLayout={() => setView("editor")}
                   onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
                   onOpenImpact={() => openImpact(selectedNode.id)}

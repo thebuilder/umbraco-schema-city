@@ -4,6 +4,7 @@ import { XIcon } from "lucide-react";
 import {
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   useEffect,
   useRef,
   useState,
@@ -132,18 +133,6 @@ export function usePresentation(initial: boolean, onToggle: () => void) {
     /** Closing the inspector, which while presenting is closing Details. */
     closeInspector: (done: () => void) =>
       presenting ? () => setDetails(false) : done,
-    /**
-     * Putting the type down, by closing the card or clicking bare ground. Presenting,
-     * that clears the selection and keeps focus: the neighbourhood is what the room is
-     * looking at, and a stray click on the ground should not tear it down.
-     */
-    putDown: (done: () => void, clear: () => void) =>
-      presenting
-        ? () => {
-            setDetails(false);
-            clear();
-          }
-        : done,
   };
 }
 
@@ -192,6 +181,33 @@ function CaptionLayer({
       <CaptionCard {...card} neighbourhood={neighbourhood} node={node} />
     </div>
   );
+}
+
+/**
+ * Keeps `--caption-space` on the app root at the room the card takes from the bottom
+ * of the view, which the 2D views pad themselves by so their last rows scroll clear
+ * of it. Read in the zoomed layer's own pixels, which the views share.
+ */
+function useCaptionSpace(card: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    // Set by the time an effect runs: the card is mounted with its layer around it.
+    const element = card.current as HTMLElement;
+    const layer = element.parentElement as HTMLElement;
+    const root = element.closest<HTMLElement>("[data-schema-city]");
+    if (!root) return;
+    const measure = () =>
+      root.style.setProperty(
+        "--caption-space",
+        `${(layer.getBoundingClientRect().bottom - element.getBoundingClientRect().top) / PRESENT_SCALE}px`
+      );
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    observer.observe(layer);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--caption-space");
+    };
+  }, [card]);
 }
 
 /**
@@ -250,6 +266,15 @@ export function PresentBar({
   );
 }
 
+/** Where the card stands: the corner, the corner above the change legend, or a strip. */
+const CORNER = "left-3 w-[min(22rem,calc(100%-1.5rem))] p-3";
+const PLACE = {
+  corner: `${CORNER} bottom-3`,
+  raised: `${CORNER} bottom-16`,
+  docked:
+    "inset-x-0 bottom-0 flex flex-wrap items-center gap-x-6 gap-y-1 border-x-0 border-b-0 px-4 py-2 *:mt-0",
+};
+
 /**
  * The inspector cut down to what an audience reads at a glance: the name, its role,
  * how much content it has and how many types it touches, each way. Details opens the
@@ -261,6 +286,7 @@ function CaptionCard({
   usageReport,
   focused,
   raised,
+  docked,
   onToggleFocus,
   onDetails,
   onClose,
@@ -271,6 +297,11 @@ function CaptionCard({
   focused: boolean;
   /** Whether the change layer's legend holds the corner, so the card sits above it. */
   raised: boolean;
+  /**
+   * Over a 2D view, where it is a strip along the bottom instead: a card in the
+   * corner left the Matrix one row at 1280x720 once the view scrolled clear of it.
+   */
+  docked: boolean;
   onToggleFocus: () => void;
   onDetails: () => void;
   onClose: () => void;
@@ -278,6 +309,7 @@ function CaptionCard({
   const card = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   usePanelFocus(card, heading, node.id);
+  useCaptionSpace(card);
   const role = ROLE[roleOf(node, neighbourhood)];
   const usage = usageState(
     node,
@@ -288,7 +320,8 @@ function CaptionCard({
   return (
     <aside
       aria-label="Caption"
-      className={`absolute left-3 w-[min(22rem,calc(100%-1.5rem))] border border-line-strong bg-panel p-3 font-sans text-prose text-sm shadow-panel ${raised ? "bottom-16" : "bottom-3"}`}
+      className={`absolute border border-line-strong bg-panel font-sans text-prose text-sm shadow-panel ${PLACE[docked ? "docked" : raised ? "raised" : "corner"]}`}
+      ref={card}
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">

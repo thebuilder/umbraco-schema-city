@@ -36,7 +36,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       },
       {
         keys: ["Click"],
-        does: "Select a building, or clear the selection by clicking bare ground",
+        does: "Select a building, or clear the selection by clicking bare ground. Focus stays on",
       },
       { keys: ["Double click"], does: "Focus a building" },
     ],

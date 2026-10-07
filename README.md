@@ -111,9 +111,11 @@ Open in editor takes you to the selected Document Type in Umbraco.
 
 Double-click a building, press Enter with a type selected, or choose Focus in the inspector.
 Focus arranges the selected type and its neighbours together. Expand one step adds the next
-connected types while keeping the existing focused positions. Escape leaves focus; press it
-again to clear the selection. While focus is on, List, Tree and Matrix show only the focused
-types, under a line that says how many and offers Show all, which leaves focus.
+connected types while keeping the existing focused positions. Closing the inspector or clicking
+bare ground clears the selection and stays in focus, so the neighbourhood stays on screen. Leave
+focus in the inspector, Escape, Home and Show all leave it; Escape with a type selected leaves
+focus first and clears the selection on a second press. While focus is on, List, Tree and Matrix
+show only the focused types, under a line that says how many and offers Show all.
 
 ![Home in focus mode with its neighbouring types, direct connections and inspector.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png)
 
@@ -406,18 +408,19 @@ Press P, or choose Present in the toolbar, to show the schema to a room. Present
 the whole screen where the browser allows it. A backoffice that is not allowed to go full screen,
 or a link opened with `present=1`, fills the window instead; press P twice for full screen. The
 toolbar and the Reset view button go, and the names over and on the city, the 2D views, the
-legends and the inspector are drawn 1.4 times larger so they read on a projector. A printed name
-too small to read at that size is left off until the camera comes closer, so the overview leaves
-most building names to the hover and the district names carry it.
+legends and the inspector are drawn 1.4 times larger so they read on a projector. The names printed
+on the boards keep their larger size longer as the camera comes closer, and the overview still
+prints every name that reads.
 
 Move the mouse and a slim bar appears at the top right with the views, Search and Leave
 presentation. It fades when the mouse rests, and Tab reaches it at any time.
 
 Selecting a type shows a caption card in the bottom-left corner instead of the inspector: its name
 and role, how much content it has, and how many types it has in each relationship. Details opens
-the full inspector over the view, and the camera frames on the whole screen either way. Closing
-the card, or clicking bare ground, puts the type down and keeps focus, so the neighbourhood stays
-on screen; Leave focus on the card, or Home, leaves it.
+the full inspector over the view, and the camera frames on the whole screen either way. In the 2D
+views the last rows scroll clear of the card. Closing the card, or clicking bare ground, puts the
+type down and keeps focus, as it does outside presentation; Leave focus on the card, or Home,
+leaves it.
 
 Escape closes Details first, then leaves presentation with the focus, the selection and the view
 kept. Leaving full screen the browser's way leaves presentation too. Focus, Impact, Show in city,
