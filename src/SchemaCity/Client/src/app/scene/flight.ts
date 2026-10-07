@@ -58,9 +58,16 @@ type KeyPress = {
   composedPath: () => readonly unknown[];
 };
 
+const MODIFIERS: ReadonlySet<string> = new Set([
+  "Shift",
+  "Meta",
+  "Control",
+  "Alt",
+]);
+
 /**
- * What a keydown does to the flight: "fly" holds the key and "release" lets go of
- * every held key.
+ * What a keydown does to the flight: "fly" holds the key, "release" lets go of
+ * every held key and "modifier" changes nothing held.
  *
  * The city flies only when the key was pressed on the scene's own `host` or on the
  * page with nothing focused. The listener is on the window, and a whitelist is the
@@ -76,7 +83,11 @@ type KeyPress = {
 export function keydownAction(
   event: KeyPress,
   host: unknown
-): "fly" | "release" {
+): "fly" | "release" | "modifier" {
+  // A modifier on its own lets go of nothing. Shift is the boost, held down mid-flight
+  // to go faster, and a Cmd or Ctrl chord releases everything when the modifier
+  // itself comes back up.
+  if (MODIFIERS.has(event.key)) return "modifier";
   if (
     !FLIGHT_CODES.has(event.code) ||
     event.metaKey ||

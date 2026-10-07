@@ -1948,7 +1948,9 @@ function Flight({
     };
     const down = (event: KeyboardEvent) => {
       boosting.current = event.shiftKey;
-      if (keydownAction(event, host.current) === "release") {
+      const action = keydownAction(event, host.current);
+      if (action === "modifier") return;
+      if (action === "release") {
         release();
         return;
       }

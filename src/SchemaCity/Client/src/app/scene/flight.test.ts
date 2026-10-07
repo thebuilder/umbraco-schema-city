@@ -189,3 +189,10 @@ test("a key another handler took, a chord or a non-flight key stops the flight",
   );
   expect(keydownAction(press("KeyL", HOST), HOST)).toBe("release");
 });
+
+test("pressing Shift mid-flight boosts rather than stopping", () => {
+  for (const key of ["Shift", "Meta", "Control", "Alt"])
+    expect(
+      keydownAction(press("ShiftLeft", HOST, { key, shiftKey: true }), HOST)
+    ).toBe("modifier");
+});
