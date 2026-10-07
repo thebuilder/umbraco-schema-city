@@ -21,6 +21,20 @@ import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 type Initial = Parameters<typeof App>[0]["initial"];
 
+// Tailwind 4 gives its utilities' variables their starting values with @property, and
+// a shadow root ignores @property, so inside the backoffice every border, outline and
+// shadow resolved to none: no button edges and no focus ring. Registered once on the
+// document, they apply inside every shadow root. The names are Tailwind's own --tw-*,
+// which Umbraco's UI does not use.
+if (!document.querySelector("style[data-schema-city-properties]")) {
+  const properties = document.createElement("style");
+  properties.dataset.schemaCityProperties = "";
+  properties.textContent = (
+    appStyles.match(/@property[^{]+\{[^}]*\}/g) ?? []
+  ).join("\n");
+  document.head.append(properties);
+}
+
 /**
  * The line shown in place of the app: loading, or why the graph did not come. The
  * status is the one thing that tells a 401 apart from a 500 without the console.
