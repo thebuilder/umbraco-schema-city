@@ -2,26 +2,32 @@ import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { dayOf } from "../model/dates";
 import {
   compareSchemas,
   createSnapshot,
   readSnapshotFile,
+  snapshotFileName,
 } from "../model/snapshots";
 import type { SchemaGraph } from "../model/types";
 import { ComparisonResults } from "./ComparisonResults";
 
-function downloadSnapshot(graph: SchemaGraph) {
-  const blob = new Blob([JSON.stringify(createSnapshot(graph), null, 2)], {
+/** Saves the snapshot and returns the file name it was saved under. */
+function downloadSnapshot(graph: SchemaGraph): string {
+  const snapshot = createSnapshot(graph);
+  const name = snapshotFileName(window.location.hostname, snapshot.capturedAt);
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "schema-city-snapshot.json";
+  link.download = name;
   document.body.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  return name;
 }
 
 export function Comparison({
@@ -40,6 +46,7 @@ export function Comparison({
   open: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
   const [baselineCapturedAt, setBaselineCapturedAt] = useState<string | null>(
     null
   );
@@ -83,7 +90,7 @@ export function Comparison({
               Import snapshot
             </Button>
             <Button
-              onClick={() => downloadSnapshot(graph)}
+              onClick={() => setSaved(downloadSnapshot(graph))}
               size="sm"
               variant="outline"
             >
@@ -115,6 +122,11 @@ export function Comparison({
               type="file"
             />
           </div>
+          {saved ? (
+            <p className="mt-2 text-phosphor text-xs" role="status">
+              Exported {saved}.
+            </p>
+          ) : null}
           {error ? (
             <p className="mt-2 text-signal text-xs" role="alert">
               {error}
@@ -125,8 +137,12 @@ export function Comparison({
           {comparison ? (
             <div className="space-y-3 px-3 py-4">
               <p className="text-3xs text-phosphor-dim">
-                Current graph: {graph.generatedAt.slice(0, 10)} · baseline{" "}
-                {snapshotDate(baselineCapturedAt)}
+                {/* A pinned fixture carries the epoch, which is no date to show. */}
+                Current graph
+                {dayOf(graph.generatedAt)
+                  ? `: ${dayOf(graph.generatedAt)}`
+                  : ""}{" "}
+                · baseline {dayOf(baselineCapturedAt) ?? "loaded"}
               </p>
               <ComparisonResults comparison={comparison} onSelect={onSelect} />
             </div>
@@ -140,8 +156,4 @@ export function Comparison({
       </SheetContent>
     </Sheet>
   );
-}
-
-function snapshotDate(timestamp: string | null) {
-  return timestamp?.slice(0, 10) ?? "loaded";
 }

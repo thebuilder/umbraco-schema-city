@@ -5,6 +5,7 @@ import {
   MAX_SNAPSHOT_BYTES,
   parseSnapshot,
   readSnapshotFile,
+  snapshotFileName,
 } from "./snapshots";
 import type { SchemaGraph, SchemaNode } from "./types";
 
@@ -172,6 +173,73 @@ describe("schema snapshots", () => {
     expect(result.added.map((change) => change.alias)).toEqual(["new"]);
     expect(result.removed).toEqual([]);
     expect(result.changed).toEqual([]);
+  });
+
+  it("names block targets and Data Types, and lists a target change once", () => {
+    const blocks = (
+      dataTypeId: string,
+      dataTypeName: string,
+      to: string[]
+    ) => ({
+      alias: "body",
+      name: "Body",
+      dataTypeId,
+      dataTypeName,
+      editorAlias: "Umbraco.BlockList",
+      editorUiAlias: null,
+      mandatory: false,
+      variesByCulture: false,
+      fromCompositionId: null,
+      targets: to.map((nodeId) => ({ nodeId, role: "content" as const })),
+    });
+    const page = (body: ReturnType<typeof blocks>) =>
+      node("page", "page", {
+        groups: [
+          {
+            id: "g",
+            alias: "content",
+            name: "Content",
+            type: "Group",
+            parentAlias: null,
+            fromCompositionId: null,
+            properties: [body],
+          },
+        ],
+      });
+    const card = node("card-key", "card", { name: "Card", isElement: true });
+    const quote = node("quote-key", "quote", {
+      name: "Quote",
+      isElement: true,
+    });
+    const before = graph(
+      [page(blocks("dt-1", "Textarea", ["card-key", "gone-key"])), card],
+      [
+        { kind: "block", from: "page", to: "card-key", propertyAlias: "body" },
+        { kind: "block", from: "page", to: "gone-key", propertyAlias: "body" },
+      ]
+    );
+    const after = graph(
+      [page(blocks("dt-2", "Textstring", ["quote-key"])), card, quote],
+      [{ kind: "block", from: "page", to: "quote-key", propertyAlias: "body" }]
+    );
+    const details =
+      compareSchemas(before, after).changed.find((c) => c.alias === "page")
+        ?.details ?? [];
+    expect(details).toEqual([
+      "property content.body Data Type: Textarea to Textstring",
+      "target added: content.body -> Quote (content)",
+      "target removed: content.body -> Card (content)",
+      "target removed: content.body -> gone-key (content)",
+    ]);
+  });
+
+  it("names the snapshot file after the site and the day", () => {
+    expect(
+      snapshotFileName("Www.Example.com", "2026-10-07T08:30:00.000Z")
+    ).toBe("schema-city-snapshot-www-example-com-2026-10-07.json");
+    expect(snapshotFileName("", "2026-10-07T08:30:00.000Z")).toBe(
+      "schema-city-snapshot-2026-10-07.json"
+    );
   });
 
   it("names replaced relationships and property-level changes", () => {
