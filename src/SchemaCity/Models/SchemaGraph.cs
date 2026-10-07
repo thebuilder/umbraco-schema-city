@@ -20,7 +20,8 @@ public record SchemaGraph(
 /// that no longer resolve. OtherUses counts what the graph has no node for: properties on Media and
 /// Member Types, and types whose collection view is this Data Type. IsBuiltIn marks one of the Data
 /// Types Umbraco installs itself. Configuration holds a few cheap values, such as a block list's min
-/// and max, and is omitted for every other editor.
+/// and max, and is omitted for every other editor. Fingerprint is the hash a review decision about
+/// the Data Type is tied to, see SchemaGraphBuilder.Fingerprint.
 /// </summary>
 public record SchemaDataType(
     string Id,
@@ -32,12 +33,17 @@ public record SchemaDataType(
     int OtherUses,
     bool IsBuiltIn,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyDictionary<string, object>? Configuration = null);
+    IReadOnlyDictionary<string, object>? Configuration = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Fingerprint = null);
 
 /// <summary>A Document Type container. ParentId is null for a folder at the tree root.</summary>
 public record SchemaFolder(string Id, string Name, string? ParentId);
 
-/// <summary>One Document Type.</summary>
+/// <summary>
+/// One Document Type. Fingerprint is the hash a review decision about the type is tied to, see
+/// SchemaGraphBuilder.Fingerprint. It is only null while the builder is still computing it.
+/// </summary>
 public record SchemaNode(
     string Id,
     string Alias,
@@ -53,7 +59,9 @@ public record SchemaNode(
     IReadOnlyList<PropertyGroup> Groups,
     int OwnPropertyCount,
     int ComposedPropertyCount,
-    IReadOnlyList<SchemaTemplate> Templates);
+    IReadOnlyList<SchemaTemplate> Templates,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Fingerprint = null);
 
 public record SchemaTemplate(string Id, string Alias, string Name, bool IsDefault);
 

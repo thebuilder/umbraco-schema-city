@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text.Json;
 using SchemaCity.Models;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
@@ -99,13 +101,44 @@ public sealed class SchemaGraphBuilder :
             .ThenBy(e => e.PropertyAlias, StringComparer.Ordinal)
             .ToArray();
 
+        // Each node's fingerprint covers its own record and every edge in or out of it, which
+        // takes in its allowed children, compositions, block targets and whoever points at it.
+        ILookup<string, SchemaEdge> touching = sortedEdges
+            .SelectMany(e => new[] { (Id: e.From, Edge: e), (Id: e.To, Edge: e) })
+            .Distinct()
+            .ToLookup(p => p.Id, p => p.Edge);
+
         return new SchemaGraph(
             DateTimeOffset.UtcNow,
             folders,
-            nodes,
+            nodes.Select(n => n with { Fingerprint = Fingerprint(n, touching[n.Id].ToArray()) }).ToArray(),
             sortedEdges,
-            DescribeDataTypes(editors, targetsByDataTypeKey, dataTypeContainers ?? [], types, otherTypes ?? []));
+            DescribeDataTypes(editors, targetsByDataTypeKey, dataTypeContainers ?? [], types, otherTypes ?? [])
+                .Select(d => d with { Fingerprint = Fingerprint(d) })
+                .ToArray());
     }
+
+    /// <summary>
+    /// The fingerprint of a node or Data Type in the graph <see cref="Build"/> returns, or null
+    /// when no node or Data Type has that key.
+    /// </summary>
+    public string? FingerprintOf(string id)
+    {
+        SchemaGraph graph = Build();
+        return graph.Nodes.FirstOrDefault(n => n.Id == id)?.Fingerprint
+            ?? graph.DataTypes.FirstOrDefault(d => d.Id == id)?.Fingerprint;
+    }
+
+    /// <summary>
+    /// The first 16 hex digits of a SHA-256 over the parts as camelCase JSON. A review decision
+    /// stores the fingerprint of its subject and reopens when it changes, so this has to change
+    /// with any part of the schema a finding reads and stay the same between runs otherwise. The
+    /// parts are records and arrays the builder has already sorted, and a record leaves out its
+    /// own null Fingerprint, so serialising is deterministic. Renaming the type changes it too,
+    /// which reopens a decision more often than strictly needed, never less.
+    /// </summary>
+    public static string Fingerprint(params object[] parts) =>
+        Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(parts, JsonSerializerOptions.Web)))[..16];
 
     /// <summary>
     /// The keys of the Data Types Umbraco installs itself, read from its own constants, so a default
