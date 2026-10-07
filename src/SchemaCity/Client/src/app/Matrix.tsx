@@ -11,6 +11,7 @@ import {
   sortColumns,
 } from "../model/matrix";
 import type { SchemaGraph } from "../model/types";
+import { useAnnounceChange } from "./a11y";
 import { READING } from "./InspectorChips";
 import { FilterField, useMatches } from "./TypeTable";
 
@@ -177,6 +178,7 @@ function Grid<Cell>({
   const rows = matched
     ? data.rows.filter((row) => matched.has(row.id))
     : data.rows;
+  useAnnounceChange(`${rows.length} of ${data.rows.length} types`);
 
   return (
     <>

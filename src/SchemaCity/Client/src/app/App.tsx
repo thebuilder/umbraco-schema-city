@@ -41,13 +41,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { PortalContainer } from "@/portal";
 import { findFindings } from "../model/findings";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import { searchNodes } from "../model/search";
 import { compareSchemas } from "../model/snapshots";
 import type { SchemaGraph, UsageReport } from "../model/types";
+import { citySummary, LiveRegion, Say } from "./a11y";
 import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
@@ -560,11 +560,30 @@ export function App({
   };
 
   return (
-    <PortalContainer value={portal}>
+    <LiveRegion portal={portal}>
       <section
         aria-label="Schema City"
         className="flex h-full flex-col bg-background font-mono text-foreground"
+        data-schema-city
       >
+        <Say
+          message={
+            selectedNode ? `${selectedNode.name} selected` : "Selection cleared"
+          }
+        />
+        <Say
+          message={`${VIEW_TABS.find((tab) => tab.value === view)?.label} view`}
+        />
+        <Say
+          message={`Layers on: ${layers.map((layer) => LAYER_LABEL[layer]).join(", ") || "none"}`}
+        />
+        <Say
+          message={
+            focus
+              ? `Focus on ${nodesById.get(focus)?.name}, ${focusCount} types`
+              : "Focus off"
+          }
+        />
         {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
             fitting, which is 848 px with the lens picker reading None and earlier
             once a longer lens name widens it. The backoffice is narrower than the
@@ -776,6 +795,7 @@ export function App({
             // it is open rather than sliding under it.
             <div
               className={`absolute inset-0 ${selectedNode ? INSPECTOR_INSET : ""}`}
+              data-focus-home
             >
               <FlatView
                 findings={findings}
@@ -802,7 +822,13 @@ export function App({
               </p>
             </div>
           ) : (
-            <div className="absolute inset-0 z-0">
+            <section
+              aria-label="City"
+              className="absolute inset-0 z-0 outline-none"
+              data-focus-home
+              tabIndex={-1}
+            >
+              <p className="sr-only">{citySummary(graph)}</p>
               <Suspense
                 fallback={
                   <p className="p-4 text-phosphor-dim text-sm">
@@ -828,7 +854,7 @@ export function App({
                   usage={usage}
                 />
               </Suspense>
-            </div>
+            </section>
           )}
 
           {selectedNode && neighbourhood ? (
@@ -930,6 +956,6 @@ export function App({
 
         <div ref={portal} />
       </section>
-    </PortalContainer>
+    </LiveRegion>
   );
 }

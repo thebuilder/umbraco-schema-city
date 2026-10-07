@@ -8,6 +8,7 @@ import { type Role, roleOf } from "../model/inspector";
 import { neighbourhoods } from "../model/neighbourhood";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
+import { useAnnounceChange } from "./a11y";
 import { FindingDot, RoleKey } from "./InspectorChips";
 
 export type TypeRow = {
@@ -185,6 +186,8 @@ export function TypeTable({
       ),
     [rows, matched, sort]
   );
+
+  useAnnounceChange(`${shown.length} of ${rows.length} types`);
 
   const columns = usage
     ? COLUMNS
