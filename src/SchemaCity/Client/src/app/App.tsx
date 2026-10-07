@@ -52,6 +52,7 @@ import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_INSET, Inspector } from "./Inspector";
+import type { Grouping } from "./layout/city";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   LENS_LABEL,
@@ -71,6 +72,11 @@ import { FlatView, VIEW_TABS, ViewSwitcher } from "./Views";
 
 /** The tag names whose own keyboard handling wins over the shortcut keys. */
 const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
+
+const GROUPINGS: { value: Grouping; label: string }[] = [
+  { value: "structure", label: "Structure" },
+  { value: "folders", label: "Folders" },
+];
 
 const LAYER_LABEL: Record<Layer, string> = {
   structure: "Structure",
@@ -189,6 +195,38 @@ function Legend() {
       </section>
 
       <section>
+        <LegendTitle>Boards</LegendTitle>
+        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
+          <LegendRow
+            mark={<span className="h-2 w-5 border border-phosphor-dim" />}
+          >
+            Courtyard round a type and its printed name
+          </LegendRow>
+          <LegendRow mark={<span className="h-3 w-1.5 bg-[#d9b24a]/70" />}>
+            Gold finger: a trace leaving for another board, one per lane
+          </LegendRow>
+          <LegendRow
+            mark={
+              <span className="size-2 rounded-full border-2 border-[#c8823a]/70" />
+            }
+          >
+            Via: a trace turning
+          </LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor-dim/40" />}>
+            Patch under a group: one block editor's Element Types, or a nested
+            folder
+          </LegendRow>
+        </ul>
+        <p className="mt-2 text-muted-foreground text-xs">
+          Group by Structure puts each root and what it can create on its own
+          board, a parent with its children around it, with boards for
+          Compositions, Elements and anything no root reaches. Group by Folders
+          follows the schema's folders. Names print beside their types as far as
+          they fit without touching; the full name is in the inspector.
+        </p>
+      </section>
+
+      <section>
         <LegendTitle>Layers</LegendTitle>
         <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
           <LegendRow
@@ -275,6 +313,7 @@ export function App({
     layers?: Layer[];
     lens?: Lens;
     view?: View;
+    group?: Grouping;
   };
   /** Given, the host owns the address bar and the app writes nothing. */
   onStateChange?: (state: UrlState) => void;
@@ -295,6 +334,7 @@ export function App({
       layers: state.layers ?? [...DEFAULT_LAYERS],
       lens: state.lens ?? "none",
       view: state.view ?? "city",
+      group: state.group ?? "structure",
     };
   });
   const [selected, setSelected] = useState<string | null>(start.id);
@@ -307,6 +347,7 @@ export function App({
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
+  const [group, setGroup] = useState<Grouping>(start.group);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [findingsOpen, setFindingsOpen] = useState(false);
@@ -417,12 +458,23 @@ export function App({
       layers,
       lens,
       view,
+      group,
     };
     mirror.current?.(state);
     if (hostOwnsUrl) return;
     const url = urlToWrite(state, mountedAt, window.location.pathname);
     if (url !== null) window.history.replaceState(null, "", url);
-  }, [selected, focus, layers, lens, view, aliasById, hostOwnsUrl, mountedAt]);
+  }, [
+    selected,
+    focus,
+    layers,
+    lens,
+    view,
+    group,
+    aliasById,
+    hostOwnsUrl,
+    mountedAt,
+  ]);
   // The palette opens on the whole schema rather than on nothing, so it reads as a
   // list of every type that a query narrows, not as a box that waits to be fed.
   const byName = useMemo(
@@ -556,6 +608,43 @@ export function App({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Structure follows what an editor can create where, Folders the
+              folders the schema files its types in. Only the city is grouped. */}
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads. */}
+          <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
+            Group
+            <Select
+              disabled={view !== "city"}
+              items={GROUPINGS}
+              onValueChange={(value) => {
+                // The comparison's baseline positions and a focus both stand on the
+                // city layout, so a new grouping starts from the whole city.
+                setFocus(null);
+                setGroup(value as Grouping);
+              }}
+              value={group}
+            >
+              <SelectTrigger
+                aria-label="Group the city by"
+                className="text-2xs uppercase tracking-terminal"
+                size="sm"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GROUPINGS.map(({ value, label }) => (
+                  <SelectItem
+                    className="text-2xs uppercase tracking-terminal"
+                    key={value}
+                    value={value}
+                  >
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
 
           <ViewSwitcher onView={setView} view={view} />
 
@@ -727,6 +816,7 @@ export function App({
                   focus={focus}
                   focusDepth={focusDepth}
                   graph={graph}
+                  grouping={group}
                   icons={icons}
                   inspectorOpen={Boolean(selectedNode && neighbourhood)}
                   layers={layers}
@@ -735,6 +825,7 @@ export function App({
                   reframe={reframe}
                   scale={scale}
                   selected={selected}
+                  usage={usage}
                 />
               </Suspense>
             </div>

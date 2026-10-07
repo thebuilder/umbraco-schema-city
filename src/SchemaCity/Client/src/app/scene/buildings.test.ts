@@ -5,7 +5,7 @@ import type {
   SchemaNode,
   SchemaProperty,
 } from "../../model/types";
-import type { Placement } from "../layout/city";
+import { MIN_FOOTPRINT, type Placement } from "../layout/city";
 import {
   buildFloorCells,
   buildingBox,
@@ -110,8 +110,8 @@ describe("property windows", () => {
     // Two windows on one slab land on opposite walls, and the composed slab's
     // window sits a floor higher: plinth, gap, then half a slab.
     expect(windows[0].rotY).not.toBe(windows[1].rotY);
-    expect(windows[0].cy).toBeCloseTo(0.49);
-    expect(windows[2].cy).toBeCloseTo(1.09);
+    expect(windows[0].cy).toBeCloseTo(0.6);
+    expect(windows[2].cy).toBeCloseTo(1.4);
     // Every window stands just off the slab, which is 0.8 of the 2-unit footprint.
     for (const w of windows) {
       expect(Math.max(Math.abs(w.cx), Math.abs(w.cz))).toBeCloseTo(0.812);
@@ -150,7 +150,7 @@ describe("buildFloorCells", () => {
     const { cells, heights } = buildFloorCells(nodes, [placement("a")]);
 
     expect(kinds(cells)).toEqual(["plinth", "own", "core", "lid"]);
-    expect(heights.get("a")).toBeCloseTo(0.8);
+    expect(heights.get("a")).toBeCloseTo(1);
   });
 
   it("leaves a gap between slabs and puts a board in the gap before a tab", () => {
@@ -176,9 +176,9 @@ describe("buildFloorCells", () => {
     // Every slab is clear of the one under it, so the groups can be counted.
     for (let i = 1; i < slabs.length; i++) {
       const below = slabs[i - 1].cy + slabs[i - 1].sy / 2;
-      expect(slabs[i].cy - slabs[i].sy / 2 - below).toBeCloseTo(0.1);
+      expect(slabs[i].cy - slabs[i].sy / 2 - below).toBeCloseTo(0.12);
     }
-    expect(heights.get("a")).toBeCloseTo(0.14 + 3 * 0.6 + 0.06);
+    expect(heights.get("a")).toBeCloseTo(0.14 + 3 * 0.8 + 0.06);
   });
 
   it("lights the lid of a page with a template", () => {
@@ -286,7 +286,7 @@ describe("connectionsOf and roleOf", () => {
     ]);
     const { cells } = buildFloorCells(
       new Map([["a", node("a")]]),
-      [placement("a")],
+      [placement("a", { footprint: MIN_FOOTPRINT })],
       connections
     );
     const pins = cells.filter((c) => c.kind === "pin");
@@ -294,11 +294,12 @@ describe("connectionsOf and roleOf", () => {
     const south = pins.filter((p) => p.cz > 0);
 
     expect(north).toHaveLength(1);
-    // A 1.8-unit plinth less its corners holds 7 pins at 0.2 apart.
-    expect(south).toHaveLength(7);
+    // The smallest footprint's 2.88-unit plinth less its corners holds 13 pins at
+    // 0.2 apart.
+    expect(south).toHaveLength(13);
     // Pins stand between the plinth and the footprint's edge, never past it.
     for (const pin of pins)
-      expect(Math.abs(pin.cz) + pin.sz / 2).toBeCloseTo(1);
+      expect(Math.abs(pin.cz) + pin.sz / 2).toBeCloseTo(MIN_FOOTPRINT / 2);
   });
 });
 
@@ -364,7 +365,7 @@ describe("focus mode's flat plates", () => {
     ]);
 
     const standing = buildFloorCells(nodes, [placement("a")]);
-    expect(standing.heights.get("a")).toBeCloseTo(2);
+    expect(standing.heights.get("a")).toBeCloseTo(2.6);
 
     const flat = buildFloorCells(nodes, [placement("a", { flatten: 1 })]);
     expect(flat.heights.get("a")).toBeCloseTo(0.1);
@@ -377,7 +378,7 @@ describe("focus mode's flat plates", () => {
 
     // Half way through the tween it is half way down, near enough.
     const half = buildFloorCells(nodes, [placement("a", { flatten: 0.5 })]);
-    expect(half.heights.get("a")).toBeCloseTo(1.05);
+    expect(half.heights.get("a")).toBeCloseTo(1.35);
   });
 
   it("flattens an Element Type too", () => {

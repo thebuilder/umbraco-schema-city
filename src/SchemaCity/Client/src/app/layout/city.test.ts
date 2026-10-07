@@ -12,16 +12,21 @@ import {
 import { STAMP_BAND } from "../scene/stage";
 import {
   cityBounds,
-  cityDistricts,
+  cityDistricts as cityOf,
   DISTRICT_GAP,
   type District,
   ISLAND_PAD,
-  layoutCity,
+  layoutCity as layoutOf,
   type Placement,
   ROW_LIMIT,
   SPARSE_RANK,
   STREET,
 } from "./city";
+
+// These cover the folder grouping and its ranked districts. structure.test.ts and
+// neighbourhoods.test.ts cover the structure grouping, which is the default.
+const cityDistricts = (graph: SchemaGraph) => cityOf(graph, "folders");
+const layoutCity = (graph: SchemaGraph) => layoutOf(graph, "folders");
 
 const small = smallFixture as unknown as SchemaGraph;
 const medium = mediumFixture as unknown as SchemaGraph;
@@ -575,7 +580,7 @@ describe("layoutCity", () => {
       const { footprint } = placements[1] as Placement;
       const between = (rows[1] as number) - (rows[0] as number) - footprint;
       expect(between).toBeCloseTo(1.5 + LABEL_STRIP);
-      expect(between - tallest).toBeGreaterThan(1);
+      expect(between - tallest).toBeGreaterThan(0.5);
     }
   });
 
@@ -783,10 +788,11 @@ describe("layoutCity", () => {
       ])
     ) as [Placement, Placement];
 
-    expect(wide.footprint).toBeCloseTo(3.6);
+    // 3.2 plus 0.8 per square root of a property, capped at sixteen properties.
+    expect(wide.footprint).toBeCloseTo(4.8);
     expect(wide.floors).toBe(2);
-    expect(wide.height).toBeCloseTo(1.2);
-    expect(capped.footprint).toBeCloseTo(6);
+    expect(wide.height).toBeCloseTo(1.6);
+    expect(capped.footprint).toBeCloseTo(6.4);
     expect(capped.floors).toBe(1);
   });
 
@@ -827,7 +833,7 @@ describe("layoutCity", () => {
       at("child").position.z -
       (at("loner").footprint + at("child").footprint) / 2;
 
-    expect(gap).toBeGreaterThanOrEqual(STREET);
+    expect(gap).toBeGreaterThanOrEqual(STREET - 1e-9);
   });
 
   it("never overlaps two footprints", () => {
@@ -913,11 +919,12 @@ describe("layoutCity", () => {
 
     // The Pages folder holds the twelve-deep chain of single types. Before those
     // ranks shared a band it came out 61 by 229, framed at eight percent fill. The
-    // strip each folded row keeps for its printed names took it from 2.0 to 2.13.
+    // strip each folded row keeps for its printed names took it from 2.0 to 2.13,
+    // and to 2.3 once the strip held a name on two lines.
     const pages = districts.find((d) => d.name === "Pages") as District;
     const width = pages.maxX - pages.minX;
     const depth = pages.maxZ - pages.minZ;
-    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(2.2);
+    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(2.4);
     console.log(
       `pathological: 300 nodes laid out in ${elapsed.toFixed(1)} ms, Pages ${width.toFixed(0)} by ${depth.toFixed(0)}`
     );

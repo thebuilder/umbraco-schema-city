@@ -20,7 +20,12 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaComparison } from "../model/snapshots";
-import type { SchemaEdge, SchemaGraph, SchemaNode } from "../model/types";
+import type {
+  SchemaEdge,
+  SchemaGraph,
+  SchemaNode,
+  UsageReport,
+} from "../model/types";
 import { inspectorWidthFor } from "./Inspector";
 import {
   type CityBounds,
@@ -28,6 +33,7 @@ import {
   cityDistricts,
   type District,
   type DistrictKind,
+  type Grouping,
   ISLAND_PAD,
   type Placement,
 } from "./layout/city";
@@ -41,13 +47,19 @@ import {
 } from "./layout/focus";
 import { describeRelationship, uniqueConnections } from "./relationship";
 import { BoardLabels, type Floated } from "./scene/BoardLabels";
-import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
 import {
-  type BoardText,
-  boardRepeats,
-  boardText,
-  labelRoom,
-} from "./scene/board-labels";
+  Boards,
+  FOLDER_PAD,
+  islandOf,
+  rimColour,
+  SLAB_HEIGHT,
+  slabColour,
+  tint,
+  WHITE,
+} from "./scene/Boards";
+import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
+import { edgeFingers, type Finger, traceVias } from "./scene/board";
+import { tracesOf } from "./scene/board-labels";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -82,7 +94,12 @@ import {
   pickLabels,
   visibleLabelIds,
 } from "./scene/labels";
-import { type Anchor, buildLinkGeometry, type Layer } from "./scene/layers";
+import {
+  type Anchor,
+  buildLinkGeometry,
+  LAYER_OF,
+  type Layer,
+} from "./scene/layers";
 import type { LensScale } from "./scene/lens";
 import {
   buildBoardOutlinePositions,
@@ -93,12 +110,14 @@ import {
   traceOutlinePositions,
   transitionToward,
 } from "./scene/reveal";
-import { buildRoadGeometry, roadTracePositions } from "./scene/roads";
+import {
+  buildRoadGeometry,
+  planRoutes,
+  roadTracePositions,
+} from "./scene/roads";
 import {
   atmosphere,
   CAMERA_FOV,
-  districtStamp,
-  FOLDER_TINT_HEIGHT,
   framingAction,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
@@ -997,10 +1016,17 @@ const LABEL_CLASS =
  * `pickLabels` keeps the best ranked ones that do not land on each other, and drops
  * the rest. District names are not candidates: they are printed on the ground.
  *
- * Every type's name is printed on the board as well, legible once the camera is close
- * enough. A related type whose whole name is already legible there gets no floating
- * label, so the screen never says one name twice. Every other type that keeps a
- * floating label has its print left off the board, through `floated`.
+ * Every type's name is printed on the board as well, wherever it fits. A related
+ * type whose whole name its board prints legibly at the board's current size gets
+ * no floating label, so the screen never says one name twice. That set changes only
+ * when a board changes size or a name fades in or out, never with a pan. The hovered
+ * and selected types' own prints are left off the board while their floating labels
+ * show, through `floated`; every other print stays put.
+ *
+ * ponytail: the board only knows its print reads, not that it is on screen or that
+ * no building stands in front of it. A related type whose print is hidden behind a
+ * tall building shows its name nowhere until the camera moves; a depth read of the
+ * print's anchor is the upgrade if that turns up.
  *
  * The layer is built and written to by hand rather than through React, because
  * this runs inside the frame loop and forty spans that only ever change their
@@ -1015,7 +1041,6 @@ function Labels({
   hoveredNeighbours,
   neighbours,
   focusNeighbours,
-  boardTexts,
   floated,
   reducedMotion,
 }: {
@@ -1027,8 +1052,10 @@ function Labels({
   hoveredNeighbours: Set<string> | null;
   neighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
-  boardTexts: Map<string, BoardText>;
-  /** Written here every repaint: the types that have a floating label now. */
+  /**
+   * Written here every repaint: the types that have a floating label now. Read here:
+   * the types whose whole name the board prints.
+   */
   floated: Floated;
   reducedMotion: boolean;
 }) {
@@ -1043,6 +1070,7 @@ function Labels({
   // skipped otherwise, so a still city costs one matrix comparison a frame.
   const dirty = useRef(true);
   const framedAt = useRef(new THREE.Matrix4());
+  const printedSeen = useRef(-1);
 
   const candidates = useMemo(() => {
     const ids = visibleLabelIds({
@@ -1116,19 +1144,19 @@ function Labels({
       labelLayer.current.style.opacity = String(
         revealAt(state.clock.elapsedTime, reducedMotion).links
       );
-    if (!dirty.current && camera.matrixWorld.equals(framedAt.current)) return;
+    if (
+      !dirty.current &&
+      printedSeen.current === floated.printedVersion &&
+      camera.matrixWorld.equals(framedAt.current)
+    )
+      return;
     dirty.current = false;
+    printedSeen.current = floated.printedVersion;
     framedAt.current.copy(camera.matrixWorld);
 
-    // A related type whose board already prints its whole name, legibly.
+    // A related type whose board prints its whole name legibly.
     const printedWhole = (candidate: { id: string; rank: number }) =>
-      candidate.rank >= 2 &&
-      boardRepeats(
-        boardTexts.get(candidate.id),
-        placementsById.get(candidate.id),
-        camera.position,
-        size.height
-      );
+      candidate.rank >= 2 && floated.printed.has(candidate.id);
 
     const kept = pickLabels(
       candidates
@@ -1177,135 +1205,12 @@ function Labels({
   return null;
 }
 
-/** Thickness of the slab of land an island is, whose top face is y = 0. */
-const SLAB_HEIGHT = 0.4;
+/** How far the lip under the focus island stands down from its top. */
 const RIM_HEIGHT = 0.18;
-/** How far the rim stands out past the slab. */
+/** How far the lip stands out past the focus island. */
 const RIM_OVERHANG = 0.9;
-/** Ground around a nested folder's members that its tint covers. */
-const FOLDER_PAD = 1;
-/** The grid sits under the rim, so the two can never z-fight. */
+/** The grid sits under every board, so the two can never z-fight. */
 const GRID_Y = -(SLAB_HEIGHT + RIM_HEIGHT + 0.05);
-
-/**
- * A hint of `toward` in `base`, mixed the way CSS mixes two colours rather than in
- * the linear space three works in. A twelfth of amber is a hint of warmth in one and
- * a brown field in the other, and these colours are picked against the panel colour
- * as the stylesheet writes it.
- */
-function tint(base: string, toward: string, amount: number): THREE.Color {
-  return new THREE.Color(base)
-    .convertLinearToSRGB()
-    .lerp(new THREE.Color(toward).convertLinearToSRGB(), amount)
-    .convertSRGBToLinear();
-}
-
-const WHITE = "#ffffff";
-
-/**
- * Font size a district's name is rasterised at. Its cap height comes out around 72 px,
- * and the stamp is at most four world units tall, so the print carries about
- * 18 px of texture per world unit. The ground needs 2 to stay crisp at the framing zoom, and
- * the rest is what Explore leans on when the camera comes down to street level.
- */
-const STAMP_FONT_PX = 100;
-/**
- * How heavy the letters are cut. A mono face at its normal weight leaves a stroke
- * about a pixel wide once the whole city is framed, and a stroke that thin at 0.55
- * opacity averages away into the slab under it.
- */
-const STAMP_WEIGHT = 600;
-/** Silkscreen text is spaced out. Ems of extra gap between two letters. */
-const STAMP_TRACKING = "0.32em";
-/**
- * How solid the print reads against the island under it. Phosphor-dim at 0.8 comes
- * out around #3f6b60 over the panel colour, which is still darker than any building
- * and half the strength of a road. Lower than this and the letters go, because the
- * whole city framed shrinks a 100 px raster to a 22 px cap and the mipmap averages a
- * thin stroke into the slab.
- */
-const STAMP_OPACITY = 0.8;
-/**
- * How far the print stands off the slab it is on. Above the slab so the two never
- * z-fight, and under the road ribbons at 0.015, so a road crossing an island's margin
- * runs over the name the way a trace runs over a board's silkscreen.
- */
-const STAMP_Y = 0.01;
-
-/** One texture per name and font, kept for the life of the page. */
-const stamps = new Map<string, THREE.CanvasTexture>();
-
-/**
- * A district's name rasterised into a texture that is exactly the ink: as wide as the
- * tracked-out name and as tall as its cap height. Sizing the texture to the cap rather
- * than to the font's line box is what lets the caller place the quad by cap height
- * alone, with no per-font fudge for the ascender and descender space around it.
- */
-function stampTexture(name: string, font: string): THREE.CanvasTexture {
-  const key = `${name}|${font}`;
-  const found = stamps.get(key);
-  if (found) return found;
-
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  const style = () => {
-    if (!context) return;
-    context.font = `${STAMP_WEIGHT} ${STAMP_FONT_PX}px ${font}`;
-    // letterSpacing is Chrome 99 and Safari 17.4. Older than that prints the name
-    // without the tracking rather than not at all.
-    context.letterSpacing = STAMP_TRACKING;
-    // White ink, because the material's colour is what tints it to the theme.
-    context.fillStyle = "#ffffff";
-    context.textBaseline = "alphabetic";
-  };
-  if (context) {
-    style();
-    const measured = context.measureText(name);
-    // The ink's own ascent, which for an uppercase name is its cap height.
-    const cap = Math.max(Math.ceil(measured.actualBoundingBoxAscent), 1);
-    canvas.width = Math.max(Math.ceil(measured.width), 1);
-    canvas.height = cap;
-    // Sizing a canvas resets every drawing state it had, the font included.
-    style();
-    context.fillText(name, 0, cap);
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  // The stamp lies on the ground, so every camera reads it at a grazing angle and a
-  // plain mipmap turns the letters to mush. The renderer clamps this to what the
-  // hardware has.
-  texture.anisotropy = 8;
-  stamps.set(key, texture);
-  return texture;
-}
-
-/**
- * The land under a district. Structure is the same panel colour the chrome uses,
- * compositions and mixed are a touch lighter and elements a touch warmer, so the
- * islands read as different places without turning into four colours.
- *
- * The panel colour is lifted toward phosphor-dim first. Under the scene's lights the
- * panel colour itself comes out close to black, and a shadow on black does not show,
- * so the buildings would stand on their islands without casting anything.
- */
-function slabColour(kind: DistrictKind, palette: Palette): THREE.Color {
-  const land = `#${tint(palette.land, palette.dim, SLAB_LIFT).getHexString()}`;
-  if (kind === "structure") return new THREE.Color(land);
-  if (kind === "elements") return tint(land, palette.amber, 0.09);
-  return tint(land, WHITE, 0.07);
-}
-
-/** How far the land is lifted from the panel colour toward phosphor-dim. */
-const SLAB_LIFT = 0.25;
-
-/** The lip of land around an island, the same for every district and for the focus one. */
-function rimColour(palette: Palette): THREE.Color {
-  return new THREE.Color(palette.land).lerp(
-    new THREE.Color(palette.background),
-    0.6
-  );
-}
 
 /**
  * How high the focus island's top face sits. Above the district slabs at 0 and the
@@ -1389,116 +1294,6 @@ function FocusIsland({
   );
 }
 
-/**
- * The world stage, borrowed from fsn: a sky and fog that meet at one horizon colour,
- * one ground plane that follows the camera so it never runs out, and an island of land
- * per district. `span` is the city's own, not the focus layout's, so entering focus
- * does not rescale the world, and the islands come from the city layout as well, so
- * the focused neighbourhood stands on whatever island it lands over.
- *
- * District outlines precede the slabs, then the stamped labels join the circuits.
- */
-function trackMaterial<T extends THREE.Material>(
-  materials: Map<number, T>,
-  index: number
-) {
-  return (material: T | null) => {
-    if (material) materials.set(index, material);
-    else materials.delete(index);
-  };
-}
-
-function revealMaterials(materials: Iterable<THREE.Material>, opacity: number) {
-  for (const material of materials) material.opacity = opacity;
-}
-
-function DistrictBoards({
-  districts,
-  palette,
-  materials,
-  reducedMotion,
-}: {
-  districts: District[];
-  reducedMotion: boolean;
-  palette: Palette;
-  materials: {
-    solid: Map<number, THREE.MeshStandardMaterial>;
-  };
-}) {
-  const rim = useMemo(() => rimColour(palette), [palette]);
-  const outline = useMemo(
-    () =>
-      buildBoardOutlinePositions(
-        districts.map((district) => ({
-          x: district.centre.x,
-          y: -SLAB_HEIGHT,
-          z: district.centre.z,
-          width: district.maxX - district.minX + ISLAND_PAD * 2,
-          height: SLAB_HEIGHT,
-          depth: district.maxZ - district.minZ + ISLAND_PAD * 2,
-        }))
-      ),
-    [districts]
-  );
-  return (
-    <>
-      {districts.map((district, index) => {
-        const width = district.maxX - district.minX + ISLAND_PAD * 2;
-        const depth = district.maxZ - district.minZ + ISLAND_PAD * 2;
-        const overhang = RIM_OVERHANG * 2;
-        return (
-          <group
-            key={district.id}
-            position={[district.centre.x, 0, district.centre.z]}
-          >
-            <mesh
-              position={[0, -SLAB_HEIGHT / 2, 0]}
-              receiveShadow
-              renderOrder={-1}
-            >
-              <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
-              <meshStandardMaterial
-                color={slabColour(district.kind, palette)}
-                depthWrite
-                metalness={0}
-                opacity={0}
-                ref={trackMaterial(materials.solid, index * 2)}
-                roughness={1}
-                transparent
-              />
-            </mesh>
-            <mesh
-              position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}
-              receiveShadow
-              renderOrder={-1}
-            >
-              <boxGeometry
-                args={[width + overhang, RIM_HEIGHT, depth + overhang]}
-              />
-              <meshStandardMaterial
-                color={rim}
-                depthWrite
-                metalness={0}
-                opacity={0}
-                ref={trackMaterial(materials.solid, index * 2 + 1)}
-                roughness={1}
-                transparent
-              />
-            </mesh>
-          </group>
-        );
-      })}
-      <IntroOutline
-        colour={palette.phosphor}
-        positions={outline}
-        reducedMotion={reducedMotion}
-        strength={0.6}
-      />
-    </>
-  );
-}
-
-/** fsn's count. Faint and small, so the sky reads as depth rather than decoration. */
 const STAR_COUNT = 700;
 /**
  * How far the key light's shadow reaches from the orbit target, as a share of the
@@ -1738,130 +1533,65 @@ function World({ palette, span }: { palette: Palette; span: number }) {
   );
 }
 
+/**
+ * The world stage, borrowed from fsn: a sky and fog that meet at one horizon colour,
+ * one ground plane that follows the camera so it never runs out, and a circuit board
+ * per district. `span` is the city's own, not the focus layout's, so entering focus
+ * does not rescale the world, and the boards come from the city layout as well, so
+ * the focused neighbourhood stands on whatever board it lands over.
+ *
+ * Board outlines trace first, then the boards fill in, then the names join the
+ * traces.
+ */
 function Stage({
   districts,
   folders,
+  fingers,
+  vias,
   span,
   palette,
   reducedMotion,
 }: {
   districts: District[];
-  /** The ground a nested folder's members cover, for the tint on the island. */
+  /** The ground a nested folder's or a socket's members cover, for its patch. */
   folders: (CityBounds & { id: string })[];
+  fingers: Finger[];
+  vias: { x: number; z: number }[];
   span: number;
   palette: Palette;
   reducedMotion: boolean;
 }) {
-  const folderColour = useMemo(
-    () => tint(palette.land, WHITE, 0.15),
-    [palette]
-  );
-  const solidMaterials = useRef(new Map<number, THREE.MeshStandardMaterial>());
-  const folderMaterials = useRef(new Map<number, THREE.MeshStandardMaterial>());
-  const stampMaterials = useRef(new Map<number, THREE.MeshBasicMaterial>());
-
-  // One rasterised name per district, with the quad it prints on. The name is fixed
-  // to its island, so the search for its spot runs once rather than every frame.
-  const stampsOf = useMemo(
+  const outline = useMemo(
     () =>
-      districts.map((district) => {
-        const texture = stampTexture(district.name.toUpperCase(), palette.mono);
-        const stamp = districtStamp(
-          {
-            minX: district.minX - ISLAND_PAD,
-            maxX: district.maxX + ISLAND_PAD,
-            minZ: district.minZ - ISLAND_PAD,
-            maxZ: district.maxZ + ISLAND_PAD,
-          },
-          texture.image.width / texture.image.height
-        );
-        return { id: district.id, texture, stamp };
-      }),
-    [districts, palette.mono]
+      buildBoardOutlinePositions(
+        districts.map((district) => ({
+          x: district.centre.x,
+          y: -SLAB_HEIGHT,
+          z: district.centre.z,
+          width: district.maxX - district.minX + ISLAND_PAD * 2,
+          height: SLAB_HEIGHT,
+          depth: district.maxZ - district.minZ + ISLAND_PAD * 2,
+        }))
+      ),
+    [districts]
   );
-
-  useFrame((state) => {
-    const progress = revealAt(state.clock.elapsedTime, reducedMotion);
-    revealMaterials(solidMaterials.current.values(), progress.districts);
-    revealMaterials(folderMaterials.current.values(), progress.districts);
-    revealMaterials(
-      stampMaterials.current.values(),
-      STAMP_OPACITY * progress.links
-    );
-  });
-
   return (
     <>
       <World palette={palette} span={span} />
-      <DistrictBoards
+      <Boards
         districts={districts}
-        materials={{
-          solid: solidMaterials.current,
-        }}
+        fingers={fingers}
+        folders={folders}
         palette={palette}
         reducedMotion={reducedMotion}
+        vias={vias}
       />
-      {/* A nested folder is a lighter rectangle on the island its members stand on,
-          which is what says where one block of a district ends and the next starts.
-          Like the district boards, it draws before connections so its reveal material
-          cannot paint over lines that do not write depth. */}
-      {folders.map((folder, index) => (
-        <mesh
-          key={folder.id}
-          position={[
-            folder.centre.x,
-            FOLDER_TINT_HEIGHT / 2 - SLAB_HEIGHT / 2,
-            folder.centre.z,
-          ]}
-          receiveShadow
-          renderOrder={-1}
-        >
-          <boxGeometry
-            args={[
-              folder.width,
-              SLAB_HEIGHT + FOLDER_TINT_HEIGHT,
-              folder.depth,
-            ]}
-          />
-          <meshStandardMaterial
-            color={folderColour}
-            depthWrite
-            metalness={0}
-            opacity={0}
-            ref={trackMaterial(folderMaterials.current, index)}
-            roughness={1}
-            transparent
-          />
-        </mesh>
-      ))}
-      {/* The district's name printed flat on its island, in the band the layout held
-          clear along the quietest of its four edges. It writes no depth, so the
-          buildings, the roads and every link stand over it.
-
-          ponytail: the print holds its strength through a selection and through focus
-          mode, where the buildings around it fade. Fading it too means telling the
-          stage which islands are lit, which is a prop and a set the stage has no other
-          use for. ponytail: a nested folder's tint is opaque and stands a hundredth of
-          a unit higher, so it would cover a name that reached under it. No folder in
-          either fixture reaches into the margin the name is printed in. */}
-      {stampsOf.map(({ id, stamp, texture }, index) => (
-        <mesh
-          key={id}
-          position={[stamp.x, STAMP_Y, stamp.z]}
-          renderOrder={1}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <planeGeometry args={[stamp.width, stamp.height]} />
-          <meshBasicMaterial
-            color={palette.dim}
-            depthWrite={false}
-            map={texture}
-            opacity={0}
-            ref={trackMaterial(stampMaterials.current, index)}
-            transparent
-          />
-        </mesh>
-      ))}
+      <IntroOutline
+        colour={palette.phosphor}
+        positions={outline}
+        reducedMotion={reducedMotion}
+        strength={0.6}
+      />
     </>
   );
 }
@@ -2367,6 +2097,8 @@ const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
 export default function Scene({
   graph,
+  grouping = "structure",
+  usage,
   baseline,
   comparison,
   focusDepth = 1,
@@ -2381,6 +2113,10 @@ export default function Scene({
   onFocus,
 }: {
   graph: SchemaGraph;
+  /** How the city is cut into districts. */
+  grouping?: Grouping;
+  /** Content counts, which put a busier type's printed name ahead of a quieter one. */
+  usage?: UsageReport;
   baseline?: SchemaGraph | null;
   comparison?: SchemaComparison | null;
   focusDepth?: number;
@@ -2423,9 +2159,9 @@ export default function Scene({
   const city = useMemo(
     () =>
       baseline && comparison
-        ? comparisonCity(baseline, graph, comparison.matches)
-        : cityDistricts(graph),
-    [baseline, comparison, graph]
+        ? comparisonCity(baseline, graph, comparison.matches, grouping)
+        : cityDistricts(graph, grouping),
+    [baseline, comparison, graph, grouping]
   );
   // The ground a nested folder's members cover, which tints that patch of its island.
   // The city layout, not what is on screen, so the islands hold still through a focus.
@@ -2614,30 +2350,19 @@ export default function Scene({
   );
   // The floating labels on screen, which the board leaves out. Shared by reference and
   // written in the frame loop, so passing it on costs no render.
-  const floated = useMemo<Floated>(() => ({ ids: new Set(), version: 0 }), []);
+  const floated = useMemo<Floated>(
+    () => ({
+      ids: new Set(),
+      version: 0,
+      printed: new Set(),
+      printedVersion: 0,
+    }),
+    []
+  );
   const interaction = useMemo(
     () => ({ hovered, selected, neighbours, hoveredNeighbours }),
     [hovered, selected, neighbours, hoveredNeighbours]
   );
-  // What each type prints on the board, sized from the city's footprints, which a
-  // focus tween moves but never resizes.
-  const boardTexts = useMemo(() => {
-    const texts = new Map<string, BoardText>();
-    const room = labelRoom(city.placements);
-    for (const placement of city.placements) {
-      const node = nodesById.get(placement.id);
-      if (node)
-        texts.set(
-          node.id,
-          boardText(
-            node.name,
-            placement.footprint,
-            room.get(node.id) ?? placement.footprint
-          )
-        );
-    }
-    return texts;
-  }, [city, nodesById]);
   // Pins and roles come from the edges alone, so a focus tween does not recount them.
   const connections = useMemo(() => connectionsOf(graph.edges ?? []), [graph]);
   const { cells, windows, heights } = useMemo(
@@ -2658,21 +2383,72 @@ export default function Scene({
   const active = useMemo(() => new Set<Layer>(layers), [layers]);
   const interactionActive = selected !== null || hovered !== null;
   const pickConnection: PickConnection = (pick) => setConnectionPick(pick);
+  // The traces route over where the buildings have settled rather than over every
+  // frame of a focus tween. Routing is the costly part of a trace, and a 400 ms
+  // tween rebuilt every layer about 25 times, so the old routes stay up until the
+  // buildings arrive and are rebuilt once there.
+  const settled = useRef({ placements, placementsById, heights });
+  if (
+    placements === target &&
+    (settled.current.placementsById !== placementsById ||
+      settled.current.heights !== heights)
+  )
+    settled.current = { placements, placementsById, heights };
+  const routed = settled.current;
   // A link leaves from the roof of the building it belongs to, so it stays visible
-  // over a tall neighbour and moves with the focus tween.
+  // over a tall neighbour.
   const anchors = useMemo(() => {
     const map = new Map<string, Anchor>();
-    for (const placement of placements) {
+    for (const placement of routed.placements) {
       map.set(placement.id, {
         x: placement.position.x,
         y:
           (placement.y ?? 0) +
-          (heights.get(placement.id) ?? placement.height) * 0.8,
+          (routed.heights.get(placement.id) ?? placement.height) * 0.8,
         z: placement.position.z,
       });
     }
     return map;
-  }, [placements, heights]);
+  }, [routed]);
+  // Where the drawn ground traces turn, for the vias, and where they leave their
+  // board for another, for the gold fingers. Read off the plan the traces draw from,
+  // which is kept per placement map and edge list, so this routes nothing again.
+  // The fingers stand on the city's boards, so a focus, which lays the
+  // neighbourhood out over them, shows none.
+  const boardMarks = useMemo(() => {
+    const routes = planRoutes(routed.placementsById, drawnEdges)
+      .routes.filter(({ edge }) => active.has(LAYER_OF[edge.kind]))
+      .map(({ edge, points }) => ({ from: edge.from, to: edge.to, points }));
+    const islands = new Map(
+      city.districts.map((district) => [district.id, islandOf(district)])
+    );
+    return {
+      // The runs a printed name keeps off where it can.
+      traces: tracesOf(routes, (id) => routed.placementsById.get(id)?.position),
+      vias: traceVias(routes),
+      fingers:
+        focus === null
+          ? edgeFingers(
+              routes,
+              (id) => routed.placementsById.get(id)?.district,
+              islands
+            )
+          : [],
+    };
+  }, [routed, drawnEdges, active, focus, city]);
+
+  const boardColours = useMemo(
+    () =>
+      new Map(
+        palette
+          ? city.districts.map((district) => [
+              district.id,
+              slabColour(district.kind, palette),
+            ])
+          : []
+      ),
+    [city, palette]
+  );
 
   // The scene colours are the theme's own tokens, read once from an element inside
   // the shadow root, so the city and the chrome can never drift apart.
@@ -2711,10 +2487,12 @@ export default function Scene({
           <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
           <Stage
             districts={city.districts}
+            fingers={boardMarks.fingers}
             folders={folderTints}
             palette={palette}
             reducedMotion={reducedMotion}
             span={span}
+            vias={boardMarks.vias}
           />
           <FocusIsland
             island={focusIsland}
@@ -2770,7 +2548,7 @@ export default function Scene({
             hovered={hovered}
             onPick={pickConnection}
             palette={palette}
-            placementsById={placementsById}
+            placementsById={routed.placementsById}
             reducedMotion={reducedMotion}
             selected={selected}
             visible={active.has("structure") || interactionActive}
@@ -2788,7 +2566,7 @@ export default function Scene({
               layer={layer}
               onPick={pickConnection}
               opacity={opacity}
-              placementsById={placementsById}
+              placementsById={routed.placementsById}
               reducedMotion={reducedMotion}
               selected={selected}
               visible={active.has(layer) || interactionActive}
@@ -2840,17 +2618,9 @@ export default function Scene({
             palette={palette}
             placements={placements}
           />
-          <BoardLabels
-            floated={floated}
-            interaction={interaction}
-            nodesById={nodesById}
-            palette={palette}
-            placementsById={placementsById}
-            reducedMotion={reducedMotion}
-            texts={boardTexts}
-          />
+          {/* The floating labels first, so the board reads this frame's floated set
+              rather than the last one's. */}
           <Labels
-            boardTexts={boardTexts}
             floated={floated}
             focusNeighbours={focusNeighbours}
             heights={heights}
@@ -2861,6 +2631,19 @@ export default function Scene({
             placementsById={placementsById}
             reducedMotion={reducedMotion}
             selected={selected}
+          />
+          <BoardLabels
+            boardColours={boardColours}
+            cityPlacements={city.placements}
+            floated={floated}
+            interaction={interaction}
+            nodesById={nodesById}
+            palette={palette}
+            placementsById={placementsById}
+            reducedMotion={reducedMotion}
+            settledById={routed.placementsById}
+            traces={boardMarks.traces}
+            usage={usage}
           />
           <Flight cameraFlight={cameraFlight} />
           <CameraRig

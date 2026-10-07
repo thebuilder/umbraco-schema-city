@@ -8,7 +8,7 @@ Each building represents a Document Type. Floors represent property groups, and 
 allowed children, compositions, block targets, and picker references. Schema City reads your model;
 it does not change your schema or content.
 
-![The city overview with Pages, Elements, Compositions and Unfiled districts and faint structure connections.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png)
+![The city overview: a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable, with type names printed beside their buildings and faint structure traces.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png)
 
 The screenshots use the included demo schema with 86 types and deliberately planted problems.
 They show the standalone client, without the surrounding Umbraco backoffice.
@@ -50,21 +50,40 @@ for testing the integration.
 ## Investigate a type
 
 Use Search or `⌘K` / `Ctrl+K` to find a type by name, alias, or property alias. Every type's name
-is printed on the board in front of its building, cut short with an ellipsis when the building has
-no room for all of it. The print appears as you zoom in and turns to stay readable when you orbit
-to the far side. Hover a building to see its direct connections and the names of connected types;
-the names of unrelated types dim. Floating labels that would overlap stay hidden until there is
-room for them. A name shows once: a related type whose whole name is already legible on the
-board gets no floating label, and a type with a floating label is not printed under it. Click a
-building to keep its connections visible and open the
-inspector. Its header names the type, its role (page, composition or Element Type) and how much
-content uses it. Overview lists the schema checks for the type, its usage, and its related types,
+is printed on the board beside its building, inside the silkscreen outline round the part. As many
+names print as fit without touching, larger types first, then types with more content, and where
+they lie is worked out once for the layout, so panning, orbiting and hovering never move a name.
+From the overview most names are already readable. Each board prints at one of three sizes, picked
+from how far away it is: as you come closer a board switches to smaller print, a little past the
+switch point so it does not switch back and forth, and more of each name fits; the old and new
+print cross-fade. A name too small to read fades out, and back in once it reads again. A
+name with no room on one line wraps onto two at a word. If it is still too wide it drops the words
+its board already says, such as Element on the Elements board or Page among pages, then whole
+trailing words behind an ellipsis, never so far that it could be another name on the same board. A
+name that still does not fit waits until you come closer; nothing is cut inside a word. Names keep
+off the traces where they can, and one that has to lie over a trace gets a patch of bare board under
+it, so the trace reads as passing beneath. The full name is always in the floating label and the
+inspector. Names and district names turn to stay
+readable when you orbit to the far side. Hover a building to see its direct connections and the
+names of connected types; the names of unrelated types dim. Floating labels that would overlap stay
+hidden until there is room for them. A related type whose whole name its board prints legibly gets
+no floating label, and the hovered or selected type's own print gives way to its floating label.
+Click a building to keep its connections visible and open the inspector. Its header names the
+type, its role (page, composition or Element Type) and how much content uses it. Overview lists the schema checks for the type, its usage, and its related types,
 with content counts once usage has loaded. Properties shows each group with the composition it
 comes from and each property's Data Type. Connections lists every configured connection by kind,
 block and picker targets by property, and the references counted in content separately. Click a
 related type to select it.
 
-Each building is built like a chip on a circuit board. Every slab is one property group, with a
+![Closer in on the Site board, where the printed names come out whole inside their courtyards, with vias where traces turn and a gold finger where traces leave for the Microsite board.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/names.png)
+
+Each district is a circuit board: a core with copper and solder mask over it, rounded corners with
+plated mounting holes, and a faint copper pour. A gold finger on a board's edge marks each lane of
+connections that leaves it for another board, and a via marks each point where a trace turns.
+
+Each building is built like a chip on that board. Its side grows with the square root of its own
+properties, so size still tracks property count without a few large types pushing the city
+apart. Every slab is one property group, with a
 gap between groups and a thin board where a new tab starts; the lit windows are its properties.
 Composed groups are translucent azure, and a composition that no content can be created from is
 made of those shells alone. Element Types are low amber blocks. Pins along the base count direct
@@ -197,11 +216,22 @@ Matched buildings keep their baseline positions. New types appear on separate ad
 Comparison covers schema configuration only. It does not compare content usage or dependencies
 in custom code. Snapshot import is for review and does not apply changes to Umbraco.
 
-Outside comparison mode, layouts are deterministic for the same schema. Each top-level folder is a
-district, and a district's place and the order of its loose types follow their connections: an
-Element Type sits under the pages that use it, a composition over the pages that compose it. So
-adding or removing types, or connections between them, can rearrange the city; manual pinning is
-not available.
+Outside comparison mode, layouts are deterministic for the same schema. The Group control in the
+toolbar chooses how the city is cut into districts, and the choice is kept in the URL:
+
+- Structure, the default, gives each type allowed at root its own board with everything it can
+  create. Inside a board each parent forms a neighbourhood with its allowed children laid out
+  beside it, so structure traces stay short. A type that several roots or parents allow sits with
+  the one a breadth-first walk from the roots reaches it from first, and the traces show the
+  rest. Element Types share one board, in one group per block editor that offers them; a type
+  offered by several editors goes with the one that offers it as content most often. Compositions
+  have their own board, and the types no root can reach go on Unreachable.
+- Folders gives each top-level folder a district, as earlier versions did.
+
+In both, a district's place and the order of its loose types follow their connections: an Element
+Type sits under the pages that use it, a composition over the pages that compose it. So adding or
+removing types, or connections between them, can rearrange the city; manual pinning is not
+available.
 
 ## Navigate the city
 

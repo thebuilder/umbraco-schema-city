@@ -1,14 +1,15 @@
 import type { SchemaGraph } from "../../model/types";
-import { cityDistricts, DISTRICT_GAP } from "./city";
+import { cityDistricts, DISTRICT_GAP, type Grouping } from "./city";
 
 /** Keep matched types at baseline coordinates; append new districts beside them. */
 export function comparisonCity(
   baseline: SchemaGraph,
   current: SchemaGraph,
-  matches: ReadonlyMap<string, string>
+  matches: ReadonlyMap<string, string>,
+  grouping: Grouping = "structure"
 ): ReturnType<typeof cityDistricts> {
-  const before = cityDistricts(baseline);
-  const currentCity = cityDistricts(current);
+  const before = cityDistricts(baseline, grouping);
+  const currentCity = cityDistricts(current, grouping);
   const byId = new Map(
     before.placements.map((placement) => [placement.id, placement])
   );
@@ -30,13 +31,16 @@ export function comparisonCity(
   );
   if (addedIds.size === 0)
     return { placements: retained, districts: before.districts };
-  const added = cityDistricts({
-    ...current,
-    nodes: current.nodes.filter((node) => addedIds.has(node.id)),
-    edges: current.edges.filter(
-      (edge) => addedIds.has(edge.from) && addedIds.has(edge.to)
-    ),
-  });
+  const added = cityDistricts(
+    {
+      ...current,
+      nodes: current.nodes.filter((node) => addedIds.has(node.id)),
+      edges: current.edges.filter(
+        (edge) => addedIds.has(edge.from) && addedIds.has(edge.to)
+      ),
+    },
+    grouping
+  );
   const shift =
     Math.max(0, ...before.districts.map((district) => district.maxX)) +
     DISTRICT_GAP;

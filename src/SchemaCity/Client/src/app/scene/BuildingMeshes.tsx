@@ -184,10 +184,31 @@ totalEmissiveRadiance += diffuseColor.rgb * (bodyGlow + edgeGlow * edgeLine);`
   return material;
 }
 
-const BOX = new THREE.BoxGeometry();
-const PLANE = new THREE.PlaneGeometry();
-// cylinderGeometry's default radius is 1, so a plaza scales by its radius directly.
-const DISC = new THREE.CylinderGeometry(1, 1, 1, 24);
+/**
+ * The unit shapes every instance scales, made per mount and disposed with it. Shared
+ * at module level, each renderer that drew them left a dispose listener on them, and
+ * a remounted canvas kept its old renderer and its lost context alive through it.
+ */
+function useUnitShapes() {
+  const shapes = useMemo(
+    () => ({
+      box: new THREE.BoxGeometry(),
+      plane: new THREE.PlaneGeometry(),
+      // A radius of 1, so a plaza scales by its radius directly.
+      disc: new THREE.CylinderGeometry(1, 1, 1, 24),
+    }),
+    []
+  );
+  useEffect(
+    () => () => {
+      shapes.box.dispose();
+      shapes.plane.dispose();
+      shapes.disc.dispose();
+    },
+    [shapes]
+  );
+  return shapes;
+}
 /** One transform written through for every instance. Each placer sets all of it. */
 const SCRATCH = new THREE.Object3D();
 
@@ -475,7 +496,8 @@ function useBuildingMaterials(reducedMotion: boolean) {
     for (const [material, resting] of fading)
       material.opacity = opacity * resting;
   });
-  return { materials, plain };
+  // The unit shapes come with the materials, made and disposed per mount the same way.
+  return { materials, plain, shapes: useUnitShapes() };
 }
 
 export function Buildings({
@@ -511,7 +533,7 @@ export function Buildings({
   onHover: (id: string | null) => void;
 }) {
   const meshes = useRef<Meshes>(new Map());
-  const { materials, plain } = useBuildingMaterials(reducedMotion);
+  const { materials, plain, shapes } = useBuildingMaterials(reducedMotion);
   const parts = useMemo(
     () => partsOf(cells, windows, plazas, placements, heights),
     [cells, windows, plazas, placements, heights]
@@ -529,29 +551,22 @@ export function Buildings({
   const held = meshes.current;
   return (
     <>
-      {KINDS.map((kind) => (
-        <Instances
-          castShadow={LOOKS[kind].castShadow}
-          count={parts.byKind[kind].length}
-          geometry={BOX}
-          held={held}
-          key={`${kind}|${parts.byKind[kind].length}`}
-          material={materials.get(kind)}
-          // Glass draws after every solid part, so the core shows through it.
-          renderOrder={LOOKS[kind].glass ? 1 : 0}
-          slot={kind}
-        />
-      ))}
+      <BoxInstances
+        box={shapes.box}
+        held={held}
+        materials={materials}
+        parts={parts}
+      />
       <Instances
         count={windows.length}
-        geometry={PLANE}
+        geometry={shapes.plane}
         held={held}
         material={plain.window}
         slot="window"
       />
       <Instances
         count={plazas.length}
-        geometry={DISC}
+        geometry={shapes.disc}
         held={held}
         material={plain.plaza}
         slot="plaza"
@@ -565,6 +580,33 @@ export function Buildings({
       />
     </>
   );
+}
+
+/** One instanced mesh of unit boxes per kind of part. */
+function BoxInstances({
+  parts,
+  box,
+  held,
+  materials,
+}: {
+  parts: Parts;
+  box: THREE.BufferGeometry;
+  held: Meshes;
+  materials: Map<(typeof KINDS)[number], THREE.Material>;
+}) {
+  return KINDS.map((kind) => (
+    <Instances
+      castShadow={LOOKS[kind].castShadow}
+      count={parts.byKind[kind].length}
+      geometry={box}
+      held={held}
+      key={`${kind}|${parts.byKind[kind].length}`}
+      material={materials.get(kind)}
+      // Glass draws after every solid part, so the core shows through it.
+      renderOrder={Number(Boolean(LOOKS[kind].glass))}
+      slot={kind}
+    />
+  ));
 }
 
 /** One invisible box per building, which is what hover, click and double-click hit. */
@@ -608,8 +650,15 @@ function HitTargets({
   );
 }
 
-const OUTLINE_POSITIONS = new THREE.EdgesGeometry(BOX).getAttribute("position")
-  .array as Float32Array;
+/** A unit box's twelve edges as line segment ends, read once and kept as plain data. */
+const OUTLINE_POSITIONS = (() => {
+  const box = new THREE.BoxGeometry();
+  const edges = new THREE.EdgesGeometry(box);
+  const positions = Float32Array.from(edges.getAttribute("position").array);
+  edges.dispose();
+  box.dispose();
+  return positions;
+})();
 
 /**
  * A box of screen-space lines around one building, after fsn's selection and aim

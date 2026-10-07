@@ -84,12 +84,37 @@ async function orbit(from, to) {
   await at("mouseReleased", to);
 }
 
+/** Turn the wheel over the canvas, which dollies the camera toward the cursor. */
+async function wheel([x, y], ticks) {
+  for (let i = 0; i < ticks; i++) {
+    // biome-ignore lint/performance/noAwaitInLoops: the wheel is one ordered stream of turns.
+    await send("Input.dispatchMouseEvent", {
+      type: "mouseWheel",
+      x,
+      y,
+      deltaX: 0,
+      deltaY: -120,
+    });
+    await wait(120);
+  }
+}
+
 const shots = [
   // The whole city on the default layer, nothing selected. All four layers at once
   // is a hairball at this width: the compositions fan alone crosses the frame a
   // hundred times and the districts under it stop reading. free-camera is the shot
   // that shows the other three.
   { name: "city", query: "?layers=structure" },
+  // Closer in on Site's neighbourhoods, where the printed names come out whole and
+  // the courtyards, vias and gold fingers on the boards can be read.
+  {
+    name: "names",
+    query: "?layers=structure",
+    async after() {
+      await wheel([700, 430], 14);
+      await wait(1500);
+    },
+  },
   // Home focused: its neighbourhood is rebuilt in place and the inspector is open.
   { name: "focus", query: "?type=home&focus=1&layers=structure" },
   // The findings drawer over the default city.
