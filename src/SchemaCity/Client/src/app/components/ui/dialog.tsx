@@ -54,7 +54,10 @@ function DialogContent({
   return (
     <DialogPortal>
       <DialogOverlay />
+      {/* Patched: base-ui hides the page behind a modal dialog but does not say
+          so, so a screen reader still offered to leave it. */}
       <DialogPrimitive.Popup
+        aria-modal="true"
         className={cn(
           "-translate-x-1/2 -translate-y-1/2 fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 overflow-hidden rounded-none border border-line-strong bg-popover p-6 text-popover-foreground shadow-panel outline-none data-closed:animate-close data-open:animate-open sm:max-w-lg",
           className

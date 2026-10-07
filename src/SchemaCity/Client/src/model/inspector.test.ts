@@ -345,7 +345,7 @@ describe("connectionGroups", () => {
 
   it("names the kinds the type has none of", () => {
     expect(emptyKindsLine(press, groups)).toBe(
-      "No children, types that compose it or pickers that allow it."
+      "No allowed children, types that compose it or pickers that allow it."
     );
     const lone = node("lone", { isElement: true });
     expect(emptyKindsLine(lone, [])).toBe(

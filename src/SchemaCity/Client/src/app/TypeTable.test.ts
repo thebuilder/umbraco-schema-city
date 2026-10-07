@@ -71,7 +71,9 @@ test("usage is a count when the report is in, and absent when it is not", () => 
     references: [],
   };
 
-  expect(typeRows(graph, usage).map((row) => row.usage)).toEqual([12, 0, 0]);
+  // Card is an Element Type: it never holds content of its own, so it shows no
+  // count rather than a 0 that reads as unused, as the inspector chips do.
+  expect(typeRows(graph, usage).map((row) => row.usage)).toEqual([12, null, 0]);
 });
 
 test("clicking a header sorts by it, and clicking it again turns it round", () => {

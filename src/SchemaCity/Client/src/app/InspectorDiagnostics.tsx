@@ -5,6 +5,7 @@ import {
   KIND_NEXT_STEP,
 } from "../model/findings";
 import type { SchemaEdge, SchemaNode } from "../model/types";
+import { plural } from "./a11y";
 import { FindingRelations } from "./FindingRelations";
 import {
   connectionKey,
@@ -75,13 +76,17 @@ export function ExplainConnections({
     edges.filter((edge) => edge.from === nodeId || edge.to === nodeId)
   );
   if (connections.length === 0) return null;
+  const types = new Set(
+    connections.map((edge) => (edge.from === nodeId ? edge.to : edge.from))
+  ).size;
   return (
     <details className="py-3.5">
       <summary className="cursor-pointer text-phosphor text-xs hover:text-phosphor-bright">
-        {/* Links, not types: a type reached through two properties, or as both
-            block content and settings, is one chip above and two links here. */}
-        Explain connections ({connections.length}{" "}
-        {connections.length === 1 ? "link" : "links"})
+        {/* Types and links both, so the number matches the tab's count of types: a
+            type reached through two properties, or as both block content and
+            settings, is one chip above and two links here. */}
+        Explain connections ({plural(types, "type")},{" "}
+        {plural(connections.length, "link")})
       </summary>
       <ul className="mt-2 space-y-2">
         {connections.map((edge) => {

@@ -13,8 +13,9 @@ import {
 import { problemLabels } from "../model/findings";
 import { chips, contentCountOf } from "../model/inspector";
 import type { SchemaNode } from "../model/types";
+import { plural } from "./a11y";
 import { FindingDot, Heading, READING, TypeChips } from "./InspectorChips";
-import { FilterField, type ListProps, useMatches } from "./TypeTable";
+import { FilterField, type ListProps, Scroller, useMatches } from "./TypeTable";
 
 /**
  * Every row key there is to open, found a level at a time until nothing new shows.
@@ -67,72 +68,159 @@ function TypeName({ id, marks }: { id: string; marks: Marks }) {
   );
 }
 
-function Count({ value }: { value: number | undefined }) {
+/** Faint grey, or label on the selected row, where faint falls below 4.5:1. */
+const quiet = (on: boolean) => (on ? "text-label" : "text-faint");
+
+/** Content items of the type across the site, which is not what sits under this row. */
+function Count({ value, on }: { value: number | undefined; on: boolean }) {
   return value === undefined ? null : (
-    <span className="ml-auto shrink-0 pl-3 font-mono text-2xs text-faint">
+    <span className={`ml-auto shrink-0 pl-3 font-mono text-2xs ${quiet(on)}`}>
       {value.toLocaleString()}
+      <span className="sr-only"> content items of this type</span>
     </span>
   );
 }
 
 const ROW = (on: boolean) => (on ? "bg-accent" : "hover:bg-accent/50");
 
-function TreeItem({
-  row,
-  tree,
-  filtering,
-  onToggle,
-  marks,
-}: {
-  row: TreeRow;
+/** A row and the rows under it, so the markup nests the way the tree does. */
+export type Branch = { row: TreeRow; children: Branch[] };
+
+/**
+ * The flat, depth-first rows as nested branches. Nested lists are what tells a
+ * screen reader how deep a row is; a flat list read every row as level 1.
+ */
+export function nest(rows: TreeRow[]): Branch[] {
+  const top: Branch[] = [];
+  const path: Branch[] = [];
+  for (const row of rows) {
+    const branch: Branch = { row, children: [] };
+    path.length = row.depth;
+    (path[path.length - 1]?.children ?? top).push(branch);
+    path.push(branch);
+  }
+  return top;
+}
+
+/** What every row in one render shares. */
+type Shared = {
   tree: Tree;
   filtering: boolean;
   onToggle: (key: string) => void;
   marks: Marks;
+  /** The row a type first appears on, the one that shows its content count. */
+  first: Map<string, string>;
+};
+
+function Branches({
+  branches,
+  shared,
+}: {
+  branches: Branch[];
+  shared: Shared;
 }) {
-  const allowed = tree.children.get(row.id)?.length ?? 0;
   return (
-    <li className={`flex items-stretch pr-2 ${ROW(row.id === marks.selected)}`}>
-      {/* One guide per level, so depth reads down the page and not only by indent. */}
-      {Array.from({ length: row.depth }, (_, level) => (
-        <span
-          aria-hidden
-          className="ml-2 w-3 shrink-0 border-line border-l"
-          // biome-ignore lint/suspicious/noArrayIndexKey: a guide is its level.
-          key={level}
-        />
+    <ul>
+      {branches.map((branch) => (
+        <TreeItem branch={branch} key={branch.row.key} shared={shared} />
       ))}
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 py-0.5">
-        {row.expandable ? (
-          <button
-            aria-expanded={row.open}
-            aria-label={`Show what ${marks.names.get(row.id)?.name} can create`}
-            className="w-4 shrink-0 text-faint hover:text-phosphor-bright disabled:opacity-50"
-            disabled={filtering}
-            onClick={() => onToggle(row.key)}
-            type="button"
-          >
-            {row.open ? "▾" : "▸"}
-          </button>
-        ) : (
-          <span aria-hidden className="w-4 shrink-0" />
-        )}
-        <TypeName id={row.id} marks={marks} />
-        {row.recursive ? (
-          <span className="shrink-0 text-2xs text-faint">
-            ↻ already above in this branch
-          </span>
-        ) : null}
-        {row.expandable ? (
+    </ul>
+  );
+}
+
+/** The fold arrow, or a spacer where the row has nothing to fold. */
+function Toggle({
+  branch,
+  shared,
+  on,
+}: {
+  branch: Branch;
+  shared: Shared;
+  on: boolean;
+}) {
+  const { row } = branch;
+  // A filtered row whose children all fell out has nothing to fold.
+  const empty = shared.filtering && branch.children.length === 0;
+  if (!row.expandable || empty)
+    return <span aria-hidden className="w-4 shrink-0" />;
+  return (
+    <button
+      aria-expanded={row.open}
+      aria-label={`Show what ${shared.marks.names.get(row.id)?.name} can create`}
+      className={`w-4 shrink-0 hover:text-phosphor-bright disabled:opacity-50 ${quiet(on)}`}
+      disabled={shared.filtering}
+      onClick={() => shared.onToggle(row.key)}
+      type="button"
+    >
+      {row.open ? "▾" : "▸"}
+    </button>
+  );
+}
+
+/**
+ * The type's content count on its first row. A type under three parents is three
+ * rows of one type, so the repeats say so instead of tripling the number.
+ */
+function RowCount({
+  row,
+  shared,
+  on,
+}: {
+  row: TreeRow;
+  shared: Shared;
+  on: boolean;
+}) {
+  const count = shared.marks.countOf(row.id);
+  if (count === undefined || shared.first.get(row.id) === row.key)
+    return <Count on={on} value={count} />;
+  return (
+    <span
+      className={`ml-auto shrink-0 pl-3 text-2xs ${quiet(on)}`}
+      title="Counted on this type's first row above"
+    >
+      same type
+    </span>
+  );
+}
+
+function TreeItem({ branch, shared }: { branch: Branch; shared: Shared }) {
+  const { row } = branch;
+  const on = row.id === shared.marks.selected;
+  const allowed = shared.tree.children.get(row.id)?.length ?? 0;
+  return (
+    <li>
+      <div className={`flex items-stretch pr-2 ${ROW(on)}`}>
+        {/* One guide per level, so depth reads down the page and not only by indent. */}
+        {Array.from({ length: row.depth }, (_, level) => (
           <span
-            className="shrink-0 text-2xs text-faint"
-            title={`${allowed} allowed child ${allowed === 1 ? "type" : "types"}`}
-          >
-            <span className="font-mono">{allowed}</span> allowed
-          </span>
-        ) : null}
-        <Count value={marks.countOf(row.id)} />
+            aria-hidden
+            className="ml-2 w-3 shrink-0 border-line border-l"
+            // biome-ignore lint/suspicious/noArrayIndexKey: a guide is its level.
+            key={level}
+          />
+        ))}
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 py-0.5">
+          <Toggle branch={branch} on={on} shared={shared} />
+          <TypeName id={row.id} marks={shared.marks} />
+          {row.recursive ? (
+            <span className={`shrink-0 text-2xs ${quiet(on)}`}>
+              ↻ already above in this branch
+            </span>
+          ) : null}
+          {row.expandable ? (
+            <span
+              className={`shrink-0 text-2xs ${quiet(on)}`}
+              title={plural(allowed, "allowed child type")}
+            >
+              <span className="font-mono">{allowed}</span> allowed
+            </span>
+          ) : null}
+          <RowCount on={on} row={row} shared={shared} />
+        </div>
       </div>
+      {branch.children.length > 0 ? (
+        <Branches branches={branch.children} shared={shared} />
+      ) : null}
     </li>
   );
 }
@@ -175,12 +263,36 @@ function Unreachable({
                 onSelect={marks.onSelect}
               />
             ) : null}
-            <Count value={marks.countOf(entry.id)} />
+            <Count
+              on={entry.id === marks.selected}
+              value={marks.countOf(entry.id)}
+            />
           </li>
         ))}
       </ul>
     </section>
   );
+}
+
+/**
+ * One line for whichever reason the tree is short: nothing allowed at root,
+ * nothing matching the filter or the focus, or the row limit. Empty otherwise.
+ */
+function shortBecause(at: {
+  roots: number;
+  rows: number;
+  filtering: boolean;
+  query: string;
+  truncated: boolean;
+}): string {
+  if (at.roots === 0)
+    return "No Document Type is allowed at root, so an editor cannot create any content.";
+  if (at.truncated)
+    return `Stopped after ${at.rows} rows. Collapse a branch or filter to see the rest.`;
+  if (!at.filtering || at.rows > 0) return "";
+  return at.query.trim() === ""
+    ? "None of the focused types is under a root."
+    : `No type under a root matches “${at.query}”.`;
 }
 
 export function CreationTree(props: ListProps) {
@@ -199,12 +311,20 @@ export function CreationTree(props: ListProps) {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
     () => new Set(tree.roots)
   );
-  const matched = useMatches(graph, query);
+  // In focus mode the scope filters like a query, which opens every path down to
+  // the focused types, so the focused type is shown without expanding by hand.
+  const matched = useMatches(graph, query, props.scope);
   const filtering = matched !== null;
   const { rows, truncated } = useMemo(
     () => treeRows(tree, expanded, matched ?? undefined),
     [tree, expanded, matched]
   );
+  const branches = useMemo(() => nest(rows), [rows]);
+  const first = useMemo(() => {
+    const at = new Map<string, string>();
+    for (const row of rows) if (!at.has(row.id)) at.set(row.id, row.key);
+    return at;
+  }, [rows]);
   const marks: Marks = {
     names,
     selected: props.selected,
@@ -244,45 +364,37 @@ export function CreationTree(props: ListProps) {
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <Scroller label="Creation tree">
         <div className="max-w-240 px-4 py-3.5">
           <div className="flex items-baseline justify-between pr-2">
             <Heading count={tree.roots.length} trace="structure">
               Allowed at root
             </Heading>
+            {/* Not what sits under the row: Article under every parent shows the
+                same site-wide number, so the header says whose count it is. */}
             {usage ? (
-              <span className="text-2xs text-faint">Content items</span>
+              <span className="text-2xs text-faint">
+                Content of this type, site-wide
+              </span>
             ) : null}
           </div>
-          <ul>
-            {rows.map((row) => (
-              <TreeItem
-                filtering={filtering}
-                key={row.key}
-                marks={marks}
-                onToggle={toggle}
-                row={row}
-                tree={tree}
-              />
-            ))}
-          </ul>
-          {/* One line for whichever reason the list above is short: nothing allowed
-              at root, nothing matching the filter, or the row limit. */}
+          <Branches
+            branches={branches}
+            shared={{ filtering, first, marks, onToggle: toggle, tree }}
+          />
           <p className="mt-2 text-label text-xs empty:hidden">
-            {tree.roots.length === 0
-              ? "No Document Type is allowed at root, so an editor cannot create any content."
-              : ""}
-            {filtering && rows.length === 0
-              ? `No type under a root matches “${query}”.`
-              : ""}
-            {truncated
-              ? `Stopped after ${rows.length} rows. Collapse a branch or filter to see the rest.`
-              : ""}
+            {shortBecause({
+              filtering,
+              query,
+              roots: tree.roots.length,
+              rows: rows.length,
+              truncated,
+            })}
           </p>
 
           <Unreachable marks={marks} matched={matched} tree={tree} />
         </div>
-      </div>
+      </Scroller>
     </div>
   );
 }

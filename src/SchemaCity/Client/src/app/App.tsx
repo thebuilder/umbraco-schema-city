@@ -1,12 +1,4 @@
-import {
-  lazy,
-  type ReactNode,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -25,11 +17,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -41,18 +28,25 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { PortalContainer } from "@/portal";
 import { findFindings } from "../model/findings";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import { searchNodes } from "../model/search";
 import { compareSchemas } from "../model/snapshots";
 import type { SchemaGraph, UsageReport } from "../model/types";
+import {
+  citySummary,
+  LiveRegion,
+  plural,
+  SEARCH_KEY,
+  useHandOff,
+} from "./a11y";
 import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_INSET, Inspector } from "./Inspector";
 import type { Grouping } from "./layout/city";
+import { Legend } from "./Legend";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   LENS_LABEL,
@@ -68,7 +62,13 @@ import {
   urlToWrite,
   type View,
 } from "./url";
-import { FlatView, VIEW_TABS, ViewSwitcher } from "./Views";
+import {
+  Announcements,
+  FlatView,
+  focusScope,
+  VIEW_TABS,
+  ViewSwitcher,
+} from "./Views";
 
 /** The tag names whose own keyboard handling wins over the shortcut keys. */
 const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
@@ -93,186 +93,6 @@ const withLayer = (on: Layer[], layer: Layer): Layer[] =>
   LAYERS.filter((name) =>
     name === layer ? !on.includes(name) : on.includes(name)
   );
-
-/** One edge style, drawn the way the scene draws it. */
-function EdgeMark({
-  className,
-  d,
-  dashed = false,
-}: {
-  className: string;
-  d: string;
-  dashed?: boolean;
-}) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      height="12"
-      viewBox="0 0 26 12"
-      width="26"
-    >
-      <path
-        d={d}
-        stroke="currentColor"
-        strokeDasharray={dashed ? "2 3" : undefined}
-        strokeWidth={1.25}
-      />
-    </svg>
-  );
-}
-
-function LegendRow({
-  mark,
-  children,
-}: {
-  mark: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <li className="flex items-center gap-2.5">
-      <span className="flex w-7 shrink-0 justify-center">{mark}</span>
-      {children}
-    </li>
-  );
-}
-
-function LegendTitle({ children }: { children: ReactNode }) {
-  return (
-    <p className="font-bold text-2xs text-phosphor-bright uppercase tracking-terminal-lg">
-      {children}
-    </p>
-  );
-}
-
-const Tint = ({ className }: { className: string }) => (
-  <span className={`size-3 ${className}`} />
-);
-
-function Legend() {
-  return (
-    <div className="space-y-3.5">
-      <section>
-        <LegendTitle>Buildings</LegendTitle>
-        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
-          <LegendRow mark={<Tint className="bg-phosphor" />}>
-            Own property group
-          </LegendRow>
-          <LegendRow
-            mark={<Tint className="border border-azure bg-azure/35" />}
-          >
-            Composed group; a building of only these is a composition
-          </LegendRow>
-          <LegendRow mark={<Tint className="bg-amber" />}>
-            Element Type, until a lens is on
-          </LegendRow>
-          <LegendRow
-            mark={
-              <Tint className="border border-phosphor bg-phosphor-bright" />
-            }
-          >
-            Lit lid: the type has a template
-          </LegendRow>
-          <LegendRow mark={<span className="size-1.5 bg-phosphor-bright" />}>
-            Roof dot: varies by culture, a second by segment
-          </LegendRow>
-          <LegendRow mark={<Tint className="bg-phosphor-dim" />}>
-            Root plaza
-          </LegendRow>
-          <LegendRow mark={<Tint className="border-2 border-signal" />}>
-            Selected
-          </LegendRow>
-        </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          One slab per property group, with a gap between groups and a thin
-          board where a new tab starts; windows represent properties. Pins on
-          the base count direct connections: allowed parents on the north edge,
-          allowed children on the south, links out on the east and links in on
-          the west. A wider footprint means more own properties. Height is not a
-          complexity score.
-        </p>
-      </section>
-
-      <section>
-        <LegendTitle>Boards</LegendTitle>
-        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
-          <LegendRow
-            mark={<span className="h-2 w-5 border border-phosphor-dim" />}
-          >
-            Courtyard round a type and its printed name
-          </LegendRow>
-          <LegendRow mark={<span className="h-3 w-1.5 bg-[#d9b24a]/70" />}>
-            Gold finger: a trace leaving for another board, one per lane
-          </LegendRow>
-          <LegendRow
-            mark={
-              <span className="size-2 rounded-full border-2 border-[#c8823a]/70" />
-            }
-          >
-            Via: a trace turning
-          </LegendRow>
-          <LegendRow mark={<Tint className="bg-phosphor-dim/40" />}>
-            Patch under a group: one block editor's Element Types, or a nested
-            folder
-          </LegendRow>
-        </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          Group by Structure puts each root and what it can create on its own
-          board, a parent with its children around it, with boards for
-          Compositions, Elements and anything no root reaches. Group by Folders
-          follows the schema's folders. Names print beside their types as far as
-          they fit without touching; the full name is in the inspector.
-        </p>
-      </section>
-
-      <section>
-        <LegendTitle>Layers</LegendTitle>
-        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
-          <LegendRow
-            mark={
-              <EdgeMark
-                className="text-phosphor-dim"
-                d="M1 6 H25 M13 3 L17 6 L13 9"
-              />
-            }
-          >
-            Allowed child, in the arrow's direction
-          </LegendRow>
-          <LegendRow
-            mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" />}
-          >
-            Composition
-          </LegendRow>
-          <LegendRow
-            mark={
-              <EdgeMark
-                className="text-[color-mix(in_srgb,var(--azure)_60%,#ffffff)]"
-                d="M1 11 Q13 -1 25 11"
-              />
-            }
-          >
-            Inheritance
-          </LegendRow>
-          <LegendRow
-            mark={<EdgeMark className="text-amber" d="M1 1 Q13 13 25 1" />}
-          >
-            Block target, dipping to the Element district
-          </LegendRow>
-          <LegendRow
-            mark={<EdgeMark className="text-violet" d="M1 6 H25" dashed />}
-          >
-            Picker reference
-          </LegendRow>
-        </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          Hover or select a building to brighten its connections. Structure
-          traces show allowed-child rules, not the content tree.
-        </p>
-      </section>
-    </div>
-  );
-}
 
 /** The legend's colour bar, the same two ends the scene mixes its buildings between. */
 const RAMP_BAR: Record<Ramp, string> = {
@@ -513,6 +333,11 @@ export function App({
     () => (baseline ? compareSchemas(baseline, graph) : null),
     [baseline, graph]
   );
+  // The focused neighbourhood, which the 2D views narrow to as the city does.
+  const scope = useMemo(
+    () => focusScope(graph, focus, focusDepth),
+    [graph, focus, focusDepth]
+  );
   const focusCount = useMemo(
     () => (focus ? reachableWithin(graph, focus, focusDepth).size : 0),
     [graph, focus, focusDepth]
@@ -554,17 +379,29 @@ export function App({
   // whole layout with it. The lists you are reading are what you fly between.
   const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
 
+  // A chosen row opens the inspector, so focus goes to its heading, not back to
+  // the Search button.
+  const handOff = useHandOff(portal);
   const pick = (id: string) => {
+    handOff.chose();
     followLink(id);
     openPalette(false);
   };
 
   return (
-    <PortalContainer value={portal}>
+    <LiveRegion portal={portal}>
       <section
         aria-label="Schema City"
         className="flex h-full flex-col bg-background font-mono text-foreground"
+        data-schema-city=""
       >
+        <Announcements
+          focus={scope}
+          layers={layers.map((layer) => LAYER_LABEL[layer])}
+          nodesById={nodesById}
+          selected={selected}
+          view={view}
+        />
         {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
             fitting, which is 848 px with the lens picker reading None and earlier
             once a longer lens name widens it. The backoffice is narrower than the
@@ -722,16 +559,7 @@ export function App({
               open={comparisonOpen}
             />
 
-            <Popover>
-              <PopoverTrigger
-                render={<Button data-trigger size="sm" variant="outline" />}
-              >
-                Legend
-              </PopoverTrigger>
-              <PopoverContent className="w-80 text-sm">
-                <Legend />
-              </PopoverContent>
-            </Popover>
+            <Legend />
 
             <Help onOpenChange={setHelpOpen} open={helpOpen} />
 
@@ -740,7 +568,7 @@ export function App({
                 flying away. The shortcut goes in the button instead. */}
             <Button data-trigger onClick={() => openPalette(true)} size="sm">
               Search
-              <Kbd>⌘K</Kbd>
+              <Kbd>{SEARCH_KEY}</Kbd>
             </Button>
           </div>
         </div>
@@ -775,7 +603,9 @@ export function App({
             // The inspector is an overlay, so the view is inset by its width while
             // it is open rather than sliding under it.
             <div
-              className={`absolute inset-0 ${selectedNode ? INSPECTOR_INSET : ""}`}
+              className={`absolute inset-0 outline-none ${selectedNode ? INSPECTOR_INSET : ""}`}
+              data-focus-home
+              tabIndex={-1}
             >
               <FlatView
                 findings={findings}
@@ -785,7 +615,9 @@ export function App({
                 onPick={() => setPaletteOpen(true)}
                 onQuery={setQuery}
                 onSelect={setSelected}
+                onShowAll={() => setFocus(null)}
                 query={query}
+                scope={scope}
                 selected={selected}
                 usage={usage}
                 view={view}
@@ -802,7 +634,13 @@ export function App({
               </p>
             </div>
           ) : (
-            <div className="absolute inset-0 z-0">
+            <section
+              aria-label="City"
+              className="absolute inset-0 z-0 outline-none"
+              data-focus-home
+              tabIndex={-1}
+            >
+              <p className="sr-only">{citySummary(graph)}</p>
               <Suspense
                 fallback={
                   <p className="p-4 text-phosphor-dim text-sm">
@@ -828,7 +666,7 @@ export function App({
                   usage={usage}
                 />
               </Suspense>
-            </div>
+            </section>
           )}
 
           {selectedNode && neighbourhood ? (
@@ -866,20 +704,23 @@ export function App({
             you type and the list scrolls inside it. */}
         <CommandDialog
           className="h-[60vh] min-h-80 sm:max-w-xl"
+          description="Type a name, an alias or a property alias, then choose a type to open it in the inspector."
+          finalFocus={handOff.finalFocus}
           onOpenChange={openPalette}
           open={paletteOpen}
+          title="Search types"
         >
           {/* Afterglow's CommandDialog is the dialog only, so the cmdk root is ours.
               Filtering is ours too: cmdk scores its own item labels, which would
               miss the property aliases the rows do not print. */}
-          <Command shouldFilter={false}>
+          <Command label="Find a type or a property alias" shouldFilter={false}>
             <CommandInput
               onValueChange={setQuery}
               placeholder="Find a type or a property alias…"
               trailing={<Kbd className="shrink-0">Esc</Kbd>}
               value={query}
             />
-            <div className="flex justify-end border-line border-b px-3 py-1 font-bold text-3xs text-phosphor-dim uppercase tracking-terminal">
+            <div className="flex justify-end border-line border-b px-3 py-1 font-bold text-3xs text-label uppercase tracking-terminal">
               {hits.length} of {nodes.length} types
             </div>
             <CommandList
@@ -892,37 +733,49 @@ export function App({
                   No type or property matches
                 </CommandEmpty>
               ) : (
-                hits.map((hit) => (
-                  <CommandItem
-                    className="group"
-                    key={hit.node.id}
-                    onSelect={() => pick(hit.node.id)}
-                    value={hit.node.id}
-                  >
-                    <span
-                      aria-hidden
-                      className={`size-2.5 shrink-0 ${swatchOf(hit.node)}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs">
-                        {hit.node.name}
-                      </span>
-                      <span className="block truncate text-3xs text-phosphor-dim">
-                        {hit.node.alias}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-2xs text-phosphor-dim">
-                      {hit.propertyAlias ??
-                        `${hit.node.ownPropertyCount + hit.node.composedPropertyCount} properties`}
-                    </span>
-                    <Kbd
-                      className="shrink-0 opacity-0 group-data-[selected=true]:opacity-100"
-                      glyph
+                hits.map((hit) => {
+                  const detail =
+                    hit.propertyAlias ??
+                    plural(
+                      hit.node.ownPropertyCount +
+                        hit.node.composedPropertyCount,
+                      "property",
+                      "properties"
+                    );
+                  return (
+                    <CommandItem
+                      // One sentence for a screen reader, without the Enter glyph.
+                      aria-label={`${hit.node.name}, alias ${hit.node.alias}, ${hit.propertyAlias ? `property ${hit.propertyAlias}` : detail}`}
+                      className="group"
+                      key={hit.node.id}
+                      onSelect={() => pick(hit.node.id)}
+                      value={hit.node.id}
                     >
-                      ↵
-                    </Kbd>
-                  </CommandItem>
-                ))
+                      <span
+                        aria-hidden
+                        className={`size-2.5 shrink-0 ${swatchOf(hit.node)}`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs">
+                          {hit.node.name}
+                        </span>
+                        <span className="block truncate text-3xs text-label">
+                          {hit.node.alias}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-2xs text-label">
+                        {detail}
+                      </span>
+                      <Kbd
+                        aria-hidden
+                        className="shrink-0 opacity-0 group-data-[selected=true]:opacity-100"
+                        glyph
+                      >
+                        ↵
+                      </Kbd>
+                    </CommandItem>
+                  );
+                })
               )}
             </CommandList>
           </Command>
@@ -930,6 +783,6 @@ export function App({
 
         <div ref={portal} />
       </section>
-    </PortalContainer>
+    </LiveRegion>
   );
 }

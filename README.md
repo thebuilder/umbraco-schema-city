@@ -72,8 +72,10 @@ Click a building to keep its connections visible and open the inspector. Its hea
 type, its role (page, composition or Element Type) and how much content uses it. Overview lists the schema checks for the type, its usage, and its related types,
 with content counts once usage has loaded. Properties shows each group with the composition it
 comes from and each property's Data Type. Connections lists every configured connection by kind,
-block and picker targets by property, and the references counted in content separately. Click a
-related type to select it.
+block and picker targets by property, and the references counted in content separately. The
+number on a type chip is the content items of that type across the site, or references under
+Observed in content. Click a related type to select it. Every type opens on Overview, also one
+you looked at before.
 
 ![Closer in on the Site board, where the printed names come out whole inside their courtyards, with vias where traces turn and a gold finger where traces leave for the Microsite board.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/names.png)
 
@@ -110,7 +112,8 @@ Open in editor takes you to the selected Document Type in Umbraco.
 Double-click a building, press Enter with a type selected, or choose Focus in the inspector.
 Focus arranges the selected type and its neighbours together. Expand one step adds the next
 connected types while keeping the existing focused positions. Escape leaves focus; press it
-again to clear the selection.
+again to clear the selection. While focus is on, List, Tree and Matrix show only the focused
+types, under a line that says how many and offers Show all, which leaves focus.
 
 ![Home in focus mode with its neighbouring types, direct connections and inspector.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png)
 
@@ -122,11 +125,12 @@ broken blocks and duplicate aliases first: each group explains the kind once and
 type and what is particular to it, such as where an unused type is allowed. Problems are open and
 notes collapsed. Within a group, the strongest cases come first, for example an unused
 type whose allowed parents have no content either. Filter by category, select a result, and inspect
-it with its related types. Export CSV saves the filtered results as one header row and one row per finding, ready for an
-Excel or Jira import: the kind, the type with its key, folder, content counts and backoffice path,
-the detail, explanation and next step, related types by name, the filter used, and the schema and
-usage snapshot dates. For an unused type, the Unused branch root column names its topmost unused
-ancestor, so a branch of unused types can go in one ticket.
+it with its related types. The drawer's header says when the schema was read and the usage
+counted. Export CSV saves the filtered results as one header row and one row per finding, ready for
+an Excel or Jira import: the kind, the type with its key, folder, content counts and backoffice
+path, the detail, explanation and next step, related types by name, the filter used, and the schema
+and usage snapshot dates. For an unused type, the Unused branch root column names its topmost
+unused ancestor, so a branch of unused types can go in one ticket.
 
 Only a type an editor can create, at root or under another type, is reported as unused. A type
 nothing can create is a dead end, or a pure mixin when something composes it. The no template note
@@ -169,7 +173,9 @@ it is not a live dependency check.
 
 List shows the same types in a searchable, sortable table, with each type's role in the city's
 colours and a pink dot beside a type that has a problem finding. Click a column heading to sort it
-or a type to open the inspector. The table works without the 3D canvas.
+or a type to open the inspector. Content counts are left blank for Element Types and for
+compositions nothing creates, as on the inspector's chips, since neither holds content of its own.
+The table works without the 3D canvas.
 
 ![The type list sorted by own property count, largest first.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png)
 
@@ -183,8 +189,9 @@ the allowed-child rules. A type allowed under two parents appears under both. A 
 appears higher in the same branch is marked and not expanded again. Below the tree, a list shows
 Document Types that no root can reach, with the types they are allowed under, so a chain that
 only hangs off another unreachable type is visible. Element Types and compositions that nothing
-can create are left out of that list. Once usage has loaded, each row shows its content count and
-types without content are drawn quieter, so the branches where content lives stand out. A pink dot
+can create are left out of that list. Once usage has loaded, each type shows its content count
+across the whole site, on its first row only; a repeat of the type further down says same type.
+Types without content are drawn quieter, so the branches where content lives stand out. A pink dot
 marks a type with a problem finding, and its tooltip names the checks.
 
 ![The creation tree from the three root types, with Home selected under Site and the unreachable types below.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/tree.png)
@@ -192,7 +199,8 @@ marks a type with a problem finding, and its tooltip names the checks.
 ### Compare types in a matrix
 
 Matrix has two grids. Compositions shows which types use which compositions, and marks a
-composition that arrives through another one. Data Types shows how many of each type's own
+composition that arrives through another one. Umbraco records a parent type as a composition of
+the types that inherit from it, so a parent appears as a column too, marked parent. Data Types shows how many of each type's own
 properties use each Data Type. Each column is headed by the Data Type name, with the property
 editor alias and the start of the Data Type key below it, so two Data Types with similar names
 stay distinguishable. Rows are sorted by name; columns sort by usage or by name.
@@ -203,10 +211,13 @@ stay distinguishable. Rows are sorted by name; columns sort by usage or by name.
 
 Editor draws the selected type as tabs and groups, in the order the schema lists them, with each
 property's name, alias, Data Type, mandatory marker and culture variance; the property editor alias
-is on hover. A group from a composition names it once on its header and starts folded, so the
-properties the type adds itself stand out, and the view opens on the first tab that has any of
-them. Expand composed groups opens the folded groups. The type's checks sit above the tabs, and a
-tab over 20 properties is marked. Choose Editor layout in the inspector to open a type here.
+is on hover, and read after the Data Type by a screen reader. A group from a composition names it
+once on its header and starts folded, so the properties the type adds itself stand out, and the
+view opens on the first tab that has any of them. Expand composed groups opens the folded groups.
+The type's checks sit above the tabs, and a tab over 20 properties is marked. Rows the checks are
+about say so in pink: both properties of a duplicate alias, with the editor each one uses, a block
+property that lists a deleted Element Type, and the properties of a culture mismatch. A folded
+group with such a row carries a dot. Choose Editor layout in the inspector to open a type here.
 
 ![Home in the editor view, opened on the Content tab where its own properties are, with its checks above the tabs.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
 
@@ -243,7 +254,14 @@ The city stands in a 3D world with a sky, a horizon and a ground that runs out t
 raised three-quarter view of the whole city, and from there you can orbit, pan, dolly toward any
 point and come down to street level. Focusing a type, leaving focus and Home fly the camera to the
 new framing. The establishing flight plays on the first visit in a browser only. The brief
-opening animation and that flight respect reduced-motion preferences.
+opening animation, that flight, and the dialogs and drawers respect reduced-motion preferences.
+
+The toolbar, the panels and the 2D views work from the keyboard; use Search or the List view to
+pick a type without the mouse. Arrow keys move between the view switcher's views and between
+tabs, every scrolling area takes focus so it can scroll, opening a type puts focus on its name in
+the inspector, and closing the inspector returns focus to what opened it. A screen reader hears
+selection, view, layer and focus changes and filter counts as they happen, and the List view is
+the city as a table.
 
 | Action | Control |
 | --- | --- |
