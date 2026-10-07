@@ -69,7 +69,8 @@ names of connected types; the names of unrelated types dim. Floating labels that
 hidden until there is room for them. A related type whose whole name its board prints legibly gets
 no floating label, and the hovered or selected type's own print gives way to its floating label.
 Click a building to keep its connections visible and open the inspector. Its header names the
-type, its role (page, composition or Element Type) and how much content uses it. Overview lists the schema checks for the type, its usage, and its related types,
+type, its role (page, composition or Element Type) and how much content uses it, and its Editor
+and Impact buttons open the pages about the type. Overview lists the schema checks for the type, its usage, and its related types,
 with content counts once usage has loaded. Properties shows each group with the composition it
 comes from and each property's Data Type. Connections lists every configured connection by kind,
 block and picker targets by property, and the references counted in content separately. The
@@ -187,7 +188,7 @@ and the Data Types list its dot becomes a hollow grey ring whose label starts "R
 inspector's Overview tab and a Data Type's Findings heading count open findings only, with the
 reviewed ones said apart, for example "1 reviewed", and the "!" marks open problems only. Reviewed
 checks stay listed, greyed out, after the open ones, so you can still read the reason or Undo it.
-The Unused lens and the Editor layout's flagged property rows weigh open findings only. A reopened
+The Unused lens and the Editor page's flagged property rows weigh open findings only. A reopened
 finding counts as open again in all of these.
 
 ![A broken block marked as intentional with its reason and Undo, and the reason form open on a duplicate alias.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/review.png)
@@ -211,7 +212,7 @@ extension.
 
 ### Check content usage
 
-The Lens menu colours buildings by content count, published share, cultures, incoming references,
+The Lens menu in the footer colours buildings by content count, published share, cultures, incoming references,
 or unused status. The Unused lens marks the types the unused checks in Findings flag, and marks
 a type in use when it has content, a type composes it or a block editor lists it. Select a type to read the counts in the inspector. Usage loads separately from
 the schema, so you can explore the model while that request is pending.
@@ -233,8 +234,19 @@ The table works without the 3D canvas.
 
 ![The type list sorted by own property count, largest first.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png)
 
-The view switcher in the toolbar chooses between City, List, Tree, Matrix, Editor and Data Types.
-The choice is kept in the URL, and every view except City works without the 3D canvas.
+The header holds what works on the whole schema: the view switcher, with City, List, Tree, Matrix
+and Data Types, then Search, Findings, Compare and the control reference. The choice of view is
+kept in the URL, and every view except City works without the 3D canvas. The two pages about one
+type, Editor and Impact, open from the selected type's inspector, or with E and I. A line over the
+page names the type and leads back to the view you came from, with the selection kept. With
+nothing selected, E and I open nothing and say "Pick a type first" instead. A link with
+`view=editor` or `view=impact` and a type still opens that page; without a type it opens the city.
+
+The footer says how many types the city has and when the schema and the usage were read, the time
+on the day of the snapshot and the date otherwise, with "usage loading" while that request is still
+out. In the City it also holds the City's own tools, Layers, Group, Lens, Legend and Reset view, and
+in every view Present. Where the workspace is narrower than about 760 px, the City's tools fold
+into one City tools menu.
 
 ### Follow the creation tree
 
@@ -271,9 +283,10 @@ view opens on the first tab that has any of them. Expand composed groups opens t
 The type's checks sit above the tabs, and a tab over 20 properties is marked. Rows the checks are
 about say so in pink: both properties of a duplicate alias, with the editor each one uses, a block
 property that lists a deleted Element Type, and the properties of a culture mismatch. A folded
-group with such a row carries a dot. Choose Editor layout in the inspector to open a type here.
+group with such a row carries a dot. Choose Editor in the inspector, or press E, to open the
+selected type here.
 
-![Home in the editor view, opened on the Content tab where its own properties are, with its checks above the tabs.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
+![Home on the Editor page, opened on the Content tab where its own properties are, with its checks above the tabs.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
 
 ### Investigate a Data Type
 
@@ -283,7 +296,7 @@ flagged. Sort by any column and filter by name, editor or key. The Data Types Um
 itself are marked built-in and stay out of the list until you tick Show built-in, except one a link
 has opened. Choose one to read its page beside the list, or under it when the room is narrow; the
 URL keeps it as `dataType=<key>`. Every Data Type name elsewhere in the app opens this page: the
-Matrix's Data Types column headings, the Editor view's property rows, the inspector's Properties
+Matrix's Data Types column headings, the Editor page's property rows, the inspector's Properties
 tab and block and picker sections, Data Type changes in Compare, and findings that name a Data
 Type.
 
@@ -309,8 +322,8 @@ bound. Media and member values are not counted.
 ### Trace the impact of a change
 
 The inspector's Impact tab lists every type a change to the selected type reaches, by group, with
-its content count, and Open impact shows the full trace in place of the view; I or the Impact view
-opens it on the selection. The trace follows four relationships, each a toggle:
+its content count, and Impact at the top of the inspector, or I, shows the full trace in place of
+the view. The trace follows four relationships, each a toggle:
 
 - Compositions and inheritance: every type that gets the type's properties, directly or through a
   type that inherits or composes it. Press Release reaches Seo Composition through Article.
@@ -332,7 +345,7 @@ Planned or existing alias checks a property alias. An alias the type has is trac
 that declares it, and lists every type it lands on; a new one is checked against every type it
 would land on if added here. Either way, a type that already has the alias from another source is
 a collision, the trap in adding a property to a composition: Umbraco compares aliases without
-case and a type cannot hold one twice. In the Editor view, each property row's Impact opens the
+case and a type cannot hold one twice. On the Editor page, each property row's Impact opens the
 trace with its alias filled in.
 
 Copy as Markdown copies a ticket-ready summary: the start type, the relationships and depth, the
@@ -377,7 +390,7 @@ or a side effect, and whether it was planned.
 While a baseline is loaded the city shows a change layer: added types azure, types changed by
 their own edit amber with a ring, side effects a quieter amber, removed types as outlines where
 they stood, and everything else dimmed. Choosing a lens replaces it until the lens is off again,
-and Show in city, from the Impact view or a Data Type, replaces it until you clear it. The List view gets a Change column, sortable and filterable, with a row for each removed type.
+and Show in city, from the Impact page or a Data Type, replaces it until you clear it. The List view gets a Change column, sortable and filterable, with a row for each removed type.
 
 Matched buildings keep their baseline positions. New types appear on separate added boards.
 Comparison covers schema configuration only. It does not compare content usage or dependencies
@@ -386,7 +399,7 @@ in custom code. Snapshot import is for review and does not apply changes to Umbr
 ![Compare against a baseline from before four planned edits: four causes with three marked planned, and Press Release open on the Element Types, parents and pickers that changed only because it was added.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/compare.png)
 
 Outside comparison mode, layouts are deterministic for the same schema. The Group control in the
-toolbar chooses how the city is cut into districts, and the choice is kept in the URL:
+footer chooses how the city is cut into districts, and the choice is kept in the URL:
 
 - Structure, the default, gives each type allowed at root its own board with everything it can
   create. Inside a board each parent forms a neighbourhood with its allowed children laid out
@@ -404,16 +417,16 @@ available.
 
 ## Present the city in a meeting
 
-Press P, or choose Present in the toolbar, to show the schema to a room. Presentation mode takes
+Press P, or choose Present in the footer, to show the schema to a room. Presentation mode takes
 the whole screen where the browser allows it. A backoffice that is not allowed to go full screen,
 or a link opened with `present=1`, fills the window instead; press P twice for full screen. The
-toolbar and the Reset view button go, and the names over and on the city, the 2D views, the
+header and the footer go, and the names over and on the city, the 2D views, the
 legends and the inspector are drawn 1.4 times larger so they read on a projector. The names printed
 on the boards keep their larger size longer as the camera comes closer, and the overview still
 prints every name that reads.
 
-Move the mouse and a slim bar appears at the top right with the views, Search and Leave
-presentation. It fades when the mouse rests, and Tab reaches it at any time.
+Move the mouse and a slim bar appears at the top right with the views over the whole schema,
+Search and Leave presentation. Editor and Impact open from the caption card's Details. It fades when the mouse rests, and Tab reaches it at any time.
 
 Selecting a type shows a caption card in the bottom-left corner instead of the inspector: its name
 and role, how much content it has, and how many types it has in each relationship. Details opens
@@ -427,7 +440,7 @@ kept. Leaving full screen the browser's way leaves presentation too. Focus, Impa
 the change layer and lenses all work as they do outside it. A typical run: the city overview,
 Search for a type and Enter to focus it, I for its Impact and Show in city, then M for the Matrix.
 
-![Presenting Home's neighbourhood: no toolbar, larger names, the caption card and the bar a mouse move brings back.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/present.png)
+![Presenting Home's neighbourhood: no header or footer, larger names, the caption card and the bar a mouse move brings back.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/present.png)
 
 ## Navigate the city
 
@@ -435,11 +448,11 @@ The city stands in a 3D world with a sky, a horizon and a ground that runs out t
 raised three-quarter view of the whole city, and from there you can orbit, pan, dolly toward any
 point and come down to street level. Focusing a type, leaving focus and Home fly the camera to the
 new framing. The establishing flight plays on the first visit in a browser only, along with a
-short hint over the canvas. If you lose the city, Reset view in the canvas corner frames it again.
+short hint over the canvas. If you lose the city, Reset view in the footer frames it again.
 The brief opening animation, that flight, and the dialogs and drawers respect reduced-motion
 preferences.
 
-The toolbar, the panels and the 2D views work from the keyboard; use Search or the List view to
+The header, the footer, the panels and the 2D views work from the keyboard; use Search or the List view to
 pick a type without the mouse. Arrow keys move between the view switcher's views and between
 tabs, every scrolling area takes focus so it can scroll, opening a type puts focus on its name in
 the inspector, and closing the inspector returns focus to what opened it. A screen reader hears
@@ -456,9 +469,10 @@ the city as a table.
 | Move faster | Hold Shift with a movement key |
 | Focus selected type | Enter |
 | Leave focus, then clear selection | Escape |
-| Reframe the city or leave focus | Home, or the Reset view button on the canvas |
+| Reframe the city or leave focus | Home, or Reset view in the footer |
 | Toggle connection layers | 1, 2, 3, 4 |
-| Switch to List, Tree, Matrix or Editor, or back to the city | L, T, M, E |
+| Switch to List, Tree or Matrix, or back to the city | L, T, M |
+| Open the selected type's Editor or Impact page, or go back | E, I |
 | Search | ⌘K / Ctrl+K |
 | Present full screen, or leave | P, or Escape to leave |
 | Show controls | ? |

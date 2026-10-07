@@ -661,6 +661,15 @@ Done 2026-10-07 on `m10/presentation`, after a tech lead presenting at 1280x720 
 - Inspector: `CaptionCard` at the bottom left (name, role, alias, usage line, one count per connection group, Focus, Details, close), raised over the change legend. Details opens the full inspector in a zoomed overlay. Closing the card or the inspector, or clicking bare ground, clears the selection and keeps focus, in and out of presentation. Camera framing takes no panel allowance while presenting, and the 2D views pad their bottom by `--caption-space`, the card's height measured with a ResizeObserver, so their last rows scroll clear of it.
 - A11y: the live region says "Presentation mode on. Escape leaves it" and "Presentation mode off"; the bar fades without motion under reduced motion; card text is `label` on `panel` (7.3:1) and `prose` (15:1).
 
+### M10, App chrome (small)
+
+Done 2026-10-07 on `m10/app-chrome`, after the toolbar had grown to fourteen controls and two of its views, Editor and Impact, showed an empty page until a type was selected.
+
+- Header (`AppHeader` in `Chrome.tsx`): the name, the view switcher with the views over the whole schema (City, List, Tree, Matrix, Data Types), Search, Findings, Compare and Help. On a type page no radio is checked and the first is the tab stop. Below 560 px of its own width the name goes to the screen reader alone and Search drops its key, which keeps it to two rows at 420 px.
+- Type pages: Editor and Impact left the switcher (`PAGE_TABS`) and open from the inspector's Editor and Impact buttons, pressed while their page is on this type, which replace Editor layout and the Impact tab's Open impact. E and I toggle them; with nothing selected they open nothing, announce "Pick a type first" and show a hint for 2.5 s (`PickFirst`). A breadcrumb over the page, "Home › Editor" with Back to the view it came from, keeps the selection. A page whose type is put down goes back. `viewOf` in `url.ts` opens `view=editor` or `view=impact` without a known type on the city. The state is `useTypePages` in `Views.tsx`, with the branching in tested helpers.
+- Footer (`AppFooter`): the type count, schema and usage times from `snapshotDate` (the time on the day, the date otherwise, epochs left out), "usage loading" while the wrappers' request is out, and a lower-bound note for partial block counts; then a host slot; then, in the City only, Layers, Group, Lens, Legend and Reset view, and Present everywhere. Below 760 px of its own width the City's tools fold into one City tools popover. The first-visit hint stays over the canvas and points at the footer.
+- Header and footer are labelled regions, hidden while presenting. The harness's sample picker moved into the footer slot, and `shots.mjs` hides `.demo-picker`. The two backoffice wrappers now extend one `SchemaCityElement`, which removed the copy of their loading the usage flag would have widened.
+
 ### Later, explicitly not v1
 
 - Content mode: instances of a type as a tree, entered from a building.
@@ -688,7 +697,7 @@ Done 2026-10-07 on `m10/presentation`, after a tech lead presenting at 1280x720 
 | base-ui portals and focus inside a shadow root | Portal container inside our root, patched into each copied primitive; proven in the harness at the spike, verified in the backoffice on 2026-09-03. |
 | Dark-only theme inside a light backoffice | Deliberate for the full-area workspace. The Document Type editor view stays a small canvas panel with Umbraco's own caption. |
 | Usage queries slow on large installs | Four small queries for the whole install, 60 s cache, `refresh` on demand. The city never waits for usage. |
-| Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements, and let the CI boot step on both majors be the detector. |
+| Backoffice API surface changes between 17, 18 and 19 | The break in 18 was on the backend (OpenAPI extension types), not the three frontend imports the plan expected. Keep the composer to service registrations only, keep the frontend's Umbraco imports in the two wrapper elements and the element they share, and let the CI boot step on both majors be the detector. |
 | Shadow DOM and WebGL canvas sizing | `ResizeObserver` on the host element, `devicePixelRatio` cap at 2. |
 | Untrusted names and aliases in the inspector | Rendered as text by React, never through `dangerouslySetInnerHTML`; the wrapper never builds HTML from names either. |
 | GitHub Actions v4 actions target the deprecated Node 20 runtime | Move checkout, setup-dotnet and setup-node to v5 (queued with the tooling branch). Done 2026-09-04. |
