@@ -117,7 +117,7 @@ export function snapshotParts(
   graph: SchemaGraph,
   usage: UsageReport | undefined,
   pending: boolean,
-  today = new Date().toISOString().slice(0, 10)
+  today = snapshotDate(new Date().toISOString())?.slice(0, 10) ?? ""
 ) {
   const read = stamp(graph.generatedAt, today);
   const counted = stamp(usage?.generatedAt, today);
@@ -300,9 +300,9 @@ function CityTools({
 
 /**
  * The footer: the snapshot's status on the left, then whatever the host puts there,
- * then the City's tools while the City is on and Present everywhere. Below 760 px of
- * its own width the City's tools fold into one menu, the width the inspector turns
- * into a sheet at, which is where the backoffice's workspace runs out of room.
+ * then the City's tools while the City is on and Present everywhere. Below 960 px of
+ * its own width the City's tools fold into one menu, which keeps the bar to one row
+ * where a narrow backoffice workspace would wrap it.
  */
 export function AppFooter({
   graph,
@@ -338,14 +338,14 @@ export function AppFooter({
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {city ? (
             <>
-              <div className="hidden flex-wrap items-center gap-2 @min-[760px]:flex">
+              <div className="hidden flex-wrap items-center gap-2 @min-[960px]:flex">
                 <CityTools {...tools} />
               </div>
               <Popover>
                 <PopoverTrigger
                   render={
                     <Button
-                      className="@min-[760px]:hidden"
+                      className="@min-[960px]:hidden"
                       data-trigger
                       size="sm"
                       variant="outline"

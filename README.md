@@ -70,7 +70,7 @@ hidden until there is room for them. A related type whose whole name its board p
 no floating label, and the hovered or selected type's own print gives way to its floating label.
 Click a building to keep its connections visible and open the inspector. Its header names the
 type, its role (page, composition or Element Type) and how much content uses it, and its Editor
-and Impact buttons open the pages about the type. Overview lists the schema checks for the type, its usage, and its related types,
+view and Impact buttons open the pages about the type. Overview lists the schema checks for the type, its usage, and its related types,
 with content counts once usage has loaded. Properties shows each group with the composition it
 comes from and each property's Data Type. Connections lists every configured connection by kind,
 block and picker targets by property, and the references counted in content separately. The
@@ -237,15 +237,16 @@ The table works without the 3D canvas.
 The header holds what works on the whole schema: the view switcher, with City, List, Tree, Matrix
 and Data Types, then Search, Findings, Compare and the control reference. The choice of view is
 kept in the URL, and every view except City works without the 3D canvas. The two pages about one
-type, Editor and Impact, open from the selected type's inspector, or with E and I. A line over the
+type, Editor and Impact, open from the selected type's inspector, with Editor view and Impact, or
+with E and I. A line over the
 page names the type and leads back to the view you came from, with the selection kept. With
 nothing selected, E and I open nothing and say "Pick a type first" instead. A link with
 `view=editor` or `view=impact` and a type still opens that page; without a type it opens the city.
 
 The footer says how many types the city has and when the schema and the usage were read, the time
-on the day of the snapshot and the date otherwise, with "usage loading" while that request is still
+on the day of the snapshot and the date otherwise, in your own time zone, with "usage loading" while that request is still
 out. In the City it also holds the City's own tools, Layers, Group, Lens, Legend and Reset view, and
-in every view Present. Where the workspace is narrower than about 760 px, the City's tools fold
+in every view Present. Where the workspace is narrower than about 960 px, the City's tools fold
 into one City tools menu.
 
 ### Follow the creation tree
@@ -283,7 +284,7 @@ view opens on the first tab that has any of them. Expand composed groups opens t
 The type's checks sit above the tabs, and a tab over 20 properties is marked. Rows the checks are
 about say so in pink: both properties of a duplicate alias, with the editor each one uses, a block
 property that lists a deleted Element Type, and the properties of a culture mismatch. A folded
-group with such a row carries a dot. Choose Editor in the inspector, or press E, to open the
+group with such a row carries a dot. Choose Editor view in the inspector, or press E, to open the
 selected type here.
 
 ![Home on the Editor page, opened on the Content tab where its own properties are, with its checks above the tabs.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
