@@ -438,10 +438,10 @@ export function byPriority(a: Ranked, b: Ranked): number {
 export type Rect = { minX: number; maxX: number; minZ: number; maxZ: number };
 
 /** The four places a print can lie round its building, as the reader sees them. */
-export type Side = "front" | "back" | "left" | "right";
+type PrintSide = "front" | "back" | "left" | "right";
 
 /** The order a name tries its places in: in front, behind, then beside. */
-const SIDES: readonly Side[] = ["front", "back", "left", "right"];
+const SIDES: readonly PrintSide[] = ["front", "back", "left", "right"];
 
 /**
  * Where a print of `width` by `height` lies beside its building: in front of the
@@ -454,7 +454,7 @@ export function printRect(
   footprint: number,
   width: number,
   height: number,
-  side: Side,
+  side: PrintSide,
   flipped: boolean
 ): Rect {
   const near = footprint / 2 + LABEL_INSET;
