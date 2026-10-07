@@ -58,13 +58,17 @@ export const LABEL_INSET = 0.1;
 export const LABEL_STRIP = 3;
 
 /**
- * Projected text height, in CSS pixels, below which a name is gone and above which
- * it is whole. The ramp between is the fade, so zooming in brings names up a few at a
- * time rather than switching a wall of them on, and a name never flickers at one
- * threshold. Six pixels is about where a mono face stops being letters.
+ * Projected text height, in CSS pixels, below which a legible name turns illegible
+ * and from which an illegible one turns legible. The band between is hysteresis, so
+ * a name resting near the edge does not blink with each pixel the camera moves, and
+ * the turn itself fades over `FADE_SECONDS`. Six pixels is about where a mono face
+ * stops being letters.
  */
 export const LOD_HIDE_PX = 6;
 export const LOD_SHOW_PX = 7;
+
+/** How long a name takes to fade in or out, and two sizes of it to cross-fade. */
+export const FADE_SECONDS = 0.3;
 
 /**
  * How far past square to the view the camera has to turn before the names flip, in
@@ -86,25 +90,68 @@ export function labelEm(footprint: number): number {
 export const PRINT_LEVELS = [0.4, 0.62, 1] as const;
 
 /**
- * The height a smaller print has to keep on screen before a name switches to it.
- * Above the 7 px a name reads from, so a switch never lands on print that is only
- * just legible.
+ * The height the smallest print on a board has to come to on screen, before
+ * foreshortening, for the board to switch to that size. Foreshortened at the default
+ * diagonal view, 12 px is about 9, which keeps a switch off print that is only just
+ * legible.
  */
-const COMFORT_PX = 9;
+const TIER_PX = 12;
+/**
+ * How far past a switch point a board's distance has to go before it switches, as a
+ * factor on that distance: a fifth nearer to take smaller print, a fifth further to
+ * take larger print back. An orbit or a pan at one zoom moves a board's distance
+ * less than that, so it keeps its size.
+ */
+const TIER_MARGIN = 1.2;
+
+/** The smallest size whose smallest print comes to `TIER_PX`, or the largest size. */
+function idealTier(pxPerUnit: number): number {
+  const at = PRINT_LEVELS.findIndex(
+    (share) => share * MIN_EM * pxPerUnit >= TIER_PX
+  );
+  return at < 0 ? PRINT_LEVELS.length - 1 : at;
+}
 
 /**
- * Which of a name's sizes to print, given how many pixels one world unit of print
- * comes to on screen: the smallest that reads comfortably, or, while none does, the
- * largest as long as it is at least fading in. -1 when even that is too small to
- * draw.
+ * Which of the `PRINT_LEVELS` a board prints at, given how many pixels a world unit
+ * comes to at its nearest point and the size it prints at now (-1 for none yet). It
+ * moves to a smaller size only once that size would still be right a fifth further
+ * out, and back to a larger one only once that would be right a fifth nearer, so a
+ * board resting near a switch point keeps one size.
  */
-export function printLevel(pxPerEm: number, ems: readonly number[]): number {
-  const reads = ems.findIndex((em) => em * pxPerEm >= COMFORT_PX);
-  if (reads >= 0) return reads;
-  const largest = ems.length - 1;
-  return largest >= 0 && (ems[largest] as number) * pxPerEm >= LOD_HIDE_PX
-    ? largest
-    : -1;
+export function boardTier(pxPerUnit: number, current: number): number {
+  if (current < 0) return idealTier(pxPerUnit);
+  const nearer = idealTier(pxPerUnit / TIER_MARGIN);
+  if (nearer < current) return nearer;
+  const further = idealTier(pxPerUnit * TIER_MARGIN);
+  return further > current ? further : current;
+}
+
+/** The camera's distance to the nearest point of a board lying at height `y`. */
+export function boardDistance(
+  camera: { x: number; y: number; z: number },
+  board: Rect,
+  y: number
+): number {
+  const dx = Math.max(board.minX - camera.x, 0, camera.x - board.maxX);
+  const dz = Math.max(board.minZ - camera.z, 0, camera.z - board.maxZ);
+  const dy = camera.y - y;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+/**
+ * Whether a name reads at `px` on screen, given whether it read at the last repaint:
+ * it turns legible from `LOD_SHOW_PX` and illegible only under `LOD_HIDE_PX`.
+ */
+export function legible(px: number, was: boolean): boolean {
+  return px >= (was ? LOD_HIDE_PX : LOD_SHOW_PX);
+}
+
+/** `value` moved toward `target` by at most `step`, for a fade. */
+export function approach(value: number, target: number, step: number): number {
+  return value < target
+    ? Math.min(target, value + step)
+    : Math.max(target, value - step);
 }
 
 /**
@@ -354,15 +401,6 @@ export function boardTextPx(
   return em * pixelsPerUnit(viewportHeight, distance) * Math.min(along, across);
 }
 
-/** 0 below `LOD_HIDE_PX`, 1 from `LOD_SHOW_PX`, a smoothstep between. */
-export function labelFade(px: number): number {
-  const t = Math.min(
-    1,
-    Math.max(0, (px - LOD_HIDE_PX) / (LOD_SHOW_PX - LOD_HIDE_PX))
-  );
-  return t * t * (3 - 2 * t);
-}
-
 /**
  * How solid the print is at rest: readable on the board and still quieter than the
  * buildings and the traces.
@@ -385,8 +423,8 @@ export type Interaction = {
 /**
  * How much of its strength a name keeps under the hover and the selection: all of
  * it at rest, for the hovered and selected types and for a related type, and
- * `DIMMED` for an unrelated one. A floating label that is on screen hides the print
- * under it through the floated set rather than here, because the label layer can
+ * `DIMMED` for an unrelated one. The hovered or selected type's floating label hides
+ * its print through the floated set rather than here, because the label layer can
  * drop a floating label whose roof is off screen, and the name has to show
  * somewhere.
  */
@@ -399,28 +437,12 @@ export function labelLight(id: string, now: Interaction): number {
 }
 
 /**
- * A name's opacity: its rest strength, faded by the level of detail, the light the
- * hover and selection leave it, the intro's progress, and how far focus mode has
- * pressed its building flat.
- */
-export function labelOpacity(
-  px: number,
-  light: number,
-  reveal: number,
-  flatten: number
-): number {
-  return BASE_OPACITY * labelFade(px) * light * reveal * (1 - flatten);
-}
-
-/**
- * The order names claim board space in: the hovered and selected types, then
- * their neighbours, then larger types before smaller, then types with more content,
- * then by id so the order is the same every time.
+ * The order names claim board space in: larger types before smaller, then types
+ * with more content, then by id so the order is the same every time. The hover and
+ * the selection play no part, so pointing at a type never moves another name.
  */
 export type Ranked = {
   id: string;
-  /** 0 for the hovered or selected type, 1 for a neighbour of one, 2 for the rest. */
-  tier: number;
   footprint: number;
   /** Content items of this type, or 0 when there is no usage report. */
   usage: number;
@@ -428,7 +450,6 @@ export type Ranked = {
 
 export function byPriority(a: Ranked, b: Ranked): number {
   return (
-    a.tier - b.tier ||
     b.footprint - a.footprint ||
     b.usage - a.usage ||
     (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
@@ -1079,16 +1100,6 @@ export function printsFor(
   return prints;
 }
 
-/**
- * Where a name stands in the queue for board space: 0 for the hovered or selected
- * type, 1 for a neighbour of either, 2 for the rest.
- */
-export function labelTier(id: string, now: Interaction): number {
-  if (id === now.hovered || id === now.selected) return 0;
-  const related = now.neighbours?.has(id) || now.hoveredNeighbours?.has(id);
-  return related ? 1 : 2;
-}
-
 /** A building's footprint as a rectangle on the board. */
 export const footprintRect = (one: Standing): Rect => ({
   minX: one.position.x - one.footprint / 2,
@@ -1100,81 +1111,181 @@ export const footprintRect = (one: Standing): Rect => ({
 /** A building pressed this far flat by focus mode is a map, not a part with a name. */
 const FLAT = 0.5;
 
-/** One name's place for a view: its size, its print at that size, where, how tall. */
-export type Arranged = Placed & { level: number; px: number };
-
 /** A name's sizes, smallest first, and its prints' widths and heights at each. */
 export type Sizes = {
   ems: readonly number[];
   levels: readonly (readonly { width: number; height: number }[])[];
 };
 
+/** Where every name lies, worked out once for a layout rather than for a view. */
+export type Solution = {
+  /**
+   * Per way up, upright then flipped, per print size, each name's place. A name
+   * missing from a size prints nothing at that size.
+   */
+  placed: readonly (readonly ReadonlyMap<string, Placed>[])[];
+  /** Each board's ground: the rectangle its standing buildings cover. */
+  boards: ReadonlyMap<string, { rect: Rect; y: number }>;
+  /** The board each standing name is on. */
+  boardOf: ReadonlyMap<string, string>;
+};
+
+/** `a` grown to take in `b`. */
+const union = (a: Rect, b: Rect): Rect => ({
+  minX: Math.min(a.minX, b.minX),
+  maxX: Math.max(a.maxX, b.maxX),
+  minZ: Math.min(a.minZ, b.minZ),
+  maxZ: Math.max(a.maxZ, b.maxZ),
+});
+
+/** The open ground between two rectangles along the axis they are furthest apart on. */
+const gapBetween = (a: Rect, b: Rect) =>
+  Math.max(b.minX - a.maxX, a.minX - b.maxX, b.minZ - a.maxZ, a.minZ - b.maxZ);
+
 /**
- * Every name's place for one view. Each standing building's name takes the size
- * `printLevel` picks from how many pixels one unit of print comes to there, and
- * `placeLabels` lays as many as fit in priority order. A flattened building takes
- * no space and prints nothing.
+ * Districts whose buildings come closer than this are one board for the names: the
+ * neighbourhood focus mode lays out over the city mixes districts on one island.
+ * The city keeps its islands two streets apart, so there they never merge.
  */
-export function arrangeNames(
+const SAME_BOARD = MAX_OVERHANG * 2;
+
+/**
+ * The boards the names are solved on: the districts' grounds, those closer than
+ * `SAME_BOARD` merged into one.
+ */
+function boardsOf(upright: readonly Standing[]) {
+  const boards = new Map<string, { rect: Rect; y: number; ids: string[] }>();
+  for (const one of upright) {
+    const board = boards.get(one.district);
+    const ground = footprintRect(one);
+    boards.set(one.district, {
+      rect: board ? union(board.rect, ground) : ground,
+      y: Math.max(board?.y ?? Number.NEGATIVE_INFINITY, one.y ?? 0),
+      ids: [...(board?.ids ?? []), one.id],
+    });
+  }
+  for (let merged = true; merged; ) {
+    merged = false;
+    for (const [a, one] of boards)
+      for (const [b, other] of boards)
+        if (a < b && gapBetween(one.rect, other.rect) < SAME_BOARD) {
+          boards.set(a, {
+            rect: union(one.rect, other.rect),
+            y: Math.max(one.y, other.y),
+            ids: [...one.ids, ...other.ids],
+          });
+          boards.delete(b);
+          merged = true;
+        }
+  }
+  return boards;
+}
+
+/**
+ * Every name's place at every print size and either way up, board by board. The
+ * prints lie flat on the board, so whether two overlap does not depend on the
+ * camera, and solving once per layout is what keeps a name still while the camera
+ * pans and orbits. Each board is solved alone, against every building and against
+ * the near half of the open ground to every other board, so a board that switches
+ * size never moves or meets a name on another. Within a board names claim space by
+ * `byPriority`, through `placeLabels`. A building focus mode has pressed flat takes
+ * no space and prints nothing.
+ *
+ * ponytail: six placements per board per layout. Solving a size lazily, on a
+ * board's first switch to it, is the upgrade if a much larger schema makes the
+ * first frame stall.
+ */
+export function solveNames(
   standing: readonly Standing[],
   sizes: ReadonlyMap<string, Sizes>,
-  pxPerEm: (one: Standing) => number,
-  interaction: Interaction,
   usageOf: (id: string) => number,
-  flipped: boolean,
   crossesTrace?: (rect: Rect) => boolean
-): Map<string, Arranged> {
+): Solution {
   const upright = standing.filter((one) => (one.flatten ?? 0) < FLAT);
-  const chosen = new Map<string, { level: number; px: number }>();
-  const wants = upright.flatMap((one): (Want & Ranked)[] => {
-    const size = sizes.get(one.id);
-    const perEm = size ? pxPerEm(one) : 0;
-    const level = size ? printLevel(perEm, size.ems) : -1;
-    if (!size || level < 0) return [];
-    chosen.set(one.id, { level, px: perEm * (size.ems[level] as number) });
-    return [
-      {
-        id: one.id,
-        tier: labelTier(one.id, interaction),
-        footprint: one.footprint,
-        usage: usageOf(one.id),
-        centre: one.position,
-        prints: size.levels[level] ?? [],
-      },
-    ];
-  });
-  wants.sort(byPriority);
-  const placed = placeLabels(
-    wants,
-    upright.map((one) => ({ id: one.id, rect: footprintRect(one) })),
-    flipped,
-    crossesTrace
+  const buildings = upright.map((one) => ({
+    id: one.id,
+    rect: footprintRect(one),
+  }));
+  const boards = boardsOf(upright);
+  const boardOf = new Map(
+    [...boards].flatMap(([board, { ids }]) => ids.map((id) => [id, board]))
   );
-  return new Map(
-    [...placed].map(([id, spot]) => [
-      id,
-      { ...spot, ...(chosen.get(id) as { level: number; px: number }) },
-    ])
+  const ranked = upright
+    .map((one) => ({
+      one,
+      id: one.id,
+      footprint: one.footprint,
+      usage: usageOf(one.id),
+    }))
+    .sort(byPriority);
+  const placed = [false, true].map((flipped) =>
+    PRINT_LEVELS.map((_, level) => {
+      const out = new Map<string, Placed>();
+      for (const [board, { rect }] of boards) {
+        // The near half of the ground to each other board is this one's to print on.
+        const others = [...boards]
+          .filter(([id]) => id !== board)
+          .map(([id, other]) => {
+            const half = gapBetween(rect, other.rect) / 2;
+            return {
+              id: `board|${id}`,
+              rect: {
+                minX: other.rect.minX - half,
+                maxX: other.rect.maxX + half,
+                minZ: other.rect.minZ - half,
+                maxZ: other.rect.maxZ + half,
+              },
+            };
+          });
+        const wants = ranked.flatMap(({ one }): Want[] => {
+          const prints = sizes.get(one.id)?.levels[level];
+          return prints && boardOf.get(one.id) === board
+            ? [
+                {
+                  id: one.id,
+                  centre: one.position,
+                  footprint: one.footprint,
+                  prints,
+                },
+              ]
+            : [];
+        });
+        for (const [id, spot] of placeLabels(
+          wants,
+          [...buildings, ...others],
+          flipped,
+          crossesTrace
+        ))
+          out.set(id, spot);
+      }
+      return out;
+    })
   );
+  return {
+    placed,
+    boards: new Map([...boards].map(([id, { rect, y }]) => [id, { rect, y }])),
+    boardOf,
+  };
 }
 
 /** How solid a courtyard line is at rest: an outline, under everything it frames. */
 const COURTYARD_OPACITY = 0.22;
 
 /**
- * How solid a type's print and its courtyard are: the print only when it was placed
- * and no floating label already says its name, both under the hover's light, the
- * intro and focus mode's flattening.
+ * How solid a type's print and its courtyard are: the print unless its floating
+ * label already says its name, both under the hover's light, the intro and focus
+ * mode's flattening. The fades for legibility and for a change of size multiply
+ * the print on top of this.
  */
 export function printStrength(
-  spot: { px: number } | undefined,
   floated: boolean,
   light: number,
   reveal: number,
   flatten: number
 ): { print: number; courtyard: number } {
+  const shown = light * reveal * (1 - flatten);
   return {
-    print: spot && !floated ? labelOpacity(spot.px, light, reveal, flatten) : 0,
-    courtyard: COURTYARD_OPACITY * light * reveal * (1 - flatten),
+    print: floated ? 0 : BASE_OPACITY * shown,
+    courtyard: COURTYARD_OPACITY * shown,
   };
 }

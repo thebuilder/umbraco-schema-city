@@ -1016,15 +1016,17 @@ const LABEL_CLASS =
  * `pickLabels` keeps the best ranked ones that do not land on each other, and drops
  * the rest. District names are not candidates: they are printed on the ground.
  *
- * Every type's name is printed on the board as well, wherever it fits legibly. A
- * related type whose whole name the board printed on screen at the last repaint
- * gets no floating label, so the screen never says one name twice. Every other type
- * that keeps a floating label has its print left off the board, through `floated`.
+ * Every type's name is printed on the board as well, wherever it fits. A related
+ * type whose whole name its board prints legibly at the board's current size gets
+ * no floating label, so the screen never says one name twice. That set changes only
+ * when a board changes size or a name fades in or out, never with a pan. The hovered
+ * and selected types' own prints are left off the board while their floating labels
+ * show, through `floated`; every other print stays put.
  *
- * ponytail: the board only knows its print is on screen and clear of other prints,
- * not that no building stands in front of it. A related type whose print is hidden
- * behind a tall building shows its name nowhere until the camera moves; a depth
- * read of the print's anchor is the upgrade if that turns up.
+ * ponytail: the board only knows its print reads, not that it is on screen or that
+ * no building stands in front of it. A related type whose print is hidden behind a
+ * tall building shows its name nowhere until the camera moves; a depth read of the
+ * print's anchor is the upgrade if that turns up.
  *
  * The layer is built and written to by hand rather than through React, because
  * this runs inside the frame loop and forty spans that only ever change their
@@ -1152,7 +1154,7 @@ function Labels({
     printedSeen.current = floated.printedVersion;
     framedAt.current.copy(camera.matrixWorld);
 
-    // A related type whose board prints its whole name, legibly and on screen.
+    // A related type whose board prints its whole name legibly.
     const printedWhole = (candidate: { id: string; rank: number }) =>
       candidate.rank >= 2 && floated.printed.has(candidate.id);
 
@@ -2639,6 +2641,7 @@ export default function Scene({
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}
+            settledById={routed.placementsById}
             traces={boardMarks.traces}
             usage={usage}
           />

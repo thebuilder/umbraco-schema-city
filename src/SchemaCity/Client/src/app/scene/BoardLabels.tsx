@@ -9,12 +9,14 @@ import * as THREE from "three";
 import type { SchemaNode, UsageReport } from "../../model/types";
 import type { Placement } from "../layout/city";
 import {
-  type Arranged,
-  arrangeNames,
+  approach,
   BASE_OPACITY,
+  boardDistance,
   boardTextPx,
+  boardTier,
   COURTYARD_SEGMENTS,
   courtyard,
+  FADE_SECONDS,
   fittedFontPx,
   type Interaction,
   KNOCKOUT_VERTICES,
@@ -24,18 +26,23 @@ import {
   LINE_STEP,
   labelLight,
   labelsFlipped,
+  legible,
+  type Placed,
+  PRINT_LEVELS,
   packAtlas,
   printCorners,
   printStrength,
   printsFor,
   type Rect,
   type Sizes,
+  type Solution,
   type Standing,
+  solveNames,
   type Trace,
   traceIndex,
 } from "./board-labels";
 import { revealAt } from "./reveal";
-import { FOLDER_TINT_HEIGHT } from "./stage";
+import { FOLDER_TINT_HEIGHT, pixelsPerUnit } from "./stage";
 
 /**
  * Font size the names are rasterised at, in CSS pixels before the device pixel
@@ -76,8 +83,8 @@ const KNOCKOUT_OPACITY = 0.85;
 
 /**
  * The types that have a floating label right now, which the label layer rewrites on
- * every repaint, and the types whose whole name the board prints legibly on screen,
- * which the board rewrites. Each side bumps its own version so the other can tell
+ * every repaint, and the types whose whole name the board prints legibly at its
+ * board's current size, which the board rewrites. Each side bumps its own version so the other can tell
  * its picture is stale.
  */
 export type Floated = {
@@ -90,6 +97,9 @@ export type Floated = {
 /** One print in the atlas: whose it is, where it sits in the texture, its size. */
 type Entry = {
   id: string;
+  text: string;
+  /** Which of the `PRINT_LEVELS` it is printed at. */
+  level: number;
   full: boolean;
   /** True for whole leading words and an ellipsis. */
   cut: boolean;
@@ -101,10 +111,8 @@ type Entry = {
 type Atlas = {
   texture: THREE.CanvasTexture;
   entries: Entry[];
-  /** Per type, every entry of its prints. */
-  all: Map<string, number[]>;
-  /** The entry of one print, by `printKey`. */
-  byPrint: Map<string, number>;
+  /** Per type, per size, per print, the entry. */
+  index: Map<string, number[][]>;
   /** Per type, its sizes and its prints' measures, as the placement reads them. */
   sizes: Map<string, Sizes>;
 };
@@ -140,10 +148,6 @@ function measureAll(
     packed: packAtlas(widths, heights, width, ATLAS_PAD),
   };
 }
-
-/** One print's key: the type, its size and its place among that size's prints. */
-const printKey = (id: string, at: { level: number; print: number }) =>
-  `${id}|${at.level}|${at.print}`;
 
 /** Decides every print and rasterises them all into one texture, packed in rows. */
 function buildAtlas(
@@ -238,6 +242,8 @@ function buildAtlas(
     levels.get(one.id)?.[one.level]?.push(i);
     return {
       id: one.id,
+      text: one.fitted.text,
+      level: one.level,
       full: one.fitted.full,
       cut: !one.fitted.full && one.fitted.text.endsWith("…"),
       // The texture is flipped on upload, so the canvas's top row is v = 1.
@@ -269,11 +275,7 @@ function buildAtlas(
       },
     ])
   );
-  const all = new Map([...levels].map(([id, sized]) => [id, sized.flat()]));
-  const byPrint = new Map(
-    planned.map((one, i) => [printKey(one.id, one), i] as const)
-  );
-  return { texture, entries, all, byPrint, sizes };
+  return { texture, entries, index: levels, sizes };
 }
 
 /** The mesh's buffers for one atlas: positions and opacities are rewritten later. */
@@ -299,6 +301,8 @@ function buildGeometry(
     index.set([at, at + 2, at + 1, at + 1, at + 2, at + 3], i * 6);
   });
   const geometry = new THREE.BufferGeometry();
+  // What each quad says, for reading the board back from the devtools.
+  geometry.userData.entries = atlas.entries;
   const dynamic = (array: Float32Array, size: number) =>
     new THREE.BufferAttribute(array, size).setUsage(THREE.DynamicDrawUsage);
   geometry.setAttribute("position", dynamic(new Float32Array(count * 12), 3));
@@ -363,15 +367,14 @@ function buildCourtyards(count: number, colour: THREE.Color) {
 
 const groundOf = (placement: { y?: number }) => placement.y ?? 0;
 
-/**
- * Where the camera is and what it is looking at, read once per repaint so the
- * placement and the opacities share one picture.
- */
+/** Where the camera is and what it is looking at, read once per repaint. */
 type View = {
   camera: THREE.Camera;
   viewportHeight: number;
   flipped: boolean;
   reveal: number;
+  /** How far a fade moves this repaint, 1 for at once. */
+  step: number;
 };
 
 /** Everything a repaint needs that does not change with the camera. */
@@ -384,14 +387,44 @@ type Inputs = {
   traceAt: (rect: Rect) => Trace[];
   /** Every building where it stands now, in the city's order the courtyards follow. */
   standing: Placement[];
+  /** Every building where the solution placed it, in the same order. */
+  settled: Placement[];
+  solution: Solution;
   interaction: Interaction;
-  usage: UsageReport | undefined;
 };
+
+/**
+ * What the board shows now, kept between repaints for one solution: each board's
+ * print size, and per name and size whether it reads and how far it has faded in.
+ */
+type Fades = {
+  tiers: Map<string, number>;
+  /** Per name and size, 1 when it reads at the last repaint. */
+  legible: Uint8Array;
+  /** Per name and size, 0 gone to 1 shown. */
+  presence: Float32Array;
+  /** Per name, 1 when its whole name prints legibly at its board's size. */
+  printed: Uint8Array;
+  /** True until the first repaint, which shows everything at once. */
+  fresh: boolean;
+};
+
+const LEVELS = PRINT_LEVELS.length;
+
+const newFades = (count: number): Fades => ({
+  tiers: new Map(),
+  legible: new Uint8Array(count * LEVELS),
+  presence: new Float32Array(count * LEVELS),
+  printed: new Uint8Array(count),
+  fresh: true,
+});
 
 const SCRATCH = new THREE.Vector3();
 const CORNERS: number[] = [];
 const SEGMENTS = new Float32Array(COURTYARD_SEGMENTS * 4);
 const PATCH = new Float32Array(KNOCKOUT_VERTICES * 2);
+const SHIFTED: Rect = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+const NONE: number[] = [];
 
 /** How many pixels one unit of print comes to at a building's ground, in this view. */
 function pxPerEmAt(one: Standing, view: View): number {
@@ -399,12 +432,18 @@ function pxPerEmAt(one: Standing, view: View): number {
   return boardTextPx(1, view.viewportHeight, view.camera.position, SCRATCH);
 }
 
-/** True when a building's ground point is inside the viewport and in front of it. */
-function onScreen(one: Standing, camera: THREE.Camera): boolean {
-  SCRATCH.set(one.position.x, groundOf(one), one.position.z).project(camera);
-  return (
-    Math.max(Math.abs(SCRATCH.x), Math.abs(SCRATCH.y)) <= 1 && SCRATCH.z < 1
-  );
+/**
+ * `rect` moved by how far a building stands from where the solution placed it,
+ * which is only ever non-zero during a focus tween. Writes into one shared rectangle.
+ */
+function shifted(rect: Rect, one: Standing, settled: Standing): Rect {
+  const dx = one.position.x - settled.position.x;
+  const dz = one.position.z - settled.position.z;
+  SHIFTED.minX = rect.minX + dx;
+  SHIFTED.maxX = rect.maxX + dx;
+  SHIFTED.minZ = rect.minZ + dz;
+  SHIFTED.maxZ = rect.maxZ + dz;
+  return SHIFTED;
 }
 
 /** Lays one entry's quad on its rectangle, at the height of its building's ground. */
@@ -441,52 +480,107 @@ function writeAlpha(colours: Float32Array, entry: number, alpha: number) {
   for (let k = 0; k < 4; k++) colours[entry * 16 + k * 4 + 3] = alpha;
 }
 
-/** The entry placed for a type, or -1 for none. */
-const placedEntry = (atlas: Atlas, id: string, spot: Arranged | undefined) =>
-  spot ? (atlas.byPrint.get(printKey(id, spot)) ?? -1) : -1;
-
-const NONE: number[] = [];
+/** Each board's print size for this view, from its nearest point's distance. */
+function updateTiers(inputs: Inputs, fades: Fades, view: View) {
+  inputs.solution.boards.forEach((board, id) => {
+    const distance = boardDistance(view.camera.position, board.rect, board.y);
+    fades.tiers.set(
+      id,
+      boardTier(
+        pixelsPerUnit(view.viewportHeight, distance),
+        fades.tiers.get(id) ?? -1
+      )
+    );
+  });
+}
 
 /**
- * Writes one type's prints: the one placed, if any, on its rectangle at `alpha`,
- * and every other entry of the type hidden.
+ * What `writeName` hands back, one object reused so a repaint allocates nothing:
+ * the place of the print at the board's size when that one reads, how far it has
+ * faded in, whether it is the whole name, and whether any fade is under way.
+ */
+const NAME: {
+  spot: Placed | undefined;
+  presence: number;
+  full: boolean;
+  moving: boolean;
+} = { spot: undefined, presence: 0, full: false, moving: false };
+
+/**
+ * Fades one type's prints toward what its board shows now and writes them: the one
+ * at its board's size when it reads, and the one at the size before while it fades
+ * out. Returns the place of the print at the board's size when that one reads, and
+ * whether any of its fades is still under way.
  */
 function writeName(
   inputs: Inputs,
-  one: Standing,
-  spot: Arranged | undefined,
-  alpha: number,
-  flipped: boolean
-) {
+  fades: Fades,
+  view: View,
+  slot: number,
+  alpha: number
+): typeof NAME {
+  const one = inputs.standing[slot] as Placement;
+  const settled = inputs.settled[slot] as Placement;
   const positions = inputs.geometry.getAttribute("position")
     .array as Float32Array;
   const colours = inputs.geometry.getAttribute("color").array as Float32Array;
-  for (const entry of inputs.atlas.all.get(one.id) ?? NONE)
-    writeAlpha(colours, entry, 0);
-  const shown = placedEntry(inputs.atlas, one.id, spot);
-  if (shown < 0) return;
-  writeQuad(
-    positions,
-    shown,
-    (spot as Arranged).rect,
-    flipped,
-    groundOf(one) + LABEL_Y
-  );
-  writeAlpha(colours, shown, alpha);
+  const entries = inputs.atlas.index.get(one.id);
+  const ems = inputs.atlas.sizes.get(one.id)?.ems;
+  const tier = fades.tiers.get(inputs.solution.boardOf.get(one.id) ?? "") ?? -1;
+  const perEm = ems ? pxPerEmAt(one, view) : 0;
+  const ways = inputs.solution.placed[view.flipped ? 1 : 0];
+  NAME.spot = undefined;
+  NAME.presence = 0;
+  NAME.full = false;
+  NAME.moving = false;
+  for (let level = 0; level < LEVELS; level++) {
+    const k = slot * LEVELS + level;
+    for (const entry of entries?.[level] ?? NONE) writeAlpha(colours, entry, 0);
+    const placed = ways?.[level]?.get(one.id);
+    const reads = legible(perEm * (ems?.[level] ?? 0), fades.legible[k] === 1);
+    fades.legible[k] = reads ? 1 : 0;
+    const target = placed && level === tier && reads ? 1 : 0;
+    const presence = approach(fades.presence[k] as number, target, view.step);
+    fades.presence[k] = presence;
+    if (presence !== target) NAME.moving = true;
+    const entry = placed ? entries?.[level]?.[placed.print] : undefined;
+    if (target === 1) {
+      NAME.spot = placed;
+      NAME.presence = presence;
+      NAME.full = entry !== undefined && !!inputs.atlas.entries[entry]?.full;
+    }
+    if (!placed || entry === undefined || presence === 0) continue;
+    writeQuad(
+      positions,
+      entry,
+      shifted(placed.rect, one, settled),
+      view.flipped,
+      groundOf(one) + LABEL_Y
+    );
+    writeAlpha(colours, entry, alpha * presence);
+  }
+  return NAME;
 }
 
 /** Writes the courtyard in slot `slot`: round the part, and its print when it has one. */
 function writeCourtyard(
-  courtyards: THREE.BufferGeometry,
+  inputs: Inputs,
   slot: number,
-  one: Standing,
-  spot: Arranged | undefined,
+  spot: Placed | undefined,
   strength: number
 ) {
-  const positions = courtyards.getAttribute("position").array as Float32Array;
-  const colours = courtyards.getAttribute("color").array as Float32Array;
+  const one = inputs.standing[slot] as Placement;
+  const positions = inputs.courtyards.getAttribute("position")
+    .array as Float32Array;
+  const colours = inputs.courtyards.getAttribute("color").array as Float32Array;
   SEGMENTS.fill(0);
-  courtyard(one.position, one.footprint, spot?.rect ?? null, SEGMENTS, 0);
+  courtyard(
+    one.position,
+    one.footprint,
+    spot ? shifted(spot.rect, one, inputs.settled[slot] as Placement) : null,
+    SEGMENTS,
+    0
+  );
   const base = slot * COURTYARD_SEGMENTS * 2;
   const y = groundOf(one) + COURTYARD_Y;
   for (let v = 0; v < COURTYARD_SEGMENTS * 2; v++) {
@@ -503,16 +597,21 @@ function writeCourtyard(
 function writeKnockout(
   inputs: Inputs,
   slot: number,
-  one: Standing,
-  spot: Arranged | undefined,
+  spot: Placed | undefined,
   alpha: number
 ) {
+  const one = inputs.standing[slot] as Placement;
   const positions = inputs.knockouts.getAttribute("position")
     .array as Float32Array;
   const colours = inputs.knockouts.getAttribute("color").array as Float32Array;
   const shown = knockoutAlpha(spot, alpha, inputs.traceAt, inputs.interaction);
   // A hidden knockout keeps whatever corners the last one left; it draws nothing.
-  if (spot && shown > 0) knockout(spot.rect, PATCH, 0);
+  if (spot && shown > 0)
+    knockout(
+      shifted(spot.rect, one, inputs.settled[slot] as Placement),
+      PATCH,
+      0
+    );
   const base = slot * KNOCKOUT_VERTICES;
   const y = groundOf(one) + LABEL_Y;
   for (let v = 0; v < KNOCKOUT_VERTICES; v++) {
@@ -522,61 +621,46 @@ function writeKnockout(
 }
 
 /**
- * True when a type's whole name is printed, visible, with its building's ground
- * on screen, which is what lets the floating label layer leave it out.
- */
-function printedWhole(
-  inputs: Inputs,
-  one: Standing,
-  spot: Arranged | undefined,
-  alpha: number,
-  camera: THREE.Camera
-) {
-  const entry = inputs.atlas.entries[placedEntry(inputs.atlas, one.id, spot)];
-  return alpha > 0 && entry?.full === true && onScreen(one, camera);
-}
-
-/**
- * Places the names for one view and writes their quads, their opacities and the
- * courtyards. Returns the types whose whole name is printed legibly with its anchor
- * on screen.
+ * Writes every name's quads and opacities and the courtyards for one view. The
+ * places come from the solution, so the camera only picks each board's size, which
+ * prints read, and how far each fade has gone. Returns whether a fade is still under
+ * way and whether the set of whole names printed legibly changed.
  */
 function repaint(
   inputs: Inputs,
+  fades: Fades,
   view: View,
   floated: Set<string>
-): Set<string> {
-  const arranged = arrangeNames(
-    inputs.standing,
-    inputs.atlas.sizes,
-    (one) => pxPerEmAt(one, view),
-    inputs.interaction,
-    (id) => inputs.usage?.byType[id]?.total ?? 0,
-    view.flipped,
-    (rect) => inputs.traceAt(rect).length > 0
-  );
-  const printed = new Set<string>();
-  inputs.standing.forEach((one, slot) => {
-    const spot = arranged.get(one.id);
+): { moving: boolean; printedChanged: boolean } {
+  if (fades.fresh) view.step = 1;
+  updateTiers(inputs, fades, view);
+  const { hovered, selected } = inputs.interaction;
+  let moving = false;
+  let printedChanged = false;
+  for (let slot = 0; slot < inputs.standing.length; slot++) {
+    const one = inputs.standing[slot] as Placement;
+    // Only the hovered or selected type gives its print up to its floating label;
+    // every other name stays where it is.
+    const own = one.id === hovered || one.id === selected;
     const strength = printStrength(
-      spot,
-      floated.has(one.id),
+      own && floated.has(one.id),
       labelLight(one.id, inputs.interaction),
       view.reveal,
       one.flatten ?? 0
     );
-    writeName(inputs, one, spot, strength.print, view.flipped);
-    writeCourtyard(inputs.courtyards, slot, one, spot, strength.courtyard);
+    const name = writeName(inputs, fades, view, slot, strength.print);
+    moving ||= name.moving;
+    writeCourtyard(inputs, slot, name.spot, strength.courtyard);
     writeKnockout(
       inputs,
       slot,
-      one,
-      spot,
-      (KNOCKOUT_OPACITY * strength.print) / BASE_OPACITY
+      name.spot,
+      (KNOCKOUT_OPACITY * strength.print * name.presence) / BASE_OPACITY
     );
-    if (printedWhole(inputs, one, spot, strength.print, view.camera))
-      printed.add(one.id);
-  });
+    const printed = name.full ? 1 : 0;
+    if (fades.printed[slot] !== printed) printedChanged = true;
+    fades.printed[slot] = printed;
+  }
   for (const geometry of [
     inputs.geometry,
     inputs.courtyards,
@@ -585,12 +669,9 @@ function repaint(
     geometry.getAttribute("position").needsUpdate = true;
     geometry.getAttribute("color").needsUpdate = true;
   }
-  return printed;
+  fades.fresh = false;
+  return { moving, printedChanged };
 }
-
-/** True when two sets hold the same ids. */
-const sameIds = (a: Set<string>, b: Set<string>) =>
-  a.size === b.size && [...a].every((id) => b.has(id));
 
 /**
  * The atlas, the meshes' geometries and their materials, each built when what it
@@ -693,40 +774,69 @@ function useKnockouts(
 
 /**
  * Repaints the names on every frame the camera, the inputs, the intro, the floated
- * set or the way up has moved since the last one, and tells the label layer which
- * whole names the board now prints.
+ * set or the way up has moved since the last one, or a fade is still under way, and
+ * tells the label layer which whole names the board now prints.
  */
 function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
   const camera = useThree((state) => state.camera);
   const height = useThree((state) => state.size.height);
+  // A new solution starts its fades afresh; the hover and the selection do not.
+  const fades = useMemo(
+    () => newFades(inputs.standing.length),
+    [inputs.solution, inputs.standing.length]
+  );
   // What the last repaint was made from, so a still frame can tell it has nothing
   // to write.
-  const written = useRef({ key: [] as unknown[], camera: new THREE.Matrix4() });
+  const written = useRef({
+    key: [] as unknown[],
+    camera: new THREE.Matrix4(),
+    moving: false,
+  });
   const flipped = useRef(false);
   const forward = useMemo(() => new THREE.Vector3(), []);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     camera.getWorldDirection(forward);
     flipped.current = labelsFlipped(forward.x, forward.z, flipped.current);
     const reveal = revealAt(state.clock.elapsedTime, reducedMotion).links;
-    const key = [inputs, reveal, floated.version, flipped.current, height];
+    const key = [
+      inputs,
+      fades,
+      reveal,
+      floated.version,
+      flipped.current,
+      height,
+    ];
     const last = written.current;
     if (
+      !last.moving &&
       key.every((value, i) => value === last.key[i]) &&
       camera.matrixWorld.equals(last.camera)
     )
       return;
-    const printed = repaint(
+    const { moving, printedChanged } = repaint(
       inputs,
-      { camera, viewportHeight: height, flipped: flipped.current, reveal },
+      fades,
+      {
+        camera,
+        viewportHeight: height,
+        flipped: flipped.current,
+        reveal,
+        step: reducedMotion ? 1 : delta / FADE_SECONDS,
+      },
       floated.ids
     );
-    if (!sameIds(printed, floated.printed)) {
-      floated.printed = printed;
+    if (printedChanged) {
+      floated.printed = new Set(
+        inputs.standing
+          .filter((_, slot) => fades.printed[slot] === 1)
+          .map((one) => one.id)
+      );
       floated.printedVersion += 1;
     }
     last.key = key;
     last.camera.copy(camera.matrixWorld);
+    last.moving = moving;
   });
 }
 
@@ -734,6 +844,7 @@ export function BoardLabels({
   cityPlacements,
   nodesById,
   placementsById,
+  settledById,
   interaction,
   floated,
   usage,
@@ -747,8 +858,10 @@ export function BoardLabels({
   nodesById: Map<string, SchemaNode>;
   /** Where each building stands right now, through a focus tween as well. */
   placementsById: Map<string, Placement>;
+  /** Where each building stands once a focus tween has settled, which the names are placed for. */
+  settledById: Map<string, Placement>;
   interaction: Interaction;
-  /** The types with a floating label right now, which print nothing here. */
+  /** The types with a floating label right now; the hovered and selected print nothing here. */
   floated: Floated;
   /** Content counts, which rank a busier type's name ahead of a quieter one's. */
   usage: UsageReport | undefined;
@@ -769,6 +882,23 @@ export function BoardLabels({
     boardColours
   );
   const traceAt = useMemo(() => traceIndex(traces), [traces]);
+  const settled = useMemo(
+    () =>
+      cityPlacements.map(
+        (placement) => settledById.get(placement.id) ?? placement
+      ),
+    [cityPlacements, settledById]
+  );
+  const solution = useMemo(
+    () =>
+      solveNames(
+        settled,
+        atlas.sizes,
+        (id) => usage?.byType[id]?.total ?? 0,
+        (rect) => traceAt(rect).length > 0
+      ),
+    [settled, atlas, usage, traceAt]
+  );
 
   const inputs = useMemo(
     (): Inputs => ({
@@ -782,8 +912,9 @@ export function BoardLabels({
       standing: cityPlacements.map(
         (placement) => placementsById.get(placement.id) ?? placement
       ),
+      settled,
+      solution,
       interaction,
-      usage,
     }),
     [
       atlas,
@@ -793,8 +924,9 @@ export function BoardLabels({
       traceAt,
       cityPlacements,
       placementsById,
+      settled,
+      solution,
       interaction,
-      usage,
     ]
   );
   useRepaint(inputs, floated, reducedMotion);

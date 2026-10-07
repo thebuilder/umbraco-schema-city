@@ -5,10 +5,12 @@ import smallFixture from "../../../dev/fixtures/small.json";
 import type { SchemaGraph } from "../../model/types";
 import { layoutCity } from "../layout/city";
 import {
-  arrangeNames,
+  approach,
   BASE_OPACITY,
   type Board,
+  boardDistance,
   boardTextPx,
+  boardTier,
   byPriority,
   COURTYARD_SEGMENTS,
   courtyard,
@@ -21,15 +23,15 @@ import {
   knockout,
   knockoutAlpha,
   LABEL_INSET,
+  LINE_HEIGHT,
+  LINE_STEP,
   LOD_HIDE_PX,
   LOD_SHOW_PX,
   labelEm,
-  labelFade,
   labelLight,
-  labelOpacity,
   labelRoom,
   labelsFlipped,
-  labelTier,
+  legible,
   MAX_EM,
   MIN_EM,
   MONO_ADVANCE,
@@ -37,19 +39,22 @@ import {
   packAtlas,
   placeLabels,
   printCorners,
-  printLevel,
   printRect,
+  printStrength,
   printsFor,
   type Ranked,
+  type Rect,
   rankPrints,
   readings,
   type Standing,
   sharedContext,
+  solveNames,
   type Trace,
   traceIndex,
   tracesOf,
   type Want,
 } from "./board-labels";
+import { pixelsPerUnit } from "./stage";
 
 const WIDE = /[\u3000-\u9fff]|\p{Extended_Pictographic}/u;
 /** What a print may hold besides the name's own characters. */
@@ -268,13 +273,40 @@ describe("labelRoom", () => {
 });
 
 describe("level of detail", () => {
-  it("hides below the low threshold, shows from the high one and ramps between", () => {
-    expect(labelFade(LOD_HIDE_PX - 1)).toBe(0);
-    expect(labelFade(LOD_HIDE_PX)).toBe(0);
-    expect(labelFade(LOD_SHOW_PX)).toBe(1);
-    const middle = labelFade((LOD_HIDE_PX + LOD_SHOW_PX) / 2);
-    expect(middle).toBeGreaterThan(0);
-    expect(middle).toBeLessThan(1);
+  it("turns legible from the high threshold and illegible only under the low one", () => {
+    const between = (LOD_HIDE_PX + LOD_SHOW_PX) / 2;
+    expect(legible(LOD_SHOW_PX, false)).toBe(true);
+    expect(legible(between, false)).toBe(false);
+    expect(legible(between, true)).toBe(true);
+    expect(legible(LOD_HIDE_PX - 0.1, true)).toBe(false);
+  });
+
+  it("does not flicker while the size wobbles inside the band", () => {
+    let reads = false;
+    const seen: boolean[] = [];
+    for (const px of [5, 7.2, 6.4, 6.9, 6.1, 6.8, 6.2, 5.9, 6.5, 6.9]) {
+      reads = legible(px, reads);
+      seen.push(reads);
+    }
+    expect(seen).toEqual([
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("fades toward its target by a step at a time, and lands on it", () => {
+    expect(approach(0, 1, 0.25)).toBe(0.25);
+    expect(approach(0.9, 1, 0.25)).toBe(1);
+    expect(approach(0.5, 0, 0.25)).toBe(0.25);
+    expect(approach(0.5, 0, 1)).toBe(0);
   });
 
   it("projects larger when closer and smaller when seen at a grazing angle", () => {
@@ -347,17 +379,23 @@ describe("labelLight", () => {
   });
 });
 
-describe("labelOpacity", () => {
-  it("is the rest strength for a legible, lit, revealed name on standing ground", () => {
-    expect(labelOpacity(LOD_SHOW_PX, 1, 1, 0)).toBeCloseTo(BASE_OPACITY);
+describe("printStrength", () => {
+  it("is the rest strength for a lit, revealed name on standing ground", () => {
+    expect(printStrength(false, 1, 1, 0).print).toBeCloseTo(BASE_OPACITY);
   });
 
   it("goes with the building when focus presses it flat", () => {
-    expect(labelOpacity(LOD_SHOW_PX, 1, 1, 1)).toBe(0);
+    expect(printStrength(false, 1, 1, 1)).toEqual({ print: 0, courtyard: 0 });
   });
 
   it("waits for the intro", () => {
-    expect(labelOpacity(LOD_SHOW_PX, 1, 0, 0)).toBe(0);
+    expect(printStrength(false, 1, 0, 0).print).toBe(0);
+  });
+
+  it("gives the print up to a floating label and keeps the courtyard", () => {
+    const strength = printStrength(true, 1, 1, 0);
+    expect(strength.print).toBe(0);
+    expect(strength.courtyard).toBeGreaterThan(0);
   });
 });
 
@@ -392,40 +430,86 @@ describe("labelsFlipped", () => {
   });
 });
 
-describe("printLevel", () => {
-  const ems = [0.8, 1.2, 2];
+describe("boardTier", () => {
+  /** Pixels a world unit comes to at `distance` in a 1000 px viewport. */
+  const at = (distance: number) => pixelsPerUnit(1000, distance);
 
-  it("takes the smallest size that reads comfortably", () => {
-    expect(printLevel(12, ems)).toBe(0);
-    expect(printLevel(8, ems)).toBe(1);
+  it("prints smaller the nearer a board is", () => {
+    expect(boardTier(at(400), -1)).toBe(2);
+    expect(boardTier(at(20), -1)).toBe(0);
   });
 
-  it("takes the largest while it is fading in, and nothing below that", () => {
-    expect(printLevel(LOD_SHOW_PX / 2, ems)).toBe(2);
-    expect(printLevel((LOD_HIDE_PX - 0.5) / 2, ems)).toBe(-1);
+  it("switches only once past a switch point by the margin, either way", () => {
+    // Walk in from far, then back out, in small steps, and note every switch.
+    const distances = [
+      ...Array.from({ length: 200 }, (_, i) => 300 - i * 1.4),
+      ...Array.from({ length: 200 }, (_, i) => 20 + i * 1.4),
+    ];
+    let tier = -1;
+    const switches: { from: number; to: number; distance: number }[] = [];
+    for (const distance of distances) {
+      const next = boardTier(at(distance), tier);
+      if (tier >= 0 && next !== tier)
+        switches.push({ from: tier, to: next, distance });
+      tier = next;
+    }
+    expect(switches.map(({ from, to }) => [from, to])).toEqual([
+      [2, 1],
+      [1, 0],
+      [0, 1],
+      [1, 2],
+    ]);
+    // The switch back out happens a good way further out than the switch in.
+    const [in1, , , out1] = switches;
+    expect((out1?.distance ?? 0) / (in1?.distance ?? 1)).toBeGreaterThan(1.4);
+  });
+
+  it("holds its size while the distance wobbles around a switch point", () => {
+    let tier = boardTier(at(100), -1);
+    let switches = 0;
+    // Find a switch point, then wobble a tenth either side of it.
+    let edge = 100;
+    while (boardTier(at(edge), tier) === tier && edge > 1) edge -= 0.5;
+    tier = boardTier(at(edge), tier);
+    for (let i = 0; i < 100; i++) {
+      const next = boardTier(at(edge * (i % 2 ? 1.1 : 0.92)), tier);
+      if (next !== tier) switches++;
+      tier = next;
+    }
+    expect(switches).toBe(0);
+  });
+});
+
+describe("boardDistance", () => {
+  const board = { minX: 0, maxX: 10, minZ: 0, maxZ: 10 };
+
+  it("is the height over a board the camera stands above", () => {
+    expect(boardDistance({ x: 5, y: 30, z: 5 }, board, 0)).toBe(30);
+  });
+
+  it("measures to the board's nearest edge from beside it", () => {
+    expect(boardDistance({ x: 13, y: 4, z: 5 }, board, 0)).toBe(5);
   });
 });
 
 describe("byPriority", () => {
   const ranked = (id: string, extra: Partial<Ranked> = {}): Ranked => ({
     id,
-    tier: 2,
     footprint: 4,
     usage: 0,
     ...extra,
   });
 
-  it("puts the selection, then its neighbours, then larger types, then busier ones", () => {
+  it("puts larger types, then busier ones, then the rest by id", () => {
     const order = [
       ranked("small"),
       ranked("busy", { usage: 9 }),
       ranked("large", { footprint: 6 }),
-      ranked("neighbour", { tier: 1, footprint: 3.2 }),
-      ranked("selected", { tier: 0, footprint: 3.2 }),
+      ranked("also small"),
     ]
       .sort(byPriority)
       .map((one) => one.id);
-    expect(order).toEqual(["selected", "neighbour", "large", "busy", "small"]);
+    expect(order).toEqual(["large", "busy", "also small", "small"]);
   });
 });
 
@@ -881,38 +965,31 @@ describe("printsFor on the fixtures", () => {
   });
 });
 
-describe("labelTier", () => {
-  const rest = {
-    hovered: null,
-    selected: null,
-    neighbours: null,
-    hoveredNeighbours: null,
-  };
+/** Each name's sizes as `solveNames` reads them, from `printsFor` in the mono face. */
+function sizesOf(prints: Map<string, { em: number; prints: Fitted[] }[]>) {
+  return new Map(
+    [...prints].map(([id, sized]) => [
+      id,
+      {
+        ems: sized.map((one) => one.em),
+        levels: sized.map(({ em, prints: fitted }) =>
+          fitted.map(({ text }) => {
+            const lines = text.split("\n");
+            return {
+              width: em * Math.max(...lines.map(mono)),
+              height: em * (LINE_HEIGHT + (lines.length - 1) * LINE_STEP),
+            };
+          })
+        ),
+      },
+    ])
+  );
+}
 
-  it("ranks the hovered and selected, then their neighbours, then the rest", () => {
-    const now = {
-      ...rest,
-      selected: "s",
-      hovered: "h",
-      neighbours: new Set(["n"]),
-      hoveredNeighbours: new Set(["m"]),
-    };
-    expect(labelTier("s", now)).toBe(0);
-    expect(labelTier("h", now)).toBe(0);
-    expect(labelTier("n", now)).toBe(1);
-    expect(labelTier("m", now)).toBe(1);
-    expect(labelTier("x", now)).toBe(2);
-    expect(labelTier("x", rest)).toBe(2);
-  });
-});
+const touching = (a: Rect, b: Rect) =>
+  a.minX < b.maxX && b.minX < a.maxX && a.minZ < b.maxZ && b.minZ < a.maxZ;
 
-describe("arrangeNames", () => {
-  const rest = {
-    hovered: null,
-    selected: null,
-    neighbours: null,
-    hoveredNeighbours: null,
-  };
+describe("solveNames", () => {
   const at = (id: string, x: number, extra: Partial<Standing> = {}) => ({
     id,
     position: { x, z: 0 },
@@ -930,68 +1007,78 @@ describe("arrangeNames", () => {
     ])
   );
 
-  it("prints the smallest size that reads, and the larger one further out", () => {
-    const near = arrangeNames(
-      [at("a", 0)],
-      sizes,
-      () => 12,
-      rest,
-      () => 0,
-      false
-    );
-    const far = arrangeNames(
-      [at("a", 0)],
-      sizes,
-      () => 6,
-      rest,
-      () => 0,
-      false
-    );
-    expect(near.get("a")?.level).toBe(0);
-    expect(near.get("a")?.px).toBeCloseTo(9.6);
-    expect(far.get("a")?.level).toBe(1);
-    expect(far.get("a")?.px).toBeCloseTo(9.6);
+  it("places every name at every size and either way up", () => {
+    const solved = solveNames([at("a", 0)], sizes, () => 0);
+    expect(solved.placed).toHaveLength(2);
+    for (const way of solved.placed)
+      for (const level of [0, 1]) expect(way[level]?.has("a")).toBe(true);
+    const front = solved.placed[0]?.[1]?.get("a")?.rect;
+    expect(front && front.minZ >= footprintRect(at("a", 0)).maxZ).toBe(true);
   });
 
-  it("prints nothing too small to read, and nothing for a flattened building", () => {
-    const placed = arrangeNames(
-      [at("a", 0), at("flat", 20, { flatten: 1 })],
+  it("prints nothing for a flattened building, and leaves it out of its board", () => {
+    const solved = solveNames(
+      [at("a", 0), at("flat", 40, { flatten: 1 })],
       sizes,
-      (one) => (one.id === "a" ? 1 : 12),
-      rest,
-      () => 0,
-      false
+      () => 0
     );
-    expect(placed.size).toBe(0);
+    expect(solved.placed[0]?.[0]?.has("flat")).toBe(false);
+    expect(solved.boards.get("d")?.rect.maxX).toBe(2);
   });
 
-  it("gives the selected type the board first when two names compete", () => {
-    // Side by side, close enough that only one print fits each strip... and
-    // a wall behind both, so each has only its front.
-    const standing = [at("a", 0), at("b", 1)];
-    const placed = arrangeNames(
-      standing,
+  it("gives the larger type the board first when two names compete", () => {
+    const solved = solveNames(
+      [at("a", 0), at("b", 0.5, { footprint: 4.5 })],
       sizes,
-      () => 6,
-      { ...rest, selected: "b" },
-      () => 0,
-      false
+      () => 0
     );
-    expect(placed.has("b")).toBe(true);
+    expect(solved.placed[0]?.[1]?.has("b")).toBe(true);
   });
 
-  it("puts a print beside its footprint, never over it", () => {
-    const one = at("a", 0);
-    const placed = arrangeNames(
-      [one],
-      sizes,
-      () => 6,
-      rest,
-      () => 0,
-      false
-    );
-    const rect = placed.get("a")?.rect;
-    const footprint = footprintRect(one);
-    expect(rect && rect.minZ >= footprint.maxZ).toBe(true);
-  });
+  it.each([
+    ["small", smallFixture],
+    ["medium", mediumFixture],
+    ["pathological", pathologicalFixture],
+  ])(
+    "lays the %s fixture out the same every time, no two prints touching at any mix of sizes",
+    (_, fixture) => {
+      const graph = fixture as unknown as SchemaGraph;
+      const placements = layoutCity(graph);
+      const names = new Map(graph.nodes.map((node) => [node.id, node.name]));
+      const named = sizesOf(printsFor(placements, (id) => names.get(id), mono));
+      const usage = (id: string) => id.length;
+      const solved = solveNames(placements, named, usage);
+      expect(solveNames(placements, named, usage)).toEqual(solved);
+      const district = new Map(placements.map((one) => [one.id, one.district]));
+      const footprints = placements.map((one) => ({
+        id: one.id,
+        rect: footprintRect(one),
+      }));
+      const clashes: string[] = [];
+      for (const way of solved.placed) {
+        const prints = way.flatMap((level, size) =>
+          [...level].map(([id, spot]) => ({ id, size, rect: spot.rect }))
+        );
+        expect(prints.length).toBeGreaterThan(placements.length);
+        for (const one of prints)
+          for (const building of footprints)
+            if (building.id !== one.id && touching(one.rect, building.rect))
+              clashes.push(`${one.id} over ${building.id}`);
+        // On one board at one size, or on two boards at any two sizes, since each
+        // board picks its own size.
+        for (let i = 0; i < prints.length; i++)
+          for (let j = i + 1; j < prints.length; j++) {
+            const a = prints[i] as (typeof prints)[number];
+            const b = prints[j] as (typeof prints)[number];
+            const together =
+              district.get(a.id) === district.get(b.id)
+                ? a.size === b.size
+                : true;
+            if (together && touching(a.rect, b.rect))
+              clashes.push(`${a.id}@${a.size} on ${b.id}@${b.size}`);
+          }
+      }
+      expect(clashes).toEqual([]);
+    }
+  );
 });
