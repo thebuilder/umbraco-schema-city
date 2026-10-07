@@ -187,14 +187,9 @@ type Ground = { minX: number; maxX: number; minZ: number; maxZ: number };
 
 /**
  * The row of a board's band its name may print in, edge to edge between the insets
- * and a full cap height deep, whatever the name's length. The printed type names keep
- * off all of it.
- *
- * ponytail: the whole row rather than the name's own width, so a print east of a
- * short name is kept out too. The width needs the rasterised name, which only the
- * scene has; pass it in if the names start missing room there.
+ * and a full cap height deep.
  */
-export function stampRow(island: Ground): Ground {
+function stampRow(island: Ground): Ground {
   return {
     minX: island.minX + STAMP_INSET,
     maxX: island.maxX - STAMP_INSET,

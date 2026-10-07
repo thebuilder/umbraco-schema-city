@@ -69,7 +69,7 @@ import {
   type Want,
 } from "./board-labels";
 import { planRoutes } from "./roads";
-import { districtStamp, pixelsPerUnit, stampRow } from "./stage";
+import { districtStamp, pixelsPerUnit } from "./stage";
 
 const WIDE = /[\u3000-\u9fff]|\p{Extended_Pictographic}/u;
 /** What a print may hold besides the name's own characters. */
@@ -1078,6 +1078,7 @@ describe("onBoard", () => {
   const edge: Edge = {
     island,
     fingers: [{ district: "d", side: "east", x: 30, z: 12 }],
+    stamp: { minX: 2, maxX: 14, minZ: 24, maxZ: 28 },
   };
   const rect = (minX: number, minZ: number, width = 4, height = 1) => ({
     minX,
@@ -1107,9 +1108,9 @@ describe("onBoard", () => {
     expect(onBoard(rect(25.5, 14), edge)).toBe(true);
   });
 
-  it("turns down a print in the row the district's name prints in", () => {
-    const row = stampRow(island);
-    expect(onBoard(rect(row.minX + 4, row.minZ + 1), edge)).toBe(false);
+  it("turns down a print over the district's name, and takes one past its end", () => {
+    expect(onBoard(rect(8, 23.5), edge)).toBe(false);
+    expect(onBoard(rect(16, 25), edge)).toBe(true);
   });
 });
 
@@ -1168,24 +1169,6 @@ describe("names on the boards of the fixtures", () => {
         (id) => byId.get(id)?.district,
         islands
       );
-      const edges = new Map(
-        [...islands].map(([id, island]): [string, Edge] => [
-          id,
-          { island, fingers: fingers.filter((f) => f.district === id) },
-        ])
-      );
-      const names = new Map(graph.nodes.map((node) => [node.id, node.name]));
-      const named = sizesOf(
-        printsFor(placements, (id) => names.get(id), mono, islands)
-      );
-      const solved = solveNames(
-        placements,
-        named,
-        (id) => id.length,
-        undefined,
-        edges
-      );
-
       const stamps = districts.flatMap((district) => {
         const island = islands.get(district.id) as Island;
         const stamp = districtStamp(
@@ -1207,6 +1190,28 @@ describe("names on the boards of the fixtures", () => {
             ]
           : [];
       });
+      const edges = new Map(
+        [...islands].map(([id, island]): [string, Edge] => [
+          id,
+          {
+            island,
+            fingers: fingers.filter((f) => f.district === id),
+            stamp: stamps.find((one) => one.district.id === id)?.rect,
+          },
+        ])
+      );
+      const names = new Map(graph.nodes.map((node) => [node.id, node.name]));
+      const named = sizesOf(
+        printsFor(placements, (id) => names.get(id), mono, islands)
+      );
+      const solved = solveNames(
+        placements,
+        named,
+        (id) => id.length,
+        undefined,
+        edges
+      );
+
       // Only a board too narrow for the name at its smallest goes without it, and
       // the medium fixture has none.
       if (name === "medium") expect(stamps).toHaveLength(districts.length);

@@ -188,6 +188,15 @@ function stampTexture(name: string, font: string): THREE.CanvasTexture {
   return texture;
 }
 
+/**
+ * A district's name's width over its cap height, as `stampTexture` rasterises it in
+ * `font`, which is what `districtStamp` sizes the print by.
+ */
+export function stampAspect(name: string, font: string): number {
+  const { image } = stampTexture(name.toUpperCase(), font);
+  return image.width / image.height;
+}
+
 /** A district's board, padding included. */
 export const islandOf = (district: District): Island => ({
   minX: district.minX - ISLAND_PAD,
@@ -594,7 +603,7 @@ function Stamps({
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
         const stamp = districtStamp(
           islandOf(district),
-          texture.image.width / texture.image.height
+          stampAspect(district.name, palette.mono)
         );
         // A board too narrow for the name at its smallest goes without it.
         return stamp ? [{ id: district.id, texture, stamp }] : [];

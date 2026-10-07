@@ -3,7 +3,7 @@
 // outline around each component that frames its print. Pure: no three.js, no React,
 // no DOM. scene/BoardLabels.tsx rasterises and draws what this decides.
 import { clearOfEdge, type Finger, PRINT_MARGIN } from "./board";
-import { pixelsPerUnit, stampRow } from "./stage";
+import { pixelsPerUnit } from "./stage";
 
 /**
  * Text size in world units per unit of footprint. A building's name is as big as the
@@ -516,18 +516,24 @@ export function printRect(
   };
 }
 
-/** A board's edge as the names see it: its ground and the gold fingers on it. */
-export type Edge = { island: Rect; fingers: readonly Finger[] };
+/**
+ * A board's edge as the names see it: its ground, the gold fingers on it and the
+ * ground its district's name prints on, when it has room for one.
+ */
+export type Edge = {
+  island: Rect;
+  fingers: readonly Finger[];
+  stamp?: Rect | null;
+};
 
 /**
  * Whether a print at `rect` stays on its board: the print margin inside its edge,
- * clear of its mounting holes and its gold fingers, and off the row its district's
- * name prints in.
+ * clear of its mounting holes, its gold fingers and its district's name.
  */
 export function onBoard(rect: Rect, edge: Edge): boolean {
   return (
     clearOfEdge(rect, edge.island, edge.fingers) &&
-    !overlapping(stampRow(edge.island), rect, PRINT_MARGIN)
+    !(edge.stamp && overlapping(edge.stamp, rect, PRINT_MARGIN))
   );
 }
 
@@ -1284,7 +1290,7 @@ function mergeNearest(boards: Map<string, Ground>): boolean {
  *
  * `edges`, by district, keeps every name on its own board (`onBoard`): a name runs
  * over open ground between buildings, but never off the board, over a hole or a
- * finger, or into the row its district's name prints in. Focus mode, which lays a
+ * finger, or over its district's name. Focus mode, which lays a
  * neighbourhood out on an island of its own, passes none.
  *
  * ponytail: six placements per board per layout. Solving a size lazily, on a

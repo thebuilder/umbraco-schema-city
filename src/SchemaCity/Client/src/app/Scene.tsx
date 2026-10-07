@@ -58,6 +58,7 @@ import {
   rimColour,
   SLAB_HEIGHT,
   slabColour,
+  stampAspect,
   tint,
   WHITE,
 } from "./scene/Boards";
@@ -136,6 +137,7 @@ import {
 import {
   atmosphere,
   CAMERA_FOV,
+  districtStamp,
   framingAction,
   framingStep,
   GRID_FRAGMENT_SHADER,
@@ -2715,6 +2717,33 @@ export default function Scene({
       ),
     [city]
   );
+  // The ground each district's name prints on, which the type names keep off. None
+  // until the theme's mono face is read, which the names are rasterised in.
+  const mono = palette?.mono;
+  const stamps = useMemo(
+    () =>
+      new Map(
+        city.districts.map((district) => {
+          const stamp =
+            mono === undefined
+              ? null
+              : districtStamp(
+                  islandOf(district),
+                  stampAspect(district.name, mono)
+                );
+          return [
+            district.id,
+            stamp && {
+              minX: stamp.x - stamp.width / 2,
+              maxX: stamp.x + stamp.width / 2,
+              minZ: stamp.z - stamp.height / 2,
+              maxZ: stamp.z + stamp.height / 2,
+            },
+          ];
+        })
+      ),
+    [city, mono]
+  );
   // Where the drawn ground traces turn, for the vias, and where they leave their
   // board for another, for the gold fingers. Read off the plan the traces draw from,
   // which is kept per placement map and edge list, so this routes nothing again.
@@ -2747,12 +2776,13 @@ export default function Scene({
                 {
                   island,
                   fingers: fingers.filter((finger) => finger.district === id),
+                  stamp: stamps.get(id),
                 },
               ])
             )
           : undefined,
     };
-  }, [routed, drawnEdges, active, focus, islands]);
+  }, [routed, drawnEdges, active, focus, islands, stamps]);
 
   const boardColours = useMemo(
     () =>
