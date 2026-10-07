@@ -366,8 +366,8 @@ or a side effect, and whether it was planned.
 
 While a baseline is loaded the city shows a change layer: added types azure, types changed by
 their own edit amber with a ring, side effects a quieter amber, removed types as outlines where
-they stood, and everything else dimmed. Choosing a lens replaces it until the lens is off again.
-The List view gets a Change column, sortable and filterable, with a row for each removed type.
+they stood, and everything else dimmed. Choosing a lens replaces it until the lens is off again,
+and Show in city, from the Impact view or a Data Type, replaces it until you clear it. The List view gets a Change column, sortable and filterable, with a row for each removed type.
 
 Matched buildings keep their baseline positions. New types appear on separate added boards.
 Comparison covers schema configuration only. It does not compare content usage or dependencies
