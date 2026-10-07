@@ -198,7 +198,12 @@ describe("the view", () => {
     expect(parseUrl("?view=list", aliases).view).toBe("list");
     expect(parseUrl("?view=tree", aliases).view).toBe("tree");
     expect(parseUrl("?view=matrix", aliases).view).toBe("matrix");
-    expect(parseUrl("?view=editor", aliases).view).toBe("editor");
+    expect(parseUrl("?view=editor&type=home", aliases).view).toBe("editor");
+    expect(parseUrl("?view=impact&type=home", aliases).view).toBe("impact");
+    // A type page is about a type, so without one, or with one the schema lost,
+    // the link opens the city rather than an empty page.
+    expect(parseUrl("?view=editor", aliases).view).toBe("city");
+    expect(parseUrl("?view=impact&type=gone", aliases).view).toBe("city");
     // The old camera modes are angles on the city, so their links open the city.
     expect(parseUrl("?view=top", aliases).view).toBe("city");
     expect(parseUrl("?view=explore", aliases).view).toBe("city");
