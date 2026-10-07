@@ -213,7 +213,8 @@ function Legend() {
             Via: a trace turning
           </LegendRow>
           <LegendRow mark={<Tint className="bg-phosphor-dim/40" />}>
-            Lighter patch: one block editor's Element Types, or a nested folder
+            Patch under a group: one block editor's Element Types, or a nested
+            folder
           </LegendRow>
         </ul>
         <p className="mt-2 text-muted-foreground text-xs">
