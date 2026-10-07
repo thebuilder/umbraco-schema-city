@@ -17,7 +17,7 @@ function ChangeRow({
       </summary>
       <div className="mt-1 pl-4 text-3xs text-label">
         {change.details.map((detail) => (
-          <p key={detail}>{detail}</p>
+          <p key={detail.text}>{detail.text}</p>
         ))}
         {change.dataTypeIds ? (
           <p className="mt-1 flex flex-wrap gap-x-2">

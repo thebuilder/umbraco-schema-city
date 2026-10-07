@@ -5,9 +5,13 @@ import {
   MAX_SNAPSHOT_BYTES,
   parseSnapshot,
   readSnapshotFile,
+  type SchemaChange,
   snapshotFileName,
 } from "./snapshots";
 import type { SchemaGraph, SchemaNode, SchemaProperty } from "./types";
+
+const texts = (change: SchemaChange | undefined) =>
+  change?.details.map((detail) => detail.text) ?? [];
 
 const node = (
   id: string,
@@ -242,7 +246,7 @@ describe("schema snapshots", () => {
     expect(result.matches.get("new-base")).toBe("old-base");
     expect(result.added).toEqual([]);
     expect(result.removed).toEqual([]);
-    expect(result.changed[0]?.details).toContain("ownPropertyCount: 1 -> 2");
+    expect(texts(result.changed[0])).toContain("ownPropertyCount: 1 -> 2");
   });
 
   it("ignores generated time and ordering while reporting additions/removals", () => {
@@ -307,7 +311,7 @@ describe("schema snapshots", () => {
     const change = compareSchemas(before, after).changed.find(
       (c) => c.alias === "page"
     );
-    const details = change?.details ?? [];
+    const details = texts(change);
     // The Data Type the property moved onto, as a link to its page.
     expect(change?.dataTypeIds).toEqual(["dt-2"]);
     expect(details).toEqual([
@@ -383,7 +387,7 @@ describe("schema snapshots", () => {
         { kind: "allowedChild", from: "page", to: "new" },
       ]
     );
-    const details = compareSchemas(before, after).changed[0]?.details ?? [];
+    const details = texts(compareSchemas(before, after).changed[0]);
     expect(details).toContain(
       "property content.title mandatory: false -> true"
     );
