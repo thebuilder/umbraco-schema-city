@@ -47,6 +47,8 @@ export type UrlState = {
   group: Grouping;
   /** The Data Type the Data Types view shows, written only while that view is on. */
   dataType: string | null;
+  /** Presentation mode, so a link sent before a meeting opens presenting. */
+  present: boolean;
 };
 
 /**
@@ -83,6 +85,7 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
     // Kept as given: a key the schema does not have shows the list with nothing
     // chosen, which the view decides, not the parser.
     dataType: params.get("dataType"),
+    present: params.get("present") === "1",
   };
 }
 
@@ -114,5 +117,6 @@ export function serialiseUrl(state: UrlState): string {
   if (state.group !== "structure") parts.push(`group=${state.group}`);
   if (state.view === "datatypes" && state.dataType)
     parts.push(`dataType=${encodeURIComponent(state.dataType)}`);
+  if (state.present) parts.push("present=1");
   return `?${parts.join("&")}`;
 }

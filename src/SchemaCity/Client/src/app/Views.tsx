@@ -100,9 +100,11 @@ export function Announcements({
   focus,
   nodesById,
   lit = null,
+  presenting = false,
 }: {
   selected: string | null;
   view: View;
+  presenting?: boolean;
   layers: string[];
   focus: FocusScope | null;
   nodesById: Map<string, SchemaNode>;
@@ -127,6 +129,11 @@ export function Announcements({
     focus
       ? `Focus on ${name(focus.around)}, ${plural(focus.ids.size, "type")}`
       : "Focus off"
+  );
+  useAnnounceChange(
+    presenting
+      ? "Presentation mode on. Escape leaves it"
+      : "Presentation mode off"
   );
   return null;
 }
