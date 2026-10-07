@@ -3,7 +3,7 @@
 // round the component and its print. One canvas atlas holds every print and one
 // mesh draws them all; `board-labels.ts` decides the text, the size, which names fit
 // without touching and which way up they read.
-import { useFrame, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { SchemaNode, UsageReport } from "../../model/types";
@@ -43,6 +43,8 @@ import {
   traceIndex,
   updateTiers,
 } from "./board-labels";
+import { introPlaying } from "./connection-visibility";
+import { useAnimationFrame } from "./frames";
 import { revealAt } from "./reveal";
 import { FOLDER_TINT_HEIGHT } from "./stage";
 
@@ -825,7 +827,8 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
   const flipped = useRef(false);
   const forward = useMemo(() => new THREE.Vector3(), []);
 
-  useFrame((state, delta) => {
+  useAnimationFrame((state, delta) => {
+    const playing = introPlaying(state.clock.elapsedTime, reducedMotion);
     camera.getWorldDirection(forward);
     flipped.current = labelsFlipped(forward.x, forward.z, flipped.current);
     const reveal = revealAt(state.clock.elapsedTime, reducedMotion).links;
@@ -838,7 +841,7 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
       height,
     ];
     const last = written.current;
-    if (unchanged(last, key, camera)) return;
+    if (unchanged(last, key, camera)) return playing;
     const frame: Frame = {
       camera,
       viewportHeight: height,
@@ -847,11 +850,14 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
       step: reducedMotion ? 1 : delta / FADE_SECONDS,
       fades,
     };
-    if (repaint(inputs, frame, floated.ids))
-      publishPrinted(inputs, fades, floated);
+    // A new printed set changes what the floating labels leave out, and they read
+    // it on the next frame, so publishing one asks for that frame.
+    const published = repaint(inputs, frame, floated.ids);
+    if (published) publishPrinted(inputs, fades, floated);
     last.key = key;
     last.camera.copy(camera.matrixWorld);
     last.moving = fades.moving;
+    return playing || fades.moving || published;
   });
 }
 

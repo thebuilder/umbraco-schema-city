@@ -19,6 +19,8 @@ import {
 } from "../layout/city";
 import { type Finger, holeSpots, type Island } from "./board";
 import { labelsFlipped } from "./board-labels";
+import { introPlaying } from "./connection-visibility";
+import { useAnimationFrame } from "./frames";
 import { revealAt } from "./reveal";
 import { districtStamp, FOLDER_TINT_HEIGHT } from "./stage";
 
@@ -658,12 +660,13 @@ export function Boards({
   );
 
   // Everything here fades in with the boards, and the names with the traces.
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const progress = revealAt(state.clock.elapsedTime, reducedMotion);
     for (const [key, material] of materials.current)
       material.opacity = key.startsWith("stamp")
         ? STAMP_OPACITY * progress.links
         : progress.districts;
+    return introPlaying(state.clock.elapsedTime, reducedMotion);
   });
 
   const held = materials.current;

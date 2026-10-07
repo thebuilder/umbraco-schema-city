@@ -77,6 +77,7 @@ import {
   connectionEmphasis,
   connectionPickable,
   connectionTraceAt,
+  introPlaying,
   visibleConnections,
 } from "./scene/connection-visibility";
 import {
@@ -88,10 +89,12 @@ import {
   groundAxes,
   keydownAction,
   orbitOffset,
+  stopped,
   translateFlightEndpoints,
   type Vec3,
   verticalStep,
 } from "./scene/flight";
+import { RedrawOnRender, useAnimationFrame } from "./scene/frames";
 import {
   type Framed,
   MIN_DISTANCE,
@@ -151,7 +154,7 @@ function useLayerReveal(
   segmentCount?: number
 ) {
   const opacity = useRef(0);
-  useFrame((state, delta) => {
+  useAnimationFrame((state, delta) => {
     const progress = revealAt(state.clock.elapsedTime, reducedMotion);
     const boot = connectionBootAt(state.clock.elapsedTime, reducedMotion);
     // The bright moving trace owns the entrance; settled paths crossfade under it.
@@ -176,6 +179,10 @@ function useLayerReveal(
     }
     if (material.current) material.current.opacity = opacity.current;
     if (object.current) object.current.visible = opacity.current > 0.001;
+    return (
+      introPlaying(state.clock.elapsedTime, reducedMotion) ||
+      opacity.current !== target
+    );
   });
 }
 
@@ -187,12 +194,13 @@ function BootProgress({
   onPhase: (phase: BootPhase) => void;
 }) {
   const last = useRef<BootPhase>(reducedMotion ? "done" : "trace");
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const { phase } = connectionBootAt(state.clock.elapsedTime, reducedMotion);
     if (phase !== last.current) {
       last.current = phase;
       onPhase(phase);
     }
+    return phase !== "done";
   });
   return null;
 }
@@ -288,7 +296,8 @@ function IntroOutline({
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);
-  useFrame((state) => {
+  useAnimationFrame((state) => {
+    const playing = introPlaying(state.clock.elapsedTime, reducedMotion);
     const reveal = revealAt(state.clock.elapsedTime, reducedMotion);
     const progress =
       phase === "connections"
@@ -296,7 +305,7 @@ function IntroOutline({
         : { trace: reveal.trace, opacity: reveal.wireframe };
     material.opacity = progress.opacity * strength;
     lines.visible = material.opacity > 0.001;
-    if (!lines.visible) return;
+    if (!lines.visible) return playing;
     geometry.instanceCount =
       traceOutlinePositions(positions, traced, progress.trace) / 2;
     if (grow)
@@ -307,6 +316,7 @@ function IntroOutline({
     (
       geometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute
     ).data.needsUpdate = true;
+    return playing;
   });
   return <primitive frustumCulled={false} object={lines} />;
 }
@@ -483,7 +493,7 @@ function RoofIcons({
     }
   }, [groups, neighbours, palette]);
 
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const detailOpacity = revealAt(
       state.clock.elapsedTime,
       reducedMotion
@@ -533,6 +543,7 @@ function RoofIcons({
       mesh.instanceMatrix.needsUpdate = true;
     }
     if (plate) plate.instanceMatrix.needsUpdate = true;
+    return introPlaying(state.clock.elapsedTime, reducedMotion);
   });
 
   return (
@@ -615,8 +626,9 @@ function useFadedEdgeColors(
   geometry: RefObject<THREE.BufferGeometry | null>
 ) {
   const fadedColors = useMemo(() => colors.slice(), [colors.length]);
-  useFrame((_, delta) => {
+  useAnimationFrame((_, delta) => {
     const step = reducedMotion ? 1 : Math.min(delta, 0.1);
+    let moving = false;
     for (let i = 0; i < colors.length; i += 4) {
       fadedColors[i] = colors[i] as number;
       fadedColors[i + 1] = colors[i + 1] as number;
@@ -626,9 +638,11 @@ function useFadedEdgeColors(
         colors[i + 3] as number,
         step
       );
+      moving ||= fadedColors[i + 3] !== colors[i + 3];
     }
     const attribute = geometry.current?.getAttribute("color");
     if (attribute) attribute.needsUpdate = true;
+    return moving;
   });
 
   return fadedColors;
@@ -966,9 +980,10 @@ function LinkStrokes({
         new THREE.InstancedBufferAttribute(new Float32Array(alpha), 1)
       );
   }, [colors, geometry]);
-  useFrame((_, delta) => {
+  useAnimationFrame((_, delta) => {
     const attribute = geometry.getAttribute("instanceAlpha");
-    if (!attribute) return;
+    if (!attribute) return false;
+    let moving = false;
     for (let i = 0; i < attribute.count; i++) {
       const target = colors[i * 8 + 3] as number;
       attribute.setX(
@@ -977,8 +992,10 @@ function LinkStrokes({
           ? target
           : transitionToward(attribute.getX(i), target, Math.min(delta, 0.1))
       );
+      moving ||= attribute.getX(i) !== target;
     }
     attribute.needsUpdate = true;
+    return moving;
   });
   // LineSegments2 updates resolution from the active viewport before each draw.
   useEffect(() => () => geometry.dispose(), [geometry]);
@@ -1154,7 +1171,8 @@ function Labels({
     };
   }, [gl, reducedMotion]);
 
-  useFrame((state) => {
+  useAnimationFrame((state) => {
+    const playing = introPlaying(state.clock.elapsedTime, reducedMotion);
     if (labelLayer.current)
       labelLayer.current.style.opacity = String(
         revealAt(state.clock.elapsedTime, reducedMotion).links
@@ -1164,7 +1182,7 @@ function Labels({
       printedSeen.current === floated.printedVersion &&
       camera.matrixWorld.equals(framedAt.current)
     )
-      return;
+      return playing;
     dirty.current = false;
     printedSeen.current = floated.printedVersion;
     framedAt.current.copy(camera.matrixWorld);
@@ -1215,6 +1233,7 @@ function Labels({
       span.style.transform = `translate(${Math.round(box.left)}px, ${Math.round(box.top)}px)`;
       if (span.textContent !== box.text) span.textContent = box.text;
     });
+    return playing;
   });
 
   return null;
@@ -1264,19 +1283,20 @@ function FocusIsland({
   if (island) shown.current = island;
   const at = shown.current;
 
-  useFrame((_, delta) => {
+  useAnimationFrame((_, delta) => {
     const to = island ? 1 : 0;
     const step = reducedMotion ? 1 : (delta * 1000) / TWEEN_MS;
     grown.current = Math.min(
       1,
       Math.max(0, grown.current + Math.sign(to - grown.current) * step)
     );
-    if (!group.current) return;
+    if (!group.current) return false;
     group.current.visible = grown.current > 0;
     // A group at the anchor scales about it, so the island opens out of the focused
     // node rather than appearing whole. Never exactly zero: a zero scale has no
     // normal matrix and three warns about it.
     group.current.scale.setScalar(Math.max(smootherstep(grown.current), 1e-4));
+    return grown.current !== to;
   });
 
   if (!at) return null;
@@ -1920,18 +1940,22 @@ function CameraRig({
 
   useRevealSelection(selectedAt, flight, covered, reducedMotion);
 
-  useFrame(() => {
+  useAnimationFrame(() => {
     const moving = flight.current;
-    if (controls) controls.enabled = moving === null;
-    if (!moving) return;
-    const t = moving.ease(
-      Math.min(1, (performance.now() - moving.started) / moving.ms)
-    );
-    const target = controls?.target ?? LOOSE_TARGET;
-    camera.position.lerpVectors(moving.from.position, moving.to.position, t);
-    target.lerpVectors(moving.from.target, moving.to.target, t);
-    camera.lookAt(target);
-    if (t >= 1) flight.current = null;
+    if (moving) {
+      const t = moving.ease(
+        Math.min(1, (performance.now() - moving.started) / moving.ms)
+      );
+      const target = controls?.target ?? LOOSE_TARGET;
+      camera.position.lerpVectors(moving.from.position, moving.to.position, t);
+      target.lerpVectors(moving.from.target, moving.to.target, t);
+      camera.lookAt(target);
+      if (t >= 1) flight.current = null;
+    }
+    // After the step, so the frame a flight lands on already hands the controls
+    // back: no frame may follow it.
+    if (controls) controls.enabled = flight.current === null;
+    return flight.current !== null;
   });
 
   return null;
@@ -2004,6 +2028,7 @@ function Flight({
 }) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as Rig | null;
+  const invalidate = useThree((state) => state.invalidate);
   const held = useMemo(() => new Set<string>(), []);
   const boosting = useRef(false);
   const velocity = useRef(new THREE.Vector3());
@@ -2024,6 +2049,8 @@ function Flight({
       // Without this the arrows scroll the backoffice around the city.
       event.preventDefault();
       held.add(event.code);
+      // A key press changes nothing React draws, so it wakes the canvas itself.
+      invalidate();
     };
     const up = (event: KeyboardEvent) => {
       boosting.current = event.shiftKey;
@@ -2041,12 +2068,12 @@ function Flight({
       window.removeEventListener("blur", release);
       release();
     };
-  }, [held, host]);
+  }, [held, host, invalidate]);
 
-  useFrame((_, delta) => {
-    if (!controls) return;
+  useAnimationFrame((_, delta) => {
+    if (!controls) return false;
     const moving = velocity.current;
-    if (held.size === 0 && moving.lengthSq() === 0) return;
+    if (held.size === 0 && moving.lengthSq() === 0) return false;
     // A tab that was in the background hands back one enormous delta, which would
     // teleport the camera as far as the whole time it was away.
     const step = Math.min(delta, 0.05);
@@ -2078,11 +2105,9 @@ function Flight({
         approach(moving.y, wanted.y, step),
         approach(moving.z, wanted.z, step)
       );
-    // A hundredth of a world unit a second is a stop, and rounding it to one keeps
-    // the frame from doing this work on every idle frame for ever.
-    if (moving.lengthSq() < 1e-4) {
+    if (stopped(moving)) {
       moving.set(0, 0, 0);
-      return;
+      return held.size > 0;
     }
     FLIGHT_STEP.copy(moving).multiplyScalar(step);
     // The orbit point rises no higher than the city is wide, which from the far
@@ -2101,6 +2126,7 @@ function Flight({
     }
     camera.position.add(FLIGHT_STEP);
     controls.target.add(FLIGHT_STEP);
+    return true;
   });
 
   return null;
@@ -2725,6 +2751,9 @@ export default function Scene({
         <Canvas
           // The far plane is the world's to set, from where the fog ends.
           camera={{ fov: CAMERA_FOV, near: 0.5, far: 1000 }}
+          // Only when something changes: a city left open in the backoffice would
+          // otherwise redraw sixty times a second to show the same picture.
+          frameloop="demand"
           // A click on paving or on the void is a click on nothing, which is how the
           // city goes back the way it was without hunting for a close button.
           onPointerMissed={() => {
@@ -2734,6 +2763,7 @@ export default function Scene({
           shadows="percentage"
         >
           <ReleaseResources />
+          <RedrawOnRender />
           <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
           <Stage
             districts={city.districts}
