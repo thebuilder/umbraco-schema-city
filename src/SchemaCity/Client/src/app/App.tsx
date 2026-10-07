@@ -55,6 +55,7 @@ import {
   lensScale,
   type Ramp,
 } from "./scene/lens";
+import { enterFocuses } from "./shortcuts";
 import {
   FLAT_VIEWS,
   parseUrl,
@@ -202,7 +203,7 @@ export function App({
       ) {
         return;
       }
-      if (event.key === "Enter" && selected) {
+      if (selected && enterFocuses(event)) {
         setFocusDepth(1);
         setFocus(selected);
       }
