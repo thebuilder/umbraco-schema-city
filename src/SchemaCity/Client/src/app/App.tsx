@@ -54,7 +54,7 @@ import { Inspector } from "./Inspector";
 import { TextButton } from "./InspectorChips";
 import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
-import { PresentationLayer, usePresentation } from "./Presentation";
+import { PresentationLayer, PresentBar, usePresentation } from "./Presentation";
 import { FindingLinks, useReviewing } from "./Review";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
@@ -783,6 +783,16 @@ export function App({
 
           {/* A container, so the inspector sizes itself to the room the workspace has. */}
           <div className="@container relative min-h-0 flex-1">
+            {/* First in the stage, so Tab reaches it before the city and Shift-Tab
+              from the city comes back to it. */}
+            {presenting ? (
+              <PresentBar
+                onLeave={() => present(false)}
+                onSearch={() => openPalette(true)}
+                onView={setView}
+                view={view}
+              />
+            ) : null}
             {/* The overlays over the canvas share one layer, so presenting zooms
               them together and the canvas keeps every pointer they do not cover. */}
             <div className="pointer-events-none absolute inset-0 z-10 [zoom:var(--present,1)] *:pointer-events-auto">
@@ -905,12 +915,6 @@ export function App({
             )}
 
             <PresentationLayer
-              bar={{
-                view,
-                onView: setView,
-                onSearch: () => openPalette(true),
-                onLeave: () => present(false),
-              }}
               card={{
                 node: selectedNode,
                 neighbourhood,

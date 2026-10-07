@@ -148,19 +148,17 @@ export function usePresentation(initial: boolean, onToggle: () => void) {
 }
 
 /**
- * The bar, the caption card and Details while presenting, with the inspector as
+ * The caption card and Details while presenting, with the inspector as
  * Details; otherwise the inspector as it is. Zoomed, and Details is the container its
  * widths are read from, so the panel takes the narrow width a zoomed area has room for.
  */
 export function PresentationLayer({
   presenting,
-  bar,
   card,
   details,
   children,
 }: {
   presenting: boolean;
-  bar: Parameters<typeof PresentBar>[0];
   card: Omit<Parameters<typeof CaptionCard>[0], "node" | "neighbourhood"> & {
     node?: SchemaNode;
     neighbourhood?: Neighbourhood;
@@ -172,7 +170,6 @@ export function PresentationLayer({
   if (!presenting) return children;
   return (
     <>
-      <PresentBar {...bar} />
       <CaptionLayer {...card} />
       {details ? (
         <div className="@container pointer-events-none absolute inset-0 z-20 [zoom:var(--present)] *:pointer-events-auto">
@@ -203,7 +200,7 @@ function CaptionLayer({
  * rests, and stays while the pointer or keyboard focus is in it. Hidden is opacity
  * only, so Tab still reaches it and showing it is what focus does.
  */
-function PresentBar({
+export function PresentBar({
   view,
   onView,
   onSearch,
