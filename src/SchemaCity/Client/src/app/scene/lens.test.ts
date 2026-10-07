@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import mediumFixture from "../../../dev/fixtures/medium.json";
 import mediumUsageFixture from "../../../dev/fixtures/medium-usage.json";
+import { findFindings } from "../../model/findings";
 import type {
   SchemaGraph,
   SchemaNode,
   TypeUsage,
   UsageReport,
 } from "../../model/types";
-import { findFindings } from "../../model/findings";
 import { lensScale } from "./lens";
 
 const medium = mediumFixture as unknown as SchemaGraph;
