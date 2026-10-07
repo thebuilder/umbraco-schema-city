@@ -23,7 +23,7 @@ export const isBlockEditor = (dataType: SchemaDataType) =>
 const UI_PREFIX = /^Umb\.PropertyEditorUi\./;
 
 /** "BlockGrid" for Umb.PropertyEditorUi.BlockGrid, the editor alias without a UI alias. */
-export const editorName = (dataType: SchemaDataType) =>
+const editorName = (dataType: SchemaDataType) =>
   dataType.editorUiAlias
     ? dataType.editorUiAlias.replace(UI_PREFIX, "")
     : dataType.editorAlias;

@@ -115,9 +115,11 @@ function Count({ value, on }: { value: number | null; on: boolean }) {
 export function FilterField({
   query,
   onQuery,
+  placeholder = "Filter types",
 }: {
   query: string;
   onQuery: (query: string) => void;
+  placeholder?: string;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -133,7 +135,7 @@ export function FilterField({
           className="h-8 w-64 min-w-[14rem] bg-secondary px-2 pr-7 font-sans text-prose text-xs placeholder:text-faint focus-visible:border-phosphor md:text-xs"
           id={id}
           onChange={(event) => onQuery(event.target.value)}
-          placeholder="Filter types"
+          placeholder={placeholder}
           ref={input}
           type="text"
           value={query}
@@ -212,6 +214,73 @@ export function Scroller({
   );
 }
 
+type Sort<Key> = { key: Key; ascending: boolean };
+
+/**
+ * A table's sort, by name to start with: choosing a column sorts by it, and
+ * choosing it again turns the order round.
+ */
+export function useSort<Key extends string>() {
+  const [sort, setSort] = useState<Sort<Key | "name">>({
+    key: "name",
+    ascending: true,
+  });
+  const toggle = (key: Key | "name") =>
+    setSort((was) => ({
+      key,
+      ascending: was.key === key ? !was.ascending : true,
+    }));
+  return [sort, toggle] as const;
+}
+
+/** The sticky header row, each heading a button that sorts by its column. */
+export function SortHeaders<Key extends string>({
+  columns,
+  sort,
+  onSort,
+}: {
+  columns: { key: Key; label: string; numeric?: boolean }[];
+  sort: Sort<Key | "name">;
+  onSort: (key: Key) => void;
+}) {
+  return (
+    <thead className="sticky top-0 z-10 bg-panel">
+      <tr>
+        {columns.map((column) => (
+          <th
+            aria-sort={
+              sort.key === column.key
+                ? sort.ascending
+                  ? "ascending"
+                  : "descending"
+                : "none"
+            }
+            className={`${CELL} border-line font-medium text-label text-xs ${
+              column.numeric ? "text-right" : ""
+            }`}
+            key={column.key}
+            scope="col"
+          >
+            <button
+              className={`hover:text-phosphor ${sort.key === column.key ? "text-prose" : ""}`}
+              onClick={() => onSort(column.key)}
+              type="button"
+            >
+              {column.label}
+              {/* aria-sort on the header says the order; the arrow is for eyes. */}
+              {sort.key === column.key ? (
+                <span aria-hidden className="text-faint">
+                  {sort.ascending ? " ▲" : " ▼"}
+                </span>
+              ) : null}
+            </button>
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
 export function TypeTable({
   graph,
   usage,
@@ -222,10 +291,7 @@ export function TypeTable({
   onSelect,
   scope,
 }: ListProps) {
-  const [sort, setSort] = useState<{ key: SortKey; ascending: boolean }>({
-    key: "name",
-    ascending: true,
-  });
+  const [sort, toggle] = useSort<SortKey>();
 
   const rows = useMemo(() => typeRows(graph, usage), [graph, usage]);
   const problems = useMemo(() => problemLabels(findings), [findings]);
@@ -247,11 +313,6 @@ export function TypeTable({
   const columns = usage
     ? COLUMNS
     : COLUMNS.filter((column) => column.key !== "usage");
-  const toggle = (key: SortKey) =>
-    setSort((was) => ({
-      key,
-      ascending: was.key === key ? !was.ascending : true,
-    }));
 
   return (
     <div className="flex h-full flex-col bg-background font-sans text-[13px] text-prose leading-normal">
@@ -269,40 +330,7 @@ export function TypeTable({
             Every Document Type in the schema. Choosing a row opens it in the
             inspector.
           </caption>
-          <thead className="sticky top-0 z-10 bg-panel">
-            <tr>
-              {columns.map((column) => (
-                <th
-                  aria-sort={
-                    sort.key === column.key
-                      ? sort.ascending
-                        ? "ascending"
-                        : "descending"
-                      : "none"
-                  }
-                  className={`${CELL} border-line font-medium text-label text-xs ${
-                    column.numeric ? "text-right" : ""
-                  }`}
-                  key={column.key}
-                  scope="col"
-                >
-                  <button
-                    className={`hover:text-phosphor ${sort.key === column.key ? "text-prose" : ""}`}
-                    onClick={() => toggle(column.key)}
-                    type="button"
-                  >
-                    {column.label}
-                    {/* aria-sort on the header says the order; the arrow is for eyes. */}
-                    {sort.key === column.key ? (
-                      <span aria-hidden className="text-faint">
-                        {sort.ascending ? " ▲" : " ▼"}
-                      </span>
-                    ) : null}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
+          <SortHeaders columns={columns} onSort={toggle} sort={sort} />
           <tbody>
             {shown.map((row) => {
               const on = row.id === selected;

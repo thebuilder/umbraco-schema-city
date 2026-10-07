@@ -28,6 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { dataTypeNames, dataTypeUsers } from "../model/data-types";
 import { findFindings } from "../model/findings";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
@@ -45,10 +46,12 @@ import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_INSET, Inspector } from "./Inspector";
+import { DataTypeLinks, TextButton } from "./InspectorChips";
 import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
+  highlightScale,
   LENS_LABEL,
   LENSES,
   type Lens,
@@ -111,6 +114,7 @@ export function App({
   usage,
   icons,
   onOpenType,
+  onOpenDataType,
   initial,
   onStateChange,
 }: {
@@ -123,6 +127,8 @@ export function App({
    */
   icons?: Record<string, string>;
   onOpenType?: (id: string) => void;
+  /** Opens a Data Type in the backoffice editor. */
+  onOpenDataType?: (id: string) => void;
   /**
    * Where to start. Left out, the app reads its own query string. `type` is a node
    * id or an alias, because the Document Type editor knows the key it is on and a
@@ -135,6 +141,7 @@ export function App({
     lens?: Lens;
     view?: View;
     group?: Grouping;
+    dataType?: string | null;
   };
   /** Given, the host owns the address bar and the app writes nothing. */
   onStateChange?: (state: UrlState) => void;
@@ -156,6 +163,7 @@ export function App({
       lens: state.lens ?? "none",
       view: state.view ?? "city",
       group: state.group ?? "structure",
+      dataType: state.dataType ?? null,
     };
   });
   const [selected, setSelected] = useState<string | null>(start.id);
@@ -169,6 +177,9 @@ export function App({
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
   const [group, setGroup] = useState<Grouping>(start.group);
+  const [dataType, setDataType] = useState<string | null>(start.dataType);
+  // The Data Type whose users Show in city lights up, until Clear or a lens.
+  const [highlight, setHighlight] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [findingsOpen, setFindingsOpen] = useState(false);
@@ -282,6 +293,7 @@ export function App({
       lens,
       view,
       group,
+      dataType,
     };
     mirror.current?.(state);
     if (hostOwnsUrl) return;
@@ -294,6 +306,7 @@ export function App({
     lens,
     view,
     group,
+    dataType,
     aliasById,
     hostOwnsUrl,
     mountedAt,
@@ -328,9 +341,17 @@ export function App({
           : "bg-phosphor-dim";
   }, [graph.edges]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
+  const dataTypeName = useMemo(() => dataTypeNames(graph), [graph]);
+  // Show in city takes the lens's place on the buildings while it is on.
   const scale = useMemo(
-    () => lensScale(graph, usage, lens, findings),
-    [graph, usage, lens, findings]
+    () =>
+      highlight
+        ? highlightScale(
+            graph,
+            new Set(dataTypeUsers(graph, highlight).map((user) => user.node.id))
+          )
+        : lensScale(graph, usage, lens, findings),
+    [graph, usage, lens, findings, highlight]
   );
   const comparison = useMemo(
     () => (baseline ? compareSchemas(baseline, graph) : null),
@@ -382,6 +403,21 @@ export function App({
   // whole layout with it. The lists you are reading are what you fly between.
   const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
 
+  // Every Data Type name in the app links here: its page, with the drawers that
+  // can hold such a link closed so the page is what you see.
+  const dataTypeLinks = useMemo(
+    () => ({
+      open: (id: string) => {
+        setFindingsOpen(false);
+        setComparisonOpen(false);
+        setDataType(id);
+        setView("datatypes");
+      },
+      nameOf: (id: string) => dataTypeName.get(id),
+    }),
+    [dataTypeName]
+  );
+
   // A chosen row opens the inspector, so focus goes to its heading, not back to
   // the Search button.
   const handOff = useHandOff(portal);
@@ -393,19 +429,23 @@ export function App({
 
   return (
     <LiveRegion portal={portal}>
-      <section
-        aria-label="Schema City"
-        className="flex h-full flex-col bg-background font-mono text-foreground"
-        data-schema-city=""
-      >
-        <Announcements
-          focus={scope}
-          layers={layers.map((layer) => LAYER_LABEL[layer])}
-          nodesById={nodesById}
-          selected={selected}
-          view={view}
-        />
-        {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
+      <DataTypeLinks value={dataTypeLinks}>
+        <section
+          aria-label="Schema City"
+          className="flex h-full flex-col bg-background font-mono text-foreground"
+          data-schema-city=""
+        >
+          <Announcements
+            focus={scope}
+            layers={layers.map((layer) => LAYER_LABEL[layer])}
+            lit={
+              highlight ? (dataTypeName.get(highlight) ?? "a Data Type") : null
+            }
+            nodesById={nodesById}
+            selected={selected}
+            view={view}
+          />
+          {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
             fitting, which is 848 px with the lens picker reading None and earlier
             once a longer lens name widens it. The backoffice is narrower than the
             harness, and a media query would have to guess by how much. ml-auto still
@@ -415,170 +455,173 @@ export function App({
             relative z-10 with a background of its own because the scene under it is
             a positioned layer: a positioned box paints over a plain sibling's text
             whatever the source order, so the toolbar has to be on a layer too. */}
-        <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-line border-b bg-background px-4 py-2.5">
-          <h1 className="shrink-0 font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
-            Schema City
-          </h1>
+          <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-line border-b bg-background px-4 py-2.5">
+            <h1 className="shrink-0 font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
+              Schema City
+            </h1>
 
-          {/* One button rather than four, because the backoffice is narrower than
+            {/* One button rather than four, because the backoffice is narrower than
               the harness and four of them ran off the edge. The count is on the
               label so the toolbar still says how much of the city is drawn.
               ponytail: base-ui's Menu is 6.9 kB gzipped of vendor that nothing else
               here uses. Four checkbox rows in the Popover already in the bundle
               would be free, at the cost of writing the roving focus and the
               typeahead this gets for nothing. Swap it if the bundle gets tight. */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button data-trigger size="sm" variant="outline" />}
-            >
-              Layers {layers.length}/{LAYERS.length}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {LAYERS.map((layer, index) => (
-                <DropdownMenuCheckboxItem
-                  checked={layers.includes(layer)}
-                  key={layer}
-                  onCheckedChange={() =>
-                    setLayers((on) => withLayer(on, layer))
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button data-trigger size="sm" variant="outline" />}
+              >
+                Layers {layers.length}/{LAYERS.length}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {LAYERS.map((layer, index) => (
+                  <DropdownMenuCheckboxItem
+                    checked={layers.includes(layer)}
+                    key={layer}
+                    onCheckedChange={() =>
+                      setLayers((on) => withLayer(on, layer))
+                    }
+                  >
+                    {LAYER_LABEL[layer]}
+                    <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Structure follows what an editor can create where, Folders the
+              folders the schema files its types in. Only the city is grouped. */}
+            {/* biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads. */}
+            <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
+              Group
+              <Select
+                disabled={view !== "city"}
+                items={GROUPINGS}
+                onValueChange={(value) => {
+                  // The comparison's baseline positions and a focus both stand on the
+                  // city layout, so a new grouping starts from the whole city.
+                  setFocus(null);
+                  setGroup(value as Grouping);
+                }}
+                value={group}
+              >
+                <SelectTrigger
+                  aria-label="Group the city by"
+                  className="text-2xs uppercase tracking-terminal"
+                  size="sm"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GROUPINGS.map(({ value, label }) => (
+                    <SelectItem
+                      className="text-2xs uppercase tracking-terminal"
+                      key={value}
+                      value={value}
+                    >
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <ViewSwitcher onView={setView} view={view} />
+
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {/* A disabled trigger swallows its own pointer events, and with them
+                the hover the tooltip needs, so the tooltip wraps the label. */}
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    // biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads.
+                    <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
                   }
                 >
-                  {LAYER_LABEL[layer]}
-                  <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Structure follows what an editor can create where, Folders the
-              folders the schema files its types in. Only the city is grouped. */}
-          {/* biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads. */}
-          <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
-            Group
-            <Select
-              disabled={view !== "city"}
-              items={GROUPINGS}
-              onValueChange={(value) => {
-                // The comparison's baseline positions and a focus both stand on the
-                // city layout, so a new grouping starts from the whole city.
-                setFocus(null);
-                setGroup(value as Grouping);
-              }}
-              value={group}
-            >
-              <SelectTrigger
-                aria-label="Group the city by"
-                className="text-2xs uppercase tracking-terminal"
-                size="sm"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {GROUPINGS.map(({ value, label }) => (
-                  <SelectItem
-                    className="text-2xs uppercase tracking-terminal"
-                    key={value}
-                    value={value}
+                  Lens
+                  <Select
+                    disabled={!usage}
+                    items={LENSES.map((name) => ({
+                      label: LENS_LABEL[name],
+                      value: name,
+                    }))}
+                    onValueChange={(value) => {
+                      setHighlight(null);
+                      setLens(value as Lens);
+                    }}
+                    value={lens}
                   >
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
+                    <SelectTrigger
+                      aria-label="Usage lens"
+                      className="text-2xs uppercase tracking-terminal"
+                      size="sm"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LENSES.map((name) => (
+                        <SelectItem
+                          className="text-2xs uppercase tracking-terminal"
+                          key={name}
+                          value={name}
+                        >
+                          {LENS_LABEL[name]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TooltipTrigger>
+                {usage ? null : (
+                  <TooltipContent>
+                    The usage endpoint did not answer, so the lens is off.
+                  </TooltipContent>
+                )}
+              </Tooltip>
 
-          <ViewSwitcher onView={setView} view={view} />
+              <Findings
+                findings={findings}
+                graph={graph}
+                nodesById={nodesById}
+                onOpenChange={setFindingsOpen}
+                onSelect={followLink}
+                open={findingsOpen}
+                usage={usage}
+              />
 
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {/* A disabled trigger swallows its own pointer events, and with them
-                the hover the tooltip needs, so the tooltip wraps the label. */}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  // biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads.
-                  <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
-                }
-              >
-                Lens
-                <Select
-                  disabled={!usage}
-                  items={LENSES.map((name) => ({
-                    label: LENS_LABEL[name],
-                    value: name,
-                  }))}
-                  onValueChange={(value) => setLens(value as Lens)}
-                  value={lens}
-                >
-                  <SelectTrigger
-                    aria-label="Usage lens"
-                    className="text-2xs uppercase tracking-terminal"
-                    size="sm"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LENSES.map((name) => (
-                      <SelectItem
-                        className="text-2xs uppercase tracking-terminal"
-                        key={name}
-                        value={name}
-                      >
-                        {LENS_LABEL[name]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TooltipTrigger>
-              {usage ? null : (
-                <TooltipContent>
-                  The usage endpoint did not answer, so the lens is off.
-                </TooltipContent>
-              )}
-            </Tooltip>
+              <ComparisonTools
+                baseline={baseline}
+                comparison={comparison}
+                graph={graph}
+                onBaselineChange={(next) => {
+                  setBaseline(next);
+                  setFocus(null);
+                  if (next) setLens("none");
+                }}
+                onOpenChange={setComparisonOpen}
+                onSelect={(id) => {
+                  setComparisonOpen(false);
+                  followLink(id);
+                }}
+                open={comparisonOpen}
+              />
 
-            <Findings
-              findings={findings}
-              graph={graph}
-              nodesById={nodesById}
-              onOpenChange={setFindingsOpen}
-              onSelect={followLink}
-              open={findingsOpen}
-              usage={usage}
-            />
+              <Legend />
 
-            <ComparisonTools
-              baseline={baseline}
-              comparison={comparison}
-              graph={graph}
-              onBaselineChange={(next) => {
-                setBaseline(next);
-                setFocus(null);
-                if (next) setLens("none");
-              }}
-              onOpenChange={setComparisonOpen}
-              onSelect={(id) => {
-                setComparisonOpen(false);
-                followLink(id);
-              }}
-              open={comparisonOpen}
-            />
+              <Help onOpenChange={setHelpOpen} open={helpOpen} />
 
-            <Legend />
-
-            <Help onOpenChange={setHelpOpen} open={helpOpen} />
-
-            {/* No tooltip on a control that opens a dialog: the tooltip's exit
+              {/* No tooltip on a control that opens a dialog: the tooltip's exit
                 animation plays over the dialog opening, which reads as the label
                 flying away. The shortcut goes in the button instead. */}
-            <Button data-trigger onClick={() => openPalette(true)} size="sm">
-              Search
-              <Kbd>{SEARCH_KEY}</Kbd>
-            </Button>
+              <Button data-trigger onClick={() => openPalette(true)} size="sm">
+                Search
+                <Kbd>{SEARCH_KEY}</Kbd>
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* A container, so the inspector sizes itself to the room the workspace has. */}
-        <div className="@container relative min-h-0 flex-1">
-          {/* The legend is an overlay in the corner of the canvas rather than a row
+          {/* A container, so the inspector sizes itself to the room the workspace has. */}
+          <div className="@container relative min-h-0 flex-1">
+            {/* The legend is an overlay in the corner of the canvas rather than a row
               above it. As a row it took its height out of the canvas the moment a
               lens was picked, and the scene dropped and re-fitted itself around the
               new viewport, which reads as the city flinching at a colour change.
@@ -586,202 +629,231 @@ export function App({
               the same reason. It covers its own box and nothing else, so the ground
               under it is the only pick the canvas loses. The list view colours
               nothing by lens, so it gets no legend over its first row. */}
-          {scale && !flat ? (
-            <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
-              <span className="font-bold uppercase tracking-terminal">
-                {LENS_LABEL[lens]}
-              </span>
-              <span>{scale.minLabel}</span>
-              <span
-                aria-hidden
-                className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`}
-              />
-              <span>{scale.maxLabel}</span>
-            </div>
-          ) : null}
-          {/* The scene and the label layer over it get a stacking context of
+            {highlight && !flat ? (
+              <div className="absolute top-0 left-0 z-10 flex max-w-full flex-wrap items-center gap-x-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
+                <span
+                  aria-hidden
+                  className={`h-2 w-6 shrink-0 ${RAMP_BAR.binary}`}
+                />
+                <span className="font-sans text-label text-xs">
+                  Lit: types using{" "}
+                  <span className="text-prose">
+                    {dataTypeName.get(highlight) ?? "the Data Type"}
+                  </span>
+                </span>
+                <TextButton onClick={() => setHighlight(null)}>
+                  Clear
+                </TextButton>
+              </div>
+            ) : scale && !flat ? (
+              <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
+                <span className="font-bold uppercase tracking-terminal">
+                  {LENS_LABEL[lens]}
+                </span>
+                <span>{scale.minLabel}</span>
+                <span
+                  aria-hidden
+                  className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`}
+                />
+                <span>{scale.maxLabel}</span>
+              </div>
+            ) : null}
+            {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
-          {flat ? null : <ComparisonLegend comparison={comparison} />}
-          {flat ? (
-            // The inspector is an overlay, so the view is inset by its width while
-            // it is open rather than sliding under it.
-            <div
-              className={`absolute inset-0 outline-none ${selectedNode ? INSPECTOR_INSET : ""}`}
-              data-focus-home
-              tabIndex={-1}
-            >
-              <FlatView
-                findings={findings}
-                graph={graph}
-                neighbourhoodById={neighbourhoodById}
-                nodesById={nodesById}
-                onPick={() => setPaletteOpen(true)}
-                onQuery={setQuery}
-                onSelect={setSelected}
-                onShowAll={() => setFocus(null)}
-                query={query}
-                scope={scope}
-                selected={selected}
-                usage={usage}
-                view={view}
-              />
-            </div>
-          ) : nodes.length === 0 ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-8 text-center">
-              <p className="font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
-                No Document Types yet
-              </p>
-              <p className="text-muted-foreground text-xs">
-                Create one under Settings, Document Types, and it turns up here
-                as a building.
-              </p>
-            </div>
-          ) : (
-            <div className="absolute inset-0 z-0">
-              <p className="sr-only">{citySummary(graph, group)}</p>
-              <Suspense
-                fallback={
-                  <p className="p-4 text-phosphor-dim text-sm">
-                    Loading the scene…
-                  </p>
-                }
+            {flat ? null : <ComparisonLegend comparison={comparison} />}
+            {flat ? (
+              // The inspector is an overlay, so the view is inset by its width while
+              // it is open rather than sliding under it.
+              <div
+                className={`absolute inset-0 outline-none ${selectedNode ? INSPECTOR_INSET : ""}`}
+                data-focus-home
+                tabIndex={-1}
               >
-                <Scene
-                  baseline={baseline}
-                  comparison={comparison}
-                  focus={focus}
-                  focusDepth={focusDepth}
+                <FlatView
+                  dataTypes={{
+                    selected: dataType,
+                    onChoose: setDataType,
+                    onOpenDataType,
+                    onShowInCity: (id) => {
+                      setHighlight(id);
+                      setView("city");
+                    },
+                  }}
+                  findings={findings}
                   graph={graph}
-                  grouping={group}
-                  icons={icons}
-                  inspectorOpen={Boolean(selectedNode && neighbourhood)}
-                  layers={layers}
-                  onFocus={enterFocus}
-                  onReset={resetView}
-                  onSelect={(id) => (id === null ? done() : setSelected(id))}
-                  reframe={reframe}
-                  scale={scale}
+                  neighbourhoodById={neighbourhoodById}
+                  nodesById={nodesById}
+                  onPick={() => setPaletteOpen(true)}
+                  onQuery={setQuery}
+                  onSelect={setSelected}
+                  onShowAll={() => setFocus(null)}
+                  query={query}
+                  scope={scope}
                   selected={selected}
                   usage={usage}
+                  view={view}
                 />
-              </Suspense>
-            </div>
-          )}
+              </div>
+            ) : nodes.length === 0 ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-8 text-center">
+                <p className="font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
+                  No Document Types yet
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Create one under Settings, Document Types, and it turns up
+                  here as a building.
+                </p>
+              </div>
+            ) : (
+              <div className="absolute inset-0 z-0">
+                <p className="sr-only">{citySummary(graph, group)}</p>
+                <Suspense
+                  fallback={
+                    <p className="p-4 text-phosphor-dim text-sm">
+                      Loading the scene…
+                    </p>
+                  }
+                >
+                  <Scene
+                    baseline={baseline}
+                    comparison={comparison}
+                    focus={focus}
+                    focusDepth={focusDepth}
+                    graph={graph}
+                    grouping={group}
+                    icons={icons}
+                    inspectorOpen={Boolean(selectedNode && neighbourhood)}
+                    layers={layers}
+                    onFocus={enterFocus}
+                    onReset={resetView}
+                    onSelect={(id) => (id === null ? done() : setSelected(id))}
+                    reframe={reframe}
+                    scale={scale}
+                    selected={selected}
+                    usage={usage}
+                  />
+                </Suspense>
+              </div>
+            )}
 
-          {selectedNode && neighbourhood ? (
-            <Inspector
-              canExpandFocus={canExpandFocus}
-              edges={graph.edges}
-              editorLayoutOpen={view === "editor"}
-              findings={findings.filter(
-                (finding) => finding.nodeId === selectedNode.id
-              )}
-              focusCount={focusCount}
-              focusDepth={focusDepth}
-              focused={focus === selectedNode.id}
-              icons={icons}
-              neighbourhood={neighbourhood}
-              node={selectedNode}
-              nodesById={nodesById}
-              onClose={done}
-              onEditorLayout={() => setView("editor")}
-              onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
-              onOpenType={onOpenType}
-              onSelect={followLink}
-              onToggleFocus={() =>
-                focus === selectedNode.id
-                  ? setFocus(null)
-                  : enterFocus(selectedNode.id)
-              }
-              usage={usage?.byType[selectedNode.id]}
-              usageReport={usage}
-            />
-          ) : null}
-        </div>
+            {selectedNode && neighbourhood ? (
+              <Inspector
+                canExpandFocus={canExpandFocus}
+                edges={graph.edges}
+                editorLayoutOpen={view === "editor"}
+                findings={findings.filter(
+                  (finding) => finding.nodeId === selectedNode.id
+                )}
+                focusCount={focusCount}
+                focusDepth={focusDepth}
+                focused={focus === selectedNode.id}
+                icons={icons}
+                neighbourhood={neighbourhood}
+                node={selectedNode}
+                nodesById={nodesById}
+                onClose={done}
+                onEditorLayout={() => setView("editor")}
+                onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
+                onOpenType={onOpenType}
+                onSelect={followLink}
+                onToggleFocus={() =>
+                  focus === selectedNode.id
+                    ? setFocus(null)
+                    : enterFocus(selectedNode.id)
+                }
+                usage={usage?.byType[selectedNode.id]}
+                usageReport={usage}
+              />
+            ) : null}
+          </div>
 
-        {/* One height whatever the query matches, so the panel never jumps while
+          {/* One height whatever the query matches, so the panel never jumps while
             you type and the list scrolls inside it. */}
-        <CommandDialog
-          className="h-[60vh] min-h-80 sm:max-w-xl"
-          description="Type a name, an alias or a property alias, then choose a type to open it in the inspector."
-          finalFocus={handOff.finalFocus}
-          onOpenChange={openPalette}
-          open={paletteOpen}
-          title="Search types"
-        >
-          {/* Afterglow's CommandDialog is the dialog only, so the cmdk root is ours.
+          <CommandDialog
+            className="h-[60vh] min-h-80 sm:max-w-xl"
+            description="Type a name, an alias or a property alias, then choose a type to open it in the inspector."
+            finalFocus={handOff.finalFocus}
+            onOpenChange={openPalette}
+            open={paletteOpen}
+            title="Search types"
+          >
+            {/* Afterglow's CommandDialog is the dialog only, so the cmdk root is ours.
               Filtering is ours too: cmdk scores its own item labels, which would
               miss the property aliases the rows do not print. */}
-          <Command label="Find a type or a property alias" shouldFilter={false}>
-            <CommandInput
-              onValueChange={setQuery}
-              placeholder="Find a type or a property alias…"
-              trailing={<Kbd className="shrink-0">Esc</Kbd>}
-              value={query}
-            />
-            <div className="flex justify-end border-line border-b px-3 py-1 font-bold text-3xs text-label uppercase tracking-terminal">
-              {hits.length} of {nodes.length} types
-            </div>
-            <CommandList
-              /* cmdk puts a sizer div between the list and its rows, so the empty
-                 state can only fill the box if that div is a column too. */
-              className="max-h-none flex-1 [&_[cmdk-list-sizer]]:flex [&_[cmdk-list-sizer]]:h-full [&_[cmdk-list-sizer]]:flex-col"
+            <Command
+              label="Find a type or a property alias"
+              shouldFilter={false}
             >
-              {hits.length === 0 ? (
-                <CommandEmpty className="flex flex-1 items-center justify-center py-0">
-                  No type or property matches
-                </CommandEmpty>
-              ) : (
-                hits.map((hit) => {
-                  const detail =
-                    hit.propertyAlias ??
-                    plural(
-                      hit.node.ownPropertyCount +
-                        hit.node.composedPropertyCount,
-                      "property",
-                      "properties"
-                    );
-                  return (
-                    <CommandItem
-                      // One sentence for a screen reader, without the Enter glyph.
-                      aria-label={`${hit.node.name}, alias ${hit.node.alias}, ${hit.propertyAlias ? `property ${hit.propertyAlias}` : detail}`}
-                      className="group"
-                      key={hit.node.id}
-                      onSelect={() => pick(hit.node.id)}
-                      value={hit.node.id}
-                    >
-                      <span
-                        aria-hidden
-                        className={`size-2.5 shrink-0 ${swatchOf(hit.node)}`}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs">
-                          {hit.node.name}
-                        </span>
-                        <span className="block truncate text-3xs text-label">
-                          {hit.node.alias}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-2xs text-label">
-                        {detail}
-                      </span>
-                      <Kbd
-                        aria-hidden
-                        className="shrink-0 opacity-0 group-data-[selected=true]:opacity-100"
-                        glyph
+              <CommandInput
+                onValueChange={setQuery}
+                placeholder="Find a type or a property alias…"
+                trailing={<Kbd className="shrink-0">Esc</Kbd>}
+                value={query}
+              />
+              <div className="flex justify-end border-line border-b px-3 py-1 font-bold text-3xs text-label uppercase tracking-terminal">
+                {hits.length} of {nodes.length} types
+              </div>
+              <CommandList
+                /* cmdk puts a sizer div between the list and its rows, so the empty
+                 state can only fill the box if that div is a column too. */
+                className="max-h-none flex-1 [&_[cmdk-list-sizer]]:flex [&_[cmdk-list-sizer]]:h-full [&_[cmdk-list-sizer]]:flex-col"
+              >
+                {hits.length === 0 ? (
+                  <CommandEmpty className="flex flex-1 items-center justify-center py-0">
+                    No type or property matches
+                  </CommandEmpty>
+                ) : (
+                  hits.map((hit) => {
+                    const detail =
+                      hit.propertyAlias ??
+                      plural(
+                        hit.node.ownPropertyCount +
+                          hit.node.composedPropertyCount,
+                        "property",
+                        "properties"
+                      );
+                    return (
+                      <CommandItem
+                        // One sentence for a screen reader, without the Enter glyph.
+                        aria-label={`${hit.node.name}, alias ${hit.node.alias}, ${hit.propertyAlias ? `property ${hit.propertyAlias}` : detail}`}
+                        className="group"
+                        key={hit.node.id}
+                        onSelect={() => pick(hit.node.id)}
+                        value={hit.node.id}
                       >
-                        ↵
-                      </Kbd>
-                    </CommandItem>
-                  );
-                })
-              )}
-            </CommandList>
-          </Command>
-        </CommandDialog>
+                        <span
+                          aria-hidden
+                          className={`size-2.5 shrink-0 ${swatchOf(hit.node)}`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs">
+                            {hit.node.name}
+                          </span>
+                          <span className="block truncate text-3xs text-label">
+                            {hit.node.alias}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-2xs text-label">
+                          {detail}
+                        </span>
+                        <Kbd
+                          aria-hidden
+                          className="shrink-0 opacity-0 group-data-[selected=true]:opacity-100"
+                          glyph
+                        >
+                          ↵
+                        </Kbd>
+                      </CommandItem>
+                    );
+                  })
+                )}
+              </CommandList>
+            </Command>
+          </CommandDialog>
 
-        <div ref={portal} />
-      </section>
+          <div ref={portal} />
+        </section>
+      </DataTypeLinks>
     </LiveRegion>
   );
 }

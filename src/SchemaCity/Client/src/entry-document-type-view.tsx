@@ -8,7 +8,13 @@ import {
 } from "@umbraco-cms/backoffice/external/lit";
 import { tryExecute, UmbApiError } from "@umbraco-cms/backoffice/resources";
 import { createRoot, type Root } from "react-dom/client";
-import { getGraph, getUsage, openTypeInEditor, resolveIcons } from "./api.js";
+import {
+  getGraph,
+  getUsage,
+  openDataTypeInEditor,
+  openTypeInEditor,
+  resolveIcons,
+} from "./api.js";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
@@ -104,6 +110,7 @@ class SchemaCityDocumentTypeViewElement extends UmbElementMixin(LitElement) {
           graph={this.#graph}
           icons={this.#icons}
           initial={{ type: this.#unique, focus: true }}
+          onOpenDataType={openDataTypeInEditor}
           onOpenType={openTypeInEditor}
           usage={this.#usage}
         />

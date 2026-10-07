@@ -62,6 +62,7 @@ async function show(path: string) {
       graph={graph}
       icons={icons}
       key={path}
+      onOpenDataType={(id) => console.log("schema-city: open Data Type", id)}
       onOpenType={(id) => console.log("schema-city: open type", id)}
       usage={usage ? ((await usage()) as UsageReport) : undefined}
     />

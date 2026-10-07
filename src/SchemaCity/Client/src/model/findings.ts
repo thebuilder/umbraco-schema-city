@@ -874,10 +874,16 @@ function dataTypeTwins(
         : `${use.name} (${id.slice(0, 8)})`;
     const anchor = [...(uses[0]?.[1].types ?? [])].sort(byName)[0] ?? "";
     const others = uses.flatMap(([, use]) => [...use.types]);
-    const before = rows.get(anchor);
+    // A type that anchors two sets adds the second to the first one's row.
+    const before = rows.get(anchor) ?? {
+      summary: "",
+      related: [],
+      properties: 0,
+      dataTypeIds: [],
+    };
     rows.set(anchor, {
       summary: [
-        before?.summary,
+        before.summary,
         uses
           .map(
             (use) =>
@@ -887,13 +893,13 @@ function dataTypeTwins(
       ]
         .filter(Boolean)
         .join("; "),
-      related: [...new Set([...(before?.related ?? []), ...others])]
+      related: [...new Set([...before.related, ...others])]
         .filter((id) => id !== anchor)
         .sort(byName),
       properties:
-        (before?.properties ?? 0) +
+        before.properties +
         uses.reduce((sum, [, use]) => sum + use.properties, 0),
-      dataTypeIds: [...(before?.dataTypeIds ?? []), ...uses.map(([id]) => id)],
+      dataTypeIds: [...before.dataTypeIds, ...uses.map(([id]) => id)],
     });
   }
   return rows;

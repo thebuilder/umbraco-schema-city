@@ -1,5 +1,6 @@
 // The view switcher and the 2D views it chooses between. Kept out of App so the
 // toolbar there only places the switcher.
+import type { ReactNode } from "react";
 import { toggleVariants } from "@/components/ui/toggle";
 import type { Finding } from "../model/findings";
 import { roleOf } from "../model/inspector";
@@ -8,19 +9,24 @@ import { reachableWithin } from "../model/reach";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
 import { plural, roving, useAnnounceChange } from "./a11y";
 import { CreationTree } from "./CreationTree";
+import { DataTypes, type DataTypesProps } from "./DataTypes";
 import { EditorLayout } from "./EditorLayout";
 import { TextButton } from "./InspectorChips";
 import { Matrix } from "./Matrix";
-import { TypeTable } from "./TypeTable";
+import { type ListProps, TypeTable } from "./TypeTable";
 import { FLAT_VIEWS, type View } from "./url";
 
-/** The switcher's entries, and the single key that toggles each one. */
+/**
+ * The switcher's entries, and the single key that toggles each one. Data Types has
+ * none: D pans the camera and no free letter says Data Types.
+ */
 export const VIEW_TABS: { value: View; label: string; key?: string }[] = [
   { value: "city", label: "City" },
   { value: "list", label: "List", key: "l" },
   { value: "tree", label: "Tree", key: "t" },
   { value: "matrix", label: "Matrix", key: "m" },
   { value: "editor", label: "Editor", key: "e" },
+  { value: "datatypes", label: "Data Types" },
 ];
 
 const ITEM = `${toggleVariants({ size: "sm", variant: "outline" })} min-w-0 border-0 bg-secondary px-3 focus-visible:z-10 focus-visible:outline-offset-[-2px]`;
@@ -91,12 +97,15 @@ export function Announcements({
   layers,
   focus,
   nodesById,
+  lit = null,
 }: {
   selected: string | null;
   view: View;
   layers: string[];
   focus: FocusScope | null;
   nodesById: Map<string, SchemaNode>;
+  /** The Data Type whose users Show in city lit, by name. */
+  lit?: string | null;
 }) {
   const name = (id: string | null | undefined) =>
     nodesById.get(id ?? "")?.name ?? "";
@@ -107,6 +116,9 @@ export function Announcements({
     `${VIEW_TABS.find((tab) => tab.value === view)?.label ?? "City"} view`
   );
   useAnnounceChange(`Layers on: ${layers.join(", ") || "none"}`);
+  useAnnounceChange(
+    lit ? `Types using ${lit} lit in the city` : "City lighting cleared"
+  );
   useAnnounceChange(
     focus
       ? `Focus on ${name(focus.around)}, ${plural(focus.ids.size, "type")}`
@@ -135,11 +147,11 @@ function FocusNote({
 }
 
 /** The List, Tree or Matrix, by the view's name. */
-const LISTS = {
+const LISTS: Partial<Record<View, (props: ListProps) => ReactNode>> = {
   list: TypeTable,
   tree: CreationTree,
   matrix: Matrix,
-} as const;
+};
 
 export function FlatView({
   view,
@@ -155,7 +167,13 @@ export function FlatView({
   neighbourhoodById,
   scope = null,
   onShowAll = () => undefined,
+  dataTypes,
 }: {
+  /** What the Data Types view needs beyond the lists' props. */
+  dataTypes: Pick<
+    DataTypesProps,
+    "selected" | "onChoose" | "onOpenDataType" | "onShowInCity"
+  >;
   view: View;
   graph: SchemaGraph;
   usage?: UsageReport;
@@ -171,6 +189,21 @@ export function FlatView({
   /** Leaves focus, which is how the lists go back to every type. */
   onShowAll?: () => void;
 }) {
+  const roleFor = (node: SchemaNode) =>
+    roleOf(node, neighbourhoodById.get(node.id));
+  // Data Types are not types, so focus does not narrow them.
+  if (view === "datatypes")
+    return (
+      <DataTypes
+        {...dataTypes}
+        findings={findings}
+        graph={graph}
+        nodesById={nodesById}
+        onSelect={onSelect}
+        roleOf={roleFor}
+        usage={usage}
+      />
+    );
   if (view === "editor")
     return (
       <EditorLayout
@@ -178,11 +211,11 @@ export function FlatView({
         nodesById={nodesById}
         onPick={onPick}
         onSelect={onSelect}
-        roleOf={(node) => roleOf(node, neighbourhoodById.get(node.id))}
+        roleOf={roleFor}
         selected={selected}
       />
     );
-  const List = LISTS[view === "tree" || view === "matrix" ? view : "list"];
+  const List = LISTS[view] ?? TypeTable;
   // One shape in and out of focus, so entering focus keeps the list mounted with
   // its sort, its open branches and the row that has keyboard focus.
   return (

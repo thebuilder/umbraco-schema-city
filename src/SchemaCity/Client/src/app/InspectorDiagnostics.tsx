@@ -15,18 +15,26 @@ import {
 
 type Lookup = Map<string, SchemaNode>;
 
-/** The findings about this type, problems first as findFindings sorts them. */
+/**
+ * The findings about this type, problems first as findFindings sorts them. On a
+ * Data Type's page the findings are about several types, so `subjects` names the
+ * type each one is on, as a link.
+ */
 export function InspectorChecks({
   findings,
   nodesById,
   onSelect,
+  subjects = false,
+  empty = "No checks flagged this type.",
 }: {
   findings: Finding[];
   nodesById: Lookup;
   onSelect: (id: string) => void;
+  subjects?: boolean;
+  empty?: string;
 }) {
   if (findings.length === 0)
-    return <p className="text-faint text-xs">No checks flagged this type.</p>;
+    return <p className="text-faint text-xs">{empty}</p>;
   return (
     <ul className="space-y-2">
       {findings.map((finding) => {
@@ -41,6 +49,18 @@ export function InspectorChecks({
             >
               {problem ? "Problem" : "Note"} · {FINDING_LABEL[finding.kind]}
             </p>
+            {subjects && finding.nodeId ? (
+              <p className="mt-0.5 text-label text-xs">
+                On{" "}
+                <button
+                  className="text-phosphor hover:text-phosphor-bright hover:underline"
+                  onClick={() => onSelect(finding.nodeId ?? "")}
+                  type="button"
+                >
+                  {nodesById.get(finding.nodeId)?.name ?? "a deleted type"}
+                </button>
+              </p>
+            ) : null}
             <p className="mt-0.5 text-prose">{finding.summary}</p>
             <p className="mt-1.5 text-faint text-xs">
               {KIND_EXPLANATION[finding.kind]}

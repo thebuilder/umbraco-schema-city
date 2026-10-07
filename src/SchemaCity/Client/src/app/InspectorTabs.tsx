@@ -14,7 +14,7 @@ import {
 import type { Neighbourhood } from "../model/neighbourhood";
 import type { SchemaEdge, SchemaNode, UsageReport } from "../model/types";
 import { plural } from "./a11y";
-import { Heading, TextButton, TypeChips } from "./InspectorChips";
+import { DataTypeLink, Heading, TextButton, TypeChips } from "./InspectorChips";
 import { ExplainConnections, InspectorChecks } from "./InspectorDiagnostics";
 
 type Lookup = Map<string, SchemaNode>;
@@ -31,7 +31,7 @@ export type TabProps = {
   countOf: (id: string) => number | undefined;
 };
 
-function Section({ children }: { children: ReactNode }) {
+export function Section({ children }: { children: ReactNode }) {
   return (
     <section className="border-line border-b py-3.5 last:border-b-0">
       {children}
@@ -39,11 +39,11 @@ function Section({ children }: { children: ReactNode }) {
   );
 }
 
-function Muted({ children }: { children: ReactNode }) {
+export function Muted({ children }: { children: ReactNode }) {
   return <p className="text-faint text-xs">{children}</p>;
 }
 
-function Values({ rows }: { rows: [string, string][] }) {
+export function Values({ rows }: { rows: [string, string][] }) {
   return (
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-0.5">
       {rows.map(([label, value]) => (
@@ -321,9 +321,14 @@ export function Connections({
               <div className="mb-2.5 last:mb-0" key={field.propertyAlias}>
                 <p className="mb-1 truncate font-mono text-label text-xs">
                   {field.propertyAlias}
-                  <span className="font-sans text-faint">
-                    {field.dataType ? ` · ${field.dataType}` : ""}
-                  </span>
+                  {field.dataType && field.dataTypeId ? (
+                    <span className="font-sans text-faint">
+                      {" · "}
+                      <DataTypeLink id={field.dataTypeId}>
+                        {field.dataType}
+                      </DataTypeLink>
+                    </span>
+                  ) : null}
                 </p>
                 <TypeChips
                   chips={chips(field.ids, nodesById, countOf)}
