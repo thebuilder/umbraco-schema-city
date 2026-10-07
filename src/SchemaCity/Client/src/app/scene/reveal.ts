@@ -271,11 +271,19 @@ export function revealAt(
   };
 }
 
+/** How close an eased fade has to come before it lands, far under a visible step. */
+const SETTLED = 1e-3;
+
+/**
+ * An exponential ease toward `target`, which lands on it once within `SETTLED`, so a
+ * finished fade equals its target and the canvas can stop rendering for it.
+ */
 export function transitionToward(
   current: number,
   target: number,
   delta: number,
   rate = 12
 ): number {
-  return current + (target - current) * Math.min(1, delta * rate);
+  const next = current + (target - current) * Math.min(1, delta * rate);
+  return Math.abs(target - next) < SETTLED ? target : next;
 }
