@@ -7,6 +7,7 @@ import {
   type PropertyTargets,
 } from "../../model/neighbourhood";
 import type { SchemaGraph } from "../../model/types";
+import { LABEL_STRIP } from "../scene/board-labels";
 import {
   cityBounds,
   ISLAND_PAD,
@@ -23,8 +24,14 @@ import {
  */
 export const FOCUS_STREET = 9;
 
-/** Ground between two buildings in a row, and between two rows, as the city uses. */
+/** Ground between two buildings in a row. */
 const GAP = 3;
+/**
+ * Ground between two rows, and between two bands: the gap, and the strip a name
+ * prints on in front of its building, as the city leaves. Without it a name in an
+ * inner row fell behind the next row's buildings.
+ */
+const ROW_GAP = GAP + LABEL_STRIP;
 /** How high the composition platform sits above the ground. */
 const PLATFORM = 3;
 /** Half the angle a ring of parents spans, so an arc covers 120 degrees. */
@@ -161,9 +168,9 @@ export function layoutFocus(
         x += sizeOf(id) + GAP;
       }
       width = Math.max(width, rowWidth);
-      z += depth + GAP;
+      z += depth + ROW_GAP;
     }
-    return { ids, spots: spread, width, depth: z - GAP };
+    return { ids, spots: spread, width, depth: z - ROW_GAP };
   };
 
   /** Puts a block down at `nearZ` on the given side and reserves the ground it takes. */
@@ -179,7 +186,7 @@ export function layoutFocus(
       spots.set(id, { x: centreX + spot.x, z: sign * (at + spot.z), y });
     }
     const side = sign < 0 ? "-1" : "1";
-    stack[side] = Math.max(stack[side], at + block.depth + GAP);
+    stack[side] = Math.max(stack[side], at + block.depth + ROW_GAP);
     return grow(boxOf(block.ids));
   };
 
@@ -197,7 +204,7 @@ export function layoutFocus(
       const ring = Math.floor(index / ROW_LIMIT);
       const along = index % ROW_LIMIT;
       const width = Math.min(ROW_LIMIT, ids.length - ring * ROW_LIMIT);
-      const radius = first + ring * pitch;
+      const radius = first + ring * (pitch + LABEL_STRIP);
       const angle =
         width === 1 ? 0 : -ARC_HALF + (along / (width - 1)) * ARC_HALF * 2;
       spots.set(id, {
@@ -207,7 +214,7 @@ export function layoutFocus(
       });
       far = Math.max(far, radius + sizeOf(id) / 2);
     });
-    stack["-1"] = Math.max(stack["-1"], far + GAP);
+    stack["-1"] = Math.max(stack["-1"], far + ROW_GAP);
     return grow(boxOf(ids));
   };
 
