@@ -52,7 +52,6 @@ import { CompareContext } from "./TypeTable";
 import {
   FLAT_VIEWS,
   parseUrl,
-  TYPE_PAGES,
   type UrlState,
   urlToWrite,
   type View,
@@ -63,6 +62,7 @@ import {
   FlatView,
   focusScope,
   PAGE_TABS,
+  useTypePages,
   VIEW_TABS,
 } from "./Views";
 
@@ -151,7 +151,7 @@ export function App({
   decisions,
   initial,
   onStateChange,
-  usagePending = false,
+  usagePending,
   footer,
 }: {
   graph: SchemaGraph;
@@ -221,13 +221,6 @@ export function App({
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
-  // The schema-wide view a type page goes back to, the last one that was on.
-  const [back, setBack] = useState<View>(
-    TYPE_PAGES.includes(start.view) ? "city" : start.view
-  );
-  if (!(TYPE_PAGES.includes(view) || view === back)) setBack(view);
-  // Bumped when E or I is pressed with no type to open, which says so.
-  const [nudge, setNudge] = useState(0);
   const [group, setGroup] = useState<Grouping>(start.group);
   const [dataType, setDataType] = useState<string | null>(start.dataType);
   // What Show in city lights up, from a Data Type page or an impact trace, until
@@ -330,7 +323,7 @@ export function App({
       const tab = VIEW_TABS.find((candidate) => candidate.key === key);
       if (tab) setView((at) => (at === tab.value ? "city" : tab.value));
       const page = PAGE_TABS.find((candidate) => candidate.key === key);
-      if (page) togglePage(page.value);
+      if (page) pages.toggle(page.value);
       if (key === "home") resetView();
       if (key === "?") setHelpOpen(true);
       if (key === "p") present(!presenting);
@@ -347,7 +340,6 @@ export function App({
     presenting,
     details,
     view,
-    back,
     impactStart,
   ]);
 
@@ -556,23 +548,7 @@ export function App({
   useEffect(() => {
     if (view !== "impact") setImpactStart(null);
   }, [view]);
-  // The type the page on screen is about. The trace keeps its own start while a
-  // click on one of its rows selects another type.
-  const pageAbout = view === "impact" ? (impactStart ?? selected) : selected;
-  // A type page whose type was put down goes back rather than standing empty.
-  if (TYPE_PAGES.includes(view) && !pageAbout) setView(back);
-
-  /**
-   * E and I, and the inspector's Editor and Impact: the page about the selected
-   * type, or, when that page is already on it, back to the view it came from. With
-   * nothing selected there is nothing to open, and the hint says so.
-   */
-  const togglePage = (page: View) => {
-    if (view === page && (!selected || pageAbout === selected)) setView(back);
-    else if (!selected) setNudge((count) => count + 1);
-    else if (page === "impact") openImpact(selected);
-    else setView(page);
-  };
+  const pages = useTypePages(view, setView, selected, impactStart, openImpact);
   // The inspector's Impact tab: every relationship, any depth, for the selection.
   const selectedImpact = useMemo(
     () => impactOf(graph, selected ?? "", {}, usage),
@@ -687,7 +663,10 @@ export function App({
               >
                 <CompareContext value={compare}>
                   <FlatView
-                    back={{ view: back, onBack: () => setView(back) }}
+                    back={{
+                      view: pages.back,
+                      onBack: () => setView(pages.back),
+                    }}
                     dataTypes={{
                       selected: dataType,
                       onChoose: setDataType,
@@ -793,7 +772,7 @@ export function App({
                 <Inspector
                   canExpandFocus={canExpandFocus}
                   edges={graph.edges}
-                  editorOpen={view === "editor"}
+                  editorOpen={pages.isOn("editor", selectedNode.id)}
                   findings={findings.filter(
                     (finding) => finding.nodeId === selectedNode.id
                   )}
@@ -802,16 +781,14 @@ export function App({
                   focused={focus === selectedNode.id}
                   icons={icons}
                   impact={selectedImpact}
-                  impactOpen={
-                    view === "impact" && pageAbout === selectedNode.id
-                  }
+                  impactOpen={pages.isOn("impact", selectedNode.id)}
                   neighbourhood={neighbourhood}
                   node={selectedNode}
                   nodesById={nodesById}
                   onClose={closeInspector(putDown)}
-                  onEditor={() => togglePage("editor")}
+                  onEditor={() => pages.toggle("editor")}
                   onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
-                  onImpact={() => togglePage("impact")}
+                  onImpact={() => pages.toggle("impact")}
                   onOpenType={onOpenType}
                   onSelect={followLink}
                   onToggleFocus={toggleFocus}
@@ -820,35 +797,32 @@ export function App({
                 />
               ) : null}
             </PresentationLayer>
-            <PickFirst count={nudge} />
+            <PickFirst count={pages.nudge} />
           </div>
 
           <AppFooter
+            city={view === "city"}
             graph={graph}
             onPresent={() => present(true)}
-            tools={
-              view === "city"
-                ? {
-                    layers,
-                    onLayer: (layer) => setLayers((on) => withLayer(on, layer)),
-                    group,
-                    // The comparison's baseline positions and a focus both stand
-                    // on the city layout, so a new grouping starts from the whole
-                    // city.
-                    onGroup: (next) => {
-                      setFocus(null);
-                      setGroup(next);
-                    },
-                    lens,
-                    onLens: (next) => {
-                      setHighlight(null);
-                      setLens(next);
-                    },
-                    lensReady: Boolean(usage),
-                    onReset: resetView,
-                  }
-                : null
-            }
+            tools={{
+              layers,
+              onLayer: (layer) => setLayers((on) => withLayer(on, layer)),
+              group,
+              // The comparison's baseline positions and a focus both stand
+              // on the city layout, so a new grouping starts from the whole
+              // city.
+              onGroup: (next) => {
+                setFocus(null);
+                setGroup(next);
+              },
+              lens,
+              onLens: (next) => {
+                setHighlight(null);
+                setLens(next);
+              },
+              lensReady: Boolean(usage),
+              onReset: resetView,
+            }}
             usage={usage}
             usagePending={usagePending}
           >

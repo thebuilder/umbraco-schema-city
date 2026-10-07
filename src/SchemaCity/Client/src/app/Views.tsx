@@ -1,6 +1,6 @@
 // The view switcher and the 2D views it chooses between. Kept out of App so the
 // toolbar there only places the switcher.
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { toggleVariants } from "@/components/ui/toggle";
 import type { Finding } from "../model/findings";
 import { type Role, roleOf } from "../model/inspector";
@@ -42,6 +42,71 @@ export const PAGE_TABS: { value: View; label: string; key: string }[] = [
 const labelOf = (view: View) =>
   [...VIEW_TABS, ...PAGE_TABS].find((tab) => tab.value === view)?.label ??
   "City";
+
+/**
+ * The schema-wide view a type page goes back to: the view on now, or while a type
+ * page is on, the one before it.
+ */
+export const backFrom = (view: View, back: View) =>
+  TYPE_PAGES.includes(view) ? back : view;
+
+/**
+ * The type the page on screen is about. The trace keeps its own start while a click
+ * on one of its rows selects another type; the editor shows the selection.
+ */
+export const aboutOf = (
+  view: View,
+  selected: string | null,
+  traced: string | null
+) => (view === "impact" ? (traced ?? selected) : selected);
+
+/**
+ * What E, I and the inspector's Editor and Impact do: go back when that page is
+ * already on this type, or has no type, open it on the selection, or with nothing
+ * selected, say so.
+ */
+export function pageStep(
+  page: View,
+  view: View,
+  selected: string | null,
+  about: string | null
+): "back" | "open" | "nudge" {
+  if (view === page && (!selected || about === selected)) return "back";
+  return selected ? "open" : "nudge";
+}
+
+/**
+ * The type pages' state: which schema-wide view they go back to, what the one on
+ * screen is about, and how many times E or I found nothing to open. A type page
+ * whose type was put down goes back rather than standing empty.
+ */
+export function useTypePages(
+  view: View,
+  setView: (view: View) => void,
+  selected: string | null,
+  traced: string | null,
+  openImpact: (id: string | null) => void
+) {
+  const [back, setBack] = useState<View>(() => backFrom(view, "city"));
+  if (backFrom(view, back) !== back) setBack(backFrom(view, back));
+  const [nudge, setNudge] = useState(0);
+  const about = aboutOf(view, selected, traced);
+  if (TYPE_PAGES.includes(view) && !about) setView(back);
+  const steps = {
+    back: () => setView(back),
+    nudge: () => setNudge((count) => count + 1),
+    open: (page: View) =>
+      page === "impact" ? openImpact(selected) : setView(page),
+  };
+  return {
+    back,
+    nudge,
+    /** Opens the page on the selection, or goes back from it. */
+    toggle: (page: View) => steps[pageStep(page, view, selected, about)](page),
+    /** Whether `page` is on screen about `id`, which presses its button. */
+    isOn: (page: View, id: string) => view === page && about === id,
+  };
+}
 
 const ITEM = `${toggleVariants({ size: "sm", variant: "outline" })} min-w-0 border-0 bg-secondary px-3 focus-visible:z-10 focus-visible:outline-offset-[-2px]`;
 

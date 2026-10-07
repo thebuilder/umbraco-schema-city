@@ -102,38 +102,49 @@ export function AppHeader({
  * always, since it is read when the workspace opens, and "2026-09-01" on any other.
  * The Findings drawer has both halves when the exact minute matters.
  */
-const stamp = (iso: string | undefined) => {
+const stamp = (iso: string | undefined, today: string) => {
   const at = snapshotDate(iso);
   if (!at) return null;
-  const today = at.startsWith(new Date().toISOString().slice(0, 10));
-  return today ? at.slice(11) : at.slice(0, 10);
+  return at.startsWith(today) ? at.slice(11) : at.slice(0, 10);
 };
 
-/** What the footer says about the snapshot the city is drawn from. */
-function SnapshotStatus({
-  graph,
-  usage,
-  usagePending,
-}: {
-  graph: SchemaGraph;
-  usage?: UsageReport;
-  usagePending: boolean;
-}) {
-  const read = stamp(graph.generatedAt);
-  const counted = stamp(usage?.generatedAt);
+/**
+ * What the footer says about the snapshot the city is drawn from, as "86 types",
+ * "schema read 09:12" and "usage 09:13". A date a snapshot does not really have is
+ * left out, and usage says when it is still on its way or never came.
+ */
+export function snapshotParts(
+  graph: SchemaGraph,
+  usage: UsageReport | undefined,
+  pending: boolean,
+  today = new Date().toISOString().slice(0, 10)
+) {
+  const read = stamp(graph.generatedAt, today);
+  const counted = stamp(usage?.generatedAt, today);
   const usageText = usage
     ? counted && `usage ${counted}`
-    : usagePending
+    : pending
       ? "usage loading"
       : "usage unavailable";
-  const parts = [
+  return [
     plural(graph.nodes.length, "type"),
     read && `schema read ${read}`,
     usageText,
   ].filter(Boolean);
+}
+
+function SnapshotStatus({
+  graph,
+  usage,
+  usagePending = false,
+}: {
+  graph: SchemaGraph;
+  usage?: UsageReport;
+  usagePending?: boolean;
+}) {
   return (
     <p className="flex min-w-0 flex-wrap items-center gap-x-2 text-2xs text-label">
-      {parts.join(" · ")}
+      {snapshotParts(graph, usage, usagePending).join(" · ")}
       {usage?.blocks?.partial ? (
         <span className="text-amber">
           Block counts stopped early, so they are lower bounds
@@ -297,15 +308,17 @@ export function AppFooter({
   graph,
   usage,
   usagePending,
+  city,
   tools,
   onPresent,
   children,
 }: {
   graph: SchemaGraph;
   usage?: UsageReport;
-  usagePending: boolean;
-  /** The City's own tools, or null in every other view. */
-  tools: CityToolProps | null;
+  usagePending?: boolean;
+  /** Whether the City is on, the one view its tools mean anything in. */
+  city: boolean;
+  tools: CityToolProps;
   onPresent: () => void;
   /** The host's own controls, like the harness's sample picker. */
   children?: ReactNode;
@@ -323,7 +336,7 @@ export function AppFooter({
         />
         {children}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {tools ? (
+          {city ? (
             <>
               <div className="hidden flex-wrap items-center gap-2 @min-[760px]:flex">
                 <CityTools {...tools} />
