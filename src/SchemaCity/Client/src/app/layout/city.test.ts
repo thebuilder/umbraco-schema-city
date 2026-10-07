@@ -12,16 +12,21 @@ import {
 import { STAMP_BAND } from "../scene/stage";
 import {
   cityBounds,
-  cityDistricts,
+  cityDistricts as cityOf,
   DISTRICT_GAP,
   type District,
   ISLAND_PAD,
-  layoutCity,
+  layoutCity as layoutOf,
   type Placement,
   ROW_LIMIT,
   SPARSE_RANK,
   STREET,
 } from "./city";
+
+// These cover the folder grouping and its ranked districts. structure.test.ts and
+// neighbourhoods.test.ts cover the structure grouping, which is the default.
+const cityDistricts = (graph: SchemaGraph) => cityOf(graph, "folders");
+const layoutCity = (graph: SchemaGraph) => layoutOf(graph, "folders");
 
 const small = smallFixture as unknown as SchemaGraph;
 const medium = mediumFixture as unknown as SchemaGraph;

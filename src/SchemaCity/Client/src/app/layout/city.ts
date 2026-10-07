@@ -16,6 +16,14 @@ import type {
 import { LABEL_STRIP } from "../scene/board-labels";
 import { FLOOR_HEIGHT } from "../scene/buildings";
 import { STAMP_BAND } from "../scene/stage";
+import { layoutNeighbourhoods } from "./neighbourhoods";
+import { type IdCluster, structureGroups } from "./structure";
+
+/**
+ * How the city is cut into districts. `structure` follows what an editor can create
+ * where; `folders` follows the folders the schema files its types in.
+ */
+export type Grouping = "structure" | "folders";
 
 /** What a district mostly holds. The scene colours and labels from this. */
 export type DistrictKind = "structure" | "compositions" | "elements" | "mixed";
@@ -94,6 +102,14 @@ const ROW_GAP = GAP + LABEL_STRIP;
  */
 export const STREET = 6;
 /**
+ * Ground between two neighbourhoods side by side: wider than the gap inside one, so
+ * a family reads as a block, and narrower than a street, because only the traces
+ * between two neighbours run down it.
+ */
+const LANE_GAP = 4;
+/** Ground between two families in one row of a neighbourhood. */
+const FAMILY_GAP = 2.5;
+/**
  * The void between two islands, which is twice a street. At one street the islands
  * read as one plate with seams in it. The roads between districts route over it.
  */
@@ -135,26 +151,44 @@ const UNPLACED = "unplaced";
 /** What a single type is, before districts are drawn around groups of them. */
 type Role = "structure" | "compositions" | "elements" | "unplaced";
 
-type Group = { id: string; name: string; members: SchemaNode[] };
+type Group = {
+  id: string;
+  name: string;
+  members: SchemaNode[];
+  /** Structure grouping only: the neighbourhoods, which replace the ranks. */
+  clusters?: IdCluster[];
+  /** Structure grouping only: the block editor an Element Type is grouped under. */
+  sockets?: Map<string, string>;
+};
 const rankCache = new WeakMap<Group, Placement[]>();
 type Laid = Group & {
   kind: DistrictKind;
   hasStructure: boolean;
   placements: Placement[];
-  /** The packed grid's members, which the layout reorders once the city is placed. */
-  loose: Placement[];
+  /**
+   * The packed tables, each of whose members the layout may swap among themselves
+   * once the city is placed.
+   */
+  loose: Placement[][];
 };
 
 /**
- * Places every node exactly once, in a district per top-level folder.
+ * Places every node exactly once.
  *
- * The schema's own folders are the grouping an editor already knows, so they drive the
- * city. A schema with no folders falls back to four districts named by role, which is
- * the same partition the city used before folders were read. Inside a district the
- * allowed-child edges among its own members rank top to bottom, and everything with no
- * such edge packs into a grid below the ranked block.
+ * By structure, the default, a district is everything one root reaches, laid out as
+ * neighbourhoods of a parent and its children, beside Compositions, Elements in one
+ * table per block editor, and Unreachable for what no root reaches
+ * (`layout/structure.ts`).
+ *
+ * By folders, a district is a top-level folder, and a schema with no folders falls
+ * back to four districts named by role. Inside a district the allowed-child edges
+ * among its own members rank top to bottom, and everything with no such edge packs
+ * into a grid below the ranked block.
  */
-export function cityDistricts(graph: SchemaGraph): {
+export function cityDistricts(
+  graph: SchemaGraph,
+  grouping: Grouping = "structure"
+): {
   placements: Placement[];
   districts: District[];
 } {
@@ -192,19 +226,23 @@ export function cityDistricts(graph: SchemaGraph): {
           ? "compositions"
           : "unplaced";
 
-  const filed = byFolder(nodes, graph.folders ?? []);
+  const filed =
+    grouping === "folders" ? byFolder(nodes, graph.folders ?? []) : [];
   // A schema with no folders, or with none that hold a type, gets districts by role.
-  const groups = filed.some((group) => group.id !== UNFILED)
-    ? filed
-    : byRole(nodes, roleOf);
+  const groups: Group[] =
+    grouping === "structure"
+      ? structureGroups(nodes, edges)
+      : filed.some((group) => group.id !== UNFILED)
+        ? filed
+        : byRole(nodes, roleOf);
   // Laid out and arranged twice: the first city says where each loose type's
   // connections stand, and the second packs every grid in that order.
   const layAll = (order?: Map<string, number>) =>
     groups.map((group) => layoutDistrict(group, roads, roleOf, order));
   const first = layAll();
-  arrange(first, edges);
+  arrange(first, edges, grouping === "structure");
   const laid = layAll(looseOrder(first, edges));
-  arrange(laid, edges);
+  arrange(laid, edges, grouping === "structure");
   return {
     placements: laid.flatMap((district) => district.placements),
     districts: laid.map(districtOf),
@@ -212,8 +250,11 @@ export function cityDistricts(graph: SchemaGraph): {
 }
 
 /** The placements alone, for a caller with no use for the district boxes. */
-export function layoutCity(graph: SchemaGraph): Placement[] {
-  return cityDistricts(graph).placements;
+export function layoutCity(
+  graph: SchemaGraph,
+  grouping: Grouping = "structure"
+): Placement[] {
+  return cityDistricts(graph, grouping).placements;
 }
 
 /**
@@ -337,6 +378,8 @@ function layoutDistrict(
   roleOf: (node: SchemaNode) => Role,
   order?: Map<string, number>
 ): Laid {
+  if (group.clusters)
+    return layoutClustered(group, group.clusters, roleOf, order);
   const mine = new Set(group.members.map((node) => node.id));
   const inside = roads.filter(
     (road) => road.from !== road.to && mine.has(road.from) && mine.has(road.to)
@@ -379,7 +422,75 @@ function layoutDistrict(
     kind,
     hasStructure: group.members.some((node) => roleOf(node) === "structure"),
     placements: [...ranked, ...packed],
-    loose: packed,
+    loose: [packed],
+  };
+}
+
+/**
+ * Lays one structure district out as its neighbourhoods. A table with no head, the
+ * compositions or one block editor's Element Types, takes the order a first
+ * arrangement of the city gave it; a family keeps alias order under its parent.
+ */
+function layoutClustered(
+  group: Group,
+  clusters: IdCluster[],
+  roleOf: (node: SchemaNode) => Role,
+  order?: Map<string, number>
+): Laid {
+  const kind = kindOf(group.members, roleOf);
+  const byId = new Map(group.members.map((node) => [node.id, node]));
+  const item = (id: string) => ({
+    id,
+    size: footprintOf(byId.get(id) as SchemaNode),
+  });
+  const rank = (family: string[]) => order?.get(family[0] as string) ?? 0;
+  const spots = layoutNeighbourhoods(
+    clusters.map((cluster) => ({
+      head: cluster.head ? item(cluster.head) : null,
+      // A stable sort, so without an order the table keeps its alias order.
+      families: (cluster.head
+        ? cluster.families
+        : [...cluster.families].sort((a, b) => rank(a) - rank(b))
+      ).map((family) => family.map(item)),
+    })),
+    {
+      gap: GAP,
+      familyGap: FAMILY_GAP,
+      rowGap: ROW_GAP,
+      laneGap: LANE_GAP,
+      street: STREET,
+      rowLimit: ROW_LIMIT,
+    }
+  );
+  const placements = group.members.map((node) => {
+    const spot = spots.get(node.id) as { x: number; z: number; row: number };
+    const socket = group.sockets?.get(node.id);
+    return place(
+      node,
+      spot.x,
+      spot.z,
+      group.id,
+      kind,
+      spot.row,
+      // A schema folder means nothing on a structure board; only a socket tints.
+      socket === undefined ? null : `socket/${socket}`
+    );
+  });
+  const at = new Map(placements.map((placement) => [placement.id, placement]));
+  return {
+    ...group,
+    kind,
+    // Unreachable stands in the middle row with the roots: its types are pages that
+    // no root reaches, and the row stacks it under the small root boards.
+    hasStructure: kind !== "compositions" && kind !== "elements",
+    placements,
+    loose: clusters
+      .filter((cluster) => cluster.head === null)
+      .map((cluster) =>
+        cluster.families.map(
+          (family) => at.get(family[0] as string) as Placement
+        )
+      ),
   };
 }
 
@@ -397,7 +508,7 @@ function layoutDistrict(
  * everything. A void of two streets separates any two islands, and the city's
  * north-west corner is the origin.
  */
-function arrange(laid: Laid[], edges: SchemaEdge[]) {
+function arrange(laid: Laid[], edges: SchemaEdge[], stack: boolean) {
   const home = new Map<string, Laid>();
   const at = new Map<string, Placement>();
   for (const district of laid) {
@@ -421,14 +532,28 @@ function arrange(laid: Laid[], edges: SchemaEdge[]) {
 
   const row = middleRow(
     laid.filter((d) => bandOf(d) === "middle"),
-    linksBetween
+    linksBetween,
+    // Stacking needs the largest first, so nothing joins the row west of it.
+    stack
   );
   const placed = new Set<Laid>();
   let x = 0;
   let middleDepth = 0;
+  // With `stack`, a district that fits under the one before it, inside the depth the
+  // row already has, stands there rather than further east. One root district per
+  // root leaves a row of small islands beside the large one, and a row that long
+  // frames every name in the city too small to read.
+  let column = { x: 0, z: 0, width: 0 };
   for (const district of row) {
-    const size = moveTo(district, x, 0);
-    x += size.width + DISTRICT_GAP;
+    const box = boxOf(district.placements);
+    const depth = box.maxZ - box.minZ + STAMP_MARGIN;
+    const under =
+      stack && column.z > 0 && column.z + depth <= middleDepth + 1e-9;
+    if (!under) column = { x, z: 0, width: 0 };
+    const size = moveTo(district, column.x, column.z);
+    column.z += size.depth + DISTRICT_GAP;
+    column.width = Math.max(column.width, size.width);
+    x = column.x + column.width + DISTRICT_GAP;
     middleDepth = Math.max(middleDepth, size.depth);
     placed.add(district);
   }
@@ -506,11 +631,12 @@ const bySize = (a: Laid, b: Laid) =>
 /**
  * The middle row, west to east: the largest district, then each time the district
  * with the most connections into the row so far, at the end of the row it shares
- * more of them with.
+ * more of them with, or always the east end when `eastOnly`.
  */
 function middleRow(
   middle: Laid[],
-  linksBetween: (a: Laid, others: readonly Laid[]) => number
+  linksBetween: (a: Laid, others: readonly Laid[]) => number,
+  eastOnly: boolean
 ): Laid[] {
   const row: Laid[] = [];
   const left = [...middle].sort(bySize);
@@ -522,7 +648,10 @@ function middleRow(
     const [first] = row;
     const last = row[row.length - 1];
     const west =
-      first && last && linksBetween(next, [first]) > linksBetween(next, [last]);
+      !eastOnly &&
+      first &&
+      last &&
+      linksBetween(next, [first]) > linksBetween(next, [last]);
     if (west) row.unshift(next);
     else row.push(next);
   }
@@ -601,12 +730,12 @@ function looseOrder(laid: Laid[], edges: SchemaEdge[]): Map<string, number> {
 
   const order = new Map<string, number>();
   for (let pass = 0; pass < 2; pass++) {
-    for (const district of laid) {
-      const slots = district.loose
+    for (const loose of laid.flatMap((district) => district.loose)) {
+      const slots = loose
         .map(({ position }) => position)
         .sort((a, b) => a.x - b.x || a.z - b.z);
       // The loose list is in alias order and the sort is stable, so ties keep it.
-      const keyed = district.loose
+      const keyed = loose
         .map((placement) => ({ placement, centre: centreOf(placement.id) }))
         .sort((a, b) =>
           a.centre === b.centre ? 0 : a.centre < b.centre ? -1 : 1
@@ -893,7 +1022,12 @@ function place(
   z: number,
   district: string,
   districtKind: DistrictKind,
-  step: number
+  step: number,
+  // A folder that is not the district's own is a folder nested inside it. Null is
+  // none, because undefined would take this default.
+  folder: string | null = node.folderId && node.folderId !== district
+    ? node.folderId
+    : null
 ): Placement {
   const floors = floorsOf(node);
   return {
@@ -904,10 +1038,7 @@ function place(
     floors,
     district,
     districtKind,
-    // A folder that is not the district's own is a folder nested inside it.
-    ...(node.folderId && node.folderId !== district
-      ? { folder: node.folderId }
-      : {}),
+    ...(folder ? { folder } : {}),
     introDelay: step * INTRO_STAGGER,
   };
 }
