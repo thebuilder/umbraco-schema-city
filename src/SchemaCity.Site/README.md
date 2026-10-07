@@ -42,7 +42,9 @@ They use 3 folders, 9 Data Types, 3 templates, 2 languages, and 193 content item
 listed in `SchemaSeeder.PlantedFindings`. Reset the demo database to seed again.
 
 Every Development boot writes `medium.json` and `medium-usage.json` to
-`src/SchemaCity/Client/dev/fixtures/` for the dev harness. Their `generatedAt` values are pinned to
+`src/SchemaCity/Client/dev/fixtures/` for the dev harness, unless the database was seeded by an
+older seed version: the site type carries the version in its description, and a mismatch logs a
+warning and leaves the fixtures alone. Their `generatedAt` values are pinned to
 the Unix epoch, so a boot alone does not change the files. Their contents reflect the demo
 installation, including any edits made in its backoffice.
 

@@ -66,6 +66,15 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         ("unusedType", "unusedArticleLegacy"),
     ];
 
+    /// <summary>
+    /// Bump this whenever the seed changes shape. The site type carries it in its description, and
+    /// the export leaves the fixtures alone when the database was seeded by another version, so an
+    /// old database never rewrites them with a stale schema.
+    /// </summary>
+    private const string SeedVersion = "2026-10-07";
+
+    private const string SiteDescription = $"Seeded Site, seed version {SeedVersion}.";
+
     /// <summary>The unattended install creates en-US. The seeder adds da-DK next to it.</summary>
     private const string DefaultCulture = "en-US";
 
@@ -548,7 +557,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 
             type.AllowedAsRoot = spec.Root;
             type.Variations = spec.Varies ? ContentVariation.Culture : ContentVariation.Nothing;
-            type.Description = $"Seeded {Title(spec.Alias)}.";
+            type.Description = spec.Alias == "site" ? SiteDescription : $"Seeded {Title(spec.Alias)}.";
 
             foreach (string composition in spec.Compositions)
             {
@@ -758,6 +767,17 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         string clientRoot = Path.GetFullPath(Path.Combine(_hostEnvironment.ContentRootPath, "..", "SchemaCity", "Client"));
         if (Directory.Exists(clientRoot) is false)
         {
+            return;
+        }
+
+        string? stamp = _contentTypeService.Get("site")?.Description;
+        if (stamp != SiteDescription)
+        {
+            _logger.LogWarning(
+                "Schema City seeder: this database was not seeded by seed version {Version} (site type says "
+                + "\"{Stamp}\"), so the fixtures are left as they are. Delete umbraco/Data to seed again.",
+                SeedVersion,
+                stamp ?? "nothing");
             return;
         }
 
