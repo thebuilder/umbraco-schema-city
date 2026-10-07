@@ -1,5 +1,5 @@
 import { XIcon } from "lucide-react";
-import { type CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Finding } from "../model/findings";
@@ -17,7 +17,14 @@ import type {
   TypeUsage,
   UsageReport,
 } from "../model/types";
-import { READING, ROLE, RoleBadges } from "./InspectorChips";
+import { plural, roving, usePanelFocus } from "./a11y";
+import {
+  READING,
+  ROLE,
+  RoleBadges,
+  TabButton,
+  TabCount,
+} from "./InspectorChips";
 import {
   FocusExpansionRow,
   InspectorFocusControls,
@@ -90,41 +97,11 @@ function Glyph({ node, svg }: { node: SchemaNode; svg?: string }) {
 
 type Tab = "overview" | "properties" | "connections";
 
-function TabButton({
-  badge,
-  current,
-  id,
-  label,
-  onPick,
-  problem = false,
-}: {
-  badge?: number;
-  current: Tab;
-  id: Tab;
-  label: string;
-  onPick: (tab: Tab) => void;
-  problem?: boolean;
-}) {
-  const selected = current === id;
-  return (
-    <button
-      aria-selected={selected}
-      className={`-mb-px border-b-2 px-2 pt-2.5 pb-2 ${selected ? "border-phosphor text-prose" : "border-transparent text-label hover:text-prose"}`}
-      onClick={() => onPick(id)}
-      role="tab"
-      type="button"
-    >
-      {label}
-      {badge ? (
-        <span
-          className={`ml-1 font-mono text-2xs ${problem ? "text-signal" : "text-faint"}`}
-        >
-          {badge}
-        </span>
-      ) : null}
-    </button>
-  );
-}
+const TAB_LABEL: Record<Tab, string> = {
+  overview: "Overview",
+  properties: "Properties",
+  connections: "Connections",
+};
 
 export function Inspector({
   focused,
@@ -169,18 +146,57 @@ export function Inspector({
   onExpandFocus?: () => void;
   canExpandFocus?: boolean;
 }) {
-  // The tab is kept with the type it was picked on, so selecting another type
-  // starts on Overview without an effect to reset it.
-  const [picked, setPicked] = useState<{ id: string; tab: Tab }>({
-    id: node.id,
-    tab: "overview",
-  });
-  const tab = picked.id === node.id ? picked.tab : "overview";
-  const pick = (next: Tab) => setPicked({ id: node.id, tab: next });
+  // Every type opens on Overview, including one shown before: remembering a tab
+  // per type made the same click land on different tabs.
+  const [tab, setTab] = useState<Tab>("overview");
+  const [tabOf, setTabOf] = useState(node.id);
+  if (tabOf !== node.id) {
+    setTabOf(node.id);
+    setTab("overview");
+  }
+  const base = useId();
+  const panel = useRef<HTMLElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  usePanelFocus(panel, heading, node.id);
 
   const kind = roleOf(node, neighbourhood);
   const role = ROLE[kind];
   const groups = connectionGroups(node, neighbourhood);
+  const problems = findings.filter(
+    (finding) => finding.severity === "problem"
+  ).length;
+  // A type in two groups, an Inherits parent that is also composed, is one type.
+  const related = new Set(
+    groups.flatMap((group) =>
+      "ids" in group ? group.ids : group.fields.flatMap((field) => field.ids)
+    )
+  ).size;
+  const total = node.ownPropertyCount + node.composedPropertyCount;
+  const counts: Record<
+    Tab,
+    { count: number; spoken: string; problem: boolean }
+  > = {
+    overview: {
+      count: findings.length,
+      spoken: [
+        plural(findings.length, "check"),
+        problems > 0 ? plural(problems, "problem") : "",
+      ]
+        .filter(Boolean)
+        .join(", "),
+      problem: problems > 0,
+    },
+    properties: {
+      count: total,
+      spoken: plural(total, "property", "properties"),
+      problem: false,
+    },
+    connections: {
+      count: related,
+      spoken: plural(related, "type"),
+      problem: false,
+    },
+  };
   const usageNow = usageState(node, neighbourhood, usageReport, usage);
   const countOf = useMemo(
     () => contentCountOf(usageReport, nodesById, edges),
@@ -199,7 +215,9 @@ export function Inspector({
 
   return (
     <aside
+      aria-label="Inspector"
       className={`absolute inset-y-0 right-0 z-10 flex ${PANEL_WIDTH} flex-col border-line-strong border-l bg-panel font-sans text-[13px] text-prose leading-normal shadow-panel`}
+      ref={panel}
     >
       <header
         className="border-line border-b px-4 pt-4 pb-3"
@@ -209,7 +227,14 @@ export function Inspector({
           {/* The roofs cull their icons by size; this one is here at any zoom. */}
           <Glyph node={node} svg={icons?.[node.icon]} />
           <div className="min-w-0 flex-1">
-            <h2 className="truncate font-semibold text-[17px] text-foreground leading-tight">
+            {/* Focusable from script only, so opening the panel or following a
+                link inside it can put the reader on the type's name. */}
+            <h2
+              className="truncate font-semibold text-[17px] text-foreground leading-tight outline-none"
+              data-inspector-heading=""
+              ref={heading}
+              tabIndex={-1}
+            >
               {node.name}
             </h2>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
@@ -266,42 +291,48 @@ export function Inspector({
         ) : null}
       </header>
 
-      <div className="flex border-line border-b px-2" role="tablist">
-        <TabButton
-          badge={findings.length}
-          current={tab}
-          id="overview"
-          label="Overview"
-          onPick={pick}
-          problem={findings.some((finding) => finding.severity === "problem")}
-        />
-        <TabButton
-          badge={node.ownPropertyCount + node.composedPropertyCount}
-          current={tab}
-          id="properties"
-          label="Properties"
-          onPick={pick}
-        />
-        <TabButton
-          badge={groups.reduce((sum, group) => sum + group.count, 0)}
-          current={tab}
-          id="connections"
-          label="Connections"
-          onPick={pick}
-        />
+      <div
+        aria-label={`${node.name} details`}
+        className="flex border-line border-b px-2"
+        onKeyDown={roving}
+        role="tablist"
+      >
+        {(Object.keys(TAB_LABEL) as Tab[]).map((id) => (
+          <TabButton
+            className="px-2 pt-2.5 pb-2"
+            id={`${base}-${id}`}
+            key={id}
+            onPick={() => setTab(id)}
+            panel={`${base}-panel`}
+            selected={tab === id}
+          >
+            {TAB_LABEL[id]}
+            <TabCount
+              count={counts[id].count}
+              problem={counts[id].problem}
+              spoken={counts[id].spoken}
+            />
+          </TabButton>
+        ))}
       </div>
 
+      {/* The viewport is the tab panel, so the one tab stop after the tabs is also
+          what scrolls. */}
       <ScrollArea
         className="min-h-0 flex-1"
-        viewport={{ "aria-label": `${node.name}, ${tab}` }}
+        viewport={{
+          "aria-labelledby": `${base}-${tab}`,
+          id: `${base}-panel`,
+          role: "tabpanel",
+        }}
       >
         {/* Keyed by type, so a list opened with "+ more" closes again for the next. */}
-        <div className="px-4 pb-4" key={node.id} role="tabpanel">
+        <div className="px-4 pb-4" key={node.id}>
           {tab === "overview" ? (
             <Overview
               {...tabProps}
               findings={findings}
-              onShowConnections={() => pick("connections")}
+              onShowConnections={() => setTab("connections")}
             />
           ) : null}
           {tab === "properties" ? (

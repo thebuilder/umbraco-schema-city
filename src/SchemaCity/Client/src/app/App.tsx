@@ -564,7 +564,7 @@ export function App({
       <section
         aria-label="Schema City"
         className="flex h-full flex-col bg-background font-mono text-foreground"
-        data-schema-city
+        data-schema-city=""
       >
         <Say
           message={

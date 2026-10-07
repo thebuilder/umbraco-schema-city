@@ -348,13 +348,15 @@ export function connectionGroups(
 }
 
 /**
- * The kinds worth saying are empty, as the noun each one reads as in "No parents,
- * children or picker references". Inheritance is rare enough that its absence is
+ * The kinds worth saying are empty, as the noun each one reads as in "No allowed
+ * parents, allowed children or picker references". Inheritance is rare enough that its absence is
  * not news, so it is never named.
  */
 const EMPTY_NOUN: Partial<Record<FlatKind | FieldKind, string>> = {
-  allowedParents: "parents",
-  allowedChildren: "children",
+  // "Allowed", because a bare "No children" beside "Inherited by" reads as a
+  // contradiction: inheritance children are a different relation.
+  allowedParents: "allowed parents",
+  allowedChildren: "allowed children",
   compositions: "compositions",
   composedBy: "types that compose it",
   blockTargets: "block targets",

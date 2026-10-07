@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import type { FindingSeverity } from "../model/findings";
 import type { Chip, Role, Trace } from "../model/inspector";
 import type { SchemaNode } from "../model/types";
+import { plural } from "./a11y";
 
 /** The app's mono, uppercase controls, set in the panel's reading type instead. */
 export const READING = "font-sans font-medium normal-case tracking-normal";
@@ -140,39 +141,115 @@ export function TextButton({
 }
 
 /**
+ * One tab of a tablist that uses `roving` for its arrow keys: only the chosen tab
+ * is a tab stop, and every tab names the one panel it controls.
+ */
+export function TabButton({
+  children,
+  className,
+  id,
+  onPick,
+  panel,
+  selected,
+}: {
+  children: ReactNode;
+  className: string;
+  id: string;
+  onPick: () => void;
+  panel: string;
+  selected: boolean;
+}) {
+  return (
+    <button
+      aria-controls={panel}
+      aria-selected={selected}
+      className={`-mb-px flex items-center gap-1.5 border-b-2 ${className} ${
+        selected
+          ? "border-phosphor text-prose"
+          : "border-transparent text-label hover:text-prose"
+      }`}
+      id={id}
+      onClick={onPick}
+      role="tab"
+      tabIndex={selected ? 0 : -1}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * A tab's count, read as part of its name: "Properties, 26 properties". A tab that
+ * holds a problem adds a "!" so it differs from a note without its colour.
+ */
+export function TabCount({
+  count,
+  spoken,
+  problem = false,
+}: {
+  count: number;
+  spoken: string;
+  problem?: boolean;
+}) {
+  if (count === 0) return null;
+  return (
+    <>
+      <span className="sr-only">, {spoken}</span>
+      <span aria-hidden className="font-mono text-2xs text-faint">
+        {count.toLocaleString()}
+        {problem ? <span className="font-bold text-signal">!</span> : null}
+      </span>
+    </>
+  );
+}
+
+/**
  * Types as chips, the first `limit` of them, with the rest behind "+ N more". The
  * count is content items for a type list and references for observed references,
- * whichever the caller passes.
+ * whichever the caller passes as `unit`, which also names the number for a screen
+ * reader and on hover.
  */
 export function TypeChips({
   chips,
   limit,
   onSelect,
+  unit = ["content item", "content items"],
 }: {
   chips: Chip[];
   limit: number;
   onSelect: (id: string) => void;
+  unit?: [string, string];
 }) {
   const [all, setAll] = useState(false);
   const shown = all ? chips : chips.slice(0, limit);
   return (
     <div className="flex flex-wrap items-center gap-1">
-      {shown.map((chip) =>
-        chip.name === null ? (
-          // A block editor still names an Element Type key that has been deleted.
-          // The backend reports it rather than dropping the edge, so the panel does too.
-          <span
-            className="border border-signal/50 px-1.5 py-0.5 text-signal text-xs"
-            key={chip.id}
-            title={chip.id}
-          >
-            missing type
-          </span>
-        ) : (
+      {shown.map((chip) => {
+        // A block editor still names an Element Type key that has been deleted.
+        // The backend reports it rather than dropping the edge, so the panel does
+        // too, with the key written out since it is all there is to search for.
+        if (chip.name === null)
+          return (
+            <span
+              className="border border-signal/50 px-1.5 py-0.5 text-signal text-xs"
+              key={chip.id}
+            >
+              missing type{" "}
+              <span className="break-all font-mono text-2xs">{chip.id}</span>
+            </span>
+          );
+        const counted =
+          chip.count === undefined
+            ? undefined
+            : `${chip.name}, ${plural(chip.count, ...unit)}`;
+        return (
           <button
+            aria-label={counted}
             className="inline-flex min-w-0 max-w-full items-baseline gap-1 border border-line bg-muted px-1.5 py-0.5 text-prose text-xs hover:border-phosphor hover:text-phosphor"
             key={chip.id}
             onClick={() => onSelect(chip.id)}
+            title={counted}
             type="button"
           >
             <span className="truncate">{chip.name}</span>
@@ -187,8 +264,8 @@ export function TypeChips({
               </span>
             )}
           </button>
-        )
-      )}
+        );
+      })}
       {chips.length > limit ? (
         <TextButton onClick={() => setAll(!all)}>
           {all ? "show fewer" : `+ ${chips.length - limit} more`}

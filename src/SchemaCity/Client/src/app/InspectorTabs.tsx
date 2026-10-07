@@ -13,6 +13,7 @@ import {
 } from "../model/inspector";
 import type { Neighbourhood } from "../model/neighbourhood";
 import type { SchemaEdge, SchemaNode, UsageReport } from "../model/types";
+import { plural } from "./a11y";
 import { Heading, TextButton, TypeChips } from "./InspectorChips";
 import { ExplainConnections, InspectorChecks } from "./InspectorDiagnostics";
 
@@ -165,6 +166,22 @@ function EmptyKinds({ groups, node }: Pick<TabProps, "groups" | "node">) {
   ) : null;
 }
 
+/**
+ * What the number on a type chip is, said once per tab: without it "Article 162"
+ * under "Used in blocks by" reads as 162 blocks.
+ */
+function CountNote({
+  groups,
+  usageReport,
+}: Pick<TabProps, "groups" | "usageReport">) {
+  return usageReport && groups.length > 0 ? (
+    <p className="pt-3 text-faint text-xs">
+      Numbers on type chips count the content items of that type across the
+      site.
+    </p>
+  ) : null;
+}
+
 export function Overview({
   findings,
   onShowConnections,
@@ -185,6 +202,7 @@ export function Overview({
         <Heading>Usage</Heading>
         <Usage usage={props.usage} />
       </Section>
+      <CountNote {...props} />
       {groups.map((group) => (
         <GroupSection
           {...props}
@@ -225,9 +243,14 @@ function ObservedList({
   return (
     <div className="mt-2.5">
       <p className="mb-1 text-label text-xs">
-        {label} <span className="font-mono">{total.toLocaleString()}</span>
+        {label}: {plural(total, "reference")}
       </p>
-      <TypeChips chips={chipList} limit={12} onSelect={onSelect} />
+      <TypeChips
+        chips={chipList}
+        limit={12}
+        onSelect={onSelect}
+        unit={["reference", "references"]}
+      />
     </div>
   );
 }
@@ -286,6 +309,7 @@ export function Connections({
   const { countOf, groups, node, nodesById, onSelect } = props;
   return (
     <>
+      <CountNote {...props} />
       {groups.map((group) => (
         <GroupSection
           {...props}

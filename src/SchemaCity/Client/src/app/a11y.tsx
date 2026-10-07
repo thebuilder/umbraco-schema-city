@@ -106,17 +106,22 @@ export const SEARCH_KEY =
     : "Ctrl K";
 
 /** The element that really has focus, looking inside shadow roots. */
-export function deepActive(): Element | null {
+function deepActive(): Element | null {
   let at = document.activeElement;
   while (at?.shadowRoot?.activeElement) at = at.shadowRoot.activeElement;
   return at;
 }
 
-/** Marks the app's root, so a dialog can find the inspector to hand focus to. */
-export const APP_ROOT = "data-schema-city";
-export const INSPECTOR_HEADING = "data-inspector-heading";
-/** Where focus goes when the element that opened the inspector is gone. */
-export const FOCUS_HOME = "data-focus-home";
+/**
+ * Nothing in particular has focus: the body, or a shadow host whose focused child
+ * was just removed, which is where focus lands when a panel closes under it.
+ */
+const focusLost = (at = deepActive()) =>
+  !at || at === document.body || Boolean(at.shadowRoot);
+
+/** The app's root, marked so a dialog or a panel can find its way around it. */
+const appRoot = (from: Element | null | undefined) =>
+  from?.closest("[data-schema-city]");
 
 /**
  * The open inspector's heading, from anywhere inside the app. A dialog that picked a
@@ -124,12 +129,47 @@ export const FOCUS_HOME = "data-focus-home";
  * what the pick opened.
  */
 export const inspectorHeading = (from: Element | null | undefined) =>
-  from
-    ?.closest(`[${APP_ROOT}]`)
-    ?.querySelector<HTMLElement>(`[${INSPECTOR_HEADING}]`) ?? null;
+  appRoot(from)?.querySelector<HTMLElement>("[data-inspector-heading]") ?? null;
 
-const plural = (count: number, one: string, many = `${one}s`) =>
-  `${count} ${count === 1 ? one : many}`;
+/**
+ * Focus for a panel over the view. Its heading takes focus when the panel opens
+ * from inside the app or changes subject, so following a link inside it never drops
+ * focus to the page. When it closes with focus in it, focus goes back to whatever
+ * opened it, or to the view (marked data-focus-home) when that is gone.
+ */
+export function usePanelFocus(
+  panel: RefObject<HTMLElement | null>,
+  heading: RefObject<HTMLElement | null>,
+  subject: string
+) {
+  useEffect(() => {
+    const root = appRoot(panel.current);
+    const opener = deepActive();
+    return () => {
+      if (!focusLost()) return;
+      const back =
+        opener?.isConnected && !focusLost(opener)
+          ? opener
+          : root?.querySelector("[data-focus-home]");
+      if (back instanceof HTMLElement) back.focus({ preventScroll: true });
+    };
+  }, [panel]);
+
+  const opened = useRef(false);
+  useEffect(() => {
+    const at = deepActive();
+    const inApp = at !== null && Boolean(appRoot(panel.current)?.contains(at));
+    // On the first open, only a reader already working in the app is moved, so a
+    // page that loads with a type selected leaves focus where the host put it.
+    if (inApp || (opened.current && focusLost(at)))
+      heading.current?.focus({ preventScroll: true });
+    opened.current = true;
+  }, [panel, heading, subject]);
+}
+
+/** "1 property", "2 properties". */
+export const plural = (count: number, one: string, many = `${one}s`) =>
+  `${count.toLocaleString()} ${count === 1 ? one : many}`;
 
 /**
  * How many districts the city draws: one per top-level folder that holds a type, and
