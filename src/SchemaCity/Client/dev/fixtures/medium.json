@@ -390,7 +390,8 @@
           "name": "SC Article",
           "isDefault": true
         }
-      ]
+      ],
+      "fingerprint": "53259f61cb0d6d50"
     },
     {
       "id": "437a3f03-0cc7-7cc1-8931-85d78eb077ba",
@@ -548,7 +549,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "8b35f0074bc1c104"
     },
     {
       "id": "efe97ed3-eccb-fe5e-5b79-336f4092e275",
@@ -1016,7 +1018,8 @@
       ],
       "ownPropertyCount": 15,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "593eb1bf87deb47e"
     },
     {
       "id": "b025ea71-1382-7aa1-d3d4-7205644a34bc",
@@ -1101,7 +1104,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "384fd19eda4696ed"
     },
     {
       "id": "52c92789-46c7-979c-aac0-6801de08bcd0",
@@ -1281,7 +1285,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "4937022c5f788536"
     },
     {
       "id": "5a5feca6-d232-1cb2-9e34-e653ae2ea3eb",
@@ -1820,7 +1825,8 @@
       ],
       "ownPropertyCount": 20,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "daef7435c4b3f152"
     },
     {
       "id": "00e07956-4c73-a094-36f0-b18cfbebedb6",
@@ -2012,7 +2018,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "125526a2bfc2bb37"
     },
     {
       "id": "e05ec34e-e052-bd4f-8e0b-fbc110c1f3e1",
@@ -2337,7 +2344,8 @@
       ],
       "ownPropertyCount": 9,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "9a4be97ece4c3345"
     },
     {
       "id": "6f6ff11a-0bc1-5d0c-62ab-fe2787d18b3d",
@@ -2389,7 +2397,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "3edcd1a462169c11"
     },
     {
       "id": "7f24c73b-b0e7-a6df-aaa7-52d185982719",
@@ -2547,7 +2556,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "42eee881fdf6be39"
     },
     {
       "id": "43f2f3b8-fb33-26bf-c82d-7bb1cd945d63",
@@ -2599,7 +2609,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "12bc8031dd89447f"
     },
     {
       "id": "50436abb-71b9-089e-2fe0-c643b1a1270e",
@@ -2733,7 +2744,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "16abfd384290748b"
     },
     {
       "id": "adbe6c57-c5b0-b3c9-64d3-0a68249f243b",
@@ -2821,7 +2833,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "b6b7d7efebaa4d77"
     },
     {
       "id": "124d52e7-ef04-6465-0660-bfe7c73c3dea",
@@ -2989,7 +3002,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 6,
-      "templates": []
+      "templates": [],
+      "fingerprint": "ff3ae23d46494bc9"
     },
     {
       "id": "f64e3132-6854-2388-d77e-7fde6ffec4d6",
@@ -3029,7 +3043,8 @@
       ],
       "ownPropertyCount": 1,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "ce7fa1ff83aafecd"
     },
     {
       "id": "e9e5b939-d62a-f40a-c69c-ca0684ccc7e5",
@@ -3081,7 +3096,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "d03711fec89d9eb1"
     },
     {
       "id": "855571b5-565e-0891-6c6b-7e1d6394fa66",
@@ -3145,7 +3161,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "aa5aa349f74cae14"
     },
     {
       "id": "62d4c970-6251-4804-8b17-5fbaf4877907",
@@ -3221,7 +3238,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "d518a47d0aa2e11c"
     },
     {
       "id": "d32b32e8-aa50-6699-2412-1ac6f835034a",
@@ -3309,7 +3327,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "8f55f3feac5e8adf"
     },
     {
       "id": "fc37bea0-55e9-6faa-75d1-aae40af67041",
@@ -3361,7 +3380,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "4be0b4e89dffada3"
     },
     {
       "id": "e4165f61-0c65-405e-9b27-4226bc4f1489",
@@ -3425,7 +3445,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "2472f1e6504de18c"
     },
     {
       "id": "3a1706e8-cbdf-5947-c4ac-ba144a3c1089",
@@ -3501,7 +3522,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "879ade8c6b436fb9"
     },
     {
       "id": "f3670c7e-8289-c611-1c85-ea3b84fa2cc6",
@@ -3589,7 +3611,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "07472428c332c00e"
     },
     {
       "id": "0c477326-3e2b-a647-8d1a-e9fe60ba7746",
@@ -3689,7 +3712,8 @@
       ],
       "ownPropertyCount": 6,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "669d4e084aaf490d"
     },
     {
       "id": "3e1522e5-ad9f-e357-9ca0-f9e801bf8942",
@@ -3741,7 +3765,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "9cc8de11db9e0fdf"
     },
     {
       "id": "61c05b08-645f-4c8a-057f-9c1e8028b067",
@@ -3805,7 +3830,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "2925c3a144cb93d8"
     },
     {
       "id": "42486f7c-60a9-35ad-df00-00d323c4307a",
@@ -3869,7 +3895,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "7ea0cd4dc521286e"
     },
     {
       "id": "ffe7ac94-95e4-c5f3-0e8e-69fe2caa8c7c",
@@ -3945,7 +3972,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "4880df5abafbb5df"
     },
     {
       "id": "6b7e2290-d06a-bcd8-9426-1f3871fc1885",
@@ -4033,7 +4061,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "78be6dc456961bcd"
     },
     {
       "id": "14ae1d1f-611f-9376-a596-b65690aa83d8",
@@ -4050,7 +4079,8 @@
       "groups": [],
       "ownPropertyCount": 0,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "fa919438bddeec6a"
     },
     {
       "id": "00da4cdc-96c1-81f0-5fb0-4998f27014fe",
@@ -4150,7 +4180,8 @@
       ],
       "ownPropertyCount": 6,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "930edb22cd466776"
     },
     {
       "id": "9d1d7f83-699a-18b2-1efc-4fba173fb680",
@@ -4167,7 +4198,8 @@
       "groups": [],
       "ownPropertyCount": 0,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "4d2b0252de6a4c2a"
     },
     {
       "id": "425a9d4d-a3cb-5422-18d7-9c0fa9eece0f",
@@ -4216,7 +4248,8 @@
       ],
       "ownPropertyCount": 1,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "565e3398696803c1"
     },
     {
       "id": "70d8edb5-ac46-3efe-ed40-9e349748222b",
@@ -4420,7 +4453,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "212f04e22ee55e6f"
     },
     {
       "id": "756ff101-f79f-ffd5-cdf5-399a4b2cc8ee",
@@ -4654,7 +4688,8 @@
       ],
       "ownPropertyCount": 9,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "164a721170fe0497"
     },
     {
       "id": "97c656b3-7b26-6e38-554b-61317103abdf",
@@ -4730,7 +4765,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "d950c087869f1a64"
     },
     {
       "id": "f06a8ff8-07b8-4660-5a56-a1d30f3190d5",
@@ -4782,7 +4818,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "fe53f8ed05e962a3"
     },
     {
       "id": "b0d4ffda-fd2b-0f2f-d309-68af477d25c7",
@@ -4979,7 +5016,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "decef7e574dbf212"
     },
     {
       "id": "6db23a43-de02-0ac0-72f2-1fb9ae325246",
@@ -5204,7 +5242,8 @@
       ],
       "ownPropertyCount": 7,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "82d55b64c272d5ef"
     },
     {
       "id": "856a35c1-3470-a0b9-c710-4b23fc5c256e",
@@ -5256,7 +5295,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "75967425b7534ac6"
     },
     {
       "id": "8a351131-6cad-5807-5ec5-0e2146b355d9",
@@ -5320,7 +5360,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "c4a0c10ac7e77def"
     },
     {
       "id": "885cb832-4ae7-79f2-c752-54b67e288d27",
@@ -5466,7 +5507,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "3a8db900c69cf321"
     },
     {
       "id": "b27f15f4-f4d4-7e7c-7ec6-c968aaa6b4c6",
@@ -5530,7 +5572,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "6108ec850754ac1a"
     },
     {
       "id": "246c6a10-871b-f597-2e1e-77317b96a201",
@@ -6008,7 +6051,8 @@
           "name": "SC Home",
           "isDefault": true
         }
-      ]
+      ],
+      "fingerprint": "5ecbfc33bd7a51ab"
     },
     {
       "id": "4821d8ba-09e5-cf72-4949-73cc2982cdcd",
@@ -6353,7 +6397,8 @@
       ],
       "ownPropertyCount": 13,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "42fc346b806572f0"
     },
     {
       "id": "d1f4de76-66fa-f39c-dc3e-224eeec65b55",
@@ -6867,7 +6912,8 @@
           "name": "SC Standard Page",
           "isDefault": true
         }
-      ]
+      ],
+      "fingerprint": "02921e639e637ef6"
     },
     {
       "id": "fa1d4adf-637f-9ecb-1745-fa994dd9c0ee",
@@ -7021,7 +7067,8 @@
       ],
       "ownPropertyCount": 6,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "e87f9efd88a71edd"
     },
     {
       "id": "9d3bcae7-97f2-ddf2-0cf8-b05ad8963e1d",
@@ -7091,7 +7138,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "878bb1c3f915b81e"
     },
     {
       "id": "602b77ae-f801-f775-b075-f3c7df385ba4",
@@ -7143,7 +7191,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "b8b38b826b91484d"
     },
     {
       "id": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
@@ -7266,7 +7315,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "2348588c35fa913f"
     },
     {
       "id": "bd52e3c1-336a-1b13-cc74-cb6dafe5e51a",
@@ -7430,7 +7480,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "e84c0021409774a7"
     },
     {
       "id": "d696e598-0d76-5b4c-9e29-8fb4e2b1e759",
@@ -7786,7 +7837,8 @@
           "name": "SC Home",
           "isDefault": true
         }
-      ]
+      ],
+      "fingerprint": "a99558d63323d51c"
     },
     {
       "id": "20b0ebb1-c48f-4028-97e6-34c4738b589f",
@@ -7850,7 +7902,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "fb3bc676ae05c796"
     },
     {
       "id": "4733a2ee-2ca5-9b1f-4948-9a29ddb86fd7",
@@ -7902,7 +7955,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "7c9ad08fd1d47682"
     },
     {
       "id": "63bdae29-36c2-5621-d992-ef7d8dbea204",
@@ -8130,7 +8184,8 @@
       ],
       "ownPropertyCount": 7,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "8fa4da234590ba14"
     },
     {
       "id": "2b0c0c53-0c20-881b-e4e1-c5d1a1b44e33",
@@ -8317,7 +8372,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "76d74940b165a22a"
     },
     {
       "id": "0a7f839c-5642-fd19-6564-7dbde4ad2964",
@@ -8426,7 +8482,8 @@
       ],
       "ownPropertyCount": 6,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "4764f6c54800c5f7"
     },
     {
       "id": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
@@ -8499,7 +8556,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "dc173a9e70ae71d7"
     },
     {
       "id": "ebe69bda-1f41-1373-ab09-41bc9d3ff087",
@@ -8791,7 +8849,8 @@
       ],
       "ownPropertyCount": 22,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "d01544d0c9b2989c"
     },
     {
       "id": "6ea3fbc5-0efd-c911-e549-493283b011aa",
@@ -8937,7 +8996,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "6d3cb67b4979eb14"
     },
     {
       "id": "2f59404d-90b0-2a41-5284-1656d3bfd672",
@@ -9228,7 +9288,8 @@
       ],
       "ownPropertyCount": 10,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "1c494ee567ddb2ff"
     },
     {
       "id": "62d3b6f5-78f5-8543-4788-9e3c3563b273",
@@ -9374,7 +9435,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "248a73762b77bff4"
     },
     {
       "id": "bf7206eb-f246-1061-80b0-97dedde32777",
@@ -9787,7 +9849,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 19,
-      "templates": []
+      "templates": [],
+      "fingerprint": "ae15e97d6d1ed8e0"
     },
     {
       "id": "59b1e319-110f-981f-9372-6c6dc21ea48c",
@@ -9945,7 +10008,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "43d9c1e0cb056a95"
     },
     {
       "id": "beaf7932-e954-cb97-dbaf-fd786aff309f",
@@ -10057,7 +10121,8 @@
       ],
       "ownPropertyCount": 7,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "fa10f0bde636753b"
     },
     {
       "id": "76c765ce-38b6-c641-de72-a1ca7db52462",
@@ -10290,7 +10355,8 @@
       ],
       "ownPropertyCount": 6,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "3dfd8d2893824cc9"
     },
     {
       "id": "e1b351dd-39b3-014f-7eb9-eb5bc4fd0534",
@@ -10523,7 +10589,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "51b050a6dd6f4e12"
     },
     {
       "id": "9ed050f3-b38d-8d50-fcb3-ca8da3cb65b6",
@@ -10960,7 +11027,8 @@
       ],
       "ownPropertyCount": 16,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "f36a9d8d674ee54a"
     },
     {
       "id": "bc8006b0-e052-0c91-3a46-b8c4746d6fbd",
@@ -11156,7 +11224,8 @@
       ],
       "ownPropertyCount": 8,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "284d8ae02d0f197f"
     },
     {
       "id": "35b6cb48-fdb2-ce3b-2ffa-2244632a456c",
@@ -11196,7 +11265,8 @@
       ],
       "ownPropertyCount": 1,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "4942568531d9f3da"
     },
     {
       "id": "672e831e-4930-3ab1-c827-6c1a2ce8fe8c",
@@ -11327,7 +11397,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "b8790368e31c8f06"
     },
     {
       "id": "76bccc6e-b746-508a-d797-4df742a7a61b",
@@ -11415,7 +11486,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "b30b6b572c217a25"
     },
     {
       "id": "a38a5d2e-a8df-34ef-ca51-31d20f9dad51",
@@ -11556,7 +11628,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 2,
-      "templates": []
+      "templates": [],
+      "fingerprint": "d860bcaf519de218"
     },
     {
       "id": "9536edc4-f7c2-fc46-8835-4f27b871f4a4",
@@ -11608,7 +11681,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "c7bc5d7f4890fb2b"
     },
     {
       "id": "a678796b-c9bd-967d-4d27-f166d1448a26",
@@ -11718,7 +11792,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 2,
-      "templates": []
+      "templates": [],
+      "fingerprint": "4ebca102ac8f95d0"
     },
     {
       "id": "3ae4c6fe-b6ea-5bc0-7fce-413ab58c2b79",
@@ -11816,7 +11891,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 2,
-      "templates": []
+      "templates": [],
+      "fingerprint": "72daf458db65c252"
     },
     {
       "id": "6efdde98-0de7-1dfb-ea41-6cecdf391f58",
@@ -12095,7 +12171,8 @@
       ],
       "ownPropertyCount": 6,
       "composedPropertyCount": 8,
-      "templates": []
+      "templates": [],
+      "fingerprint": "7f8264172be5316b"
     },
     {
       "id": "7b44ce32-fdf4-0009-2e67-225d77864d47",
@@ -12205,7 +12282,8 @@
       ],
       "ownPropertyCount": 1,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "1a086cc9d9e3809d"
     },
     {
       "id": "b1769713-e9b2-abc8-da05-367b1f0434ff",
@@ -12274,7 +12352,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "06f16fbf4ca998da"
     },
     {
       "id": "c357bf33-0b06-81e2-c2ba-67442dac8f36",
@@ -12721,7 +12800,8 @@
           "name": "SC Standard Page",
           "isDefault": true
         }
-      ]
+      ],
+      "fingerprint": "fd050da1741ead7d"
     },
     {
       "id": "3461a1e5-db48-f51b-865f-10c95e413813",
@@ -12922,7 +13002,8 @@
       ],
       "ownPropertyCount": 5,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "0a52e3d2b2c3a875"
     },
     {
       "id": "87ab11c1-095e-69ec-b87e-bad3a35891e9",
@@ -13015,7 +13096,8 @@
       ],
       "ownPropertyCount": 3,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "c1dab2633a49272e"
     },
     {
       "id": "4b00f6fb-4610-69f9-73de-10a4269bf24f",
@@ -13190,7 +13272,8 @@
       ],
       "ownPropertyCount": 4,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "4c6e122b82d9df10"
     },
     {
       "id": "1edb139e-534b-04d0-5b23-9a5b93b8fe7e",
@@ -13403,7 +13486,8 @@
       ],
       "ownPropertyCount": 6,
       "composedPropertyCount": 5,
-      "templates": []
+      "templates": [],
+      "fingerprint": "42731aa7ae73743a"
     },
     {
       "id": "fe7b5abd-fff2-438a-d8fb-889a120c6685",
@@ -13455,7 +13539,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "6ce15f13a00b0f04"
     },
     {
       "id": "5e8ef531-3bdd-7922-c31e-18d7b1b99e1a",
@@ -13507,7 +13592,8 @@
       ],
       "ownPropertyCount": 2,
       "composedPropertyCount": 0,
-      "templates": []
+      "templates": [],
+      "fingerprint": "77ce5639cc38091b"
     }
   ],
   "edges": [
@@ -16954,7 +17040,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "97552631ad25d2e9"
     },
     {
       "id": "fbaf13a8-4036-41f2-93a3-974f678c312a",
@@ -16964,7 +17051,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "1b5d3a5e6a548060"
     },
     {
       "id": "fd1e0da5-5606-4862-b679-5d0cf3a52a59",
@@ -16974,7 +17062,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "2e878f890c0daead"
     },
     {
       "id": "5046194e-4237-453c-a547-15db3a07c4e1",
@@ -16984,7 +17073,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "6e22565af46f28e8"
     },
     {
       "id": "e4d66c0f-b935-4200-81f0-025f7256b89a",
@@ -16994,7 +17084,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "3d3125bb0aa58fee"
     },
     {
       "id": "88e8a052-30ee-4d44-a507-59f2cdfc769c",
@@ -17004,7 +17095,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "95155ee90eae8883"
     },
     {
       "id": "0b6a45e7-44ba-430d-9da5-4e46060b9e03",
@@ -17014,7 +17106,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "bc4e8042b90f73d3"
     },
     {
       "id": "f38f0ac7-1d27-439c-9f3f-089cd8825a53",
@@ -17024,7 +17117,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "c01512d9b6714d98"
     },
     {
       "id": "1df9f033-e6d4-451f-b8d2-e0cbc50a836f",
@@ -17034,7 +17128,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 1,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "a6f5c1d96198ad05"
     },
     {
       "id": "ad9f0cf2-bda2-45d5-9ea1-a63cfc873fd3",
@@ -17044,7 +17139,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "2dbd75b28d0a7cf4"
     },
     {
       "id": "930861bf-e262-4ead-a704-f99453565708",
@@ -17054,7 +17150,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "637163c2f486cef5"
     },
     {
       "id": "ba5bdbe6-ab3e-46a8-82b3-2c45f10bc47f",
@@ -17064,7 +17161,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 6,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "ef11d6b4c842bd9b"
     },
     {
       "id": "0e9794eb-f9b5-4f20-a788-93acd233a7e4",
@@ -17074,7 +17172,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "14cddf560854d002"
     },
     {
       "id": "8f1ef1e1-9de4-40d3-a072-6673f631ca64",
@@ -17084,7 +17183,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "57354b4119972a01"
     },
     {
       "id": "8e7f995c-bd81-4627-9932-c40e568ec788",
@@ -17094,7 +17194,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "8dca1c3a751231cd"
     },
     {
       "id": "5eb57825-e15e-4fc7-8e37-fca65cdafbde",
@@ -17104,7 +17205,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 4,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "33d4c7bc6bfd6818"
     },
     {
       "id": "f0bc4bfb-b499-40d6-ba86-058885a5178c",
@@ -17114,7 +17216,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 6,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "89caef26fc9efc03"
     },
     {
       "id": "a97cec69-9b71-4c30-8b12-ec398860d7e8",
@@ -17124,7 +17227,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "8a69c5f08f44869f"
     },
     {
       "id": "c0808dd3-8133-4e4b-8ce8-e2bea84a96a4",
@@ -17134,7 +17238,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "72f46a7ac28f9140"
     },
     {
       "id": "3a0156c4-3b8c-4803-bdc1-6871faa83fff",
@@ -17144,7 +17249,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 1,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "d9a8509a5d989558"
     },
     {
       "id": "4309a3ea-0d78-4329-a06c-c80b036af19a",
@@ -17154,7 +17260,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "c9e39a67070150d1"
     },
     {
       "id": "1ea2e01f-ebd8-4ce1-8d71-6b1149e63548",
@@ -17164,7 +17271,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "27b40a32838ea081"
     },
     {
       "id": "b4e3535a-1753-47e2-8568-602cf8cfee6f",
@@ -17174,7 +17282,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "5331edc8e0e9a78d"
     },
     {
       "id": "0e63d883-b62b-4799-88c3-157f82e83ecc",
@@ -17184,7 +17293,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "c75c76c0400ea914"
     },
     {
       "id": "1b661f40-2242-4b44-b9cb-3990ee2b13c0",
@@ -17194,7 +17304,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "f5fcf3a2eab6f350"
     },
     {
       "id": "2e6d3631-066e-44b8-aec4-96f09099b2b5",
@@ -17204,7 +17315,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "d7d5a272c53e4aab"
     },
     {
       "id": "bb5f57c9-ce2b-4bb9-b697-4caca783a805",
@@ -17214,7 +17326,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "640088d838f7f865"
     },
     {
       "id": "ca90c950-0aff-4e72-b976-a30b1ac57dad",
@@ -17227,7 +17340,8 @@
       "isBuiltIn": true,
       "configuration": {
         "blocks": 0
-      }
+      },
+      "fingerprint": "a88d9cf55072a1c0"
     },
     {
       "id": "b9bfc6d1-9ce1-55a0-95d7-5a0abf874310",
@@ -17271,7 +17385,8 @@
         "blocks": 6,
         "min": 0,
         "max": 20
-      }
+      },
+      "fingerprint": "bd22bcd052ac9fbd"
     },
     {
       "id": "0e53928f-67e4-c3e1-3de0-ab5cbcbfc120",
@@ -17293,7 +17408,8 @@
       "isBuiltIn": false,
       "configuration": {
         "blocks": 2
-      }
+      },
+      "fingerprint": "b9731733e797d012"
     },
     {
       "id": "ce75ab85-00be-3ff4-2ed8-932cf1f83c9e",
@@ -17311,7 +17427,8 @@
       "isBuiltIn": false,
       "configuration": {
         "blocks": 1
-      }
+      },
+      "fingerprint": "522c9f3d8d8a39ac"
     },
     {
       "id": "7fa85b72-1d36-24f2-763f-e1719f0e9c41",
@@ -17350,7 +17467,8 @@
       "configuration": {
         "blocks": 5,
         "gridColumns": 12
-      }
+      },
+      "fingerprint": "52a951e2df39551a"
     },
     {
       "id": "05ae39b7-5ec9-8945-0b04-d4f17eac0851",
@@ -17372,7 +17490,8 @@
       "isBuiltIn": false,
       "configuration": {
         "max": 5
-      }
+      },
+      "fingerprint": "1778fce486b257d8"
     },
     {
       "id": "7d3417d8-a9a3-07c1-5d14-97059eba50ca",
@@ -17394,7 +17513,8 @@
       "isBuiltIn": false,
       "configuration": {
         "blocks": 2
-      }
+      },
+      "fingerprint": "816ca65267d292f4"
     },
     {
       "id": "858b2fb4-0006-1bfa-6f5f-ce77b0c5352e",
@@ -17412,7 +17532,8 @@
       "isBuiltIn": false,
       "configuration": {
         "blocks": 1
-      }
+      },
+      "fingerprint": "5186ea7d7079e9f8"
     },
     {
       "id": "28d4586f-e751-34a2-92ef-8145ee72aaa6",
@@ -17422,7 +17543,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": false
+      "isBuiltIn": false,
+      "fingerprint": "30ee06bc496f361f"
     },
     {
       "id": "1c3a7a5e-3d8d-8efc-de30-5a6b0f54861e",
@@ -17432,7 +17554,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": false
+      "isBuiltIn": false,
+      "fingerprint": "d74191a2c8f48978"
     },
     {
       "id": "b6b73142-b9c1-4bf8-a16d-e1c23320b549",
@@ -17442,7 +17565,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "6050876995f3121e"
     },
     {
       "id": "c6bac0dd-4ab9-45b1-8e30-e4b619ee5da3",
@@ -17452,7 +17576,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 1,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "7764d074aa80d3c1"
     },
     {
       "id": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
@@ -17462,7 +17587,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "a4ee95589441e76f"
     },
     {
       "id": "92897bc6-a5f3-4ffe-ae27-f2e7e33dda49",
@@ -17472,7 +17598,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "37da0f61879229c2"
     },
     {
       "id": "bc1e266c-dac4-4164-bf08-8a1ec6a7143d",
@@ -17482,7 +17609,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 1,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "65d74554bd9ec6eb"
     },
     {
       "id": "8f430dd6-4e96-447e-9dc0-cb552c8cd1f3",
@@ -17492,7 +17620,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 1,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "76d18eebfa50ba0c"
     },
     {
       "id": "84c6b441-31df-4ffe-b67e-67d5bc3ae65a",
@@ -17502,7 +17631,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 1,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "a0e6bfc2ac5248ef"
     },
     {
       "id": "215cb418-2153-4429-9aef-8c0f0041191b",
@@ -17512,7 +17642,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 1,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "cd8db9874bf38692"
     },
     {
       "id": "70575fe7-9812-4396-bbe1-c81a76db71b5",
@@ -17522,7 +17653,8 @@
       "folder": null,
       "targets": [],
       "otherUses": 1,
-      "isBuiltIn": true
+      "isBuiltIn": true,
+      "fingerprint": "8cfc757c37adbb34"
     }
   ]
 }
