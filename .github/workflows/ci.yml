@@ -31,6 +31,9 @@ jobs:
       - run: npm run lint
         working-directory: src/SchemaCity/Client
 
+      - run: npm test
+        working-directory: src/SchemaCity/Client
+
       # Only on a pull request: the gate compares the changed files against the base,
       # and a push has nothing to compare them to.
       - name: audit the changed client code
