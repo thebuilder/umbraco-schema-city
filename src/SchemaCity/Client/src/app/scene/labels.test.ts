@@ -47,6 +47,17 @@ describe("pickLabels", () => {
     expect(idsOf(kept)).toEqual(["ground"]);
   });
 
+  it("keeps taller boxes apart when presentation mode scales the text", () => {
+    const stacked = [
+      candidate("ground", 100, 100),
+      candidate("roof", 100, 100 - LABEL_HEIGHT_PX - 2),
+    ];
+    expect(idsOf(pickLabels(stacked))).toEqual(["ground", "roof"]);
+    expect(
+      idsOf(pickLabels(stacked, { labelHeight: LABEL_HEIGHT_PX * 1.4 }))
+    ).toEqual(["ground"]);
+  });
+
   it("stops at the cap even when every label fits", () => {
     const many = Array.from({ length: LABEL_CAP + 12 }, (_, i) =>
       candidate(`n${i}`, 100, i * (LABEL_HEIGHT_PX + 2))

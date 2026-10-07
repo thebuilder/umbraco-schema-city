@@ -811,9 +811,17 @@ function publishPrinted(inputs: Inputs, fades: Fades, floated: Floated) {
  * set or the way up has moved since the last one, or a fade is still under way, and
  * tells the label layer which whole names the board now prints.
  */
-function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
+function useRepaint(
+  inputs: Inputs,
+  floated: Floated,
+  reducedMotion: boolean,
+  textScale: number
+) {
   const camera = useThree((state) => state.camera);
-  const height = useThree((state) => state.size.height);
+  // Presenting asks every name for `textScale` times the pixels before it reads or
+  // takes a smaller size, which is the same sum as a viewport that much shorter: a
+  // board keeps larger print longer and a name too small for a projector goes.
+  const height = useThree((state) => state.size.height) / textScale;
   // A new solution starts its fades afresh; the hover and the selection do not.
   const fades = useMemo(
     () => newFades(inputs.standing.length),
@@ -881,6 +889,7 @@ export function BoardLabels({
   reducedMotion,
   traces,
   boardColours,
+  textScale,
 }: {
   /** The city's own placements, which decide every print and its size. */
   cityPlacements: readonly Placement[];
@@ -900,6 +909,8 @@ export function BoardLabels({
   traces: readonly Trace[];
   /** Each board's colour by district id, for the bare board under a print. */
   boardColours: Map<string, THREE.Color>;
+  /** How many times the usual pixels a name needs to read, 1.4 when presenting. */
+  textScale: number;
 }) {
   const { atlas, geometry, material, courtyards, lineMaterial } = useNameMesh(
     cityPlacements,
@@ -958,7 +969,7 @@ export function BoardLabels({
       interaction,
     ]
   );
-  useRepaint(inputs, floated, reducedMotion);
+  useRepaint(inputs, floated, reducedMotion, textScale);
 
   return (
     <>

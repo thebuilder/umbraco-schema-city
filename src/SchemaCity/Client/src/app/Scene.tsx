@@ -107,6 +107,7 @@ import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
   CHAR_PX,
   LABEL_CAP,
+  LABEL_HEIGHT_PX,
   labelAnchors,
   pickLabels,
   visibleLabelIds,
@@ -1075,6 +1076,7 @@ function Labels({
   focusNeighbours,
   floated,
   reducedMotion,
+  textScale,
 }: {
   nodesById: Map<string, SchemaNode>;
   placementsById: Map<string, Placement>;
@@ -1090,6 +1092,8 @@ function Labels({
    */
   floated: Floated;
   reducedMotion: boolean;
+  /** How much larger than the chrome's own type the names are, 1.4 when presenting. */
+  textScale: number;
 }) {
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
@@ -1154,13 +1158,17 @@ function Labels({
     parent.append(layer);
     spans.current = made;
 
+    // Scaled from the class's own size, so presenting keeps the theme's type and
+    // only multiplies it.
+    const style = getComputedStyle(made[0]);
+    const fontPx = Number.parseFloat(style.fontSize) * textScale;
+    for (const span of made) span.style.fontSize = `${fontPx}px`;
     // One measurement of the real font beats a guess at the mono advance, and a
     // wrong width is either labels that touch or labels dropped for nothing.
     const context = document.createElement("canvas").getContext("2d");
     if (context) {
-      const style = getComputedStyle(made[0]);
-      context.font = `${style.fontSize} ${style.fontFamily}`;
-      charPx.current = context.measureText("M").width || CHAR_PX;
+      context.font = `${fontPx}px ${style.fontFamily}`;
+      charPx.current = context.measureText("M").width || CHAR_PX * textScale;
     }
     dirty.current = true;
 
@@ -1169,7 +1177,7 @@ function Labels({
       labelLayer.current = null;
       spans.current = [];
     };
-  }, [gl, reducedMotion]);
+  }, [gl, reducedMotion, textScale]);
 
   useAnimationFrame((state) => {
     const playing = introPlaying(state.clock.elapsedTime, reducedMotion);
@@ -1216,7 +1224,12 @@ function Labels({
             buildingPx: behind ? 0 : candidate.footprint * perUnit,
           };
         }),
-      { charPx: charPx.current, width: size.width, height: size.height }
+      {
+        charPx: charPx.current,
+        labelHeight: LABEL_HEIGHT_PX * textScale,
+        width: size.width,
+        height: size.height,
+      }
     );
     // The board leaves out what floats, so a cut print never sits under the whole name.
     floated.ids.clear();
@@ -2350,6 +2363,7 @@ export default function Scene({
   layers,
   icons,
   inspectorOpen = false,
+  textScale = 1,
   reframe = 0,
   onReset,
   onSelect,
@@ -2378,6 +2392,11 @@ export default function Scene({
    * focused neighbourhood is not half behind the panel.
    */
   inspectorOpen?: boolean;
+  /**
+   * How much larger the floating names are drawn and the printed ones chosen, 1.4 in
+   * presentation mode so they read from the back of a meeting room.
+   */
+  textScale?: number;
   /**
    * Bumped to frame the whole city again. It is a count rather than a flag because
    * the camera has to answer Home a second time from wherever the reader took it.
@@ -2912,6 +2931,7 @@ export default function Scene({
             placementsById={placementsById}
             reducedMotion={reducedMotion}
             selected={selected}
+            textScale={textScale}
           />
           <BoardLabels
             boardColours={boardColours}
@@ -2923,6 +2943,7 @@ export default function Scene({
             placementsById={placementsById}
             reducedMotion={reducedMotion}
             settledById={routed.placementsById}
+            textScale={textScale}
             traces={boardMarks.traces}
             usage={usage}
           />

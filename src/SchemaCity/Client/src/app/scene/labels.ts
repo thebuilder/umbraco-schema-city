@@ -68,6 +68,8 @@ export function pickLabels(
   candidates: LabelCandidate[],
   options: {
     charPx?: number;
+    /** Box height, larger than `LABEL_HEIGHT_PX` when presentation mode scales the text. */
+    labelHeight?: number;
     cap?: number;
     minBuildingPx?: number;
     /** Viewport in CSS pixels. Anchors outside it are dropped. */
@@ -77,6 +79,7 @@ export function pickLabels(
 ): LabelBox[] {
   const {
     charPx = CHAR_PX,
+    labelHeight = LABEL_HEIGHT_PX,
     cap = LABEL_CAP,
     minBuildingPx = MIN_BUILDING_PX,
     width = Number.POSITIVE_INFINITY,
@@ -99,9 +102,9 @@ export function pickLabels(
       text: candidate.text,
       left: candidate.x - boxWidth / 2,
       // The anchor is the top face of the building, so the box sits above it.
-      top: candidate.y - LABEL_HEIGHT_PX,
+      top: candidate.y - labelHeight,
       width: boxWidth,
-      height: LABEL_HEIGHT_PX,
+      height: labelHeight,
     };
     if (kept.some((other) => overlaps(other, box))) continue;
     kept.push(box);
