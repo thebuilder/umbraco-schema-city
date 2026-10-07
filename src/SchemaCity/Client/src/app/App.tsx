@@ -662,8 +662,8 @@ export function App({
                   inspectorOpen={Boolean(selectedNode && neighbourhood)}
                   layers={layers}
                   onFocus={enterFocus}
-                  onSelect={(id) => (id === null ? done() : setSelected(id))}
                   onReset={resetView}
+                  onSelect={(id) => (id === null ? done() : setSelected(id))}
                   reframe={reframe}
                   scale={scale}
                   selected={selected}
