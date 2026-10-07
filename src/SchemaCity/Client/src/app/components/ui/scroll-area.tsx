@@ -7,8 +7,12 @@ import { cn } from "@/lib/utils";
 function ScrollArea({
   className,
   children,
+  viewport,
   ...props
-}: ScrollAreaPrimitive.Root.Props) {
+}: ScrollAreaPrimitive.Root.Props & {
+  /** Props for the viewport, such as the name it is read by or a tabpanel role. */
+  viewport?: ScrollAreaPrimitive.Viewport.Props;
+}) {
   return (
     <ScrollAreaPrimitive.Root
       className={cn("relative", className)}
@@ -18,6 +22,12 @@ function ScrollArea({
       <ScrollAreaPrimitive.Viewport
         className="size-full overscroll-contain rounded-none outline-none focus-visible:outline-2 focus-visible:outline-phosphor-bright"
         data-slot="scroll-area-viewport"
+        // Patched: base-ui sets tabIndex once from whether the content overflowed, and
+        // a tab change that adds overflow later never updates it, so a keyboard could
+        // not scroll the longer tab. Always a tab stop instead, named by the caller.
+        role="region"
+        tabIndex={0}
+        {...viewport}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>

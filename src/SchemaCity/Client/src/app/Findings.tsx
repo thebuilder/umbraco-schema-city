@@ -251,7 +251,10 @@ export function Findings({
           </fieldset>
         ) : null}
 
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea
+          className="min-h-0 flex-1"
+          viewport={{ "aria-label": "Findings list" }}
+        >
           <div className="space-y-2 px-4 pb-4">
             {matched.length === 0 ? (
               <p className="text-faint text-xs">

@@ -291,7 +291,10 @@ export function Inspector({
         />
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea
+        className="min-h-0 flex-1"
+        viewport={{ "aria-label": `${node.name}, ${tab}` }}
+      >
         {/* Keyed by type, so a list opened with "+ more" closes again for the next. */}
         <div className="px-4 pb-4" key={node.id} role="tabpanel">
           {tab === "overview" ? (
