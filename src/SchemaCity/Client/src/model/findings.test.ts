@@ -9,6 +9,7 @@ import {
   type FindingKind,
   findFindings,
   findingGroups,
+  KIND_NEXT_STEP,
   problemLabels,
 } from "./findings";
 import type {
@@ -187,10 +188,10 @@ describe("findFindings, one rule at a time", () => {
       [edge("block", "host", "used", "blocks")]
     );
     expect(aliasesFor(graph, "unusedElementType")).toEqual(["spare"]);
-  });
     expect(summaryOf(graph, "unusedElementType", "spare")?.summary).toBe(
       "No block editor lists it. 1 type has a block editor that could"
     );
+  });
 
   it("reports a type no editor can create and nothing composes", () => {
     const graph = graphOf(
@@ -198,10 +199,10 @@ describe("findFindings, one rule at a time", () => {
       [edge("allowedChild", "home", "child")]
     );
     expect(aliasesFor(graph, "deadEnd")).toEqual(["orphan"]);
-  });
     expect(summaryOf(graph, "deadEnd", "orphan")?.summary).toBe(
       "Not allowed at root or under any type, and nothing composes it. 1 property"
     );
+  });
 
   it("leaves a composed type off the dead ends, whatever usage says", () => {
     const graph = graphOf(
@@ -782,6 +783,15 @@ describe("findFindings, one rule at a time", () => {
     expect(summaryOf(graph, "overloadedTab", "tabless")?.summary).toBe(
       "listing group holds 21 properties"
     );
+    const loose = graphOf([
+      node("loose", {
+        allowedAsRoot: true,
+        groups: [{ ...group("no-group", many("item", 21)), name: "No group" }],
+      }),
+    ]);
+    expect(summaryOf(loose, "overloadedTab", "loose")?.summary).toBe(
+      "Ungrouped holds 21 properties"
+    );
   });
 
   it("reports a content block with nothing to fill in", () => {
@@ -812,15 +822,6 @@ describe("findFindings, one rule at a time", () => {
         node("home", { allowedAsRoot: true }),
         node("noSettings", { isElement: true, ownPropertyCount: 0 }),
         node("spare", { isElement: true, ownPropertyCount: 0 }),
-    const loose = graphOf([
-      node("loose", {
-        allowedAsRoot: true,
-        groups: [{ ...group("no-group", many("item", 21)), name: "No group" }],
-      }),
-    ]);
-    expect(summaryOf(loose, "overloadedTab", "loose")?.summary).toBe(
-      "Ungrouped holds 21 properties"
-    );
       ],
       [
         {
@@ -1047,6 +1048,13 @@ describe("findFindings on the pathological fixture", () => {
     expect(unusedType).toBeGreaterThan(0);
     expect(counts).toEqual({ ...rest, noTemplate: 6 });
   });
+});
+
+it("says what to do for every kind, and never that a type is safe to delete", () => {
+  for (const kind of FINDING_KINDS) {
+    expect(KIND_NEXT_STEP[kind].length).toBeGreaterThan(0);
+    expect(KIND_NEXT_STEP[kind].toLowerCase()).not.toContain("safe");
+  }
 });
 
 it("labels each type by its problems only, in finding order", () => {

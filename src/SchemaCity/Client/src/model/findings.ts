@@ -125,6 +125,40 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
     "An editor can create these types, but no template is allowed. Check whether they are meant to render on their own.",
 };
 
+/**
+ * What a developer can do about each kind, shown beside the explanation. A finding
+ * is evidence to check, so none of these calls a type safe to delete.
+ */
+export const KIND_NEXT_STEP: Record<FindingKind, string> = {
+  brokenBlock:
+    "Remove the missing Element Type from the block editor, or restore it if content still holds those blocks.",
+  duplicateAlias:
+    "Rename the property on one source or drop one of the compositions, then check which value editors expect.",
+  emptyBlock:
+    "Add the properties the block needs, or keep it if it is a deliberate divider or spacer.",
+  cultureMismatch:
+    "Let the type vary by culture, or make the property or Element Type invariant, whichever editors expect.",
+  unreachableChain:
+    "Allow the top of the chain under a type a root reaches, or remove the chain if it is left over.",
+  deadEnd: "Allow it under a page, or remove it if it is left over.",
+  unusedElementType:
+    "Check stored block values and custom code, then add it to a block editor or remove it.",
+  unusedType:
+    "Check custom code and imports, then remove it or allow it where editors need it.",
+  overloadedTab:
+    "Split the tab into groups or more tabs, so editors find the fields they need.",
+  nearDuplicateDataType:
+    "Compare the configurations, then move the properties onto one Data Type if they should match.",
+  noProperties:
+    "Add properties, or check whether code relies on it as a folder or marker type.",
+  complexity:
+    "Check whether some properties belong in a composition or a block, so the type stays readable.",
+  pureMixin:
+    "Nothing, if it is meant as a mixin. With one or two users, consider moving its properties onto them.",
+  noTemplate:
+    "Allow a template if it should render on its own, or leave it for headless or block-only content.",
+};
+
 const SEVERITY: Record<FindingKind, FindingSeverity> = {
   brokenBlock: "problem",
   duplicateAlias: "problem",
@@ -397,6 +431,13 @@ export function findFindings(
     // this one row says so. A type something composes is a mixin doing its job, so
     // it is never a dead end; the pure mixin note below covers it instead.
     if (!(node.isElement || canCreate) && composers === 0) {
+      const detail =
+        content(node.id) ||
+        plural(
+          node.ownPropertyCount + node.composedPropertyCount,
+          "property",
+          "properties"
+        );
       add(
         "deadEnd",
         node,
@@ -416,6 +457,8 @@ export function findFindings(
 
     const duplicates = duplicateAliases(node);
     if (duplicates.length > 0) {
+      const source = (id: string) =>
+        id === node.id ? "this type" : (nameOf.get(id) ?? id);
       add(
         "duplicateAlias",
         node,
@@ -426,13 +469,6 @@ export function findFindings(
             return editors.size > 1
               ? `${alias}: ${origins.map((origin) => `${origin.editor} from ${source(origin.id)}`).join(", ")}`
               : `${alias} from ${list(origins.map((origin) => source(origin.id)))}`;
-      const detail =
-        content(node.id) ||
-        plural(
-          node.ownPropertyCount + node.composedPropertyCount,
-          "property",
-          "properties"
-        );
           })
           .join("; "),
         [
@@ -471,8 +507,6 @@ export function findFindings(
       );
       const variantBlocks = (blocksFrom.get(node.id) ?? []).filter(
         (edge) => byId.get(edge.to)?.variesByCulture
-      const source = (id: string) =>
-        id === node.id ? "this type" : (nameOf.get(id) ?? id);
       );
       const listed = [
         ...new Set(
