@@ -371,23 +371,31 @@ export function labelRoom(
       const apart = Math.abs(other.position.x - one.position.x) - reach;
       if (apart >= 0) open = Math.min(open, apart);
     }
-    let overhang = Math.min(
+    const overhang = Math.min(
       MAX_OVERHANG,
-      Math.max(0, open / 2 - NAME_SPACING / 2)
+      Math.max(0, open / 2 - NAME_SPACING / 2),
+      edgeRoom(one, islands?.get(one.district ?? ""))
     );
-    const island =
-      one.district === undefined ? undefined : islands?.get(one.district);
-    if (island) {
-      // Centred under its building, so the nearer edge limits both sides.
-      const edge = Math.min(
-        one.position.x - half - island.minX,
-        island.maxX - one.position.x - half
-      );
-      overhang = Math.min(overhang, Math.max(0, edge - PRINT_MARGIN));
-    }
     room.set(one.id, one.footprint + overhang * 2);
   }
   return room;
+}
+
+/**
+ * How far a name centred under `one` may run past its sides and stay the print
+ * margin inside `island`'s east and west edges: the nearer edge limits both sides.
+ */
+function edgeRoom(
+  one: { position: { x: number }; footprint: number },
+  island: Rect | undefined
+): number {
+  if (!island) return Number.POSITIVE_INFINITY;
+  const half = one.footprint / 2;
+  const edge = Math.min(
+    one.position.x - half - island.minX,
+    island.maxX - one.position.x - half
+  );
+  return Math.max(0, edge - PRINT_MARGIN);
 }
 
 /** The widest a name prints when it stands clear of its neighbours. */
@@ -572,6 +580,24 @@ function placesFor(
           }));
     return tries.filter((one) => fits(want.id, one));
   });
+}
+
+/** Each district's edge from its board, the fingers on any board and its name's ground. */
+export function boardEdges(
+  islands: ReadonlyMap<string, Rect>,
+  fingers: readonly Finger[],
+  stamps: ReadonlyMap<string, Rect | null>
+): Map<string, Edge> {
+  return new Map(
+    [...islands].map(([id, island]) => [
+      id,
+      {
+        island,
+        fingers: fingers.filter((finger) => finger.district === id),
+        stamp: stamps.get(id),
+      },
+    ])
+  );
 }
 
 /** One name to place: its building, and the prints it may use, best first. */

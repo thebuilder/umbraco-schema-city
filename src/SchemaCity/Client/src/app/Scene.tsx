@@ -53,18 +53,23 @@ import { describeRelationship, uniqueConnections } from "./relationship";
 import { BoardLabels, type Floated } from "./scene/BoardLabels";
 import {
   Boards,
+  cityBoards,
   FOLDER_PAD,
-  islandOf,
   rimColour,
   SLAB_HEIGHT,
   slabColour,
-  stampAspect,
   tint,
   WHITE,
 } from "./scene/Boards";
 import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
-import { edgeFingers, type Finger, traceVias } from "./scene/board";
-import { tracesOf } from "./scene/board-labels";
+import {
+  edgeFingers,
+  type Finger,
+  type Island,
+  type Traced,
+  traceVias,
+} from "./scene/board";
+import { boardEdges, tracesOf } from "./scene/board-labels";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -137,7 +142,6 @@ import {
 import {
   atmosphere,
   CAMERA_FOV,
-  districtStamp,
   framingAction,
   framingStep,
   GRID_FRAGMENT_SHADER,
@@ -2365,6 +2369,39 @@ function subscribeReducedMotion(change: () => void) {
   return () => query.removeEventListener("change", change);
 }
 
+/**
+ * What the boards take from the drawn traces: the runs a printed name keeps off where
+ * it can, a via where a trace turns, a gold finger where one leaves its board, and the
+ * edges the printed names stay inside. A focus lays its neighbourhood out over the
+ * boards, on an island of its own, so off the city (`onCity` false) there are no
+ * fingers and no edges.
+ */
+function boardMarksOf(
+  routes: Traced[],
+  placementsById: Map<string, Placement>,
+  boards: {
+    islands: ReadonlyMap<string, Island>;
+    stamps: ReadonlyMap<string, Island | null>;
+  },
+  onCity: boolean
+) {
+  const fingers = onCity
+    ? edgeFingers(
+        routes,
+        (id) => placementsById.get(id)?.district,
+        boards.islands
+      )
+    : [];
+  return {
+    traces: tracesOf(routes, (id) => placementsById.get(id)?.position),
+    vias: traceVias(routes),
+    fingers,
+    edges: onCity
+      ? boardEdges(boards.islands, fingers, boards.stamps)
+      : undefined,
+  };
+}
+
 export default function Scene({
   graph,
   grouping = "structure",
@@ -2709,40 +2746,10 @@ export default function Scene({
     }
     return map;
   }, [routed]);
-  // Each district's board, padding included.
-  const islands = useMemo(
-    () =>
-      new Map(
-        city.districts.map((district) => [district.id, islandOf(district)])
-      ),
-    [city]
-  );
-  // The ground each district's name prints on, which the type names keep off. None
-  // until the theme's mono face is read, which the names are rasterised in.
-  const mono = palette?.mono;
-  const stamps = useMemo(
-    () =>
-      new Map(
-        city.districts.map((district) => {
-          const stamp =
-            mono === undefined
-              ? null
-              : districtStamp(
-                  islandOf(district),
-                  stampAspect(district.name, mono)
-                );
-          return [
-            district.id,
-            stamp && {
-              minX: stamp.x - stamp.width / 2,
-              maxX: stamp.x + stamp.width / 2,
-              minZ: stamp.z - stamp.height / 2,
-              maxZ: stamp.z + stamp.height / 2,
-            },
-          ];
-        })
-      ),
-    [city, mono]
+  // Each district's board, and the ground its name prints on.
+  const boards = useMemo(
+    () => cityBoards(city.districts, palette),
+    [city, palette]
   );
   // Where the drawn ground traces turn, for the vias, and where they leave their
   // board for another, for the gold fingers. Read off the plan the traces draw from,
@@ -2753,36 +2760,8 @@ export default function Scene({
     const routes = planRoutes(routed.placementsById, drawnEdges)
       .routes.filter(({ edge }) => active.has(LAYER_OF[edge.kind]))
       .map(({ edge, points }) => ({ from: edge.from, to: edge.to, points }));
-    const fingers =
-      focus === null
-        ? edgeFingers(
-            routes,
-            (id) => routed.placementsById.get(id)?.district,
-            islands
-          )
-        : [];
-    return {
-      // The runs a printed name keeps off where it can.
-      traces: tracesOf(routes, (id) => routed.placementsById.get(id)?.position),
-      vias: traceVias(routes),
-      fingers,
-      // The boards the printed names stay on. A focus lays its neighbourhood out on
-      // an island of its own, off these boards, so it keeps to none of them.
-      edges:
-        focus === null
-          ? new Map(
-              [...islands].map(([id, island]) => [
-                id,
-                {
-                  island,
-                  fingers: fingers.filter((finger) => finger.district === id),
-                  stamp: stamps.get(id),
-                },
-              ])
-            )
-          : undefined,
-    };
-  }, [routed, drawnEdges, active, focus, islands, stamps]);
+    return boardMarksOf(routes, routed.placementsById, boards, focus === null);
+  }, [routed, drawnEdges, active, focus, boards]);
 
   const boardColours = useMemo(
     () =>
@@ -2999,11 +2978,10 @@ export default function Scene({
           />
           <BoardLabels
             boardColours={boardColours}
+            boards={{ islands: boards.islands, edges: boardMarks.edges }}
             cityPlacements={city.placements}
-            edges={boardMarks.edges}
             floated={floated}
             interaction={interaction}
-            islands={islands}
             nodesById={nodesById}
             palette={palette}
             placementsById={placementsById}

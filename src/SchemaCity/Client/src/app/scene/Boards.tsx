@@ -192,18 +192,54 @@ function stampTexture(name: string, font: string): THREE.CanvasTexture {
  * A district's name's width over its cap height, as `stampTexture` rasterises it in
  * `font`, which is what `districtStamp` sizes the print by.
  */
-export function stampAspect(name: string, font: string): number {
+function stampAspect(name: string, font: string): number {
   const { image } = stampTexture(name.toUpperCase(), font);
   return image.width / image.height;
 }
 
 /** A district's board, padding included. */
-export const islandOf = (district: District): Island => ({
+const islandOf = (district: District): Island => ({
   minX: district.minX - ISLAND_PAD,
   maxX: district.maxX + ISLAND_PAD,
   minZ: district.minZ - ISLAND_PAD,
   maxZ: district.maxZ + ISLAND_PAD,
 });
+
+/**
+ * Each district's board, padding included, and the ground its name prints on, for the
+ * type names to keep off: null for a board with no room for its name, and no stamps
+ * at all until the theme's mono face is known, which the names are rasterised in.
+ */
+export function cityBoards(
+  districts: readonly District[],
+  palette: { mono: string } | null
+): {
+  islands: Map<string, Island>;
+  stamps: Map<string, Island | null>;
+} {
+  const islands = new Map(
+    districts.map((district) => [district.id, islandOf(district)])
+  );
+  if (!palette) return { islands, stamps: new Map() };
+  const grounds = new Map(
+    districts.map((district) => {
+      const stamp = districtStamp(
+        islandOf(district),
+        stampAspect(district.name, palette.mono)
+      );
+      return [
+        district.id,
+        stamp && {
+          minX: stamp.x - stamp.width / 2,
+          maxX: stamp.x + stamp.width / 2,
+          minZ: stamp.z - stamp.height / 2,
+          maxZ: stamp.z + stamp.height / 2,
+        },
+      ];
+    })
+  );
+  return { islands, stamps: grounds };
+}
 
 /**
  * A board's outline as a shape in x and -z, so that extruding it along +z and

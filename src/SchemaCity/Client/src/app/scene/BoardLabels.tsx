@@ -901,8 +901,7 @@ export function BoardLabels({
   traces,
   boardColours,
   textScale,
-  islands,
-  edges,
+  boards,
 }: {
   /** The city's own placements, which decide every print and its size. */
   cityPlacements: readonly Placement[];
@@ -924,16 +923,20 @@ export function BoardLabels({
   boardColours: Map<string, THREE.Color>;
   /** How many times the usual pixels a board targets for its print size, 1.4 when presenting. */
   textScale: number;
-  /** Each district's board, which its names keep the narrowest of their prints on. */
-  islands: ReadonlyMap<string, Rect>;
-  /** Each district's board and its fingers, which its names stay on; none in focus mode. */
-  edges: ReadonlyMap<string, Edge> | undefined;
+  /**
+   * Each district's board, which keeps the narrowest of its names' prints on it, and
+   * its edge, which every print stays inside; no edges in focus mode.
+   */
+  boards: {
+    islands: ReadonlyMap<string, Rect>;
+    edges?: ReadonlyMap<string, Edge>;
+  };
 }) {
   const { atlas, geometry, material, courtyards, lineMaterial } = useNameMesh(
     cityPlacements,
     nodesById,
     palette,
-    islands
+    boards.islands
   );
   const { knockouts, knockoutMaterial } = useKnockouts(
     cityPlacements,
@@ -954,9 +957,9 @@ export function BoardLabels({
         atlas.sizes,
         (id) => usage?.byType[id]?.total ?? 0,
         (rect) => traceAt(rect).length > 0,
-        edges
+        boards.edges
       ),
-    [settled, atlas, usage, traceAt, edges]
+    [settled, atlas, usage, traceAt, boards.edges]
   );
 
   const inputs = useMemo(
