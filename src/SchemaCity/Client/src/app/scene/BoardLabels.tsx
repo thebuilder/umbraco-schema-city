@@ -59,7 +59,8 @@ const ATLAS_BUDGET = 64 * 1024 * 1024;
 const ATLAS_PAD = 4;
 /**
  * How high the print stands: over the nested folder tints at 0.02, so a folder never
- * hides a name, and under the roads at 0.05, so a trace runs over the silkscreen.
+ * hides a name. The roads stand higher, at 0.05, but write no depth, and the print
+ * draws after them, so a print over a trace lies on top with its knockout under it.
  */
 const LABEL_Y = FOLDER_TINT_HEIGHT + 0.01;
 /** The courtyard lines stand with the print. */
