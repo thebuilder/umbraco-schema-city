@@ -29,6 +29,8 @@ class SchemaCityDocumentTypeViewElement extends UmbElementMixin(LitElement) {
   #root?: Root;
   #graph?: SchemaGraph;
   #usage?: UsageReport;
+  // Until the usage request settles, either way, which the footer says.
+  #usagePending = true;
   #icons?: Record<string, string>;
   #unique?: string;
   #failed?: string;
@@ -84,10 +86,12 @@ class SchemaCityDocumentTypeViewElement extends UmbElementMixin(LitElement) {
     // starts only once the graph has drawn. A failure leaves `usage` undefined,
     // which is what disables the lens picker, and says so once.
     const usage = await tryExecute(this, getUsage());
+    this.#usagePending = false;
     if (usage.error) {
       console.warn(
         "Schema City: the usage endpoint did not answer, so the lens stays off."
       );
+      this.#draw();
       return;
     }
     this.#usage = usage.data ?? undefined;
@@ -117,6 +121,7 @@ class SchemaCityDocumentTypeViewElement extends UmbElementMixin(LitElement) {
           onOpenDataType={openDataTypeInEditor}
           onOpenType={openTypeInEditor}
           usage={this.#usage}
+          usagePending={this.#usagePending}
         />
       ) : (
         <p className="p-4 font-mono text-sm text-phosphor-dim">
