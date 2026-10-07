@@ -61,12 +61,14 @@ readable when you orbit to the far side. Hover a building to see its direct conn
 names of connected types; the names of unrelated types dim. Floating labels that would overlap stay
 hidden until there is room for them. A name shows once: a related type whose whole name the board
 prints on screen gets no floating label, and a type with a floating label is not printed under it.
-Click a building to keep its connections visible and open the inspector. Its header names the type, its role (page, composition or Element Type) and how much
-content uses it. Overview lists the schema checks for the type, its usage, and its related types,
+Click a building to keep its connections visible and open the inspector. Its header names the
+type, its role (page, composition or Element Type) and how much content uses it. Overview lists the schema checks for the type, its usage, and its related types,
 with content counts once usage has loaded. Properties shows each group with the composition it
 comes from and each property's Data Type. Connections lists every configured connection by kind,
 block and picker targets by property, and the references counted in content separately. Click a
 related type to select it.
+
+![Closer in on the Site board, where the printed names come out whole inside their courtyards, with vias where traces turn and a gold finger where traces leave for the Microsite board.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/names.png)
 
 Each district is a circuit board: a core with copper and solder mask over it, rounded corners with
 plated mounting holes, and a faint copper pour. A gold finger on a board's edge marks each lane of
