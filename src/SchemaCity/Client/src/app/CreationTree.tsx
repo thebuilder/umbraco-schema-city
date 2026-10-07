@@ -13,6 +13,7 @@ import {
 import { problemLabels } from "../model/findings";
 import { chips, contentCountOf } from "../model/inspector";
 import type { SchemaNode } from "../model/types";
+import { plural } from "./a11y";
 import { FindingDot, Heading, READING, TypeChips } from "./InspectorChips";
 import { FilterField, type ListProps, Scroller, useMatches } from "./TypeTable";
 
@@ -127,15 +128,65 @@ function Branches({
   );
 }
 
+/** The fold arrow, or a spacer where the row has nothing to fold. */
+function Toggle({
+  branch,
+  shared,
+  on,
+}: {
+  branch: Branch;
+  shared: Shared;
+  on: boolean;
+}) {
+  const { row } = branch;
+  // A filtered row whose children all fell out has nothing to fold.
+  const empty = shared.filtering && branch.children.length === 0;
+  if (!row.expandable || empty)
+    return <span aria-hidden className="w-4 shrink-0" />;
+  return (
+    <button
+      aria-expanded={row.open}
+      aria-label={`Show what ${shared.marks.names.get(row.id)?.name} can create`}
+      className={`w-4 shrink-0 hover:text-phosphor-bright disabled:opacity-50 ${quiet(on)}`}
+      disabled={shared.filtering}
+      onClick={() => shared.onToggle(row.key)}
+      type="button"
+    >
+      {row.open ? "▾" : "▸"}
+    </button>
+  );
+}
+
+/**
+ * The type's content count on its first row. A type under three parents is three
+ * rows of one type, so the repeats say so instead of tripling the number.
+ */
+function RowCount({
+  row,
+  shared,
+  on,
+}: {
+  row: TreeRow;
+  shared: Shared;
+  on: boolean;
+}) {
+  const count = shared.marks.countOf(row.id);
+  if (count === undefined || shared.first.get(row.id) === row.key)
+    return <Count on={on} value={count} />;
+  return (
+    <span
+      className={`ml-auto shrink-0 pl-3 text-2xs ${quiet(on)}`}
+      title="Counted on this type's first row above"
+    >
+      same type
+    </span>
+  );
+}
+
 function TreeItem({ branch, shared }: { branch: Branch; shared: Shared }) {
   const { row } = branch;
-  const { tree, filtering, onToggle, marks, first } = shared;
-  const on = row.id === marks.selected;
-  const allowed = tree.children.get(row.id)?.length ?? 0;
-  // A filtered row whose children all fell out has nothing to fold.
-  const toggles =
-    row.expandable && !(filtering && branch.children.length === 0);
-  const count = marks.countOf(row.id);
+  const on = row.id === shared.marks.selected;
+  const allowed = shared.tree.children.get(row.id)?.length ?? 0;
   return (
     <li>
       <div className={`flex items-stretch pr-2 ${ROW(on)}`}>
@@ -149,21 +200,8 @@ function TreeItem({ branch, shared }: { branch: Branch; shared: Shared }) {
           />
         ))}
         <div className="flex min-w-0 flex-1 items-center gap-1.5 py-0.5">
-          {toggles ? (
-            <button
-              aria-expanded={row.open}
-              aria-label={`Show what ${marks.names.get(row.id)?.name} can create`}
-              className={`w-4 shrink-0 hover:text-phosphor-bright disabled:opacity-50 ${quiet(on)}`}
-              disabled={filtering}
-              onClick={() => onToggle(row.key)}
-              type="button"
-            >
-              {row.open ? "▾" : "▸"}
-            </button>
-          ) : (
-            <span aria-hidden className="w-4 shrink-0" />
-          )}
-          <TypeName id={row.id} marks={marks} />
+          <Toggle branch={branch} on={on} shared={shared} />
+          <TypeName id={row.id} marks={shared.marks} />
           {row.recursive ? (
             <span className={`shrink-0 text-2xs ${quiet(on)}`}>
               ↻ already above in this branch
@@ -172,23 +210,12 @@ function TreeItem({ branch, shared }: { branch: Branch; shared: Shared }) {
           {row.expandable ? (
             <span
               className={`shrink-0 text-2xs ${quiet(on)}`}
-              title={`${allowed} allowed child ${allowed === 1 ? "type" : "types"}`}
+              title={plural(allowed, "allowed child type")}
             >
               <span className="font-mono">{allowed}</span> allowed
             </span>
           ) : null}
-          {/* A type under three parents is three rows of one type, so its count
-              shows once and the repeats say so instead of tripling it. */}
-          {count === undefined || first.get(row.id) === row.key ? (
-            <Count on={on} value={count} />
-          ) : (
-            <span
-              className={`ml-auto shrink-0 pl-3 text-2xs ${quiet(on)}`}
-              title="Counted on this type's first row above"
-            >
-              same type
-            </span>
-          )}
+          <RowCount on={on} row={row} shared={shared} />
         </div>
       </div>
       {branch.children.length > 0 ? (
@@ -245,6 +272,27 @@ function Unreachable({
       </ul>
     </section>
   );
+}
+
+/**
+ * One line for whichever reason the tree is short: nothing allowed at root,
+ * nothing matching the filter or the focus, or the row limit. Empty otherwise.
+ */
+function shortBecause(at: {
+  roots: number;
+  rows: number;
+  filtering: boolean;
+  query: string;
+  truncated: boolean;
+}): string {
+  if (at.roots === 0)
+    return "No Document Type is allowed at root, so an editor cannot create any content.";
+  if (at.truncated)
+    return `Stopped after ${at.rows} rows. Collapse a branch or filter to see the rest.`;
+  if (!at.filtering || at.rows > 0) return "";
+  return at.query.trim() === ""
+    ? "None of the focused types is under a root."
+    : `No type under a root matches “${at.query}”.`;
 }
 
 export function CreationTree(props: ListProps) {
@@ -334,21 +382,14 @@ export function CreationTree(props: ListProps) {
             branches={branches}
             shared={{ filtering, first, marks, onToggle: toggle, tree }}
           />
-          {/* One line for whichever reason the list above is short: nothing allowed
-              at root, nothing matching the filter, or the row limit. */}
           <p className="mt-2 text-label text-xs empty:hidden">
-            {tree.roots.length === 0
-              ? "No Document Type is allowed at root, so an editor cannot create any content."
-              : ""}
-            {filtering && rows.length === 0 && query.trim() !== ""
-              ? `No type under a root matches “${query}”.`
-              : ""}
-            {filtering && rows.length === 0 && query.trim() === ""
-              ? "None of the focused types is under a root."
-              : ""}
-            {truncated
-              ? `Stopped after ${rows.length} rows. Collapse a branch or filter to see the rest.`
-              : ""}
+            {shortBecause({
+              filtering,
+              query,
+              roots: tree.roots.length,
+              rows: rows.length,
+              truncated,
+            })}
           </p>
 
           <Unreachable marks={marks} matched={matched} tree={tree} />

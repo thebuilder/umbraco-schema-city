@@ -1,5 +1,5 @@
-import { editorLabel } from "../model/editor-layout";
 import type { PropertyGroup, SchemaNode } from "../model/types";
+import { DataTypeName } from "./InspectorChips";
 
 type Lookup = Map<string, SchemaNode>;
 
@@ -52,19 +52,10 @@ function Rows({
               nodesById={nodesById}
             />
           </div>
-          {/* The Data Type is what an editor recognises; the editor alias behind it
-              is on hover for a mouse and read after it for a screen reader. */}
-          <p
-            className="max-w-40 truncate text-right text-label text-xs"
-            title={editorLabel(property)}
-          >
-            {property.dataTypeName ?? property.editorAlias}
-            {property.dataTypeName ? (
-              <span className="sr-only">
-                , editor {property.editorUiAlias ?? property.editorAlias}
-              </span>
-            ) : null}
-          </p>
+          <DataTypeName
+            className="block max-w-40 truncate text-right text-label text-xs"
+            property={property}
+          />
         </li>
       ))}
     </ul>

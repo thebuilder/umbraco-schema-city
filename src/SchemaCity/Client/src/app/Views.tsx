@@ -4,8 +4,9 @@ import { toggleVariants } from "@/components/ui/toggle";
 import type { Finding } from "../model/findings";
 import { roleOf } from "../model/inspector";
 import type { Neighbourhood } from "../model/neighbourhood";
+import { reachableWithin } from "../model/reach";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
-import { roving } from "./a11y";
+import { plural, roving, useAnnounceChange } from "./a11y";
 import { CreationTree } from "./CreationTree";
 import { EditorLayout } from "./EditorLayout";
 import { TextButton } from "./InspectorChips";
@@ -69,6 +70,77 @@ export function ViewSwitcher({
   );
 }
 
+/** In focus mode, the focused type and its neighbours, which the lists narrow to. */
+export type FocusScope = { ids: ReadonlySet<string>; around: string };
+
+export const focusScope = (
+  graph: SchemaGraph,
+  focus: string | null,
+  depth: number
+): FocusScope | null =>
+  focus ? { ids: reachableWithin(graph, focus, depth), around: focus } : null;
+
+/**
+ * What the live region says as the app changes around a screen reader: the
+ * selection, the view, the layers that are on, and focus with how many types it
+ * shows. Each speaks when it changes, not when the app opens.
+ */
+export function Announcements({
+  selected,
+  view,
+  layers,
+  focus,
+  nodesById,
+}: {
+  selected: string | null;
+  view: View;
+  layers: string[];
+  focus: FocusScope | null;
+  nodesById: Map<string, SchemaNode>;
+}) {
+  const name = (id: string | null | undefined) =>
+    nodesById.get(id ?? "")?.name ?? "";
+  useAnnounceChange(
+    selected ? `${name(selected)} selected` : "Selection cleared"
+  );
+  useAnnounceChange(
+    `${VIEW_TABS.find((tab) => tab.value === view)?.label ?? "City"} view`
+  );
+  useAnnounceChange(`Layers on: ${layers.join(", ") || "none"}`);
+  useAnnounceChange(
+    focus
+      ? `Focus on ${name(focus.around)}, ${plural(focus.ids.size, "type")}`
+      : "Focus off"
+  );
+  return null;
+}
+
+/** The line over a list in focus mode, with the way back to every type. */
+function FocusNote({
+  scope,
+  nodesById,
+  onShowAll,
+}: {
+  scope: FocusScope;
+  nodesById: Map<string, SchemaNode>;
+  onShowAll: () => void;
+}) {
+  return (
+    <p className="flex flex-wrap items-baseline gap-x-1 border-line border-b bg-panel px-4 py-1.5 font-sans text-label text-xs">
+      Showing the {plural(scope.ids.size, "type")} around{" "}
+      {nodesById.get(scope.around)?.name ?? "the focused type"}.
+      <TextButton onClick={onShowAll}>Show all</TextButton>
+    </p>
+  );
+}
+
+/** The List, Tree or Matrix, by the view's name. */
+const LISTS = {
+  list: TypeTable,
+  tree: CreationTree,
+  matrix: Matrix,
+} as const;
+
 export function FlatView({
   view,
   graph,
@@ -82,7 +154,7 @@ export function FlatView({
   findings,
   neighbourhoodById,
   scope = null,
-  onShowAll,
+  onShowAll = () => undefined,
 }: {
   view: View;
   graph: SchemaGraph;
@@ -95,8 +167,8 @@ export function FlatView({
   onPick: () => void;
   findings: Finding[];
   neighbourhoodById: Map<string, Neighbourhood>;
-  /** In focus mode, the focused type and its neighbours; the lists show only these. */
-  scope?: { ids: ReadonlySet<string>; around: string } | null;
+  scope?: FocusScope | null;
+  /** Leaves focus, which is how the lists go back to every type. */
   onShowAll?: () => void;
 }) {
   if (view === "editor")
@@ -110,27 +182,26 @@ export function FlatView({
         selected={selected}
       />
     );
-  const shared = {
-    graph,
-    onQuery,
-    onSelect,
-    query,
-    scope: scope?.ids ?? null,
-    selected,
-  };
-  let list = <TypeTable {...shared} findings={findings} usage={usage} />;
-  if (view === "tree")
-    list = <CreationTree {...shared} findings={findings} usage={usage} />;
-  if (view === "matrix") list = <Matrix {...shared} />;
-  if (!scope) return list;
+  const List = LISTS[view === "tree" || view === "matrix" ? view : "list"];
+  // One shape in and out of focus, so entering focus keeps the list mounted with
+  // its sort, its open branches and the row that has keyboard focus.
   return (
     <div className="flex h-full flex-col bg-background">
-      <p className="flex flex-wrap items-baseline gap-x-1 border-line border-b bg-panel px-4 py-1.5 font-sans text-label text-xs">
-        Showing the {scope.ids.size} types around{" "}
-        {nodesById.get(scope.around)?.name ?? "the focused type"}.
-        <TextButton onClick={() => onShowAll?.()}>Show all</TextButton>
-      </p>
-      <div className="min-h-0 flex-1">{list}</div>
+      {scope ? (
+        <FocusNote nodesById={nodesById} onShowAll={onShowAll} scope={scope} />
+      ) : null}
+      <div className="min-h-0 flex-1">
+        <List
+          findings={findings}
+          graph={graph}
+          onQuery={onQuery}
+          onSelect={onSelect}
+          query={query}
+          scope={scope?.ids ?? null}
+          selected={selected}
+          usage={usage}
+        />
+      </div>
     </div>
   );
 }

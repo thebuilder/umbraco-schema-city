@@ -12,7 +12,7 @@ import {
   useState,
 } from "react";
 import { PortalContainer } from "@/portal";
-import type { SchemaGraph } from "../model/types";
+import type { SchemaGraph, SchemaNode } from "../model/types";
 
 const Announce = createContext<(message: string) => void>(() => undefined);
 
@@ -62,12 +62,6 @@ export function useAnnounceChange(message: string | null) {
     last.current = message;
     if (message) announce(message);
   }, [message, announce]);
-}
-
-/** useAnnounceChange for a component that has nothing to render. */
-export function Say({ message }: { message: string | null }) {
-  useAnnounceChange(message);
-  return null;
 }
 
 const ARROWS: Partial<Record<string, (at: number, last: number) => number>> = {
@@ -128,8 +122,29 @@ const appRoot = (from: Element | null | undefined) =>
  * type returns focus here rather than to its own trigger, since the inspector is
  * what the pick opened.
  */
-export const inspectorHeading = (from: Element | null | undefined) =>
+const inspectorHeading = (from: Element | null | undefined) =>
   appRoot(from)?.querySelector<HTMLElement>("[data-inspector-heading]") ?? null;
+
+/**
+ * For a dialog whose rows open the inspector. `chose` marks that a row was picked,
+ * and `finalFocus`, given to the dialog, then sends focus to the inspector heading
+ * rather than back to the trigger. Closing without a pick returns to the trigger.
+ * `from` is any element inside the app.
+ */
+export function useHandOff(from: RefObject<Element | null>) {
+  const picked = useRef(false);
+  return {
+    chose: () => {
+      picked.current = true;
+    },
+    finalFocus: (): HTMLElement | true => {
+      const chose = picked.current;
+      picked.current = false;
+      const heading = chose ? inspectorHeading(from.current) : null;
+      return heading ?? true;
+    },
+  };
+}
 
 /**
  * Focus for a panel over the view. Its heading takes focus when the panel opens
@@ -182,52 +197,48 @@ export function districtCount(graph: SchemaGraph): number {
   const parentOf = new Map(
     folders.map((folder) => [folder.id, folder.parentId])
   );
-  const topOf = (id: string) => {
-    let at = id;
-    for (let hops = folders.length; hops > 0; hops--) {
-      const parent = parentOf.get(at);
-      if (parent === null || parent === undefined) break;
-      at = parent;
-    }
-    return at;
+  // Bounded by the folder count, so a parent cycle cannot recurse for ever.
+  const topOf = (id: string, hops = folders.length): string => {
+    const parent = parentOf.get(id);
+    return parent && hops > 0 ? topOf(parent, hops - 1) : id;
   };
-  const tops = new Set(
-    graph.nodes.map((node) =>
-      node.folderId !== null && parentOf.has(node.folderId)
-        ? topOf(node.folderId)
-        : null
-    )
+  const filed = graph.nodes.filter(
+    (node) => node.folderId !== null && parentOf.has(node.folderId)
   );
-  if ([...tops].some((top) => top !== null)) return tops.size;
-  return districtsByRole(graph);
+  if (filed.length === 0) return districtsByRole(graph);
+  const tops = new Set(filed.map((node) => topOf(node.folderId ?? "")));
+  return tops.size + (filed.length < graph.nodes.length ? 1 : 0);
 }
 
-/** Pages reached from a root, compositions, Element Types, and the rest. */
-function districtsByRole(graph: SchemaGraph): number {
-  const known = new Set(graph.nodes.map((node) => node.id));
+/** Types a root can reach down the allowed-child rules, the roots included. */
+function reachedFromRoots(graph: SchemaGraph): Set<string> {
   const children = new Map<string, string[]>();
-  const composed = new Set<string>();
-  for (const edge of graph.edges ?? []) {
-    if (!(known.has(edge.from) && known.has(edge.to))) continue;
-    if (edge.kind === "composition") composed.add(edge.to);
+  for (const edge of graph.edges ?? [])
     if (edge.kind === "allowedChild")
       children.set(edge.from, [...(children.get(edge.from) ?? []), edge.to]);
-  }
   const reached = new Set(
     graph.nodes
       .filter((node) => node.allowedAsRoot && !node.isElement)
       .map((node) => node.id)
   );
+  // A Set visits what is added while it is walked, so this is breadth first.
   for (const id of reached)
     for (const child of children.get(id) ?? []) reached.add(child);
-  const roles = new Set(
-    graph.nodes.map((node) => {
-      if (node.isElement) return "elements";
-      if (reached.has(node.id)) return "structure";
-      return composed.has(node.id) ? "compositions" : "unplaced";
-    })
-  );
-  return roles.size;
+  return reached;
+}
+
+/** Pages reached from a root, compositions, Element Types, and the rest. */
+function districtsByRole(graph: SchemaGraph): number {
+  const reached = reachedFromRoots(graph);
+  const composed = new Set<string>();
+  for (const edge of graph.edges ?? [])
+    if (edge.kind === "composition") composed.add(edge.to);
+  const roleOf = (node: SchemaNode) => {
+    if (node.isElement) return "elements";
+    if (reached.has(node.id)) return "structure";
+    return composed.has(node.id) ? "compositions" : "unplaced";
+  };
+  return new Set(graph.nodes.map(roleOf)).size;
 }
 
 /** The canvas's one-line reading, since the buildings themselves say nothing. */

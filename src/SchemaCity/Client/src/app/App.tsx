@@ -36,11 +36,10 @@ import { compareSchemas } from "../model/snapshots";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import {
   citySummary,
-  inspectorHeading,
   LiveRegion,
   plural,
-  Say,
   SEARCH_KEY,
+  useHandOff,
 } from "./a11y";
 import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
@@ -63,7 +62,13 @@ import {
   urlToWrite,
   type View,
 } from "./url";
-import { FlatView, VIEW_TABS, ViewSwitcher } from "./Views";
+import {
+  Announcements,
+  FlatView,
+  focusScope,
+  VIEW_TABS,
+  ViewSwitcher,
+} from "./Views";
 
 /** The tag names whose own keyboard handling wins over the shortcut keys. */
 const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
@@ -330,13 +335,13 @@ export function App({
   );
   // The focused neighbourhood, which the 2D views narrow to as the city does.
   const scope = useMemo(
-    () =>
-      focus
-        ? { ids: reachableWithin(graph, focus, focusDepth), around: focus }
-        : null,
+    () => focusScope(graph, focus, focusDepth),
     [graph, focus, focusDepth]
   );
-  const focusCount = scope?.ids.size ?? 0;
+  const focusCount = useMemo(
+    () => (focus ? reachableWithin(graph, focus, focusDepth).size : 0),
+    [graph, focus, focusDepth]
+  );
   const canExpandFocus = useMemo(
     () =>
       focus
@@ -374,9 +379,11 @@ export function App({
   // whole layout with it. The lists you are reading are what you fly between.
   const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
 
-  const picked = useRef(false);
+  // A chosen row opens the inspector, so focus goes to its heading, not back to
+  // the Search button.
+  const handOff = useHandOff(portal);
   const pick = (id: string) => {
-    picked.current = true;
+    handOff.chose();
     followLink(id);
     openPalette(false);
   };
@@ -388,23 +395,12 @@ export function App({
         className="flex h-full flex-col bg-background font-mono text-foreground"
         data-schema-city=""
       >
-        <Say
-          message={
-            selectedNode ? `${selectedNode.name} selected` : "Selection cleared"
-          }
-        />
-        <Say
-          message={`${VIEW_TABS.find((tab) => tab.value === view)?.label} view`}
-        />
-        <Say
-          message={`Layers on: ${layers.map((layer) => LAYER_LABEL[layer]).join(", ") || "none"}`}
-        />
-        <Say
-          message={
-            focus
-              ? `Focus on ${nodesById.get(focus)?.name}, ${focusCount} types`
-              : "Focus off"
-          }
+        <Announcements
+          focus={scope}
+          layers={layers.map((layer) => LAYER_LABEL[layer])}
+          nodesById={nodesById}
+          selected={selected}
+          view={view}
         />
         {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
             fitting, which is 848 px with the lens picker reading None and earlier
@@ -709,13 +705,7 @@ export function App({
         <CommandDialog
           className="h-[60vh] min-h-80 sm:max-w-xl"
           description="Type a name, an alias or a property alias, then choose a type to open it in the inspector."
-          // A chosen row opens the inspector, so focus goes to its heading, not
-          // back to the Search button.
-          finalFocus={() => {
-            const chose = picked.current;
-            picked.current = false;
-            return chose ? inspectorHeading(portal.current) : true;
-          }}
+          finalFocus={handOff.finalFocus}
           onOpenChange={openPalette}
           open={paletteOpen}
           title="Search types"

@@ -7,18 +7,18 @@ import { Kbd } from "@/components/ui/kbd";
 import {
   type EditorPanel,
   type EditorTab,
-  editorLabel,
   editorLayout,
   editorSummary,
   firstOwnTab,
   MIXED,
   panelSource,
 } from "../model/editor-layout";
-import { type Finding, TAB_LIMIT } from "../model/findings";
+import { type Finding, type FindingKind, TAB_LIMIT } from "../model/findings";
 import type { Role } from "../model/inspector";
 import type { SchemaNode, SchemaProperty } from "../model/types";
 import { plural, roving, SEARCH_KEY } from "./a11y";
 import {
+  DataTypeName,
   FindingDot,
   READING,
   RoleBadges,
@@ -52,6 +52,65 @@ const OVERLOADED = `More than ${TAB_LIMIT} properties, see the Overloaded tab no
 const rowKey = (property: SchemaProperty) =>
   `${property.fromCompositionId ?? ""}:${property.alias}`;
 
+/** One property and the type around it, which is what a row rule reads. */
+type RowContext = { properties: SchemaProperty[]; nodesById: Lookup };
+type RowRule = (property: SchemaProperty, at: RowContext) => string | null;
+
+/** Element Types a block property lists, without the picker targets. */
+const blockTargets = (property: SchemaProperty) =>
+  property.targets.filter((target) => target.role !== "picker");
+
+/** Both rows of an alias that arrives twice, naming the other source and editor. */
+const duplicateRow: RowRule = (property, { properties, nodesById }) => {
+  const others = properties.filter(
+    (other) =>
+      other.alias === property.alias &&
+      other.fromCompositionId !== property.fromCompositionId
+  );
+  if (others.length === 0) return null;
+  const sources = others.map((other) =>
+    other.fromCompositionId
+      ? (nodesById.get(other.fromCompositionId)?.name ?? "a deleted type")
+      : "this type"
+  );
+  const editors = others
+    .filter((other) => other.dataTypeId !== property.dataTypeId)
+    .map((other) => other.dataTypeName ?? other.editorAlias);
+  const differ =
+    editors.length > 0
+      ? `, with a different editor (${editors.join(", ")})`
+      : "";
+  return `Duplicate alias: ${property.alias} also comes from ${sources.join(", ")}${differ}`;
+};
+
+const brokenRow: RowRule = (property, { nodesById }) =>
+  blockTargets(property).some((target) => !nodesById.has(target.nodeId))
+    ? "Broken block: lists an Element Type that no longer exists"
+    : null;
+
+const varyingRow: RowRule = (property) =>
+  property.variesByCulture
+    ? "Culture mismatch: varies by culture on a type that does not"
+    : null;
+
+const variantBlockRow: RowRule = (property, { nodesById }) => {
+  const names = blockTargets(property)
+    .map((target) => nodesById.get(target.nodeId))
+    .filter((target) => target?.variesByCulture)
+    .map((target) => target?.name);
+  return names.length > 0
+    ? `Culture mismatch: lists ${[...new Set(names)].join(", ")}, which varies by culture`
+    : null;
+};
+
+/** The row rules, each behind the finding kind that has to be present for it. */
+const ROW_RULES: [FindingKind, RowRule][] = [
+  ["duplicateAlias", duplicateRow],
+  ["brokenBlock", brokenRow],
+  ["cultureMismatch", varyingRow],
+  ["cultureMismatch", variantBlockRow],
+];
+
 /**
  * What the type's findings say about single property rows, by row key: both rows
  * of a duplicate alias, a block property that lists a deleted Element Type, and a
@@ -64,70 +123,17 @@ export function propertyFlags(
   nodesById: Lookup
 ): Map<string, string> {
   const kinds = new Set(findings.map((finding) => finding.kind));
-  const properties = node.groups.flatMap((group) => group.properties);
-  const flags = new Map<string, string[]>();
-  const flag = (property: SchemaProperty, text: string) =>
-    flags.set(rowKey(property), [...(flags.get(rowKey(property)) ?? []), text]);
-  const source = (property: SchemaProperty) =>
-    property.fromCompositionId
-      ? (nodesById.get(property.fromCompositionId)?.name ?? "a deleted type")
-      : "this type";
-  const editor = (property: SchemaProperty) =>
-    property.dataTypeName ?? property.editorAlias;
-
-  if (kinds.has("duplicateAlias"))
-    for (const property of properties) {
-      const others = properties.filter(
-        (other) =>
-          other.alias === property.alias &&
-          other.fromCompositionId !== property.fromCompositionId
-      );
-      if (others.length === 0) continue;
-      const differ = others.filter(
-        (other) => other.dataTypeId !== property.dataTypeId
-      );
-      flag(
-        property,
-        `Duplicate alias: ${property.alias} also comes from ${others.map(source).join(", ")}${
-          differ.length > 0
-            ? `, with a different editor (${differ.map(editor).join(", ")})`
-            : ""
-        }`
-      );
-    }
-
-  if (kinds.has("brokenBlock"))
-    for (const property of properties)
-      if (
-        property.targets.some(
-          (target) => target.role !== "picker" && !nodesById.has(target.nodeId)
-        )
-      )
-        flag(
-          property,
-          "Broken block: lists an Element Type that no longer exists"
-        );
-
-  if (kinds.has("cultureMismatch") && !node.variesByCulture)
-    for (const property of properties) {
-      if (property.variesByCulture)
-        flag(
-          property,
-          "Culture mismatch: varies by culture on a type that does not"
-        );
-      const variant = property.targets.filter(
-        (target) =>
-          target.role !== "picker" &&
-          nodesById.get(target.nodeId)?.variesByCulture
-      );
-      if (variant.length > 0)
-        flag(
-          property,
-          `Culture mismatch: lists ${[...new Set(variant.map((target) => nodesById.get(target.nodeId)?.name))].join(", ")}, which varies by culture`
-        );
-    }
-
-  return new Map([...flags].map(([key, texts]) => [key, texts.join(". ")]));
+  const rules = ROW_RULES.filter(([kind]) => kinds.has(kind));
+  const at = {
+    properties: node.groups.flatMap((group) => group.properties),
+    nodesById,
+  };
+  const flags = new Map<string, string>();
+  for (const property of at.properties) {
+    const texts = rules.flatMap(([, rule]) => rule(property, at) ?? []);
+    if (texts.length > 0) flags.set(rowKey(property), texts.join(". "));
+  }
+  return flags;
 }
 
 export function EditorLayout({
@@ -203,7 +209,8 @@ function PropertyItem({
 }) {
   return (
     <li
-      className={`grid grid-cols-[minmax(0,1fr)_minmax(0,14rem)] items-baseline gap-x-4 border-line/40 border-t border-l-2 px-3 py-1.5 first:border-t-0 ${flag ? "border-l-signal" : "border-l-transparent"}`}
+      className="grid grid-cols-[minmax(0,1fr)_minmax(0,14rem)] items-baseline gap-x-4 border-line/40 border-t border-l-2 border-l-transparent px-3 py-1.5 first:border-t-0 data-[flagged=true]:border-l-signal"
+      data-flagged={flag !== undefined}
     >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <span className={quiet ? "text-label" : "text-prose"}>
@@ -221,24 +228,67 @@ function PropertyItem({
           <From id={property.fromCompositionId} nodesById={nodesById} />
         ) : null}
       </div>
-      {/* The Data Type is what an editor recognises; the editor alias behind it
-          is on hover for a mouse and read after it for a screen reader. */}
-      <span
-        className="truncate text-label text-xs"
-        title={editorLabel(property)}
-      >
-        {property.dataTypeName ?? property.editorAlias}
-        {property.dataTypeName ? (
-          <span className="sr-only">
-            , editor {property.editorUiAlias ?? property.editorAlias}
-          </span>
-        ) : null}
+      <DataTypeName className="truncate text-label text-xs" property={property}>
         {property.variesByCulture ? (
           <span className="text-faint"> · varies by culture</span>
         ) : null}
-      </span>
-      {flag ? <p className="col-span-2 text-signal text-xs">{flag}</p> : null}
+      </DataTypeName>
+      <p className="col-span-2 text-signal text-xs empty:hidden">{flag}</p>
     </li>
+  );
+}
+
+/** A group's header, which folds it, with its count, notes and source. */
+function PanelHeader({
+  panel,
+  nodesById,
+  open,
+  onToggle,
+  overloaded,
+  flagged,
+}: {
+  panel: EditorPanel;
+  nodesById: Lookup;
+  open: boolean;
+  onToggle: () => void;
+  overloaded: boolean;
+  flagged: number;
+}) {
+  const source = panelSource(panel);
+  const composed = borrowed(panel);
+  return (
+    <h3>
+      <button
+        aria-expanded={open}
+        className="flex w-full items-baseline gap-2 bg-muted px-3 py-1.5 text-left hover:bg-accent/50"
+        onClick={onToggle}
+        type="button"
+      >
+        <span aria-hidden className="w-3 shrink-0 text-faint text-xs">
+          {open ? "▾" : "▸"}
+        </span>
+        <span
+          className={`truncate font-medium ${composed ? "text-label" : "text-prose"}`}
+        >
+          {panel.name}
+        </span>
+        <span className="font-mono text-2xs text-faint">
+          {panel.properties.length}
+        </span>
+        {overloaded ? <FindingDot severity="note" title={OVERLOADED} /> : null}
+        {/* A folded group still says a row inside it was flagged. */}
+        {flagged > 0 ? (
+          <FindingDot
+            title={`${plural(flagged, "flagged property", "flagged properties")}`}
+          />
+        ) : null}
+        {composed && source ? (
+          <span className="ml-auto shrink-0">
+            <From id={source} nodesById={nodesById} />
+          </span>
+        ) : null}
+      </button>
+    </h3>
   );
 }
 
@@ -261,21 +311,16 @@ function Panel({
   overloaded: boolean;
   flags: Map<string, string>;
 }) {
-  const source = panelSource(panel);
-  const composed = borrowed(panel);
-  const flagged = panel.properties.filter((property) =>
-    flags.has(rowKey(property))
-  ).length;
   const rows = (
     <ul>
       {panel.properties.map((property) => (
         <PropertyItem
           flag={flags.get(rowKey(property))}
           key={rowKey(property)}
-          mixed={source === MIXED}
+          mixed={panelSource(panel) === MIXED}
           nodesById={nodesById}
           property={property}
-          quiet={composed}
+          quiet={borrowed(panel)}
         />
       ))}
     </ul>
@@ -285,42 +330,67 @@ function Panel({
     return <section className="border border-line">{rows}</section>;
   return (
     <section className="border border-line">
-      <h3>
-        <button
-          aria-expanded={open}
-          className="flex w-full items-baseline gap-2 bg-muted px-3 py-1.5 text-left hover:bg-accent/50"
-          onClick={onToggle}
-          type="button"
-        >
-          <span aria-hidden className="w-3 shrink-0 text-faint text-xs">
-            {open ? "▾" : "▸"}
-          </span>
-          <span
-            className={`truncate font-medium ${composed ? "text-label" : "text-prose"}`}
-          >
-            {panel.name}
-          </span>
-          <span className="font-mono text-2xs text-faint">
-            {panel.properties.length}
-          </span>
-          {overloaded ? (
-            <FindingDot severity="note" title={OVERLOADED} />
-          ) : null}
-          {/* A folded group still says a row inside it was flagged. */}
-          {flagged > 0 ? (
-            <FindingDot
-              title={`${flagged} flagged ${flagged === 1 ? "property" : "properties"}`}
-            />
-          ) : null}
-          {composed && source ? (
-            <span className="ml-auto shrink-0">
-              <From id={source} nodesById={nodesById} />
-            </span>
-          ) : null}
-        </button>
-      </h3>
+      <PanelHeader
+        flagged={
+          panel.properties.filter((property) => flags.has(rowKey(property)))
+            .length
+        }
+        nodesById={nodesById}
+        onToggle={onToggle}
+        open={open}
+        overloaded={overloaded}
+        panel={panel}
+      />
       {open ? <div className="border-line border-t">{rows}</div> : null}
     </section>
+  );
+}
+
+const panelRole = (tabRow: boolean, tab: string) =>
+  tabRow ? { role: "tabpanel", "aria-labelledby": tab } : {};
+
+/** The type's tabs as a tablist whose arrow keys move between them. */
+function EditorTabs({
+  node,
+  tabs,
+  shown,
+  base,
+  onOpen,
+}: {
+  node: SchemaNode;
+  tabs: EditorTab[];
+  shown: EditorTab | undefined;
+  /** The id prefix the tabs and their panel share. */
+  base: string;
+  onOpen: (key: string) => void;
+}) {
+  return (
+    <div
+      aria-label={`${node.name} tabs`}
+      className="flex flex-wrap border-line border-b"
+      onKeyDown={roving}
+      role="tablist"
+    >
+      {tabs.map((tab, index) => (
+        <TabButton
+          className="px-2.5 pt-3 pb-2"
+          id={`${base}-${index}`}
+          key={tab.key}
+          onPick={() => onOpen(tab.key)}
+          panel={`${base}-panel`}
+          selected={tab === shown}
+        >
+          {tab.name}
+          <SpokenCount
+            count={tab.count}
+            spoken={plural(tab.count, "property", "properties")}
+          />
+          {tab.count > TAB_LIMIT ? (
+            <FindingDot severity="note" title={OVERLOADED} />
+          ) : null}
+        </TabButton>
+      ))}
+    </div>
   );
 }
 
@@ -386,32 +456,13 @@ function Layout({
           className={`${COLUMN} flex flex-wrap items-end justify-between gap-x-4`}
         >
           {tabRow ? (
-            <div
-              aria-label={`${node.name} tabs`}
-              className="flex flex-wrap border-line border-b"
-              onKeyDown={roving}
-              role="tablist"
-            >
-              {tabs.map((tab, index) => (
-                <TabButton
-                  className="px-2.5 pt-3 pb-2"
-                  id={`${base}-${index}`}
-                  key={tab.key}
-                  onPick={() => setOpen(tab.key)}
-                  panel={`${base}-panel`}
-                  selected={tab === shown}
-                >
-                  {tab.name}
-                  <SpokenCount
-                    count={tab.count}
-                    spoken={plural(tab.count, "property", "properties")}
-                  />
-                  {tab.count > TAB_LIMIT ? (
-                    <FindingDot severity="note" title={OVERLOADED} />
-                  ) : null}
-                </TabButton>
-              ))}
-            </div>
+            <EditorTabs
+              base={base}
+              node={node}
+              onOpen={setOpen}
+              shown={shown}
+              tabs={tabs}
+            />
           ) : (
             <span />
           )}
@@ -435,12 +486,7 @@ function Layout({
           className={`${COLUMN} space-y-2 py-3`}
           id={`${base}-panel`}
           // A tab panel only when there is a tab row to label it.
-          {...(tabRow && shown
-            ? {
-                role: "tabpanel",
-                "aria-labelledby": `${base}-${tabs.indexOf(shown)}`,
-              }
-            : {})}
+          {...panelRole(tabRow, `${base}-${tabs.indexOf(shown)}`)}
         >
           {shown ? null : (
             <p className="text-faint text-xs">This type has no properties.</p>

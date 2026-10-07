@@ -1,12 +1,39 @@
 import { type ReactNode, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { editorLabel } from "../model/editor-layout";
 import type { FindingSeverity } from "../model/findings";
 import type { Chip, Role, Trace } from "../model/inspector";
-import type { SchemaNode } from "../model/types";
+import type { SchemaNode, SchemaProperty } from "../model/types";
 import { plural } from "./a11y";
 
 /** The app's mono, uppercase controls, set in the panel's reading type instead. */
 export const READING = "font-sans font-medium normal-case tracking-normal";
+
+/**
+ * A property's Data Type, which is what an editor recognises. The property editor
+ * behind it is on hover for a mouse and read after it for a screen reader; a
+ * property whose Data Type is gone shows the editor alone.
+ */
+export function DataTypeName({
+  property,
+  className,
+  children,
+}: {
+  property: SchemaProperty;
+  className: string;
+  children?: ReactNode;
+}) {
+  const editor = property.editorUiAlias ?? property.editorAlias;
+  return (
+    <span className={className} title={editorLabel(property)}>
+      {property.dataTypeName ?? property.editorAlias}
+      <span className="sr-only">
+        {property.dataTypeName ? `, editor ${editor}` : ""}
+      </span>
+      {children}
+    </span>
+  );
+}
 
 export const ROLE: Record<
   Role,
