@@ -1,7 +1,7 @@
 // The matrix view: types down the side, compositions or Data Types across the top.
 // A real table with sticky headers, so it scrolls both ways and still says which
 // row and column a cell belongs to.
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, use, useMemo, useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   type CompositionUse,
@@ -13,7 +13,7 @@ import {
 } from "../model/matrix";
 import type { SchemaGraph, SchemaNode } from "../model/types";
 import { plural, useAnnounceChange } from "./a11y";
-import { READING } from "./InspectorChips";
+import { DataTypeLinks, READING } from "./InspectorChips";
 import { FilterField, Scroller, useMatches } from "./TypeTable";
 
 type Kind = "compositions" | "dataTypes";
@@ -71,6 +71,7 @@ export function Matrix({
   scope: ReadonlySet<string> | null;
 }) {
   const [kind, setKind] = useState<Kind>("compositions");
+  const links = use(DataTypeLinks);
   const [columnSort, setColumnSort] = useState<ColumnSort>("usage");
   const compositions = useMemo(() => compositionMatrix(graph), [graph]);
   const dataTypes = useMemo(() => dataTypeMatrix(graph), [graph]);
@@ -92,8 +93,8 @@ export function Matrix({
     [inherits]
   );
 
-  const composition = (use: CompositionUse) =>
-    use.via === null ? (
+  const composition = ({ via }: CompositionUse) =>
+    via === null ? (
       <span className="text-azure text-sm">●</span>
     ) : (
       <span className="text-azure/70 text-sm">○</span>
@@ -101,10 +102,10 @@ export function Matrix({
   const compositionSays = (
     row: SchemaNode,
     column: MatrixColumn,
-    use: CompositionUse
+    { via }: CompositionUse
   ) => {
-    if (use.via !== null)
-      return `${row.name} uses ${column.label} through ${names.get(use.via) ?? "another composition"}`;
+    if (via !== null)
+      return `${row.name} uses ${column.label} through ${names.get(via) ?? "another composition"}`;
     return inherits.has(`${row.id}>${column.id}`)
       ? `${row.name} inherits from ${column.label}`
       : `${row.name} uses ${column.label} directly`;
@@ -173,6 +174,7 @@ export function Matrix({
           empty="No type has properties of its own."
           matched={matched}
           note="Counts each type's own properties. A composed property counts once, on the composition that declares it, so the column total is the number of properties using that Data Type."
+          onColumn={links?.open}
           onSelect={onSelect}
           says={(row, column, count) =>
             `${row.name}: ${plural(count, "property", "properties")} on ${column.label}`
@@ -190,6 +192,7 @@ function Grid<Cell>({
   says,
   columnName,
   tag = () => null,
+  onColumn,
   columnSort,
   matched,
   selected,
@@ -206,6 +209,8 @@ function Grid<Cell>({
   columnName: (column: MatrixColumn) => string;
   /** A short word printed on a column header, such as "parent". */
   tag?: (column: MatrixColumn) => string | null;
+  /** Given, a column header is a link, as a Data Type header is to its page. */
+  onColumn?: (id: string) => void;
   columnSort: ColumnSort;
   matched: ReadonlySet<string> | null;
   selected: string | null;
@@ -248,12 +253,8 @@ function Grid<Cell>({
                 </th>
                 {columns.map((column) => {
                   const marked = tag(column);
-                  return (
-                    <th
-                      className={`${CELL} sticky top-0 z-20 bg-panel px-1 py-2 align-bottom font-normal`}
-                      key={column.id}
-                      scope="col"
-                    >
+                  const header = (
+                    <>
                       <span className="sr-only">{columnName(column)}</span>
                       {/* Vertical, so a long editor alias costs height once instead
                           of width in every row. The key in the detail line keeps
@@ -262,7 +263,7 @@ function Grid<Cell>({
                         aria-hidden
                         className="inline-block rotate-180 text-left [writing-mode:vertical-rl]"
                       >
-                        <span className="block max-h-48 truncate text-prose text-xs">
+                        <span className="block max-h-48 truncate text-prose text-xs group-hover:text-phosphor group-hover:underline">
                           {column.label}
                           {marked ? (
                             <span className="text-azure"> · {marked}</span>
@@ -272,6 +273,25 @@ function Grid<Cell>({
                           {column.detail} · {column.total}
                         </span>
                       </span>
+                    </>
+                  );
+                  return (
+                    <th
+                      className={`${CELL} sticky top-0 z-20 bg-panel px-1 py-2 align-bottom font-normal`}
+                      key={column.id}
+                      scope="col"
+                    >
+                      {onColumn ? (
+                        <button
+                          className="group"
+                          onClick={() => onColumn(column.id)}
+                          type="button"
+                        >
+                          {header}
+                        </button>
+                      ) : (
+                        header
+                      )}
                     </th>
                   );
                 })}

@@ -95,6 +95,14 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         does: "Shows the type's tabs, groups and properties as an editor sees them",
       },
       { keys: ["Findings"], does: "Opens the drawer of problems and notes" },
+      {
+        keys: ["Data Types"],
+        does: "Lists every Data Type with what uses it, what it offers and the blocks content stores in it. Any Data Type name opens it here",
+      },
+      {
+        keys: ["Show in city"],
+        does: "Lights the types that use a Data Type. Clear over the canvas ends it",
+      },
       { keys: ["Lens"], does: "Recolours the city by usage" },
     ],
   },

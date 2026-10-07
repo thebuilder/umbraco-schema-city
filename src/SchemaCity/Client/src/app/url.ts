@@ -15,10 +15,16 @@ import { LENSES, type Lens } from "./scene/lens";
  * replace the canvas. One value rather than a flag each, because those views have no
  * camera and the camera has no table.
  */
-export type View = "city" | "list" | "tree" | "matrix" | "editor";
+export type View = "city" | "list" | "tree" | "matrix" | "editor" | "datatypes";
 
 /** The views drawn without the 3D canvas. */
-export const FLAT_VIEWS: readonly View[] = ["list", "tree", "matrix", "editor"];
+export const FLAT_VIEWS: readonly View[] = [
+  "list",
+  "tree",
+  "matrix",
+  "editor",
+  "datatypes",
+];
 
 const VIEWS: readonly View[] = ["city", ...FLAT_VIEWS];
 
@@ -31,6 +37,8 @@ export type UrlState = {
   view: View;
   /** How the city is cut into districts. Structure is the default and is left out. */
   group: Grouping;
+  /** The Data Type the Data Types view shows, written only while that view is on. */
+  dataType: string | null;
 };
 
 /**
@@ -64,6 +72,9 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
     view: VIEWS.find((candidate) => candidate === params.get("view")) ?? "city",
     // Anything but folders, an old link with no group among them, is the default.
     group: params.get("group") === "folders" ? "folders" : "structure",
+    // Kept as given: a key the schema does not have shows the list with nothing
+    // chosen, which the view decides, not the parser.
+    dataType: params.get("dataType"),
   };
 }
 
@@ -93,5 +104,7 @@ export function serialiseUrl(state: UrlState): string {
   if (state.lens !== "none") parts.push(`lens=${state.lens}`);
   if (state.view !== "city") parts.push(`view=${state.view}`);
   if (state.group !== "structure") parts.push(`group=${state.group}`);
+  if (state.view === "datatypes" && state.dataType)
+    parts.push(`dataType=${encodeURIComponent(state.dataType)}`);
   return `?${parts.join("&")}`;
 }

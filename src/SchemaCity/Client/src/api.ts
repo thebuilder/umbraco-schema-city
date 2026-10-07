@@ -1,4 +1,5 @@
 import type { UmbClassInterface } from "@umbraco-cms/backoffice/class-api";
+import { UMB_EDIT_DATA_TYPE_WORKSPACE_PATH_PATTERN } from "@umbraco-cms/backoffice/data-type";
 import { UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN } from "@umbraco-cms/backoffice/document-type";
 import { loadManifestPlainJs } from "@umbraco-cms/backoffice/extension-api";
 import { filter, firstValueFrom } from "@umbraco-cms/backoffice/external/rxjs";
@@ -51,6 +52,17 @@ export const openTypeInEditor = (unique: string) =>
       UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN.generateAbsolute({
         unique,
       }),
+      document.baseURI
+    )
+  );
+
+/** The same handoff for a Data Type, through Umbraco's own Data Type editor route. */
+export const openDataTypeInEditor = (unique: string) =>
+  history.pushState(
+    null,
+    "",
+    new URL(
+      UMB_EDIT_DATA_TYPE_WORKSPACE_PATH_PATTERN.generateAbsolute({ unique }),
       document.baseURI
     )
   );

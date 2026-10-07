@@ -1,3 +1,4 @@
+using System.Reflection;
 using SchemaCity.Models;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
@@ -17,20 +18,35 @@ public sealed class SchemaGraphBuilder :
 {
     private readonly IContentTypeService _contentTypeService;
     private readonly IDataTypeService _dataTypeService;
+    private readonly IDataTypeContainerService _dataTypeContainerService;
+    private readonly IMediaTypeService _mediaTypeService;
+    private readonly IMemberTypeService _memberTypeService;
     private SchemaGraph? _cached;
 
-    public SchemaGraphBuilder(IContentTypeService contentTypeService, IDataTypeService dataTypeService)
+    public SchemaGraphBuilder(
+        IContentTypeService contentTypeService,
+        IDataTypeService dataTypeService,
+        IDataTypeContainerService dataTypeContainerService,
+        IMediaTypeService mediaTypeService,
+        IMemberTypeService memberTypeService)
     {
         _contentTypeService = contentTypeService;
         _dataTypeService = dataTypeService;
+        _dataTypeContainerService = dataTypeContainerService;
+        _mediaTypeService = mediaTypeService;
+        _memberTypeService = memberTypeService;
     }
 
     // ponytail: no lock. Two threads racing here build the graph twice and one result wins,
     // which costs a few milliseconds. Add a Lazy if a profiler ever says it matters.
+    // ContentTypeCacheRefresherNotification covers Media and Member Types too, so the other
+    // types read here clear the cache the same way.
     public SchemaGraph Build() => _cached ??= BuildGraph(
         _contentTypeService.GetAll(),
         _contentTypeService.GetContainers([]),
-        _dataTypeService.GetAllAsync().GetAwaiter().GetResult());
+        _dataTypeService.GetAllAsync().GetAwaiter().GetResult(),
+        _dataTypeContainerService.GetAllAsync().GetAwaiter().GetResult(),
+        [.. _mediaTypeService.GetAll(), .. _memberTypeService.GetAll()]);
 
     public void Handle(ContentTypeCacheRefresherNotification notification) => _cached = null;
 
@@ -38,12 +54,15 @@ public sealed class SchemaGraphBuilder :
 
     /// <summary>
     /// The whole mapping, with no services in sight, so a test can hand it content types and data
-    /// types it built itself.
+    /// types it built itself. <paramref name="otherTypes"/> are the Media and Member Types, which
+    /// are not nodes but can still be what keeps a Data Type in use.
     /// </summary>
     public static SchemaGraph BuildGraph(
         IEnumerable<IContentType> contentTypes,
         IEnumerable<EntityContainer> containerList,
-        IEnumerable<IDataType> dataTypes)
+        IEnumerable<IDataType> dataTypes,
+        IEnumerable<EntityContainer>? dataTypeContainers = null,
+        IEnumerable<IContentTypeComposition>? otherTypes = null)
     {
         EntityContainer[] containers = containerList.ToArray();
         IContentType[] types = contentTypes.ToArray();
@@ -80,7 +99,76 @@ public sealed class SchemaGraphBuilder :
             .ThenBy(e => e.PropertyAlias, StringComparer.Ordinal)
             .ToArray();
 
-        return new SchemaGraph(DateTimeOffset.UtcNow, folders, nodes, sortedEdges);
+        return new SchemaGraph(
+            DateTimeOffset.UtcNow,
+            folders,
+            nodes,
+            sortedEdges,
+            DescribeDataTypes(editors, targetsByDataTypeKey, dataTypeContainers ?? [], types, otherTypes ?? []));
+    }
+
+    /// <summary>
+    /// The keys of the Data Types Umbraco installs itself, read from its own constants, so a default
+    /// added in a later version arrives with the package. Some are Guid fields and some only string
+    /// constants, so both are read.
+    /// </summary>
+    private static readonly HashSet<Guid> BuiltInKeys = typeof(Umbraco.Cms.Core.Constants.DataTypes.Guids)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Select(field => field.GetValue(null) switch
+        {
+            Guid key => key,
+            string text when Guid.TryParse(text, out Guid key) => key,
+            _ => Guid.Empty,
+        })
+        .Where(key => key != Guid.Empty)
+        .ToHashSet();
+
+    /// <summary>Every Data Type, sorted by name, whether a property uses it or not.</summary>
+    private static SchemaDataType[] DescribeDataTypes(
+        IDataType[] dataTypes,
+        IReadOnlyDictionary<Guid, SchemaTarget[]> targetsByDataTypeKey,
+        IEnumerable<EntityContainer> containers,
+        IContentType[] documentTypes,
+        IEnumerable<IContentTypeComposition> otherTypes)
+    {
+        Dictionary<int, EntityContainer> folders = containers.ToDictionary(c => c.Id);
+        IContentTypeComposition[] others = otherTypes.ToArray();
+
+        // A Media or Member Type property, or a collection view, keeps a Data Type in use as much
+        // as a Document Type property does, and the graph has no node to show it on.
+        Dictionary<Guid, int> otherUses = others
+            .SelectMany(t => t.PropertyTypes.Select(p => p.DataTypeKey))
+            .Concat(documentTypes.Concat(others).Select(t => t.ListView).OfType<Guid>())
+            .GroupBy(key => key)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        return dataTypes
+            .Select(d => new SchemaDataType(
+                Id: d.Key.ToString(),
+                Name: d.Name ?? string.Empty,
+                EditorAlias: d.EditorAlias,
+                EditorUiAlias: d.EditorUiAlias,
+                Folder: FolderPath(d.ParentId, folders),
+                Targets: targetsByDataTypeKey.GetValueOrDefault(d.Key) ?? [],
+                OtherUses: otherUses.GetValueOrDefault(d.Key),
+                IsBuiltIn: BuiltInKeys.Contains(d.Key),
+                Configuration: BlockEditorInspector.Summary(d)))
+            .OrderBy(d => d.Name, StringComparer.Ordinal)
+            .ThenBy(d => d.Id, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    /// <summary>"Blocks/Grids" for a Data Type two folders down, null at the root. Cycle safe.</summary>
+    private static string? FolderPath(int parentId, IReadOnlyDictionary<int, EntityContainer> folders)
+    {
+        List<string> names = [];
+        HashSet<int> seen = [];
+        for (int at = parentId; seen.Add(at) && folders.TryGetValue(at, out EntityContainer? folder); at = folder.ParentId)
+        {
+            names.Insert(0, folder.Name ?? string.Empty);
+        }
+
+        return names.Count > 0 ? string.Join('/', names) : null;
     }
 
     private static SchemaNode ToNode(

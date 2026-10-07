@@ -8,7 +8,7 @@ import type {
   TypeUsage,
   UsageReport,
 } from "../../model/types";
-import { lensScale } from "./lens";
+import { highlightScale, lensScale } from "./lens";
 
 const medium = mediumFixture as unknown as SchemaGraph;
 const mediumUsage = mediumUsageFixture as unknown as UsageReport;
@@ -159,4 +159,15 @@ describe("the lenses on the seeded site's usage report", () => {
       .sort();
     expect(lit).toEqual(["blogPost", "campaignPage"]);
   });
+});
+
+it("lights the users of a Data Type and quiets every other building, Element Types too", () => {
+  const scale = highlightScale(graph, new Set(["article", "hero"]));
+  expect(scale.ramp).toBe("binary");
+  expect([...scale.t]).toEqual([
+    ["home", 0],
+    ["article", 1],
+    ["empty", 0],
+    ["hero", 1],
+  ]);
 });

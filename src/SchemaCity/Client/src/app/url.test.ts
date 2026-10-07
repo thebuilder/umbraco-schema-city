@@ -13,6 +13,7 @@ describe("parseUrl", () => {
       lens: "none",
       view: "city",
       group: "structure",
+      dataType: null,
     });
   });
 
@@ -26,6 +27,7 @@ describe("parseUrl", () => {
       lens: "none",
       view: "city",
       group: "structure",
+      dataType: null,
     });
   });
 
@@ -37,6 +39,7 @@ describe("parseUrl", () => {
       lens: "none",
       view: "city",
       group: "structure",
+      dataType: null,
     });
   });
 
@@ -79,6 +82,7 @@ describe("serialiseUrl", () => {
       lens: "none",
       view: "city",
       group: "structure",
+      dataType: null,
     });
   });
 
@@ -90,6 +94,7 @@ describe("serialiseUrl", () => {
       lens: "cultures",
       view: "city",
       group: "structure",
+      dataType: null,
     });
   });
 
@@ -101,6 +106,7 @@ describe("serialiseUrl", () => {
       lens: "unused",
       view: "city",
       group: "structure",
+      dataType: null,
     });
   });
 
@@ -113,6 +119,7 @@ describe("serialiseUrl", () => {
         lens: "count",
         view: "city",
         group: "structure",
+        dataType: null,
       })
     ).toBe("?type=article&focus=1&layers=structure,compositions&lens=count");
   });
@@ -126,6 +133,7 @@ describe("serialiseUrl", () => {
         lens: "none",
         view: "city",
         group: "structure",
+        dataType: null,
       })
     ).toBe("?layers=");
   });
@@ -142,6 +150,7 @@ describe("urlToWrite", () => {
     lens: "none",
     view: "city",
     group: "structure",
+    dataType: null,
   };
 
   it("writes the query onto the route the app was mounted under", () => {
@@ -168,6 +177,7 @@ describe("the grouping", () => {
         lens: "none",
         view: "city",
         group: "folders",
+        dataType: null,
       })
     ).toBe("?layers=structure&group=folders");
   });
@@ -191,7 +201,19 @@ describe("the view", () => {
         lens: "none",
         view: "list",
         group: "structure",
+        dataType: null,
       })
     ).toBe("?layers=structure&view=list");
+  });
+
+  it("carries the chosen Data Type, but only while the Data Types view is on", () => {
+    const at = parseUrl("?view=datatypes&dataType=a-key", aliases);
+    expect([at.view, at.dataType]).toEqual(["datatypes", "a-key"]);
+    expect(serialiseUrl({ ...at, view: "datatypes" })).toBe(
+      "?layers=structure&view=datatypes&dataType=a-key"
+    );
+    expect(serialiseUrl({ ...at, view: "list" })).toBe(
+      "?layers=structure&view=list"
+    );
   });
 });

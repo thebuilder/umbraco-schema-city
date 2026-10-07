@@ -69,7 +69,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// the export leaves the fixtures alone when the database was seeded by another version, so an
     /// old database never rewrites them with a stale schema.
     /// </summary>
-    private const string SeedVersion = "2026-10-07";
+    private const string SeedVersion = "2026-10-07.3";
 
     private const string SiteDescription = $"Seeded Site, seed version {SeedVersion}.";
 
@@ -83,6 +83,11 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// a realistic date rather than the epoch so the demo never says "Last edited 1970-01-01".
     /// </summary>
     private static readonly DateTimeOffset FixtureDate = new(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
+
+    /// <summary>The two areas of SC Page Grid's row block, which stored grid values have to name.</summary>
+    private static readonly Guid LeftArea = Guid.Parse("11111111-0000-0000-0000-000000000001");
+
+    private static readonly Guid RightArea = Guid.Parse("11111111-0000-0000-0000-000000000002");
 
     private static readonly JsonSerializerOptions FixtureJson = new()
     {
@@ -101,6 +106,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     private readonly IShortStringHelper _shortStringHelper;
     private readonly ITemplateService _templateService;
     private readonly UsageCollector _usageCollector;
+    private readonly SchemaGraphBuilder _graphBuilder;
 
     /// <summary>Data Types the seeded property types point at, in rotation order.</summary>
     private readonly List<IDataType> _editors = [];
@@ -135,7 +141,8 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         IConfigurationEditorJsonSerializer serializer,
         IShortStringHelper shortStringHelper,
         ITemplateService templateService,
-        UsageCollector usageCollector)
+        UsageCollector usageCollector,
+        SchemaGraphBuilder graphBuilder)
     {
         _contentService = contentService;
         _contentTypeService = contentTypeService;
@@ -148,6 +155,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         _shortStringHelper = shortStringHelper;
         _templateService = templateService;
         _usageCollector = usageCollector;
+        _graphBuilder = graphBuilder;
     }
 
     public async Task HandleAsync(UmbracoApplicationStartedNotification notification, CancellationToken cancellationToken)
@@ -167,7 +175,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             await SeedAsync();
         }
 
-        await ExportFixtureAsync();
+        ExportFixture();
     }
 
     private async Task SeedAsync()
@@ -322,8 +330,8 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
                     AreaGridColumns = 12,
                     Areas =
                     [
-                        new() { Key = Guid.Parse("11111111-0000-0000-0000-000000000001"), Alias = "left", ColumnSpan = 6, RowSpan = 1 },
-                        new() { Key = Guid.Parse("11111111-0000-0000-0000-000000000002"), Alias = "right", ColumnSpan = 6, RowSpan = 1 },
+                        new() { Key = LeftArea, Alias = "left", ColumnSpan = 6, RowSpan = 1 },
+                        new() { Key = RightArea, Alias = "right", ColumnSpan = 6, RowSpan = 1 },
                     ],
                 },
                 new() { ContentElementTypeKey = Key("elementGridColumn"), AllowInAreas = true },
@@ -674,9 +682,8 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// 193 items in a fixed shape: 183 published, 5 drafts, 5 in the recycle bin.
     /// </summary>
     /// <remarks>
-    /// ponytail: no property values are written, so every block editor property is empty. The
-    /// usage endpoint only counts nodes and versions, so this is enough for M3. Instance-level
-    /// block usage, which parses property JSON, would need values here first.
+    /// The only property values written are the block values <see cref="AddBlocks"/> puts on the
+    /// first articles, so the usage report has stored blocks to count.
     /// </remarks>
     private void CreateContent()
     {
@@ -689,6 +696,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         for (int i = 1; i <= 150; i++)
         {
             IContent article = Create($"Article {i:D3}", news.Id, "article");
+            AddBlocks(article, i);
             if (i <= 140)
             {
                 Publish(article);
@@ -744,10 +752,133 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     private IContent Publish(IContent content)
     {
         _contentService.Save(content);
-        _contentService.Publish(content, ["*"], UmbracoConstants.Security.SuperUserId);
+        PublishResult result = _contentService.Publish(content, ["*"], UmbracoConstants.Security.SuperUserId);
+
+        // Publishing validates every stored block, and a silent failure would leave a draft where
+        // the fixture test expects a published item.
+        if (result.Success is false)
+        {
+            throw new InvalidOperationException($"Could not publish {content.Name}: {result.Result}.");
+        }
+
         _published++;
         return content;
     }
+
+    /// <summary>
+    /// Body blocks on the first 30 articles and on three of the drafts, a grid row with two area
+    /// items on the first 12, and rich text blocks on the first 20. Only Element Types without a
+    /// mandatory property are stored, because publishing validates each block and the blocks carry
+    /// no values. So elementCard, elementHeading, elementGridColumn and the rest stay offered by a
+    /// block editor but never stored, which is the empty case the Data Types view marks.
+    /// </summary>
+    private void AddBlocks(IContent article, int i)
+    {
+        string owner = article.Name!;
+        if (i <= 30 || i is > 140 and <= 143)
+        {
+            List<(string Content, string? Settings)> body = [("elementQuote", null), ("elementImage", "elementBlockSettings")];
+            if (i <= 10)
+            {
+                body.Add(("elementCallToAction", null));
+            }
+
+            article.SetValue("articleField01", BlockList(owner, body));
+        }
+
+        if (i <= 12)
+        {
+            article.SetValue("articleField02", BlockGrid(owner));
+        }
+
+        if (i <= 20)
+        {
+            article.SetValue("articleField03", RichTextBlocks(owner, i <= 5 ? ["elementRteFigure", "elementQuote"] : ["elementRteFigure"]));
+        }
+    }
+
+    /// <summary>A Block List value in the Umbraco 14+ shape, every block exposed for the invariant culture.</summary>
+    private string BlockList(string owner, IEnumerable<(string Content, string? Settings)> blocks)
+    {
+        (Guid Key, string Alias, Guid? SettingsKey, string? SettingsAlias)[] items = blocks
+            .Select((block, n) => (
+                KeyFor($"{owner}/body/{n}"),
+                block.Content,
+                block.Settings is null ? (Guid?)null : KeyFor($"{owner}/body/{n}/settings"),
+                block.Settings))
+            .ToArray();
+
+        return JsonSerializer.Serialize(new
+        {
+            layout = new Dictionary<string, object>
+            {
+                [UmbracoConstants.PropertyEditors.Aliases.BlockList] = items.Select(b => new { contentKey = b.Key, settingsKey = b.SettingsKey }),
+            },
+            contentData = items.Select(b => BlockData(b.Key, b.Alias)),
+            settingsData = items.Where(b => b.SettingsKey is not null).Select(b => BlockData(b.SettingsKey!.Value, b.SettingsAlias!)),
+            expose = items.Select(b => Exposed(b.Key)),
+        });
+    }
+
+    /// <summary>One grid row with its settings, holding a video in the left area and a form in the right.</summary>
+    private string BlockGrid(string owner)
+    {
+        Guid row = KeyFor($"{owner}/grid/row");
+        Guid settings = KeyFor($"{owner}/grid/row/settings");
+        Guid video = KeyFor($"{owner}/grid/video");
+        Guid form = KeyFor($"{owner}/grid/form");
+        object AreaItem(Guid key) => new { contentKey = key, columnSpan = 6, rowSpan = 1, areas = Array.Empty<object>() };
+
+        return JsonSerializer.Serialize(new
+        {
+            layout = new Dictionary<string, object>
+            {
+                [UmbracoConstants.PropertyEditors.Aliases.BlockGrid] = new[]
+                {
+                    new
+                    {
+                        contentKey = row,
+                        settingsKey = settings,
+                        columnSpan = 12,
+                        rowSpan = 1,
+                        areas = new[]
+                        {
+                            new { key = LeftArea, items = new[] { AreaItem(video) } },
+                            new { key = RightArea, items = new[] { AreaItem(form) } },
+                        },
+                    },
+                },
+            },
+            contentData = new[] { BlockData(row, "elementGridRow"), BlockData(video, "elementVideo"), BlockData(form, "elementForm") },
+            settingsData = new[] { BlockData(settings, "elementGridSettings") },
+            expose = new[] { Exposed(row), Exposed(video), Exposed(form) },
+        });
+    }
+
+    /// <summary>Rich text whose markup places each block, with the blocks kept beside it.</summary>
+    private string RichTextBlocks(string owner, string[] elements)
+    {
+        Guid[] keys = elements.Select((_, n) => KeyFor($"{owner}/rte/{n}")).ToArray();
+        return JsonSerializer.Serialize(new
+        {
+            markup = "<p>Seeded text.</p>" + string.Concat(keys.Select(k => $"<umb-rte-block data-content-key=\"{k}\"><!--Umbraco-Block--></umb-rte-block>")),
+            blocks = new
+            {
+                layout = new Dictionary<string, object>
+                {
+                    [UmbracoConstants.PropertyEditors.Aliases.RichText] = keys.Select(k => new { contentKey = k }),
+                },
+                contentData = keys.Select((k, n) => BlockData(k, elements[n])),
+                settingsData = Array.Empty<object>(),
+                expose = keys.Select(Exposed),
+            },
+        });
+    }
+
+    private object BlockData(Guid key, string alias) =>
+        new { key, contentTypeKey = _types[alias].Key, values = Array.Empty<object>() };
+
+    private static object Exposed(Guid key) => new { contentKey = key, culture = (string?)null, segment = (string?)null };
 
     private void PublishBothCultures(IContent content, string englishName, string danishName)
     {
@@ -767,7 +898,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// files and dirty the working tree. LastEdited is pinned per row rather than in the seeder, because fixing the real dates
     /// would mean writing umbracoContentVersion.versionDate behind the content service's back.
     /// </summary>
-    private async Task ExportFixtureAsync()
+    private void ExportFixture()
     {
         string clientRoot = Path.GetFullPath(Path.Combine(_hostEnvironment.ContentRootPath, "..", "SchemaCity", "Client"));
         if (Directory.Exists(clientRoot) is false)
@@ -789,13 +920,10 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         string directory = Path.Combine(clientRoot, "dev", "fixtures");
         Directory.CreateDirectory(directory);
 
-        // The full list from the service, not _editors: that field leaves out
-        // _brokenBlockList on purpose, so exactly one Document Type uses it, and the exported
-        // fixture still has to carry the broken block reference that Data Type plants.
-        SchemaGraph graph = SchemaGraphBuilder.BuildGraph(
-            _contentTypeService.GetAll(),
-            _contentTypeService.GetContainers([]),
-            await _dataTypeService.GetAllAsync());
+        // What the graph endpoint returns, read from the services and not from _editors: that field
+        // leaves out _brokenBlockList on purpose, so exactly one Document Type uses it, and the
+        // exported fixture still has to carry the broken block reference that Data Type plants.
+        SchemaGraph graph = _graphBuilder.Build();
 
         string path = Path.Combine(directory, "medium.json");
         System.IO.File.WriteAllText(path, JsonSerializer.Serialize(graph with { GeneratedAt = FixtureDate }, FixtureJson));

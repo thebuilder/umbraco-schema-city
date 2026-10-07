@@ -1,5 +1,6 @@
 import type {
   PropertyGroup,
+  SchemaDataType,
   SchemaEdge,
   SchemaGraph,
   SchemaNode,
@@ -49,6 +50,8 @@ export type SchemaChange = {
   currentId?: string;
   baselineId?: string;
   details: string[];
+  /** The current Data Types of properties that changed Data Type, as links. */
+  dataTypeIds?: string[];
 };
 
 export type SchemaComparison = {
@@ -178,18 +181,7 @@ function validateNode(value: unknown, index: number): SchemaNode {
           property.variesByCulture,
           `${propertyPath}.variesByCulture`
         );
-        requiredArray(property.targets, `${propertyPath}.targets`).forEach(
-          (target, targetIndex) => {
-            const targetPath = `${propertyPath}.targets[${targetIndex}]`;
-            if (!record(target))
-              throw new Error(`${targetPath} must be an object`);
-            requiredString(target.nodeId, `${targetPath}.nodeId`);
-            if (
-              !["content", "settings", "picker"].includes(String(target.role))
-            )
-              throw new Error(`${targetPath}.role is invalid`);
-          }
-        );
+        validateTargets(property.targets, `${propertyPath}.targets`);
       }
     );
   });
@@ -213,12 +205,48 @@ function validateGraph(value: unknown): SchemaGraph {
   validateNodeIds(nodes);
   const edges = requiredArray(value.edges, "graph.edges");
   validateEdges(edges);
+  // Snapshots exported before the Data Types view have no list, and stay importable.
+  const dataTypes =
+    value.dataTypes === undefined
+      ? undefined
+      : requiredArray(value.dataTypes, "graph.dataTypes");
+  dataTypes?.forEach(validateDataType);
   return {
     generatedAt: timestamp(value.generatedAt, "graph.generatedAt"),
     folders: folders as SchemaGraph["folders"],
     nodes,
     edges: edges as SchemaGraph["edges"],
+    ...(dataTypes ? { dataTypes: dataTypes as SchemaDataType[] } : {}),
   };
+}
+
+function validateTargets(value: unknown, path: string) {
+  for (const [index, target] of requiredArray(value, path).entries()) {
+    const at = `${path}[${index}]`;
+    if (!record(target)) throw new Error(`${at} must be an object`);
+    requiredString(target.nodeId, `${at}.nodeId`);
+    if (!["content", "settings", "picker"].includes(String(target.role)))
+      throw new Error(`${at}.role is invalid`);
+  }
+}
+
+function validateDataType(value: unknown, index: number) {
+  const path = `graph.dataTypes[${index}]`;
+  if (!record(value)) throw new Error(`${path} must be an object`);
+  for (const key of ["id", "name", "editorAlias"])
+    requiredString(value[key], `${path}.${key}`);
+  nullableString(value.editorUiAlias, `${path}.editorUiAlias`);
+  nullableString(value.folder, `${path}.folder`);
+  count(value.otherUses, `${path}.otherUses`);
+  if (value.isBuiltIn !== undefined)
+    requiredBoolean(value.isBuiltIn, `${path}.isBuiltIn`);
+  validateTargets(value.targets, `${path}.targets`);
+  if (value.configuration === undefined) return;
+  if (!record(value.configuration))
+    throw new Error(`${path}.configuration must be an object`);
+  for (const [key, setting] of Object.entries(value.configuration))
+    if (!["string", "number", "boolean"].includes(typeof setting))
+      throw new Error(`${path}.configuration.${key} must be a plain value`);
 }
 
 function validateNodeIds(nodes: SchemaNode[]) {
@@ -711,6 +739,32 @@ function detailDiff(
   return details;
 }
 
+/**
+ * The Data Types properties moved onto, matched by group and alias as the details
+ * are. Only the current side, since the page a link opens shows the current schema.
+ */
+function changedDataTypes(previous: SchemaNode, node: SchemaNode): string[] {
+  const keyOf = (group: PropertyGroup, property: SchemaProperty) =>
+    `${group.alias}.${property.alias}`;
+  const before = new Map(
+    previous.groups.flatMap((group) =>
+      group.properties.map((p) => [keyOf(group, p), p.dataTypeId] as const)
+    )
+  );
+  return [
+    ...new Set(
+      node.groups.flatMap((group) =>
+        group.properties
+          .filter((p) => {
+            const was = before.get(keyOf(group, p));
+            return was !== undefined && was !== p.dataTypeId;
+          })
+          .map((p) => p.dataTypeId)
+      )
+    ),
+  ];
+}
+
 export function compareSchemas(
   baseline: SchemaGraph,
   current: SchemaGraph
@@ -736,6 +790,7 @@ export function compareSchemas(
     const previous = baselineById.get(baselineId);
     if (!previous) continue;
     const details = detailDiff(previous, node, baseline, current, matches);
+    const dataTypeIds = changedDataTypes(previous, node);
     if (details.length > 0)
       changed.push({
         status: "changed",
@@ -744,6 +799,7 @@ export function compareSchemas(
         currentId: node.id,
         baselineId,
         details,
+        ...(dataTypeIds.length > 0 ? { dataTypeIds } : {}),
       });
   }
   for (const node of byKey(baseline.nodes, (candidate) => candidate.alias)) {

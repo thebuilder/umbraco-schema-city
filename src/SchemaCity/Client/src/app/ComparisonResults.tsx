@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { SchemaChange, SchemaComparison } from "../model/snapshots";
+import { DataTypeLink } from "./InspectorChips";
 
 function ChangeRow({
   change,
@@ -18,6 +19,14 @@ function ChangeRow({
         {change.details.map((detail) => (
           <p key={detail}>{detail}</p>
         ))}
+        {change.dataTypeIds ? (
+          <p className="mt-1 flex flex-wrap gap-x-2">
+            Data Types now:
+            {change.dataTypeIds.map((id) => (
+              <DataTypeLink className="text-phosphor" id={id} key={id} />
+            ))}
+          </p>
+        ) : null}
         {change.currentId ? (
           <button
             className="mt-1 text-phosphor underline-offset-2 hover:text-phosphor-bright hover:underline"

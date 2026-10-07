@@ -229,6 +229,90 @@ public class SchemaGraphBuilderTests
                 && e.PropertyAlias == "body" && e.Role == BlockEditorInspector.ContentRole);
     }
 
+    /// <summary>
+    /// Data Types come back whether a property uses them or not, with the keys a block editor
+    /// offers even once the Element Type is gone, the folder path, and the uses the graph has no
+    /// node for.
+    /// </summary>
+    [Fact]
+    public void BuildGraph_lists_every_data_type_with_its_targets_folder_and_other_uses()
+    {
+        Guid elementKey = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        Guid goneKey = Guid.Parse("98989898-9898-9898-9898-989898989898");
+        ContentType element = NewContentType(1600, elementKey, "elementCard", "Card", parentId: -1);
+        element.IsElement = true;
+
+        EntityContainer blocksFolder = new(Umbraco.Cms.Core.Constants.ObjectTypes.DataType) { Id = 70, Name = "Blocks", ParentId = -1 };
+        EntityContainer gridsFolder = new(Umbraco.Cms.Core.Constants.ObjectTypes.DataType) { Id = 71, Name = "Grids", ParentId = 70 };
+
+        var grid = new FakeDataType(new BlockGridConfiguration
+        {
+            GridColumns = 12,
+            Blocks = [new() { ContentElementTypeKey = elementKey }, new() { ContentElementTypeKey = goneKey }],
+        })
+        {
+            Name = "Page Grid",
+            EditorAlias = "Umbraco.BlockGrid",
+            ParentId = 71,
+        };
+        var unused = new FakeDataType(new object()) { Name = "Unused Text" };
+        var mediaOnly = new FakeDataType(new object()) { Name = "Upload" };
+
+        ContentType host = NewContentType(1601, HomeKey, "home", "Home", parentId: -1);
+        host.AddPropertyType(NewProperty("grid", grid, id: 40), "content", "Content");
+        MediaType image = new(ShortStringHelper, -1) { Id = 1602, Key = Guid.NewGuid(), Alias = "image", Name = "Image" };
+        image.AddPropertyType(NewProperty("file", mediaOnly, id: 41), "media", "Media");
+
+        SchemaGraph graph = SchemaGraphBuilder.BuildGraph(
+            [host, element], [], [unused, grid, mediaOnly], [blocksFolder, gridsFolder], [image]);
+
+        Assert.Equal(["Page Grid", "Unused Text", "Upload"], graph.DataTypes.Select(d => d.Name));
+
+        SchemaDataType gridType = graph.DataTypes[0];
+        Assert.Equal(grid.Key.ToString(), gridType.Id);
+        Assert.Equal("Umbraco.BlockGrid", gridType.EditorAlias);
+        Assert.Equal("Blocks/Grids", gridType.Folder);
+        Assert.Equal([elementKey.ToString(), goneKey.ToString()], gridType.Targets.Select(t => t.NodeId));
+        Assert.Equal(12, gridType.Configuration?["gridColumns"]);
+        Assert.Equal(2, gridType.Configuration?["blocks"]);
+        Assert.Equal(0, gridType.OtherUses);
+
+        SchemaDataType unusedType = graph.DataTypes[1];
+        Assert.Null(unusedType.Folder);
+        Assert.Empty(unusedType.Targets);
+        Assert.Null(unusedType.Configuration);
+        Assert.Equal(0, unusedType.OtherUses);
+
+        Assert.Equal(1, graph.DataTypes[2].OtherUses);
+        Assert.DoesNotContain(graph.DataTypes, d => d.IsBuiltIn);
+    }
+
+    /// <summary>
+    /// Built-in Data Types are recognised by Umbraco's own keys, both the ones it exposes as Guid
+    /// fields and the ones it exposes only as strings, such as Label (bytes).
+    /// </summary>
+    [Fact]
+    public void BuildGraph_marks_the_data_types_umbraco_installs_itself()
+    {
+        var textstring = new FakeDataType(new object())
+        {
+            Key = Umbraco.Cms.Core.Constants.DataTypes.Guids.TextstringGuid,
+            Name = "Textstring",
+        };
+        var labelBytes = new FakeDataType(new object())
+        {
+            Key = Guid.Parse(Umbraco.Cms.Core.Constants.DataTypes.Guids.LabelBytes),
+            Name = "Label (bytes)",
+        };
+        var own = new FakeDataType(new object()) { Name = "Page Blocks" };
+
+        SchemaGraph graph = SchemaGraphBuilder.BuildGraph([], [], [textstring, labelBytes, own]);
+
+        Assert.Equal(
+            [("Label (bytes)", true), ("Page Blocks", false), ("Textstring", true)],
+            graph.DataTypes.Select(d => (d.Name, d.IsBuiltIn)));
+    }
+
     /// <summary>Building the same content types twice has to produce byte-identical JSON.</summary>
     [Fact]
     public void BuildGraph_is_deterministic()

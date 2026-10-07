@@ -144,6 +144,11 @@ const shots = [
   { name: "matrix", query: "?view=matrix" },
   // Home laid out the way the content editor shows it.
   { name: "editor", query: "?view=editor&type=home" },
+  // SC Page Grid's page: what it offers, what content stores of each, and its users.
+  {
+    name: "datatypes",
+    query: "?view=datatypes&dataType=7fa85b72-1d36-24f2-763f-e1719f0e9c41",
+  },
   // Orbited round and down to a few degrees above the ground, where the city meets
   // the horizon.
   {

@@ -90,6 +90,21 @@ function unusedScale(
 }
 
 /**
+ * Show in city from a Data Type's page: the types in `lit` take the selection's
+ * colour and every other building goes quiet, Element Types included, so the users
+ * stand out wherever they are. The same binary ramp the Unused lens draws.
+ */
+export const highlightScale = (
+  graph: SchemaGraph,
+  lit: ReadonlySet<string>
+): LensScale => ({
+  ramp: "binary",
+  t: new Map(graph.nodes.map((node) => [node.id, lit.has(node.id) ? 1 : 0])),
+  minLabel: "other types",
+  maxLabel: "uses it",
+});
+
+/**
  * The scale for one lens, or null when the lens is off or has nothing to say. The
  * three counting lenses stretch their ramp over the values they actually found, so
  * a schema where every type has thousands of items still shows a difference.

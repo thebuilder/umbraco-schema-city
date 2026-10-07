@@ -782,5 +782,93 @@
       "lastEdited": null
     }
   },
-  "references": []
+  "references": [],
+  "blocks": {
+    "partial": false,
+    "valuesRead": 65,
+    "unreadable": 0,
+    "byDataType": [
+      {
+        "dataTypeId": "7d3417d8-a9a3-07c1-5d14-97059eba50ca",
+        "values": 20,
+        "items": 20,
+        "elements": [
+          {
+            "elementTypeId": "42486f7c-60a9-35ad-df00-00d323c4307a",
+            "content": 5,
+            "settings": 0,
+            "items": 5
+          },
+          {
+            "elementTypeId": "6b7e2290-d06a-bcd8-9426-1f3871fc1885",
+            "content": 20,
+            "settings": 0,
+            "items": 20
+          }
+        ]
+      },
+      {
+        "dataTypeId": "7fa85b72-1d36-24f2-763f-e1719f0e9c41",
+        "values": 12,
+        "items": 12,
+        "elements": [
+          {
+            "elementTypeId": "00da4cdc-96c1-81f0-5fb0-4998f27014fe",
+            "content": 12,
+            "settings": 0,
+            "items": 12
+          },
+          {
+            "elementTypeId": "3a1706e8-cbdf-5947-c4ac-ba144a3c1089",
+            "content": 12,
+            "settings": 0,
+            "items": 12
+          },
+          {
+            "elementTypeId": "f3670c7e-8289-c611-1c85-ea3b84fa2cc6",
+            "content": 0,
+            "settings": 12,
+            "items": 12
+          },
+          {
+            "elementTypeId": "fc37bea0-55e9-6faa-75d1-aae40af67041",
+            "content": 12,
+            "settings": 0,
+            "items": 12
+          }
+        ]
+      },
+      {
+        "dataTypeId": "b9bfc6d1-9ce1-55a0-95d7-5a0abf874310",
+        "values": 33,
+        "items": 33,
+        "elements": [
+          {
+            "elementTypeId": "3e1522e5-ad9f-e357-9ca0-f9e801bf8942",
+            "content": 33,
+            "settings": 0,
+            "items": 33
+          },
+          {
+            "elementTypeId": "42486f7c-60a9-35ad-df00-00d323c4307a",
+            "content": 33,
+            "settings": 0,
+            "items": 33
+          },
+          {
+            "elementTypeId": "62d4c970-6251-4804-8b17-5fbaf4877907",
+            "content": 10,
+            "settings": 0,
+            "items": 10
+          },
+          {
+            "elementTypeId": "855571b5-565e-0891-6c6b-7e1d6394fa66",
+            "content": 0,
+            "settings": 33,
+            "items": 33
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -222,6 +222,8 @@ export type Field = {
   propertyAlias: string;
   /** The property's Data Type, or its editor alias when the Data Type is gone. */
   dataType: string | null;
+  /** The Data Type's key, which its name links to. */
+  dataTypeId: string | null;
   ids: string[];
 };
 
@@ -304,24 +306,24 @@ export function connectionGroups(
     blockHosts: around.blockHosts,
     referencesIn: around.referencesIn,
   };
-  const dataTypeOf = new Map(
+  const propertyOf = new Map(
     node.groups.flatMap((group) =>
-      group.properties.map(
-        (property) =>
-          [
-            property.alias,
-            property.dataTypeName ?? property.editorAlias,
-          ] as const
-      )
+      group.properties.map((property) => [property.alias, property] as const)
     )
   );
   const fields = (targets: Neighbourhood["blockTargets"]): Field[] =>
-    targets.map((group) => ({
-      propertyAlias: group.propertyAlias,
-      dataType: dataTypeOf.get(group.propertyAlias) ?? null,
-      // The same Element Type as block content and as settings is one chip.
-      ids: [...new Set(group.ids)],
-    }));
+    targets.map((group) => {
+      const property = propertyOf.get(group.propertyAlias);
+      return {
+        propertyAlias: group.propertyAlias,
+        dataType: property
+          ? (property.dataTypeName ?? property.editorAlias)
+          : null,
+        dataTypeId: property?.dataTypeId ?? null,
+        // The same Element Type as block content and as settings is one chip.
+        ids: [...new Set(group.ids)],
+      };
+    });
   const byField: Record<FieldKind, Field[]> = {
     blockTargets: fields(around.blockTargets),
     referencesOut: fields(around.referencesOut),

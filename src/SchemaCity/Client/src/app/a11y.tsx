@@ -118,30 +118,30 @@ const focusLost = (at = deepActive()) =>
 const appRoot = (from: Element | null | undefined) =>
   from?.closest("[data-schema-city]");
 
-/**
- * The open inspector's heading, from anywhere inside the app. A dialog that picked a
- * type returns focus here rather than to its own trigger, since the inspector is
- * what the pick opened.
- */
-const inspectorHeading = (from: Element | null | undefined) =>
-  appRoot(from)?.querySelector<HTMLElement>("[data-inspector-heading]") ?? null;
+/** The open inspector's heading, which a pick of a type hands focus to. */
+const INSPECTOR_HEADING = "[data-inspector-heading]";
+
+/** The Data Type page's heading, which a pick of a Data Type hands focus to. */
+export const DATA_TYPE_HEADING = "[data-data-type-heading]";
 
 /**
- * For a dialog whose rows open the inspector. `chose` marks that a row was picked,
- * and `finalFocus`, given to the dialog, then sends focus to the inspector heading
- * rather than back to the trigger. Closing without a pick returns to the trigger.
- * `from` is any element inside the app.
+ * For a dialog whose rows open the inspector or a Data Type page. `chose` marks
+ * that a row was picked and which heading it opened, and `finalFocus`, given to the
+ * dialog, then sends focus to that heading rather than back to the trigger. Closing
+ * without a pick returns to the trigger. `from` is any element inside the app.
  */
 export function useHandOff(from: RefObject<Element | null>) {
-  const picked = useRef(false);
+  const picked = useRef<string | null>(null);
   return {
-    chose: () => {
-      picked.current = true;
+    chose: (heading = INSPECTOR_HEADING) => {
+      picked.current = heading;
     },
     finalFocus: (): HTMLElement | true => {
       const chose = picked.current;
-      picked.current = false;
-      const heading = chose ? inspectorHeading(from.current) : null;
+      picked.current = null;
+      const heading = chose
+        ? appRoot(from.current)?.querySelector<HTMLElement>(chose)
+        : null;
       return heading ?? true;
     },
   };
