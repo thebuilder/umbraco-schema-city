@@ -3717,6 +3717,70 @@
       "templates": []
     },
     {
+      "id": "61c05b08-645f-4c8a-057f-9c1e8028b067",
+      "alias": "elementLocalisedText",
+      "name": "Element Localised Text",
+      "icon": "icon-brick",
+      "iconColor": null,
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
+      "isElement": true,
+      "allowedAsRoot": false,
+      "variesByCulture": true,
+      "variesBySegment": false,
+      "description": null,
+      "groups": [
+        {
+          "id": "73da9dd6-15f3-e22f-49ca-38b4b4afb5a2",
+          "alias": "details",
+          "name": "Details",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "elementLocalisedTextField01",
+              "name": "Element Localised Text Field01",
+              "dataTypeId": "4309a3ea-0d78-4329-a06c-c80b036af19a",
+              "dataTypeName": "Media Picker",
+              "editorAlias": "Umbraco.MediaPicker3",
+              "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "elementLocalisedTextField02",
+              "name": "Element Localised Text Field02",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "elementLocalisedTextField03",
+              "name": "Element Localised Text Field03",
+              "dataTypeId": "c6bac0dd-4ab9-45b1-8e30-e4b619ee5da3",
+              "dataTypeName": "Textarea",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 3,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
       "id": "42486f7c-60a9-35ad-df00-00d323c4307a",
       "alias": "elementQuote",
       "name": "Element Quote",
@@ -3941,6 +4005,23 @@
         }
       ],
       "ownPropertyCount": 5,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "14ae1d1f-611f-9376-a596-b65690aa83d8",
+      "alias": "elementSpacer",
+      "name": "Element Spacer",
+      "icon": "icon-brick",
+      "iconColor": null,
+      "folderId": "e6a256aa-815d-ae06-f3c6-1e4f6bf94fdb",
+      "isElement": true,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": null,
+      "groups": [],
+      "ownPropertyCount": 0,
       "composedPropertyCount": 0,
       "templates": []
     },
@@ -6898,6 +6979,251 @@
       "templates": []
     },
     {
+      "id": "9d3bcae7-97f2-ddf2-0cf8-b05ad8963e1d",
+      "alias": "legacyHub",
+      "name": "Legacy Hub",
+      "icon": "icon-document",
+      "iconColor": null,
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "Seeded Legacy Hub.",
+      "groups": [
+        {
+          "id": "c39ec911-e56e-99e5-a60b-8803643ed079",
+          "alias": "details",
+          "name": "Details",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "legacyHubField01",
+              "name": "Legacy Hub Field01",
+              "dataTypeId": "7d3417d8-a9a3-07c1-5d14-97059eba50ca",
+              "dataTypeName": "SC Rich Text With Blocks",
+              "editorAlias": "Umbraco.RichText",
+              "editorUiAlias": "Umb.PropertyEditorUi.Tiptap",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                {
+                  "nodeId": "6b7e2290-d06a-bcd8-9426-1f3871fc1885",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "42486f7c-60a9-35ad-df00-00d323c4307a",
+                  "role": "content"
+                }
+              ]
+            },
+            {
+              "alias": "legacyHubField02",
+              "name": "Legacy Hub Field02",
+              "dataTypeId": "05ae39b7-5ec9-8945-0b04-d4f17eac0851",
+              "dataTypeName": "SC Related Content",
+              "editorAlias": "Umbraco.MultiNodeTreePicker",
+              "editorUiAlias": "Umb.PropertyEditorUi.DocumentPicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                {
+                  "nodeId": "cbb5a292-699c-0306-5c28-64fa225e1940",
+                  "role": "picker"
+                },
+                {
+                  "nodeId": "c357bf33-0b06-81e2-c2ba-67442dac8f36",
+                  "role": "picker"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "602b77ae-f801-f775-b075-f3c7df385ba4",
+      "alias": "legacyHubPage",
+      "name": "Legacy Hub Page",
+      "icon": "icon-newspaper",
+      "iconColor": "color-blue",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "Seeded Legacy Hub Page.",
+      "groups": [
+        {
+          "id": "dd1938b7-4dce-6e79-fddb-2acece200baf",
+          "alias": "details",
+          "name": "Details",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "legacyHubPageField01",
+              "name": "Legacy Hub Page Field01",
+              "dataTypeId": "92897bc6-a5f3-4ffe-ae27-f2e7e33dda49",
+              "dataTypeName": "True/false",
+              "editorAlias": "Umbraco.TrueFalse",
+              "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "legacyHubPageField02",
+              "name": "Legacy Hub Page Field02",
+              "dataTypeId": "2e6d3631-066e-44b8-aec4-96f09099b2b5",
+              "dataTypeName": "Numeric",
+              "editorAlias": "Umbraco.Integer",
+              "editorUiAlias": "Umb.PropertyEditorUi.Integer",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "alias": "localisedBlockHost",
+      "name": "Localised Block Host",
+      "icon": "icon-folder",
+      "iconColor": null,
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "Seeded Localised Block Host.",
+      "groups": [
+        {
+          "id": "18f2065d-39d8-d77a-58e1-89d48edf51d9",
+          "alias": "details",
+          "name": "Details",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "localisedBlockHostField01",
+              "name": "Localised Block Host Field01",
+              "dataTypeId": "b9bfc6d1-9ce1-55a0-95d7-5a0abf874310",
+              "dataTypeName": "SC Body Blocks",
+              "editorAlias": "Umbraco.BlockList",
+              "editorUiAlias": "Umb.PropertyEditorUi.BlockList",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                {
+                  "nodeId": "0c477326-3e2b-a647-8d1a-e9fe60ba7746",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "855571b5-565e-0891-6c6b-7e1d6394fa66",
+                  "role": "settings"
+                },
+                {
+                  "nodeId": "ffe7ac94-95e4-c5f3-0e8e-69fe2caa8c7c",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "3e1522e5-ad9f-e357-9ca0-f9e801bf8942",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "42486f7c-60a9-35ad-df00-00d323c4307a",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "62d4c970-6251-4804-8b17-5fbaf4877907",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "e9e5b939-d62a-f40a-c69c-ca0684ccc7e5",
+                  "role": "content"
+                }
+              ]
+            },
+            {
+              "alias": "localisedBlockHostField02",
+              "name": "Localised Block Host Field02",
+              "dataTypeId": "7fa85b72-1d36-24f2-763f-e1719f0e9c41",
+              "dataTypeName": "SC Page Grid",
+              "editorAlias": "Umbraco.BlockGrid",
+              "editorUiAlias": "Umb.PropertyEditorUi.BlockGrid",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                {
+                  "nodeId": "3a1706e8-cbdf-5947-c4ac-ba144a3c1089",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "f3670c7e-8289-c611-1c85-ea3b84fa2cc6",
+                  "role": "settings"
+                },
+                {
+                  "nodeId": "e4165f61-0c65-405e-9b27-4226bc4f1489",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "d32b32e8-aa50-6699-2412-1ac6f835034a",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "00da4cdc-96c1-81f0-5fb0-4998f27014fe",
+                  "role": "content"
+                },
+                {
+                  "nodeId": "fc37bea0-55e9-6faa-75d1-aae40af67041",
+                  "role": "content"
+                }
+              ]
+            },
+            {
+              "alias": "localisedBody",
+              "name": "Localised Body",
+              "dataTypeId": "ce75ab85-00be-3ff4-2ed8-932cf1f83c9e",
+              "dataTypeName": "SC Localised Blocks",
+              "editorAlias": "Umbraco.BlockList",
+              "editorUiAlias": "Umb.PropertyEditorUi.BlockList",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                {
+                  "nodeId": "61c05b08-645f-4c8a-057f-9c1e8028b067",
+                  "role": "content"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 3,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
       "id": "bd52e3c1-336a-1b13-cc74-cb6dafe5e51a",
       "alias": "microsite",
       "name": "Microsite",
@@ -7478,6 +7804,58 @@
         }
       ],
       "ownPropertyCount": 3,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "4733a2ee-2ca5-9b1f-4948-9a29ddb86fd7",
+      "alias": "nearDuplicatePage",
+      "name": "Near Duplicate Page",
+      "icon": "icon-store",
+      "iconColor": "color-green",
+      "folderId": null,
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "Seeded Near Duplicate Page.",
+      "groups": [
+        {
+          "id": "485d0567-73d7-0576-5712-9117c8191ab0",
+          "alias": "details",
+          "name": "Details",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "metaTitle",
+              "name": "Meta Title",
+              "dataTypeId": "28d4586f-e751-34a2-92ef-8145ee72aaa6",
+              "dataTypeName": "SEO Title",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "shareTitle",
+              "name": "Share Title",
+              "dataTypeId": "1c3a7a5e-3d8d-8efc-de30-5a6b0f54861e",
+              "dataTypeName": "SeoTitle",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 2,
       "composedPropertyCount": 0,
       "templates": []
     },
@@ -8066,6 +8444,298 @@
         }
       ],
       "ownPropertyCount": 3,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
+      "id": "ebe69bda-1f41-1373-ab09-41bc9d3ff087",
+      "alias": "overloadedTabPage",
+      "name": "Overloaded Tab Page",
+      "icon": "icon-users",
+      "iconColor": null,
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "Seeded Overloaded Tab Page.",
+      "groups": [
+        {
+          "id": "a13795ad-3de4-7acf-566d-54c57c12acbd",
+          "alias": "content",
+          "name": "Content",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "overloadedTabPageField01",
+              "name": "Overloaded Tab Page Field01",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField02",
+              "name": "Overloaded Tab Page Field02",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField03",
+              "name": "Overloaded Tab Page Field03",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField04",
+              "name": "Overloaded Tab Page Field04",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField05",
+              "name": "Overloaded Tab Page Field05",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField06",
+              "name": "Overloaded Tab Page Field06",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField07",
+              "name": "Overloaded Tab Page Field07",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField08",
+              "name": "Overloaded Tab Page Field08",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField09",
+              "name": "Overloaded Tab Page Field09",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField10",
+              "name": "Overloaded Tab Page Field10",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField11",
+              "name": "Overloaded Tab Page Field11",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField12",
+              "name": "Overloaded Tab Page Field12",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField13",
+              "name": "Overloaded Tab Page Field13",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField14",
+              "name": "Overloaded Tab Page Field14",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField15",
+              "name": "Overloaded Tab Page Field15",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField16",
+              "name": "Overloaded Tab Page Field16",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField17",
+              "name": "Overloaded Tab Page Field17",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField18",
+              "name": "Overloaded Tab Page Field18",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField19",
+              "name": "Overloaded Tab Page Field19",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField20",
+              "name": "Overloaded Tab Page Field20",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField21",
+              "name": "Overloaded Tab Page Field21",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "overloadedTabPageField22",
+              "name": "Overloaded Tab Page Field22",
+              "dataTypeId": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 22,
       "composedPropertyCount": 0,
       "templates": []
     },
@@ -11466,6 +12136,75 @@
       "templates": []
     },
     {
+      "id": "b1769713-e9b2-abc8-da05-367b1f0434ff",
+      "alias": "spacerBlockHost",
+      "name": "Spacer Block Host",
+      "icon": "icon-calendar",
+      "iconColor": "color-red",
+      "folderId": "b0ce3a45-ce05-54af-a47d-a15fee8b2a26",
+      "isElement": false,
+      "allowedAsRoot": false,
+      "variesByCulture": false,
+      "variesBySegment": false,
+      "description": "Seeded Spacer Block Host.",
+      "groups": [
+        {
+          "id": "9efe076e-5c39-84c5-54d4-8907950eaf50",
+          "alias": "details",
+          "name": "Details",
+          "type": "Group",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": [
+            {
+              "alias": "spacerBlockHostField01",
+              "name": "Spacer Block Host Field01",
+              "dataTypeId": "5046194e-4237-453c-a547-15db3a07c4e1",
+              "dataTypeName": "Date Picker",
+              "editorAlias": "Umbraco.DateTime",
+              "editorUiAlias": "Umb.PropertyEditorUi.DatePicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "spacerBlockHostField02",
+              "name": "Spacer Block Host Field02",
+              "dataTypeId": "fd1e0da5-5606-4862-b679-5d0cf3a52a59",
+              "dataTypeName": "Content Picker",
+              "editorAlias": "Umbraco.ContentPicker",
+              "editorUiAlias": "Umb.PropertyEditorUi.DocumentPicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "spacerBody",
+              "name": "Spacer Body",
+              "dataTypeId": "858b2fb4-0006-1bfa-6f5f-ce77b0c5352e",
+              "dataTypeName": "SC Spacer Blocks",
+              "editorAlias": "Umbraco.BlockList",
+              "editorUiAlias": "Umb.PropertyEditorUi.BlockList",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": [
+                {
+                  "nodeId": "14ae1d1f-611f-9376-a596-b65690aa83d8",
+                  "role": "content"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "ownPropertyCount": 3,
+      "composedPropertyCount": 0,
+      "templates": []
+    },
+    {
       "id": "c357bf33-0b06-81e2-c2ba-67442dac8f36",
       "alias": "standardPage",
       "name": "Standard Page",
@@ -12967,6 +13706,11 @@
     },
     {
       "kind": "allowedChild",
+      "from": "9d3bcae7-97f2-ddf2-0cf8-b05ad8963e1d",
+      "to": "602b77ae-f801-f775-b075-f3c7df385ba4"
+    },
+    {
+      "kind": "allowedChild",
       "from": "9ed050f3-b38d-8d50-fcb3-ca8da3cb65b6",
       "to": "bc8006b0-e052-0c91-3a46-b8c4746d6fbd"
     },
@@ -13004,6 +13748,26 @@
       "kind": "allowedChild",
       "from": "c357bf33-0b06-81e2-c2ba-67442dac8f36",
       "to": "c357bf33-0b06-81e2-c2ba-67442dac8f36"
+    },
+    {
+      "kind": "allowedChild",
+      "from": "d1f4de76-66fa-f39c-dc3e-224eeec65b55",
+      "to": "4733a2ee-2ca5-9b1f-4948-9a29ddb86fd7"
+    },
+    {
+      "kind": "allowedChild",
+      "from": "d1f4de76-66fa-f39c-dc3e-224eeec65b55",
+      "to": "90652c3f-efa0-a97b-eee5-f4fd62795d23"
+    },
+    {
+      "kind": "allowedChild",
+      "from": "d1f4de76-66fa-f39c-dc3e-224eeec65b55",
+      "to": "b1769713-e9b2-abc8-da05-367b1f0434ff"
+    },
+    {
+      "kind": "allowedChild",
+      "from": "d1f4de76-66fa-f39c-dc3e-224eeec65b55",
+      "to": "ebe69bda-1f41-1373-ab09-41bc9d3ff087"
     },
     {
       "kind": "allowedChild",
@@ -14411,6 +15175,118 @@
     },
     {
       "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "00da4cdc-96c1-81f0-5fb0-4998f27014fe",
+      "propertyAlias": "localisedBlockHostField02",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "0c477326-3e2b-a647-8d1a-e9fe60ba7746",
+      "propertyAlias": "localisedBlockHostField01",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "3a1706e8-cbdf-5947-c4ac-ba144a3c1089",
+      "propertyAlias": "localisedBlockHostField02",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "3e1522e5-ad9f-e357-9ca0-f9e801bf8942",
+      "propertyAlias": "localisedBlockHostField01",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "42486f7c-60a9-35ad-df00-00d323c4307a",
+      "propertyAlias": "localisedBlockHostField01",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "61c05b08-645f-4c8a-057f-9c1e8028b067",
+      "propertyAlias": "localisedBody",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "62d4c970-6251-4804-8b17-5fbaf4877907",
+      "propertyAlias": "localisedBlockHostField01",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "855571b5-565e-0891-6c6b-7e1d6394fa66",
+      "propertyAlias": "localisedBlockHostField01",
+      "role": "settings"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "d32b32e8-aa50-6699-2412-1ac6f835034a",
+      "propertyAlias": "localisedBlockHostField02",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "e4165f61-0c65-405e-9b27-4226bc4f1489",
+      "propertyAlias": "localisedBlockHostField02",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "e9e5b939-d62a-f40a-c69c-ca0684ccc7e5",
+      "propertyAlias": "localisedBlockHostField01",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "f3670c7e-8289-c611-1c85-ea3b84fa2cc6",
+      "propertyAlias": "localisedBlockHostField02",
+      "role": "settings"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "fc37bea0-55e9-6faa-75d1-aae40af67041",
+      "propertyAlias": "localisedBlockHostField02",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "90652c3f-efa0-a97b-eee5-f4fd62795d23",
+      "to": "ffe7ac94-95e4-c5f3-0e8e-69fe2caa8c7c",
+      "propertyAlias": "localisedBlockHostField01",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "9d3bcae7-97f2-ddf2-0cf8-b05ad8963e1d",
+      "to": "42486f7c-60a9-35ad-df00-00d323c4307a",
+      "propertyAlias": "legacyHubField01",
+      "role": "content"
+    },
+    {
+      "kind": "block",
+      "from": "9d3bcae7-97f2-ddf2-0cf8-b05ad8963e1d",
+      "to": "6b7e2290-d06a-bcd8-9426-1f3871fc1885",
+      "propertyAlias": "legacyHubField01",
+      "role": "content"
+    },
+    {
+      "kind": "block",
       "from": "9ed050f3-b38d-8d50-fcb3-ca8da3cb65b6",
       "to": "00da4cdc-96c1-81f0-5fb0-4998f27014fe",
       "propertyAlias": "productPageField09",
@@ -14691,6 +15567,13 @@
     },
     {
       "kind": "block",
+      "from": "b1769713-e9b2-abc8-da05-367b1f0434ff",
+      "to": "14ae1d1f-611f-9376-a596-b65690aa83d8",
+      "propertyAlias": "spacerBody",
+      "role": "content"
+    },
+    {
+      "kind": "block",
       "from": "bc8006b0-e052-0c91-3a46-b8c4746d6fbd",
       "to": "00da4cdc-96c1-81f0-5fb0-4998f27014fe",
       "propertyAlias": "productVariantField06",
@@ -15856,6 +16739,18 @@
       "from": "756ff101-f79f-ffd5-cdf5-399a4b2cc8ee",
       "to": "cbb5a292-699c-0306-5c28-64fa225e1940",
       "propertyAlias": "eventPageField02"
+    },
+    {
+      "kind": "reference",
+      "from": "9d3bcae7-97f2-ddf2-0cf8-b05ad8963e1d",
+      "to": "c357bf33-0b06-81e2-c2ba-67442dac8f36",
+      "propertyAlias": "legacyHubField02"
+    },
+    {
+      "kind": "reference",
+      "from": "9d3bcae7-97f2-ddf2-0cf8-b05ad8963e1d",
+      "to": "cbb5a292-699c-0306-5c28-64fa225e1940",
+      "propertyAlias": "legacyHubField02"
     },
     {
       "kind": "reference",

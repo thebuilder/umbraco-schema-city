@@ -23,7 +23,7 @@
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png",
-      "Caption": "The findings drawer: unused types, dead ends, duplicate aliases, broken block configurations and more, each row selecting the type it is about."
+      "Caption": "The findings drawer, grouped by kind with breakages first. Each row names its own evidence and opens the type it is about."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png",

@@ -51,7 +51,7 @@ import type { SchemaGraph, UsageReport } from "../model/types";
 import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
-import { INSPECTOR_WIDTH, Inspector } from "./Inspector";
+import { INSPECTOR_INSET, Inspector } from "./Inspector";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   LENS_LABEL,
@@ -656,7 +656,8 @@ export function App({
           </div>
         </div>
 
-        <div className="relative min-h-0 flex-1">
+        {/* A container, so the inspector sizes itself to the room the workspace has. */}
+        <div className="@container relative min-h-0 flex-1">
           {/* The legend is an overlay in the corner of the canvas rather than a row
               above it. As a row it took its height out of the canvas the moment a
               lens was picked, and the scene dropped and re-fitted itself around the
@@ -684,7 +685,9 @@ export function App({
           {flat ? (
             // The inspector is an overlay, so the view is inset by its width while
             // it is open rather than sliding under it.
-            <div className={`absolute inset-0 ${selectedNode ? "pr-80" : ""}`}>
+            <div
+              className={`absolute inset-0 ${selectedNode ? INSPECTOR_INSET : ""}`}
+            >
               <FlatView
                 graph={graph}
                 nodesById={nodesById}
@@ -723,9 +726,7 @@ export function App({
                   focusDepth={focusDepth}
                   graph={graph}
                   icons={icons}
-                  inspectorWidth={
-                    selectedNode && neighbourhood ? INSPECTOR_WIDTH : 0
-                  }
+                  inspectorOpen={Boolean(selectedNode && neighbourhood)}
                   layers={layers}
                   onFocus={enterFocus}
                   onSelect={(id) => (id === null ? done() : setSelected(id))}

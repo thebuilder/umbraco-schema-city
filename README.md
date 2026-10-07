@@ -10,7 +10,7 @@ it does not change your schema or content.
 
 ![The city overview with Pages, Elements, Compositions and Unfiled districts and faint structure connections.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png)
 
-The screenshots use the included demo schema with 78 types and deliberately planted problems.
+The screenshots use the included demo schema with 86 types and deliberately planted problems.
 They show the standalone client, without the surrounding Umbraco backoffice.
 
 ## Try it locally
@@ -52,7 +52,12 @@ for testing the integration.
 Use Search or `⌘K` / `Ctrl+K` to find a type by name, alias, or property alias. Hover a building to
 see its direct connections and the names of connected types. Labels that would overlap stay
 hidden until there is room for them as you zoom in. Click a building to keep its connections visible and open the
-inspector, which shows properties, composition origins, usage counts, and related types.
+inspector. Its header names the type, its role (page, composition or Element Type) and how much
+content uses it. Overview lists the schema checks for the type, its usage, and its related types,
+with content counts once usage has loaded. Properties shows each group with the composition it
+comes from and each property's Data Type. Connections lists every configured connection by kind,
+block and picker targets by property, and the references counted in content separately. Click a
+related type to select it.
 
 Each building is built like a chip on a circuit board. Every slab is one property group, with a
 gap between groups and a thin board where a new tab starts; the lit windows are its properties.
@@ -72,7 +77,8 @@ across all layers, including ones you have switched off.
 | Blocks | Element Types configured as block content or settings |
 | References | Document Types allowed by configured pickers |
 
-Click a connection or use Explain connections in the inspector to see what it represents.
+Click a connection, or use Explain connections at the end of the inspector's Connections tab, to
+see what it represents.
 Open in editor takes you to the selected Document Type in Umbraco.
 
 ### Focus on a neighbourhood
@@ -87,10 +93,31 @@ again to clear the selection.
 ### Review findings
 
 Findings lists unused types, duplicate aliases, missing block targets, empty types, and other
-configuration checks. Filter by category, select a result, and inspect the explanation and related
-types. Export CSV saves the filtered results with schema and usage timestamps for a ticket or review.
+configuration checks. Results are grouped by kind in a fixed order, definite breakages such as
+broken blocks and duplicate aliases first: each group explains the kind once, and each row shows the
+type and what is particular to it, such as where an unused type is allowed. Problems are open and
+notes collapsed. Within a group, the strongest cases come first, for example an unused
+type whose allowed parents have no content either. Filter by category, select a result, and inspect
+it with its related types. Export CSV saves the filtered results with schema and usage timestamps
+and the kind's explanation for a ticket or review.
 
-![Findings filtered to dead ends, duplicate aliases, broken blocks, empty types and complexity checks.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
+Only a type an editor can create, at root or under another type, is reported as unused. A type
+nothing can create is a dead end, or a pure mixin when something composes it. The no template note
+is left out when more than half of the creatable types have no template, since that schema is
+headless by design, and on a type already reported as unused.
+
+- Unreachable chain: a type with allowed parents, none of which a root can reach.
+- Culture mismatch: an invariant type with a property that varies by culture, or with a block
+  editor that lists an Element Type that varies by culture.
+- Near-duplicate Data Type: Data Types whose names match once case, spaces, hyphens and
+  underscores are ignored. Each set is one note, on a type that uses the least-used of them, and
+  lists every other type that uses any of them.
+- Overloaded tab: a tab, or a group on a type without tabs, with more than 20 properties, composed
+  ones included.
+- Empty block: an Element Type offered as a content block that has no properties. It is a note,
+  because a divider or spacer block is often empty on purpose.
+
+![Findings grouped by kind with broken blocks and duplicate aliases first, each row naming its own evidence.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
 
 A finding is a reason to investigate, not an instruction to delete. An unused Document Type has
 no counted content in the usage snapshot. An unused Element Type has no configured block-editor
@@ -106,7 +133,8 @@ the schema, so you can explore the model while that request is pending.
 ![The Content count lens with Article selected and its usage totals shown in the inspector.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png)
 
 Configured picker connections and observed references between content items are different data.
-The inspector reports them separately. Usage is a snapshot, cached on the server for one minute;
+The inspector's Connections tab reports them separately, under Picker references and Observed in
+content. Usage is a snapshot, cached on the server for one minute;
 it is not a live dependency check.
 
 ### Use the table

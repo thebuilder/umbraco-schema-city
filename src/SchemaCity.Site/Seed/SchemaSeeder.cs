@@ -33,7 +33,7 @@ public sealed class SchemaSeederComposer : IComposer
 }
 
 /// <summary>
-/// Fills this throwaway site with a content model big enough to look like a real project, 78
+/// Fills this throwaway site with a content model big enough to look like a real project, 86
 /// Document Types and 193 content items, and plants the findings listed in
 /// <see cref="PlantedFindings"/> so the findings drawer has something to report. It runs once, on
 /// the first Development boot of an install that has no Document Types yet. Every later boot only
@@ -42,19 +42,26 @@ public sealed class SchemaSeederComposer : IComposer
 public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationStartedNotification>
 {
     /// <summary>
-    /// The findings the seed data is built to produce, as (kind, Document Type alias). M3's
-    /// findings test asserts that its own output contains all of these. It cannot assert equality:
+    /// The findings the seed data is built to produce, as (kind, Document Type alias), with the
+    /// client's kind ids. The findings test asserts that its own output contains all of these.
+    /// It cannot assert equality:
     /// the no-template rule matches every creatable type the seeder leaves without one, and giving
     /// 60 Document Types a template would write 60 .cshtml files into the site.
     /// </summary>
     public static readonly (string Kind, string Alias)[] PlantedFindings =
     [
-        ("brokenBlockReference", "brokenBlockHost"),
-        ("duplicatePropertyAlias", "dupAliasPage"),
+        ("brokenBlock", "brokenBlockHost"),
+        ("cultureMismatch", "localisedBlockHost"),
+        ("deadEnd", "deadEndPromo"),
+        ("deadEnd", "legacyHub"),
+        ("deadEnd", "unusedSeoComposition"),
+        ("duplicateAlias", "dupAliasPage"),
+        ("emptyBlock", "elementSpacer"),
+        ("nearDuplicateDataType", "nearDuplicatePage"),
         ("noProperties", "emptyType"),
         ("noTemplate", "noTemplatePage"),
-        ("structuralDeadEnd", "deadEndPromo"),
-        ("structuralDeadEnd", "unusedSeoComposition"),
+        ("overloadedTab", "overloadedTabPage"),
+        ("unreachableChain", "legacyHubPage"),
         ("unusedElementType", "unusedElementBanner"),
         ("unusedType", "unusedArticleLegacy"),
     ];
@@ -90,6 +97,15 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 
     /// <summary>The Block List whose configuration names a deleted Element Type.</summary>
     private IDataType _brokenBlockList = null!;
+
+    /// <summary>The Block List that offers the culture-variant elementLocalisedText.</summary>
+    private IDataType _localisedBlockList = null!;
+
+    /// <summary>The Block List that offers elementSpacer, which has no properties.</summary>
+    private IDataType _spacerBlockList = null!;
+
+    /// <summary>Two Text Box Data Types named "SEO Title" and "SeoTitle".</summary>
+    private IDataType[] _nearDuplicateTitles = [];
 
     private int _published;
     private int _drafts;
@@ -196,8 +212,10 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     // ---------------------------------------------------------------- element types
 
     /// <summary>
-    /// 15 Element Types plus <c>elementDoomed</c>, which the broken-block Data Type points at and
-    /// <see cref="DeleteDoomedElementType"/> deletes again.
+    /// 17 Element Types plus <c>elementDoomed</c>, which the broken-block Data Type points at and
+    /// <see cref="DeleteDoomedElementType"/> deletes again. The two appended last are planted:
+    /// <c>elementLocalisedText</c> varies by culture under an invariant host, and
+    /// <c>elementSpacer</c> is a block with no properties.
     /// </summary>
     /// <remarks>
     /// ponytail: these get built-in editors only, because the block Data Types do not exist yet
@@ -213,16 +231,22 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             "elementDoomed", "elementForm", "elementGridColumn", "elementGridRow",
             "elementGridSettings", "elementHeading", "elementImage", "elementQuote",
             "elementRichText", "elementRteFigure", "elementVideo", "unusedElementBanner",
+            "elementLocalisedText", "elementSpacer",
         ];
 
         for (int i = 0; i < aliases.Length; i++)
         {
             IContentType type = NewType(aliases[i], folderId, "icon-brick");
             type.IsElement = true;
+            type.Variations = aliases[i] == "elementLocalisedText" ? ContentVariation.Culture : ContentVariation.Nothing;
 
             // Mandatory only lives on Element Types. A mandatory property on a Document Type that
             // gets seeded content would fail the publish, and the seeder writes no property values.
-            AddProperties(type, aliases[i], 2 + (i % 5), mandatoryFirst: i % 3 == 0);
+            if (aliases[i] != "elementSpacer")
+            {
+                AddProperties(type, aliases[i], 2 + (i % 5), mandatoryFirst: i % 3 == 0);
+            }
+
             Save(type);
         }
     }
@@ -329,8 +353,28 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         _editors.Add(await CreateDataTypeAsync("SC Rich Text With Blocks", UmbracoConstants.PropertyEditors.Aliases.RichText, "Umb.PropertyEditorUi.Tiptap", richText));
         _editors.Add(await CreateDataTypeAsync("SC Related Content", UmbracoConstants.PropertyEditors.Aliases.MultiNodeTreePicker, "Umb.PropertyEditorUi.DocumentPicker", relatedContent));
 
-        // Kept out of _editors so exactly one Document Type uses it.
+        // Kept out of _editors so exactly one Document Type uses each, and the rotation that
+        // hands the other types their editors stays as it was.
         _brokenBlockList = await CreateDataTypeAsync("SC Broken Blocks", UmbracoConstants.PropertyEditors.Aliases.BlockList, "Umb.PropertyEditorUi.BlockList", brokenBlocks);
+        _localisedBlockList = await CreateDataTypeAsync(
+            "SC Localised Blocks",
+            UmbracoConstants.PropertyEditors.Aliases.BlockList,
+            "Umb.PropertyEditorUi.BlockList",
+            new BlockListConfiguration { Blocks = [new() { ContentElementTypeKey = Key("elementLocalisedText") }] });
+        _spacerBlockList = await CreateDataTypeAsync(
+            "SC Spacer Blocks",
+            UmbracoConstants.PropertyEditors.Aliases.BlockList,
+            "Umb.PropertyEditorUi.BlockList",
+            new BlockListConfiguration { Blocks = [new() { ContentElementTypeKey = Key("elementSpacer") }] });
+
+        // The same editor twice under names that differ in case and spacing, the way a second
+        // Data Type gets made by someone who did not find the first. Names that differ only in
+        // case do not work: Umbraco saves the second one as "Seo Title (1)".
+        _nearDuplicateTitles =
+        [
+            await CreateDataTypeAsync("SEO Title", UmbracoConstants.PropertyEditors.Aliases.TextBox, "Umb.PropertyEditorUi.TextBox", new TextboxConfiguration { MaxChars = 60 }),
+            await CreateDataTypeAsync("SeoTitle", UmbracoConstants.PropertyEditors.Aliases.TextBox, "Umb.PropertyEditorUi.TextBox", new TextboxConfiguration { MaxChars = 70 }),
+        ];
     }
 
     private async Task<IDataType> CreateDataTypeAsync(string name, string editorAlias, string editorUiAlias, object configuration)
@@ -445,7 +489,9 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         new("errorPage", [], [], 1),
         new("redirectPage", [], [], 1),
         new("sitemapPage", [], ["seoComposition"], 1),
-        new("landingPage", ["landingSection"], ["seoComposition", "openGraphComposition", "heroComposition"], 18),
+        // The later planted types hang off landingPage, not home, so home's focus neighbourhood
+        // keeps the size the layout tests measure.
+        new("landingPage", ["landingSection", "localisedBlockHost", "nearDuplicatePage", "overloadedTabPage", "spacerBlockHost"], ["seoComposition", "openGraphComposition", "heroComposition"], 18),
         new("landingSection", [], [], 6),
         new("pricingPage", ["pricingTier"], ["seoComposition"], 5),
         new("pricingTier", [], [], 7),
@@ -462,14 +508,21 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         new("settingsEntry", [], ["settingsComposition"], 4),
         new("dictionaryPage", [], [], 2),
 
-        // Planted findings. Each one is reachable in the tree except deadEndPromo, so that the
-        // dead-end rule matches deadEndPromo and not the other seven.
+        // Planted findings. Each one is reachable in the tree except deadEndPromo, legacyHub and
+        // legacyHubPage, so the dead-end rule matches the first two and the unreachable chain
+        // rule matches legacyHubPage, which is allowed only under legacyHub.
         new("unusedArticleLegacy", [], ["seoComposition"], 6),
         new("emptyType", [], [], 0),
         new("noTemplatePage", [], ["seoComposition"], 5),
         new("dupAliasPage", [], ["seoComposition"], 4),
         new("brokenBlockHost", [], [], 3),
         new("deadEndPromo", [], ["seoComposition"], 5),
+        new("legacyHub", ["legacyHubPage"], [], 2),
+        new("legacyHubPage", [], [], 2),
+        new("localisedBlockHost", [], [], 2),
+        new("nearDuplicatePage", [], [], 0),
+        new("overloadedTabPage", [], [], 0),
+        new("spacerBlockHost", [], [], 2),
     ];
 
     private void CreateStructureTypes(int folderId)
@@ -494,9 +547,34 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 
             AddProperties(type, spec.Alias, spec.Properties, mandatoryFirst: false, varies: spec.Varies);
 
-            if (spec.Alias == "brokenBlockHost")
+            switch (spec.Alias)
             {
-                type.AddPropertyType(NewProperty("brokenBody", _brokenBlockList), "details", "Details");
+                case "brokenBlockHost":
+                    type.AddPropertyType(NewProperty("brokenBody", _brokenBlockList), "details", "Details");
+                    break;
+                case "localisedBlockHost":
+                    AddToGroup(type, "details", PropertyGroupType.Group, NewProperty("localisedBody", _localisedBlockList));
+                    break;
+                case "spacerBlockHost":
+                    AddToGroup(type, "details", PropertyGroupType.Group, NewProperty("spacerBody", _spacerBlockList));
+                    break;
+                case "nearDuplicatePage":
+                    AddToGroup(
+                        type,
+                        "details",
+                        PropertyGroupType.Group,
+                        NewProperty("metaTitle", _nearDuplicateTitles[0]),
+                        NewProperty("shareTitle", _nearDuplicateTitles[1]));
+                    break;
+                case "overloadedTabPage":
+                    // More than the overloaded tab rule's 20 in one tab, which AddProperties never
+                    // does: it spreads a type over two tabs and a group.
+                    AddToGroup(
+                        type,
+                        "content",
+                        PropertyGroupType.Tab,
+                        [.. Enumerable.Range(1, 22).Select(n => NewProperty($"overloadedTabPageField{n:D2}", _editors[0]))]);
+                    break;
             }
 
             Save(type);
@@ -762,6 +840,18 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             type.PropertyGroups[groupAlias].Type = groupType;
             type.PropertyGroups[groupAlias].Key = KeyFor($"{type.Alias}/{groupAlias}");
         }
+    }
+
+    /// <summary>Adds planted properties to one group, keyed the way AddProperties keys its groups.</summary>
+    private void AddToGroup(IContentType type, string groupAlias, PropertyGroupType groupType, params IPropertyType[] properties)
+    {
+        foreach (IPropertyType property in properties)
+        {
+            type.AddPropertyType(property, groupAlias, Title(groupAlias));
+        }
+
+        type.PropertyGroups[groupAlias].Type = groupType;
+        type.PropertyGroups[groupAlias].Key = KeyFor($"{type.Alias}/{groupAlias}");
     }
 
     /// <summary>

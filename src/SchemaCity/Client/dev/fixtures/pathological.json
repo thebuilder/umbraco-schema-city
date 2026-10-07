@@ -2596,7 +2596,7 @@
       "folderId": "97b25951-7296-58c3-86e5-bebd73be0d2b",
       "isElement": true,
       "allowedAsRoot": false,
-      "variesByCulture": false,
+      "variesByCulture": true,
       "variesBySegment": false,
       "description": null,
       "groups": [
@@ -2616,7 +2616,7 @@
               "editorAlias": "Umbraco.DateTime",
               "editorUiAlias": "Umb.PropertyEditorUi.DatePicker",
               "mandatory": false,
-              "variesByCulture": false,
+              "variesByCulture": true,
               "fromCompositionId": null,
               "targets": []
             },
@@ -2628,7 +2628,7 @@
               "editorAlias": "Umbraco.TextBox",
               "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
               "mandatory": true,
-              "variesByCulture": false,
+              "variesByCulture": true,
               "fromCompositionId": null,
               "targets": []
             }
@@ -4367,43 +4367,8 @@
       "variesByCulture": false,
       "variesBySegment": false,
       "description": null,
-      "groups": [
-        {
-          "id": "9591d191-fe3c-5956-82bf-9a9740f368e1",
-          "alias": "content",
-          "name": "Content",
-          "type": "Tab",
-          "parentAlias": null,
-          "fromCompositionId": null,
-          "properties": [
-            {
-              "alias": "block39Field00",
-              "name": "Block39 Field00",
-              "dataTypeId": "d9c1e1fa-1e46-58b7-82e0-06247191a561",
-              "dataTypeName": "Seo Toggle",
-              "editorAlias": "Umbraco.TrueFalse",
-              "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
-              "mandatory": false,
-              "variesByCulture": false,
-              "fromCompositionId": null,
-              "targets": []
-            },
-            {
-              "alias": "block39Field01",
-              "name": "Block39 Field01",
-              "dataTypeId": "7a820e03-7a70-5f84-94be-437f44906faf",
-              "dataTypeName": "Image Picker",
-              "editorAlias": "Umbraco.MediaPicker3",
-              "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
-              "mandatory": false,
-              "variesByCulture": false,
-              "fromCompositionId": null,
-              "targets": []
-            }
-          ]
-        }
-      ],
-      "ownPropertyCount": 2,
+      "groups": [],
+      "ownPropertyCount": 0,
       "composedPropertyCount": 0,
       "templates": []
     },
@@ -10113,6 +10078,174 @@
               "variesByCulture": false,
               "fromCompositionId": null,
               "targets": []
+            },
+            {
+              "alias": "editorial40Field03",
+              "name": "Editorial40 Field03",
+              "dataTypeId": "d9c1e1fa-1e46-58b7-82e0-06247191a561",
+              "dataTypeName": "Seo Toggle",
+              "editorAlias": "Umbraco.TrueFalse",
+              "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field04",
+              "name": "Editorial40 Field04",
+              "dataTypeId": "7a820e03-7a70-5f84-94be-437f44906faf",
+              "dataTypeName": "Image Picker",
+              "editorAlias": "Umbraco.MediaPicker3",
+              "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field05",
+              "name": "Editorial40 Field05",
+              "dataTypeId": "4d067a69-12ab-5dd2-914c-3721c13ed2b0",
+              "dataTypeName": "Date Picker",
+              "editorAlias": "Umbraco.DateTime",
+              "editorUiAlias": "Umb.PropertyEditorUi.DatePicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field06",
+              "name": "Editorial40 Field06",
+              "dataTypeId": "861e2ded-bcf9-59bb-a72a-37fce0371be3",
+              "dataTypeName": "Text String",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field07",
+              "name": "Editorial40 Field07",
+              "dataTypeId": "5c2452dd-5d03-5998-95b4-82af663c5c47",
+              "dataTypeName": "SEO Toggle",
+              "editorAlias": "Umbraco.TrueFalse",
+              "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field08",
+              "name": "Editorial40 Field08",
+              "dataTypeId": "ce81f109-966d-5d6b-a518-125824718148",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field09",
+              "name": "Editorial40 Field09",
+              "dataTypeId": "b08770df-1dc8-557a-836f-278387166733",
+              "dataTypeName": "Textarea",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field10",
+              "name": "Editorial40 Field10",
+              "dataTypeId": "d9c1e1fa-1e46-58b7-82e0-06247191a561",
+              "dataTypeName": "Seo Toggle",
+              "editorAlias": "Umbraco.TrueFalse",
+              "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field11",
+              "name": "Editorial40 Field11",
+              "dataTypeId": "7a820e03-7a70-5f84-94be-437f44906faf",
+              "dataTypeName": "Image Picker",
+              "editorAlias": "Umbraco.MediaPicker3",
+              "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field12",
+              "name": "Editorial40 Field12",
+              "dataTypeId": "4d067a69-12ab-5dd2-914c-3721c13ed2b0",
+              "dataTypeName": "Date Picker",
+              "editorAlias": "Umbraco.DateTime",
+              "editorUiAlias": "Umb.PropertyEditorUi.DatePicker",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field13",
+              "name": "Editorial40 Field13",
+              "dataTypeId": "861e2ded-bcf9-59bb-a72a-37fce0371be3",
+              "dataTypeName": "Text String",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field14",
+              "name": "Editorial40 Field14",
+              "dataTypeId": "5c2452dd-5d03-5998-95b4-82af663c5c47",
+              "dataTypeName": "SEO Toggle",
+              "editorAlias": "Umbraco.TrueFalse",
+              "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
+              "mandatory": true,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field15",
+              "name": "Editorial40 Field15",
+              "dataTypeId": "ce81f109-966d-5d6b-a518-125824718148",
+              "dataTypeName": "Textstring",
+              "editorAlias": "Umbraco.TextBox",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
+            },
+            {
+              "alias": "editorial40Field16",
+              "name": "Editorial40 Field16",
+              "dataTypeId": "b08770df-1dc8-557a-836f-278387166733",
+              "dataTypeName": "Textarea",
+              "editorAlias": "Umbraco.TextArea",
+              "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
+              "mandatory": false,
+              "variesByCulture": false,
+              "fromCompositionId": null,
+              "targets": []
             }
           ]
         },
@@ -10175,7 +10308,7 @@
           ]
         }
       ],
-      "ownPropertyCount": 3,
+      "ownPropertyCount": 17,
       "composedPropertyCount": 4,
       "templates": [
         {
@@ -33187,7 +33320,7 @@
               "editorAlias": "Umbraco.TextBox",
               "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
               "mandatory": false,
-              "variesByCulture": false,
+              "variesByCulture": true,
               "fromCompositionId": null,
               "targets": []
             },

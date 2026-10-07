@@ -21,6 +21,7 @@ import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaComparison } from "../model/snapshots";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "../model/types";
+import { inspectorWidthFor } from "./Inspector";
 import {
   type CityBounds,
   cityBounds,
@@ -1999,7 +2000,7 @@ const LOOSE_TARGET = new THREE.Vector3();
 function CameraRig({
   bounds,
   buildingHeight,
-  inspectorWidth,
+  inspectorOpen,
   reframe,
   reducedMotion,
   overview,
@@ -2007,8 +2008,7 @@ function CameraRig({
 }: {
   bounds: Framed;
   buildingHeight: number;
-  /** CSS pixels of canvas the inspector covers on the right, 0 when it is closed. */
-  inspectorWidth: number;
+  inspectorOpen: boolean;
   /** Bumped by Home to ask for the same city to be framed again. */
   reframe: number;
   reducedMotion: boolean;
@@ -2033,11 +2033,12 @@ function CameraRig({
       viewOf(
         bounds,
         size,
-        inspectorWidth / 2,
+        // The canvas is as wide as the area the panel sizes itself to.
+        inspectorOpen ? inspectorWidthFor(size.width) / 2 : 0,
         overview ? 0.94 : 0.9,
         buildingHeight
       ),
-    [bounds, buildingHeight, inspectorWidth, overview, size]
+    [bounds, buildingHeight, inspectorOpen, overview, size]
   );
 
   useEffect(() => {
@@ -2339,7 +2340,7 @@ export default function Scene({
   focus,
   layers,
   icons,
-  inspectorWidth = 0,
+  inspectorOpen = false,
   reframe = 0,
   onSelect,
   onFocus,
@@ -2356,11 +2357,11 @@ export default function Scene({
   focus: string | null;
   layers: readonly Layer[];
   /**
-   * CSS pixels of the canvas the inspector covers on the right, 0 when it is closed.
-   * Every framing flight aims at the middle of what it leaves rather than at the
-   * middle of the canvas, so a focused neighbourhood is not half behind the panel.
+   * Whether the inspector covers the right of the canvas. Every framing flight aims
+   * at the middle of what it leaves rather than at the middle of the canvas, so a
+   * focused neighbourhood is not half behind the panel.
    */
-  inspectorWidth?: number;
+  inspectorOpen?: boolean;
   /**
    * Bumped to frame the whole city again. It is a count rather than a flag because
    * the camera has to answer Home a second time from wherever the reader took it.
@@ -2789,7 +2790,7 @@ export default function Scene({
             bounds={bounds}
             buildingHeight={Math.max(1, ...heights.values())}
             flightRef={cameraFlight}
-            inspectorWidth={inspectorWidth}
+            inspectorOpen={inspectorOpen}
             overview={focus === null}
             reducedMotion={reducedMotion}
             reframe={reframe}
