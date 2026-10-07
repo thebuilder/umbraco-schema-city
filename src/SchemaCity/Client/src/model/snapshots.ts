@@ -166,6 +166,9 @@ function validateNode(value: unknown, index: number): SchemaNode {
         for (const key of ["alias", "name", "dataTypeId", "editorAlias"])
           requiredString(property[key], `${propertyPath}.${key}`);
         nullableString(property.editorUiAlias, `${propertyPath}.editorUiAlias`);
+        // Snapshots exported before the Data Type name was sent have none.
+        if (property.dataTypeName !== undefined)
+          nullableString(property.dataTypeName, `${propertyPath}.dataTypeName`);
         nullableString(
           property.fromCompositionId,
           `${propertyPath}.fromCompositionId`

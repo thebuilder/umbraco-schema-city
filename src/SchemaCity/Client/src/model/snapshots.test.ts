@@ -7,7 +7,7 @@ import {
   readSnapshotFile,
   snapshotFileName,
 } from "./snapshots";
-import type { SchemaGraph, SchemaNode } from "./types";
+import type { SchemaGraph, SchemaNode, SchemaProperty } from "./types";
 
 const node = (
   id: string,
@@ -100,6 +100,48 @@ describe("schema snapshots", () => {
         graph: {},
       }).error
     ).toContain("graph.generatedAt");
+  });
+
+  it("accepts a property without a Data Type name and rejects a wrong one", () => {
+    const withName = (dataTypeName?: unknown) => ({
+      format: "schema-city",
+      version: 1,
+      capturedAt: "2026-09-06T00:00:00Z",
+      graph: graph([
+        node("a", "page", {
+          groups: [
+            {
+              id: "g",
+              alias: "content",
+              name: "Content",
+              type: "Group",
+              parentAlias: null,
+              fromCompositionId: null,
+              properties: [
+                {
+                  alias: "title",
+                  name: "Title",
+                  dataTypeId: "dt",
+                  ...(dataTypeName === undefined ? {} : { dataTypeName }),
+                  editorAlias: "Umbraco.TextBox",
+                  editorUiAlias: null,
+                  mandatory: false,
+                  variesByCulture: false,
+                  fromCompositionId: null,
+                  targets: [],
+                } as SchemaProperty,
+              ],
+            },
+          ],
+        }),
+      ]),
+    });
+    // Snapshots exported before the Data Type name existed have no such key.
+    expect(parseSnapshot(withName()).snapshot).toBeDefined();
+    expect(parseSnapshot(withName(null)).snapshot).toBeDefined();
+    expect(parseSnapshot(withName(7)).error).toContain(
+      "dataTypeName must be a string or null"
+    );
   });
 
   it("rejects duplicate ids, cyclic folders, invalid dates, and ambiguous aliases", () => {
