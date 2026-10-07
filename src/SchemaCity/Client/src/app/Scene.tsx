@@ -1699,6 +1699,14 @@ type CameraFlight = {
 const LOOSE_TARGET = new THREE.Vector3();
 
 /**
+ * Where the camera was when the scene last unmounted, per graph, with the framing
+ * it was on. A 2D view replaces the canvas, and coming back to the city framed it
+ * from scratch, losing wherever the reader had flown. A changed framing, such as
+ * focus entered from the list, is framed fresh instead.
+ */
+const kept = new WeakMap<object, { pose: View; framing: string }>();
+
+/**
  * Frames the city, and flies to a new framing when focus changes it. The first
  * framing is fsn's establishing shot. A keyboard move translates a flight as it
  * runs; a pointer press or the wheel stops it where it is and hands the camera
@@ -1718,10 +1726,13 @@ function CameraRig({
   reducedMotion,
   overview,
   flightRef,
+  graph,
   selectedAt,
   span,
 }: {
   bounds: Framed;
+  /** Which city this is, for the pose it is shown from again after a 2D view. */
+  graph: object;
   buildingHeight: number;
   inspectorOpen: boolean;
   /** The selected building, which a new selection slides out from under the panel. */
@@ -1744,7 +1755,10 @@ function CameraRig({
     controls: unknown;
     reframe: number;
   } | null>(null);
-  const revealed = useRef<string | null>(null);
+  // What is already selected when the scene mounts is not a new selection.
+  const revealed = useRef<string | null>(selectedAt?.id ?? null);
+  const restored = useRef<View | null>(null);
+  const framing = useMemo(() => JSON.stringify(bounds), [bounds]);
   // The canvas is as wide as the area the panel sizes itself to.
   const covered = inspectorOpen ? inspectorWidthFor(size.width) : 0;
 
@@ -1790,13 +1804,27 @@ function CameraRig({
     const action = framingAction(framed.current, { bounds, controls, reframe });
     framed.current = { bounds, controls, reframe };
     if (action === "none") return;
+    const back = kept.get(graph);
+    if (first && back?.framing === framing) {
+      // Back from a 2D view: no establishing shot and no flight, just the pose.
+      restored.current = back.pose;
+      flight.current = null;
+      placeCamera(camera, controls, back.pose);
+      return;
+    }
     // The controls arriving mid-establishing-shot need nothing: the flight writes
     // their target every frame and hands them the camera when it lands.
     if (action === "snap" && !first && flight.current) return;
     if (reducedMotion || action === "snap") {
       if (reducedMotion || !first || introSeen()) {
         flight.current = null;
-        placeCamera(camera, controls, view);
+        // The controls arriving after a restore take the restored pose, not a frame.
+        placeCamera(
+          camera,
+          controls,
+          action === "snap" ? (restored.current ?? view) : view
+        );
+        restored.current = null;
         return;
       }
       const opening = introOf(view);
@@ -1822,6 +1850,21 @@ function CameraRig({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, bounds, controls, reframe, reducedMotion]);
+
+  useEffect(
+    () => () => {
+      // Where a flight was going rather than where it had got to.
+      const pose = flight.current?.to ?? {
+        position: camera.position,
+        target: controls?.target ?? LOOSE_TARGET,
+      };
+      kept.set(graph, {
+        pose: { position: pose.position.clone(), target: pose.target.clone() },
+        framing,
+      });
+    },
+    [camera, controls, flight, framing, graph]
+  );
 
   useEffect(() => {
     // Only a new selection slides the camera. The panel resizing or the reader
@@ -2782,6 +2825,7 @@ export default function Scene({
             flightRef={cameraFlight}
             inspectorOpen={inspectorOpen}
             overview={focus === null}
+            graph={graph}
             reducedMotion={reducedMotion}
             reframe={reframe}
             selectedAt={selectedAt}
