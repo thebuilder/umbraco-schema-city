@@ -888,6 +888,40 @@ function useRepaint(
   );
 }
 
+/**
+ * Where every name prints, solved once per settled layout. Only a new layout, new
+ * traces or new usage solve it again, so a camera move never moves a name.
+ */
+function useSolution(
+  cityPlacements: readonly Placement[],
+  settledById: Map<string, Placement>,
+  atlas: ReturnType<typeof useNameMesh>["atlas"],
+  usage: UsageReport | undefined,
+  traces: readonly Trace[],
+  edges: ReadonlyMap<string, Edge> | undefined
+) {
+  const traceAt = useMemo(() => traceIndex(traces), [traces]);
+  const settled = useMemo(
+    () =>
+      cityPlacements.map(
+        (placement) => settledById.get(placement.id) ?? placement
+      ),
+    [cityPlacements, settledById]
+  );
+  const solution = useMemo(
+    () =>
+      solveNames(
+        settled,
+        atlas.sizes,
+        (id) => usage?.byType[id]?.total ?? 0,
+        (rect) => traceAt(rect).length > 0,
+        edges
+      ),
+    [settled, atlas, usage, traceAt, edges]
+  );
+  return { traceAt, settled, solution };
+}
+
 export function BoardLabels({
   cityPlacements,
   nodesById,
@@ -942,24 +976,13 @@ export function BoardLabels({
     cityPlacements,
     boardColours
   );
-  const traceAt = useMemo(() => traceIndex(traces), [traces]);
-  const settled = useMemo(
-    () =>
-      cityPlacements.map(
-        (placement) => settledById.get(placement.id) ?? placement
-      ),
-    [cityPlacements, settledById]
-  );
-  const solution = useMemo(
-    () =>
-      solveNames(
-        settled,
-        atlas.sizes,
-        (id) => usage?.byType[id]?.total ?? 0,
-        (rect) => traceAt(rect).length > 0,
-        boards.edges
-      ),
-    [settled, atlas, usage, traceAt, boards.edges]
+  const { traceAt, settled, solution } = useSolution(
+    cityPlacements,
+    settledById,
+    atlas,
+    usage,
+    traces,
+    boards.edges
   );
 
   const inputs = useMemo(
