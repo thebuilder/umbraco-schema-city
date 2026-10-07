@@ -39,7 +39,8 @@ export const FRAMING_DIRECTION = unit({ x: 1, y: 1, z: 1 });
  * right slopes. Each corner bounds the shift from both sides, the two bounds close
  * as `D` grows, and the nearest `D` at which they meet is the horizontal fit. The
  * height fit is each corner's own, around the target, and the distance is the
- * larger of the two. The shift then centres the corners in the window.
+ * larger of the two, kept inside `range`. The shift then centres the corners in
+ * the window.
  */
 export function framing(
   corners: readonly Vec3[],
@@ -47,7 +48,8 @@ export function framing(
   viewport: { width: number; height: number },
   coveredWidth: number,
   fill: number,
-  fov: number
+  fov: number,
+  range = { min: 0, max: Number.POSITIVE_INFINITY }
 ): { distance: number; shift: number } {
   const back = unit(direction);
   const right = unit(cross({ x: 0, y: 1, z: 0 }, back));
@@ -72,7 +74,10 @@ export function framing(
     rightmost = Math.max(rightmost, across + rightEdge * toward);
   }
   const wide = (rightmost - leftmost) / (rightEdge - left);
-  const distance = Math.max(tall, wide);
+  // Inside the orbit range, or the controls clamp the distance the moment a flight
+  // hands them the camera, which reads as the camera overshooting and snapping back.
+  // Past the far end some of the city is cut off, which is the lesser problem.
+  const distance = Math.min(range.max, Math.max(range.min, tall, wide));
   // The shift has to be at least `rightmost - rightEdge * D` and at most
   // `leftmost - left * D`; at the horizontal fit the two are equal. When the height
   // set the distance there is room either side, and the shift that leaves equal room
@@ -107,17 +112,27 @@ export type Framed = {
   }[];
 };
 
+/** The orbit controls' dolly range, which every framing stays inside. */
+export const MIN_DISTANCE = 3;
+export const maxDistanceFor = (span: number) => span * 6;
+
 /**
  * Where the camera stands to frame `bounds` from the default direction: every corner
  * of every piece of ground, at the ground and at the height of the tallest building,
- * inside `fill` of the canvas left of the `covered` pixels the inspector takes.
+ * inside `fill` of the canvas left of the `covered` pixels the inspector takes, and
+ * no further out than the controls let the camera go for a city `span` across.
+ *
+ * A panel over more than half the canvas leaves a strip too narrow to frame a city
+ * in, and fitting one there sends the camera out of the dolly range. The panel is
+ * left out then, and the city framed across the whole canvas, partly under it.
  */
 export function viewOf(
   bounds: Framed,
   size: { width: number; height: number },
   covered: number,
   fill: number,
-  buildingHeight: number
+  buildingHeight: number,
+  span: number
 ): { position: Vec3; target: Vec3 } {
   const corners = bounds.grounds.flatMap((ground) =>
     [ground.minX, ground.maxX].flatMap((x) =>
@@ -134,9 +149,10 @@ export function viewOf(
     corners,
     FRAMING_DIRECTION,
     size,
-    covered,
+    covered > size.width / 2 ? 0 : covered,
     fill,
-    CAMERA_FOV
+    CAMERA_FOV,
+    { min: MIN_DISTANCE, max: maxDistanceFor(span) }
   );
   const right = unit(cross({ x: 0, y: 1, z: 0 }, FRAMING_DIRECTION));
   const target = {

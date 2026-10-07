@@ -1,5 +1,11 @@
 import { expect, test } from "vitest";
-import { type Framed, revealShift, type Vec3, viewOf } from "./framing";
+import {
+  type Framed,
+  maxDistanceFor,
+  revealShift,
+  type Vec3,
+  viewOf,
+} from "./framing";
 import { CAMERA_FOV } from "./stage";
 
 const sub = (a: Vec3, b: Vec3): Vec3 => ({
@@ -72,6 +78,9 @@ const CITIES: { bounds: Framed; height: number }[] = [
   },
 ];
 
+/** A city span whose dolly range none of these framings reaches. */
+const FAR = 1000;
+
 const CANVASES = [
   { width: 1440, height: 900, panel: 520 },
   { width: 1000, height: 800, panel: 340 },
@@ -94,7 +103,14 @@ test.each(CANVASES)(
   (canvas) => {
     const uncovered = canvas.width - canvas.panel;
     for (const city of CITIES) {
-      const view = viewOf(city.bounds, canvas, canvas.panel, 0.9, city.height);
+      const view = viewOf(
+        city.bounds,
+        canvas,
+        canvas.panel,
+        0.9,
+        city.height,
+        FAR
+      );
       const landed = cornersOf(city).map((corner) =>
         project(corner, view, canvas)
       );
@@ -131,7 +147,7 @@ test("a building the panel opens over slides out beside it", () => {
   const panel = 520;
   const [city] = CITIES;
   // Framed with the panel closed, the way the city stands before a search pick.
-  const view = viewOf(city.bounds, canvas, 0, 0.9, city.height);
+  const view = viewOf(city.bounds, canvas, 0, 0.9, city.height, FAR);
   const add = (a: Vec3, b: Vec3) => ({
     x: a.x + b.x,
     y: a.y + b.y,
@@ -163,4 +179,33 @@ test("a building the panel opens over slides out beside it", () => {
     y: 0,
     z: 0,
   });
+});
+
+const distanceOf = (view: { position: Vec3; target: Vec3 }) =>
+  Math.hypot(...Object.values(sub(view.position, view.target)));
+
+test("a framing never leaves the dolly range, so landing does not snap", () => {
+  // A 420 px embedding with the 340 px panel open leaves an 80 px strip, which
+  // would put the camera several times past the far end of the range.
+  const [, , , city] = CITIES;
+  const span = 140;
+  const narrow = { width: 420, height: 700 };
+  const view = viewOf(city.bounds, narrow, 340, 0.9, city.height, span);
+  expect(distanceOf(view)).toBeLessThanOrEqual(maxDistanceFor(span) + 1e-6);
+  // A tiny city framed on a huge canvas stays out of the near end too.
+  const tiny = framed([box(0, 1, 0, 1)]);
+  const close = viewOf(tiny, { width: 1440, height: 900 }, 0, 0.9, 1, 4);
+  expect(distanceOf(close)).toBeGreaterThanOrEqual(3);
+});
+
+test("a panel over more than half the canvas is framed as if it were closed", () => {
+  const [city] = CITIES;
+  const narrow = { width: 600, height: 800 };
+  expect(viewOf(city.bounds, narrow, 340, 0.9, city.height, FAR)).toEqual(
+    viewOf(city.bounds, narrow, 0, 0.9, city.height, FAR)
+  );
+  // Under half, the panel still counts.
+  expect(viewOf(city.bounds, narrow, 280, 0.9, city.height, FAR)).not.toEqual(
+    viewOf(city.bounds, narrow, 0, 0.9, city.height, FAR)
+  );
 });

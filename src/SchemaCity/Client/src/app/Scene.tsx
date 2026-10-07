@@ -84,7 +84,14 @@ import {
   keydownAction,
   translateFlightEndpoints,
 } from "./scene/flight";
-import { type Framed, revealShift, type Vec3, viewOf } from "./scene/framing";
+import {
+  type Framed,
+  MIN_DISTANCE,
+  maxDistanceFor,
+  revealShift,
+  type Vec3,
+  viewOf,
+} from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
 import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
@@ -1707,12 +1714,15 @@ function CameraRig({
   overview,
   flightRef,
   selectedAt,
+  span,
 }: {
   bounds: Framed;
   buildingHeight: number;
   inspectorOpen: boolean;
   /** The selected building, which a new selection slides out from under the panel. */
   selectedAt: { id: string; point: Vec3 } | null;
+  /** The city's longer side, which sets the dolly range a framing stays inside. */
+  span: number;
   /** Bumped by Home to ask for the same city to be framed again. */
   reframe: number;
   reducedMotion: boolean;
@@ -1739,13 +1749,14 @@ function CameraRig({
       size,
       covered,
       overview ? 0.94 : 0.9,
-      buildingHeight
+      buildingHeight,
+      span
     );
     return {
       position: new THREE.Vector3().copy(fit.position),
       target: new THREE.Vector3().copy(fit.target),
     };
-  }, [bounds, buildingHeight, covered, overview, size]);
+  }, [bounds, buildingHeight, covered, overview, size, span]);
 
   useEffect(() => {
     // Captured, so it runs before the controls' own listener on the same canvas:
@@ -1877,9 +1888,9 @@ function Controls({ span }: { span: number }) {
     <OrbitControls
       dampingFactor={0.065}
       makeDefault
-      maxDistance={span * 6}
+      maxDistance={maxDistanceFor(span)}
       maxPolarAngle={MAX_POLAR}
-      minDistance={3}
+      minDistance={MIN_DISTANCE}
       mouseButtons={{
         LEFT: THREE.MOUSE.ROTATE,
         MIDDLE: THREE.MOUSE.DOLLY,
@@ -2638,6 +2649,7 @@ export default function Scene({
             reducedMotion={reducedMotion}
             reframe={reframe}
             selectedAt={selectedAt}
+            span={span}
           />
           <Controls span={span} />
         </Canvas>
