@@ -45,8 +45,8 @@ import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_INSET, Inspector } from "./Inspector";
-import type { Grouping } from "./layout/city";
 import { Legend } from "./Legend";
+import type { Grouping } from "./layout/city";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   LENS_LABEL,
@@ -638,7 +638,7 @@ export function App({
             </div>
           ) : (
             <div className="absolute inset-0 z-0">
-              <p className="sr-only">{citySummary(graph)}</p>
+              <p className="sr-only">{citySummary(graph, group)}</p>
               <Suspense
                 fallback={
                   <p className="p-4 text-phosphor-dim text-sm">
