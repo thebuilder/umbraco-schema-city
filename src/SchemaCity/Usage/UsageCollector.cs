@@ -176,11 +176,20 @@ public sealed class UsageCollector
                 .GroupBy(r => (r.ContentTypeKey, r.Alias))
                 .ToDictionary(g => g.Key, g => g.First().DataTypeKey);
 
-            return BlockCounter.Count(
-                scope.Database.Query<BlockCounter.ValueRow>(BlockValuesSql, BlockEditors),
+            // Wrapped, or C# hands the array over as the params array itself and @0 binds only
+            // its first alias. As one argument NPoco expands it into the IN list.
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            BlockUsage blocks = BlockCounter.Count(
+                scope.Database.Query<BlockCounter.ValueRow>(BlockValuesSql, new object[] { BlockEditors }),
                 dataTypeOf,
                 MaxBlockValues,
                 BlockBudget);
+            _logger.LogDebug(
+                "Schema City: read {Values} block values in {Milliseconds} ms, partial {Partial}.",
+                blocks.ValuesRead,
+                clock.ElapsedMilliseconds,
+                blocks.Partial);
+            return blocks;
         }
         catch (Exception exception)
         {

@@ -101,6 +101,37 @@ export type UsageReport = {
   generatedAt: string;
   byType: Record<string, TypeUsage>; // keyed by node id
   references: { fromType: string; toType: string; count: number }[]; // instance-level, aggregated
+  /** Stored block instances. Reports from before block counting lack it. */
+  blocks?: BlockUsage;
+};
+
+/**
+ * Blocks stored in the latest version of every document outside the recycle bin.
+ * `partial` means the count stopped at its row cap or time budget, or failed, so
+ * every number is a lower bound.
+ */
+export type BlockUsage = {
+  partial: boolean;
+  valuesRead: number;
+  /** Values that were not valid JSON, and so could not be read. */
+  unreadable: number;
+  byDataType: DataTypeBlocks[];
+};
+
+export type DataTypeBlocks = {
+  dataTypeId: string;
+  /** Property values holding JSON. A nested editor can have none of its own. */
+  values: number;
+  /** Content items with at least one block in this Data Type. */
+  items: number;
+  elements: ElementBlocks[];
+};
+
+export type ElementBlocks = {
+  elementTypeId: string;
+  content: number;
+  settings: number;
+  items: number;
 };
 
 export type TypeUsage = {

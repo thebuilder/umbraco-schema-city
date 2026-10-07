@@ -116,6 +116,18 @@ public class UsageCollectorTests
 
         Assert.Equal(["da-DK", "en-US"], usage.ByType[keysByAlias["campaignPage"]].Cultures);
         Assert.Equal(["da-DK", "en-US"], usage.ByType[keysByAlias["blogPost"]].Cultures);
+
+        // The seeder's AddBlocks: body blocks on 30 articles and 3 drafts, a grid row on 12, rich
+        // text blocks on 20, and elementCard offered by the grid but never stored.
+        BlockUsage blocks = usage.Blocks!;
+        Assert.False(blocks.Partial);
+        Assert.Equal(0, blocks.Unreadable);
+        Assert.Equal(65, blocks.ValuesRead);
+        ElementBlocks Stored(string elementAlias) =>
+            blocks.ByDataType.SelectMany(d => d.Elements).Single(e => e.ElementTypeId == keysByAlias[elementAlias]);
+        Assert.Equal(new ElementBlocks(keysByAlias["elementImage"], 33, 0, 33), Stored("elementImage"));
+        Assert.Equal(new ElementBlocks(keysByAlias["elementGridSettings"], 0, 12, 12), Stored("elementGridSettings"));
+        Assert.DoesNotContain(blocks.ByDataType.SelectMany(d => d.Elements), e => e.ElementTypeId == keysByAlias["elementCard"]);
     }
 
     private static UsageCollector.CountRow Counts(Guid key, int total, int published, int drafts, int trashed, int roots) =>
