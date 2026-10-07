@@ -49,9 +49,14 @@ for testing the integration.
 
 ## Investigate a type
 
-Use Search or `⌘K` / `Ctrl+K` to find a type by name, alias, or property alias. Hover a building to
-see its direct connections and the names of connected types. Labels that would overlap stay
-hidden until there is room for them as you zoom in. Click a building to keep its connections visible and open the
+Use Search or `⌘K` / `Ctrl+K` to find a type by name, alias, or property alias. Every type's name
+is printed on the board in front of its building, cut short with an ellipsis when the building has
+no room for all of it. The print appears as you zoom in and turns to stay readable when you orbit
+to the far side. Hover a building to see its direct connections and the names of connected types;
+the names of unrelated types dim. Floating labels that would overlap stay hidden until there is
+room for them. A name shows once: a related type whose whole name is already legible on the
+board gets no floating label, and a type with a floating label is not printed under it. Click a
+building to keep its connections visible and open the
 inspector. Its header names the type, its role (page, composition or Element Type) and how much
 content uses it. Overview lists the schema checks for the type, its usage, and its related types,
 with content counts once usage has loaded. Properties shows each group with the composition it

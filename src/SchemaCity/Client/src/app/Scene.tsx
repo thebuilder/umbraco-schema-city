@@ -40,7 +40,14 @@ import {
   layoutFocus,
 } from "./layout/focus";
 import { describeRelationship, uniqueConnections } from "./relationship";
+import { BoardLabels, type Floated } from "./scene/BoardLabels";
 import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
+import {
+  type BoardText,
+  boardRepeats,
+  boardText,
+  labelRoom,
+} from "./scene/board-labels";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -186,6 +193,8 @@ function pickConnectionRange(
 
 type Palette = {
   phosphor: string;
+  /** Phosphor's near-white, the silkscreen colour of the type names on the board. */
+  bright: string;
   dim: string;
   signal: string;
   amber: string;
@@ -988,6 +997,11 @@ const LABEL_CLASS =
  * `pickLabels` keeps the best ranked ones that do not land on each other, and drops
  * the rest. District names are not candidates: they are printed on the ground.
  *
+ * Every type's name is printed on the board as well, legible once the camera is close
+ * enough. A related type whose whole name is already legible there gets no floating
+ * label, so the screen never says one name twice. Every other type that keeps a
+ * floating label has its print left off the board, through `floated`.
+ *
  * The layer is built and written to by hand rather than through React, because
  * this runs inside the frame loop and forty spans that only ever change their
  * transform are not worth a render each.
@@ -998,9 +1012,11 @@ function Labels({
   heights,
   selected,
   hovered,
-  graph,
+  hoveredNeighbours,
   neighbours,
   focusNeighbours,
+  boardTexts,
+  floated,
   reducedMotion,
 }: {
   nodesById: Map<string, SchemaNode>;
@@ -1008,9 +1024,12 @@ function Labels({
   heights: Map<string, number>;
   selected: string | null;
   hovered: string | null;
-  graph: SchemaGraph;
+  hoveredNeighbours: Set<string> | null;
   neighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
+  boardTexts: Map<string, BoardText>;
+  /** Written here every repaint: the types that have a floating label now. */
+  floated: Floated;
   reducedMotion: boolean;
 }) {
   const camera = useThree((state) => state.camera);
@@ -1030,7 +1049,7 @@ function Labels({
       hovered,
       selected,
       neighbours,
-      hoveredNeighbours: hovered ? neighboursOf(graph, hovered) : null,
+      hoveredNeighbours,
       focusNeighbours,
     });
 
@@ -1044,7 +1063,7 @@ function Labels({
   }, [
     hovered,
     selected,
-    graph,
+    hoveredNeighbours,
     neighbours,
     focusNeighbours,
     nodesById,
@@ -1101,31 +1120,47 @@ function Labels({
     dirty.current = false;
     framedAt.current.copy(camera.matrixWorld);
 
+    // A related type whose board already prints its whole name, legibly.
+    const printedWhole = (candidate: { id: string; rank: number }) =>
+      candidate.rank >= 2 &&
+      boardRepeats(
+        boardTexts.get(candidate.id),
+        placementsById.get(candidate.id),
+        camera.position,
+        size.height
+      );
+
     const kept = pickLabels(
-      candidates.map((candidate) => {
-        anchor.set(candidate.x, candidate.y, candidate.z);
-        // How big the building is on screen, which depends on how far away this
-        // particular building is.
-        const perUnit = pixelsPerUnit(
-          size.height,
-          camera.position.distanceTo(anchor)
-        );
-        anchor.project(camera);
-        // A point behind the camera projects mirrored onto the screen, so it is
-        // moved off it instead, which drops even a pinned name.
-        const behind = anchor.z > 1;
-        return {
-          id: candidate.id,
-          text: candidate.text,
-          rank: candidate.rank,
-          pinned: candidate.rank < 2,
-          x: behind ? -1 : (anchor.x * 0.5 + 0.5) * size.width,
-          y: (0.5 - anchor.y * 0.5) * size.height - candidate.lift,
-          buildingPx: behind ? 0 : candidate.footprint * perUnit,
-        };
-      }),
+      candidates
+        .filter((candidate) => !printedWhole(candidate))
+        .map((candidate) => {
+          anchor.set(candidate.x, candidate.y, candidate.z);
+          // How big the building is on screen, which depends on how far away this
+          // particular building is.
+          const perUnit = pixelsPerUnit(
+            size.height,
+            camera.position.distanceTo(anchor)
+          );
+          anchor.project(camera);
+          // A point behind the camera projects mirrored onto the screen, so it is
+          // moved off it instead, which drops even a pinned name.
+          const behind = anchor.z > 1;
+          return {
+            id: candidate.id,
+            text: candidate.text,
+            rank: candidate.rank,
+            pinned: candidate.rank < 2,
+            x: behind ? -1 : (anchor.x * 0.5 + 0.5) * size.width,
+            y: (0.5 - anchor.y * 0.5) * size.height - candidate.lift,
+            buildingPx: behind ? 0 : candidate.footprint * perUnit,
+          };
+        }),
       { charPx: charPx.current, width: size.width, height: size.height }
     );
+    // The board leaves out what floats, so a cut print never sits under the whole name.
+    floated.ids.clear();
+    for (const box of kept) floated.ids.add(box.id);
+    floated.version += 1;
 
     spans.current.forEach((span, index) => {
       const box = kept[index];
@@ -2573,6 +2608,36 @@ export default function Scene({
   // In focus mode the lit set is the focused node's, so clicking through the
   // neighbourhood does not dim the layout you are standing in.
   const neighbours = focusNeighbours ?? selectionNeighbours;
+  const hoveredNeighbours = useMemo(
+    () => (hovered ? neighboursOf(graph, hovered) : null),
+    [graph, hovered]
+  );
+  // The floating labels on screen, which the board leaves out. Shared by reference and
+  // written in the frame loop, so passing it on costs no render.
+  const floated = useMemo<Floated>(() => ({ ids: new Set(), version: 0 }), []);
+  const interaction = useMemo(
+    () => ({ hovered, selected, neighbours, hoveredNeighbours }),
+    [hovered, selected, neighbours, hoveredNeighbours]
+  );
+  // What each type prints on the board, sized from the city's footprints, which a
+  // focus tween moves but never resizes.
+  const boardTexts = useMemo(() => {
+    const texts = new Map<string, BoardText>();
+    const room = labelRoom(city.placements);
+    for (const placement of city.placements) {
+      const node = nodesById.get(placement.id);
+      if (node)
+        texts.set(
+          node.id,
+          boardText(
+            node.name,
+            placement.footprint,
+            room.get(node.id) ?? placement.footprint
+          )
+        );
+    }
+    return texts;
+  }, [city, nodesById]);
   // Pins and roles come from the edges alone, so a focus tween does not recount them.
   const connections = useMemo(() => connectionsOf(graph.edges ?? []), [graph]);
   const { cells, windows, heights } = useMemo(
@@ -2618,6 +2683,7 @@ export default function Scene({
       amber: token("--amber"),
       azure: token("--azure"),
       background: token("--background"),
+      bright: token("--phosphor-bright"),
       dim: token("--phosphor-dim"),
       land: token("--panel"),
       mono: token("--font-mono") || "ui-monospace, monospace",
@@ -2774,11 +2840,22 @@ export default function Scene({
             palette={palette}
             placements={placements}
           />
+          <BoardLabels
+            floated={floated}
+            interaction={interaction}
+            nodesById={nodesById}
+            palette={palette}
+            placementsById={placementsById}
+            reducedMotion={reducedMotion}
+            texts={boardTexts}
+          />
           <Labels
+            boardTexts={boardTexts}
+            floated={floated}
             focusNeighbours={focusNeighbours}
-            graph={graph}
             heights={heights}
             hovered={hovered}
+            hoveredNeighbours={hoveredNeighbours}
             neighbours={neighbours}
             nodesById={nodesById}
             placementsById={placementsById}

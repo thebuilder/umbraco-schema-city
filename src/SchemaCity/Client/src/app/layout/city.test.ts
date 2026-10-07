@@ -3,6 +3,12 @@ import mediumFixture from "../../../dev/fixtures/medium.json";
 import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import smallFixture from "../../../dev/fixtures/small.json";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
+import {
+  LABEL_INSET,
+  LABEL_STRIP,
+  LINE_HEIGHT,
+  MAX_EM,
+} from "../scene/board-labels";
 import { STAMP_BAND } from "../scene/stage";
 import {
   cityBounds,
@@ -543,6 +549,36 @@ describe("layoutCity", () => {
     expect(overlaps(placements)).toEqual([]);
   });
 
+  it("leaves a strip for the printed names between two rows of a block", () => {
+    // A folded rank and a packed grid, the two places rows stand a gap apart.
+    const children = Array.from({ length: 12 }, (_, i) => `child${i}`);
+    const loose = Array.from({ length: 12 }, (_, i) => `loose${i}`);
+    const placements = layoutCity(
+      graphOf(
+        [
+          node("root", { allowedAsRoot: true }),
+          ...[...children, ...loose].map((alias) => node(alias)),
+        ],
+        children.map((alias) => road("root", alias))
+      )
+    );
+    const tallest = LABEL_INSET + MAX_EM * LINE_HEIGHT;
+    for (const prefix of ["child", "loose"]) {
+      const rows = [
+        ...new Set(
+          placements
+            .filter((p) => p.id.startsWith(prefix))
+            .map((p) => p.position.z)
+        ),
+      ].sort((a, b) => a - b);
+      expect(rows).toHaveLength(2);
+      const { footprint } = placements[1] as Placement;
+      const between = (rows[1] as number) - (rows[0] as number) - footprint;
+      expect(between).toBeCloseTo(1.5 + LABEL_STRIP);
+      expect(between - tallest).toBeGreaterThan(1);
+    }
+  });
+
   it("orders every rank in a district by the column its parents landed in", () => {
     const placements = layoutCity(medium);
     const byId = new Map(placements.map((p) => [p.id, p]));
@@ -876,11 +912,12 @@ describe("layoutCity", () => {
     expect(elapsed).toBeLessThan(200);
 
     // The Pages folder holds the twelve-deep chain of single types. Before those
-    // ranks shared a band it came out 61 by 229, framed at eight percent fill.
+    // ranks shared a band it came out 61 by 229, framed at eight percent fill. The
+    // strip each folded row keeps for its printed names took it from 2.0 to 2.13.
     const pages = districts.find((d) => d.name === "Pages") as District;
     const width = pages.maxX - pages.minX;
     const depth = pages.maxZ - pages.minZ;
-    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(2);
+    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(2.2);
     console.log(
       `pathological: 300 nodes laid out in ${elapsed.toFixed(1)} ms, Pages ${width.toFixed(0)} by ${depth.toFixed(0)}`
     );

@@ -13,6 +13,7 @@ import type {
   SchemaGraph,
   SchemaNode,
 } from "../../model/types";
+import { LABEL_STRIP } from "../scene/board-labels";
 import { STAMP_BAND } from "../scene/stage";
 
 /** What a district mostly holds. The scene colours and labels from this. */
@@ -72,6 +73,12 @@ const FOOTPRINT = 2;
  * nine-unit street, the seeded city covered its plates about 8 percent.
  */
 const GAP = FOOTPRINT * 0.75;
+/**
+ * Ground between two rows of one block: the gap plus the strip each building's
+ * printed name lies in, south of it. Only rows a gap apart need it; a street already
+ * holds the print of the row above it.
+ */
+const ROW_GAP = GAP + LABEL_STRIP;
 /**
  * The street between two dagre ranks and between a district's ranked block and its
  * packed grid. Six units carries a dozen lanes at the spacing the roads keep, and
@@ -722,7 +729,7 @@ function layoutRanks(
         const width =
           row.reduce((sum, node) => sum + footprintOf(node), 0) +
           GAP * (row.length - 1);
-        const rowZ = z + (i / ROW_LIMIT) * (depth + GAP) + depth / 2;
+        const rowZ = z + (i / ROW_LIMIT) * (depth + ROW_GAP) + depth / 2;
         let x = -width / 2;
         for (const node of row) {
           const centre = x + footprintOf(node) / 2;
@@ -731,7 +738,7 @@ function layoutRanks(
           x += footprintOf(node) + GAP;
         }
       }
-      z += rows * depth + (rows - 1) * GAP + STREET;
+      z += rows * depth + (rows - 1) * ROW_GAP + STREET;
       step += 1;
       continue;
     }
@@ -837,8 +844,8 @@ function layoutGrid(
     widths[column] = Math.max(widths[column] as number, footprintOf(node));
     depths[i % rows] = Math.max(depths[i % rows] as number, footprintOf(node));
   });
-  const lefts = offsets(widths);
-  const tops = offsets(depths);
+  const lefts = offsets(widths, GAP);
+  const tops = offsets(depths, ROW_GAP);
   const width =
     (lefts[columns - 1] as number) + (widths[columns - 1] as number);
   return nodes.map((node, i) => {
@@ -855,12 +862,12 @@ function layoutGrid(
   });
 }
 
-/** Where each cell of a run starts, one gap after the cell before it. */
-function offsets(sizes: number[]): number[] {
+/** Where each cell of a run starts, `gap` after the cell before it. */
+function offsets(sizes: number[], gap: number): number[] {
   let at = 0;
   return sizes.map((size) => {
     const start = at;
-    at += size + GAP;
+    at += size + gap;
     return start;
   });
 }
