@@ -1,12 +1,4 @@
-import {
-  type CSSProperties,
-  lazy,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -58,11 +50,11 @@ import {
 } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
-import { INSPECTOR_INSET, Inspector } from "./Inspector";
+import { Inspector } from "./Inspector";
 import { TextButton } from "./InspectorChips";
 import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
-import { CaptionCard, PRESENT_SCALE, PresentBar } from "./Presentation";
+import { PresentationLayer, usePresentation } from "./Presentation";
 import { FindingLinks, useReviewing } from "./Review";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
@@ -133,6 +125,47 @@ const cityScale = (
   lit: ReadonlySet<string> | null,
   layer: LensScale | null
 ) => (lit ? highlightScale(graph, lit) : (lens ?? layer));
+
+/**
+ * The colour key in the canvas's top-left corner: what Show in city lit, with Clear,
+ * or the lens's two ends. The 2D views colour nothing by lens, so they get neither.
+ */
+function LensLegend({
+  flat,
+  highlight,
+  lens,
+  lensColours,
+  onClear,
+}: {
+  flat: boolean;
+  highlight: { label: string } | null;
+  lens: Lens;
+  lensColours: LensScale | null;
+  onClear: () => void;
+}) {
+  if (flat) return null;
+  if (highlight)
+    return (
+      <div className="absolute top-0 left-0 z-10 flex max-w-full flex-wrap items-center gap-x-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
+        <span aria-hidden className={`h-2 w-6 shrink-0 ${RAMP_BAR.binary}`} />
+        <span className="font-sans text-label text-xs">
+          Lit: <span className="text-prose">{highlight.label}</span>
+        </span>
+        <TextButton onClick={onClear}>Clear</TextButton>
+      </div>
+    );
+  if (!lensColours) return null;
+  return (
+    <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
+      <span className="font-bold uppercase tracking-terminal">
+        {LENS_LABEL[lens]}
+      </span>
+      <span>{lensColours.minLabel}</span>
+      <span aria-hidden className={`h-2 w-32 ${RAMP_BAR[lensColours.ramp]}`} />
+      <span>{lensColours.maxLabel}</span>
+    </div>
+  );
+}
 
 // three.js, fiber and drei are a third of the bundle, so they load with the scene
 // rather than with the workspace element.
@@ -234,57 +267,18 @@ export function App({
   const [reframe, setReframe] = useState(0);
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
-  const [presenting, setPresenting] = useState(start.present);
-  // The full inspector over the view while presenting, opened from the caption card.
-  const [details, setDetails] = useState(false);
-  const root = useRef<HTMLElement>(null);
-  // Whether this app asked for the fullscreen the document is in, so the browser's
-  // own way out of it, Escape or its exit button, leaves presentation as well.
-  const ownsFullscreen = useRef(false);
-
-  /**
-   * Into presentation, full screen where the page may have it. A backoffice in a
-   * frame without permission, or a link opened with present=1 and no key press
-   * behind it, is refused, and the app fills the window instead.
-   */
-  const present = (on: boolean) => {
-    setPresenting(on);
-    setDetails(false);
-    // The canvas changes size both ways, so whatever is on it is framed again.
-    setReframe((count) => count + 1);
-    if (!on) {
-      if (ownsFullscreen.current) {
-        ownsFullscreen.current = false;
-        document.exitFullscreen().catch(() => undefined);
-      }
-      return;
-    }
-    root.current
-      ?.requestFullscreen?.()
-      .then(() => {
-        ownsFullscreen.current = true;
-        // Held, so Escape reaches the app and closes Search or Details first; holding
-        // it still leaves full screen. Chromium only, and nothing is lost without it.
-        return (
-          navigator as Navigator & {
-            keyboard?: { lock?: (keys: string[]) => Promise<void> };
-          }
-        ).keyboard?.lock?.(["Escape"]);
-      })
-      .catch(() => undefined);
-  };
-
-  useEffect(() => {
-    const onChange = () => {
-      if (document.fullscreenElement || !ownsFullscreen.current) return;
-      ownsFullscreen.current = false;
-      setPresenting(false);
-      setDetails(false);
-      setReframe((count) => count + 1);
-    };
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
+  const {
+    presenting,
+    details,
+    setDetails,
+    present,
+    rootProps,
+    textScale,
+    panelInset,
+    panelOpen,
+    closeInspector,
+    putDown: presentingPutDown,
+  } = usePresentation(start.present, () => setReframe((count) => count + 1));
 
   // Home, and the Reset view button over the city. Leaving focus already flies back
   // to the whole city, so it only asks for a fresh framing with no focus to leave.
@@ -488,6 +482,9 @@ export function App({
   );
   const selectedNode = selected ? nodesById.get(selected) : undefined;
   const flat = FLAT_VIEWS.includes(view);
+  // Where the change layer's legend holds the canvas's bottom-left corner, which the
+  // caption card then sits above.
+  const changeLegendShown = !flat && scale?.ramp === "change";
   const neighbourhood = selectedNode && neighbourhoodById.get(selectedNode.id);
 
   const openPalette = (open: boolean) => {
@@ -511,16 +508,7 @@ export function App({
     setFocus(null);
     setSelected(null);
   };
-  /**
-   * Presenting, putting the type down keeps the focus: the neighbourhood is what the
-   * room is looking at, and a stray click on the ground should not tear it down.
-   */
-  const putDown = presenting
-    ? () => {
-        setDetails(false);
-        setSelected(null);
-      }
-    : done;
+  const putDown = presentingPutDown(done, () => setSelected(null));
 
   const toggleFocus = () => {
     if (!selected) return;
@@ -593,16 +581,11 @@ export function App({
       <FindingLinks dataTypes={dataTypeLinks} reviews={reviewing}>
         <section
           aria-label="Schema City"
-          // Fixed over the window as well as full screen, for when full screen is
-          // refused. `--present` is the zoom the 2D views and overlays take.
-          className={`flex h-full flex-col bg-background font-mono text-foreground ${presenting ? "fixed inset-0 z-[9999]" : ""}`}
+          // Fixed over the window as well as full screen while presenting, for when
+          // full screen is refused.
+          className="flex h-full flex-col bg-background font-mono text-foreground data-present:fixed data-present:inset-0 data-present:z-[9999]"
           data-schema-city=""
-          ref={root}
-          style={
-            presenting
-              ? ({ "--present": PRESENT_SCALE } as CSSProperties)
-              : undefined
-          }
+          {...rootProps}
         >
           <Announcements
             focus={scope}
@@ -623,195 +606,183 @@ export function App({
             relative z-10 with a background of its own because the scene under it is
             a positioned layer: a positioned box paints over a plain sibling's text
             whatever the source order, so the toolbar has to be on a layer too. */}
-          {presenting ? null : (
-            <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-line border-b bg-background px-4 py-2.5">
-              <h1 className="shrink-0 font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
-                Schema City
-              </h1>
+          {/* Hidden rather than unmounted while presenting, so its menus and
+            drawers keep their state for when the presenter comes back. */}
+          <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-line border-b bg-background px-4 py-2.5 in-data-present:hidden">
+            <h1 className="shrink-0 font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
+              Schema City
+            </h1>
 
-              {/* One button rather than four, because the backoffice is narrower than
+            {/* One button rather than four, because the backoffice is narrower than
               the harness and four of them ran off the edge. The count is on the
               label so the toolbar still says how much of the city is drawn.
               ponytail: base-ui's Menu is 6.9 kB gzipped of vendor that nothing else
               here uses. Four checkbox rows in the Popover already in the bundle
               would be free, at the cost of writing the roving focus and the
               typeahead this gets for nothing. Swap it if the bundle gets tight. */}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={<Button data-trigger size="sm" variant="outline" />}
-                >
-                  Layers {layers.length}/{LAYERS.length}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {LAYERS.map((layer, index) => (
-                    <DropdownMenuCheckboxItem
-                      checked={layers.includes(layer)}
-                      key={layer}
-                      onCheckedChange={() =>
-                        setLayers((on) => withLayer(on, layer))
-                      }
-                    >
-                      {LAYER_LABEL[layer]}
-                      <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Structure follows what an editor can create where, Folders the
-              folders the schema files its types in. Only the city is grouped. */}
-              {/* biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads. */}
-              <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
-                Group
-                <Select
-                  disabled={view !== "city"}
-                  items={GROUPINGS}
-                  onValueChange={(value) => {
-                    // The comparison's baseline positions and a focus both stand on the
-                    // city layout, so a new grouping starts from the whole city.
-                    setFocus(null);
-                    setGroup(value as Grouping);
-                  }}
-                  value={group}
-                >
-                  <SelectTrigger
-                    aria-label="Group the city by"
-                    className="text-2xs uppercase tracking-terminal"
-                    size="sm"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GROUPINGS.map(({ value, label }) => (
-                      <SelectItem
-                        className="text-2xs uppercase tracking-terminal"
-                        key={value}
-                        value={value}
-                      >
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
-
-              <ViewSwitcher onView={setView} view={view} />
-
-              <div className="ml-auto flex flex-wrap items-center gap-2">
-                {/* A disabled trigger swallows its own pointer events, and with them
-                the hover the tooltip needs, so the tooltip wraps the label. */}
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      // biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads.
-                      <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={<Button data-trigger size="sm" variant="outline" />}
+              >
+                Layers {layers.length}/{LAYERS.length}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {LAYERS.map((layer, index) => (
+                  <DropdownMenuCheckboxItem
+                    checked={layers.includes(layer)}
+                    key={layer}
+                    onCheckedChange={() =>
+                      setLayers((on) => withLayer(on, layer))
                     }
                   >
-                    Lens
-                    <Select
-                      disabled={!usage}
-                      items={LENSES.map((name) => ({
-                        label: LENS_LABEL[name],
-                        value: name,
-                      }))}
-                      onValueChange={(value) => {
-                        setHighlight(null);
-                        setLens(value as Lens);
-                      }}
-                      value={lens}
+                    {LAYER_LABEL[layer]}
+                    <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Structure follows what an editor can create where, Folders the
+              folders the schema files its types in. Only the city is grouped. */}
+            {/* biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads. */}
+            <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
+              Group
+              <Select
+                disabled={view !== "city"}
+                items={GROUPINGS}
+                onValueChange={(value) => {
+                  // The comparison's baseline positions and a focus both stand on the
+                  // city layout, so a new grouping starts from the whole city.
+                  setFocus(null);
+                  setGroup(value as Grouping);
+                }}
+                value={group}
+              >
+                <SelectTrigger
+                  aria-label="Group the city by"
+                  className="text-2xs uppercase tracking-terminal"
+                  size="sm"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GROUPINGS.map(({ value, label }) => (
+                    <SelectItem
+                      className="text-2xs uppercase tracking-terminal"
+                      key={value}
+                      value={value}
                     >
-                      <SelectTrigger
-                        aria-label="Usage lens"
-                        className="text-2xs uppercase tracking-terminal"
-                        size="sm"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {LENSES.map((name) => (
-                          <SelectItem
-                            className="text-2xs uppercase tracking-terminal"
-                            key={name}
-                            value={name}
-                          >
-                            {LENS_LABEL[name]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TooltipTrigger>
-                  {usage ? null : (
-                    <TooltipContent>
-                      The usage endpoint did not answer, so the lens is off.
-                    </TooltipContent>
-                  )}
-                </Tooltip>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
 
-                <Findings
-                  findings={findings}
-                  graph={graph}
-                  nodesById={nodesById}
-                  onOpenChange={setFindingsOpen}
-                  onSelect={followLink}
-                  open={findingsOpen}
-                  usage={usage}
-                />
+            <ViewSwitcher onView={setView} view={view} />
 
-                <ComparisonTools
-                  baseline={baseline}
-                  changes={changes}
-                  graph={graph}
-                  onBaselineChange={(next) => {
-                    setBaseline(next);
-                    setFocus(null);
-                    if (next) setLens("none");
-                  }}
-                  onOpenChange={setComparisonOpen}
-                  onSelect={(id) => {
-                    setComparisonOpen(false);
-                    followLink(id);
-                  }}
-                  open={comparisonOpen}
-                />
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {/* A disabled trigger swallows its own pointer events, and with them
+                the hover the tooltip needs, so the tooltip wraps the label. */}
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    // biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads.
+                    <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
+                  }
+                >
+                  Lens
+                  <Select
+                    disabled={!usage}
+                    items={LENSES.map((name) => ({
+                      label: LENS_LABEL[name],
+                      value: name,
+                    }))}
+                    onValueChange={(value) => {
+                      setHighlight(null);
+                      setLens(value as Lens);
+                    }}
+                    value={lens}
+                  >
+                    <SelectTrigger
+                      aria-label="Usage lens"
+                      className="text-2xs uppercase tracking-terminal"
+                      size="sm"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LENSES.map((name) => (
+                        <SelectItem
+                          className="text-2xs uppercase tracking-terminal"
+                          key={name}
+                          value={name}
+                        >
+                          {LENS_LABEL[name]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TooltipTrigger>
+                {usage ? null : (
+                  <TooltipContent>
+                    The usage endpoint did not answer, so the lens is off.
+                  </TooltipContent>
+                )}
+              </Tooltip>
 
-                <Legend />
+              <Findings
+                findings={findings}
+                graph={graph}
+                nodesById={nodesById}
+                onOpenChange={setFindingsOpen}
+                onSelect={followLink}
+                open={findingsOpen}
+                usage={usage}
+              />
 
-                <Help onOpenChange={setHelpOpen} open={helpOpen} />
+              <ComparisonTools
+                baseline={baseline}
+                changes={changes}
+                graph={graph}
+                onBaselineChange={(next) => {
+                  setBaseline(next);
+                  setFocus(null);
+                  if (next) setLens("none");
+                }}
+                onOpenChange={setComparisonOpen}
+                onSelect={(id) => {
+                  setComparisonOpen(false);
+                  followLink(id);
+                }}
+                open={comparisonOpen}
+              />
 
-                {/* No tooltip on a control that opens a dialog: the tooltip's exit
+              <Legend />
+
+              <Help onOpenChange={setHelpOpen} open={helpOpen} />
+
+              {/* No tooltip on a control that opens a dialog: the tooltip's exit
                 animation plays over the dialog opening, which reads as the label
                 flying away. The shortcut goes in the button instead. */}
-                <Button
-                  aria-keyshortcuts="P"
-                  onClick={() => present(true)}
-                  size="sm"
-                  variant="outline"
-                >
-                  Present
-                </Button>
+              <Button
+                aria-keyshortcuts="P"
+                onClick={() => present(true)}
+                size="sm"
+                variant="outline"
+              >
+                Present
+              </Button>
 
-                <Button
-                  data-trigger
-                  onClick={() => openPalette(true)}
-                  size="sm"
-                >
-                  Search
-                  <Kbd>{SEARCH_KEY}</Kbd>
-                </Button>
-              </div>
+              <Button data-trigger onClick={() => openPalette(true)} size="sm">
+                Search
+                <Kbd>{SEARCH_KEY}</Kbd>
+              </Button>
             </div>
-          )}
+          </div>
 
           {/* A container, so the inspector sizes itself to the room the workspace has. */}
           <div className="@container relative min-h-0 flex-1">
-            {presenting ? (
-              <PresentBar
-                onLeave={() => present(false)}
-                onSearch={() => openPalette(true)}
-                onView={setView}
-                view={view}
-              />
-            ) : null}
             {/* The overlays over the canvas share one layer, so presenting zooms
               them together and the canvas keeps every pointer they do not cover. */}
             <div className="pointer-events-none absolute inset-0 z-10 [zoom:var(--present,1)] *:pointer-events-auto">
@@ -823,46 +794,15 @@ export function App({
               the same reason. It covers its own box and nothing else, so the ground
               under it is the only pick the canvas loses. The list view colours
               nothing by lens, so it gets no legend over its first row. */}
-              {highlight && !flat ? (
-                <div className="absolute top-0 left-0 z-10 flex max-w-full flex-wrap items-center gap-x-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
-                  <span
-                    aria-hidden
-                    className={`h-2 w-6 shrink-0 ${RAMP_BAR.binary}`}
-                  />
-                  <span className="font-sans text-label text-xs">
-                    Lit: <span className="text-prose">{highlight.label}</span>
-                  </span>
-                  <TextButton onClick={() => setHighlight(null)}>
-                    Clear
-                  </TextButton>
-                </div>
-              ) : lensColours && !flat ? (
-                <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
-                  <span className="font-bold uppercase tracking-terminal">
-                    {LENS_LABEL[lens]}
-                  </span>
-                  <span>{lensColours.minLabel}</span>
-                  <span
-                    aria-hidden
-                    className={`h-2 w-32 ${RAMP_BAR[lensColours.ramp]}`}
-                  />
-                  <span>{lensColours.maxLabel}</span>
-                </div>
-              ) : null}
-              {flat ? null : (
+              <LensLegend
+                flat={flat}
+                highlight={highlight}
+                lens={lens}
+                lensColours={lensColours}
+                onClear={() => setHighlight(null)}
+              />
+              {changeLegendShown ? (
                 <ComparisonLegend changes={changes} scale={scale} />
-              )}
-              {presenting && selectedNode && neighbourhood ? (
-                <CaptionCard
-                  focused={focus === selectedNode.id}
-                  neighbourhood={neighbourhood}
-                  node={selectedNode}
-                  onClose={putDown}
-                  onDetails={() => setDetails(true)}
-                  onToggleFocus={toggleFocus}
-                  raised={!flat && scale?.ramp === "change"}
-                  usageReport={usage}
-                />
               ) : null}
             </div>
             {/* The scene and the label layer over it get a stacking context of
@@ -871,7 +811,7 @@ export function App({
               // The inspector is an overlay, so the view is inset by its width while
               // it is open rather than sliding under it.
               <div
-                className={`absolute inset-0 isolate outline-none [zoom:var(--present,1)] ${selectedNode && !presenting ? INSPECTOR_INSET : ""}`}
+                className={`absolute inset-0 isolate outline-none [zoom:var(--present,1)] ${selectedNode ? panelInset : ""}`}
                 data-focus-home
                 tabIndex={-1}
               >
@@ -945,30 +885,46 @@ export function App({
                     icons={icons}
                     // The caption card leaves the city the whole canvas, and Details
                     // is an overlay the presenter closes again.
-                    inspectorOpen={
-                      !presenting && Boolean(selectedNode && neighbourhood)
-                    }
+                    inspectorOpen={panelOpen(
+                      Boolean(selectedNode && neighbourhood)
+                    )}
                     layers={layers}
                     onFocus={enterFocus}
-                    // Reset view and its hint are chrome; Home still reframes.
-                    onReset={presenting ? undefined : resetView}
+                    onReset={resetView}
                     onSelect={(id) =>
                       id === null ? putDown() : setSelected(id)
                     }
                     reframe={reframe}
                     scale={scale}
                     selected={selected}
-                    textScale={presenting ? PRESENT_SCALE : 1}
+                    textScale={textScale}
                     usage={usage}
                   />
                 </Suspense>
               </div>
             )}
 
-            {selectedNode && neighbourhood && (details || !presenting) ? (
-              // Zoomed while presenting, and the container its widths are read
-              // from, so the panel takes the narrow width a zoomed area has room for.
-              <div className="@container pointer-events-none absolute inset-0 z-20 [zoom:var(--present,1)] *:pointer-events-auto">
+            <PresentationLayer
+              bar={{
+                view,
+                onView: setView,
+                onSearch: () => openPalette(true),
+                onLeave: () => present(false),
+              }}
+              card={{
+                node: selectedNode,
+                neighbourhood,
+                usageReport: usage,
+                focused: focus === selected,
+                raised: changeLegendShown,
+                onToggleFocus: toggleFocus,
+                onDetails: () => setDetails(true),
+                onClose: putDown,
+              }}
+              details={details}
+              presenting={presenting}
+            >
+              {selectedNode && neighbourhood ? (
                 <Inspector
                   canExpandFocus={canExpandFocus}
                   edges={graph.edges}
@@ -984,7 +940,7 @@ export function App({
                   neighbourhood={neighbourhood}
                   node={selectedNode}
                   nodesById={nodesById}
-                  onClose={presenting ? () => setDetails(false) : done}
+                  onClose={closeInspector(done)}
                   onEditorLayout={() => setView("editor")}
                   onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
                   onOpenImpact={() => openImpact(selectedNode.id)}
@@ -994,8 +950,8 @@ export function App({
                   usage={usage?.byType[selectedNode.id]}
                   usageReport={usage}
                 />
-              </div>
-            ) : null}
+              ) : null}
+            </PresentationLayer>
           </div>
 
           {/* One height whatever the query matches, so the panel never jumps while

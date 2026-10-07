@@ -7,6 +7,7 @@ import {
   pixelsPerUnit,
   STAMP_BAND,
   STAMP_CAP,
+  settlingResize,
 } from "./stage";
 
 test("no part of the city is in fog, wherever the camera orbits over it", () => {
@@ -55,6 +56,19 @@ test("only a new framing moves the camera", () => {
   expect(framingAction(at, { ...at, bounds: other })).toBe("fly");
   // Home asks for the city it is already looking at, so nothing but the count moves.
   expect(framingAction(at, { ...at, reframe: 1 })).toBe("fly");
+  // The canvas settling just after a reframe, as entering presentation does.
+  expect(framingAction(at, at, true)).toBe("fly");
+});
+
+test("a resize frames again only just after a reframe", () => {
+  const state = { until: 0, view: null as string | null };
+  expect(settlingResize(state, "small", false, 0)).toBe(false);
+  // A resize with no reframe behind it keeps the reader's camera.
+  expect(settlingResize(state, "large", false, 100)).toBe(false);
+  // The reframe itself is not a resize; the size it settles on next is.
+  expect(settlingResize(state, "large", true, 200)).toBe(false);
+  expect(settlingResize(state, "full", false, 900)).toBe(true);
+  expect(settlingResize(state, "back", false, 5000)).toBe(false);
 });
 
 test("a world unit at twice the distance is half the size on screen", () => {

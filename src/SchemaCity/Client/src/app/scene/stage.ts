@@ -72,14 +72,46 @@ export function pixelsPerUnit(
  */
 export function framingAction<B, C>(
   last: { bounds: B; controls: C; reframe: number } | null,
-  next: { bounds: B; controls: C; reframe: number }
+  next: { bounds: B; controls: C; reframe: number },
+  /** The canvas settling on a new size just after a reframe, from `settlingResize`. */
+  resized = false
 ): "none" | "snap" | "fly" {
   if (last === null) return "snap";
-  if (last.bounds !== next.bounds || last.reframe !== next.reframe)
+  if (last.bounds !== next.bounds || last.reframe !== next.reframe || resized)
     return "fly";
   // The orbit controls arrive one render after the first framing, and the target
   // they were created with is the origin, so that framing has to be applied again.
   return last.controls === next.controls ? "none" : "snap";
+}
+
+/**
+ * How long after a reframe a change of canvas size frames again. Entering or leaving
+ * presentation asks for a reframe and then resizes the canvas, once when the toolbar
+ * goes and again when full screen lands, so the framing asked for is the one at the
+ * size the canvas settles on.
+ *
+ * ponytail: a time window, not the end of the resize. A full-screen animation slower
+ * than this lands on the last size it framed for; reading the fullscreenchange event
+ * is the upgrade if that shows.
+ */
+const RESIZE_SETTLE_MS = 1500;
+
+/**
+ * Whether this run of the framing effect is the canvas changing size within
+ * `RESIZE_SETTLE_MS` of a reframe. `state` is the rig's own record of the last view
+ * it saw and when the window closes, updated in place; `view` changes identity only
+ * when the size or the bounds do.
+ */
+export function settlingResize<V>(
+  state: { until: number; view: V | null },
+  view: V,
+  asked: boolean,
+  now: number
+): boolean {
+  const resized = state.view !== null && state.view !== view;
+  state.view = view;
+  if (asked) state.until = now + RESIZE_SETTLE_MS;
+  return resized && now < state.until;
 }
 
 /**

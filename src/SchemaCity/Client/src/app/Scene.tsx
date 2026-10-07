@@ -143,6 +143,7 @@ import {
   pixelsPerUnit,
   SKY_FRAGMENT_SHADER,
   SKY_VERTEX_SHADER,
+  settlingResize,
 } from "./scene/stage";
 
 /** Retain geometry through exits, then stop drawing a fully hidden layer. */
@@ -1670,17 +1671,6 @@ const FLIGHT_MS = 700;
 /** Home is a shorter trip: the city is already on screen, only badly aimed. */
 const REFRAME_MS = 400;
 /**
- * How long after a reframe a change of canvas size frames again. Entering or leaving
- * presentation asks for a reframe and then resizes the canvas, once when the toolbar
- * goes and again when full screen lands, so the framing asked for is the one at the
- * size the canvas settles on.
- *
- * ponytail: a time window, not the end of the resize. A full-screen animation slower
- * than this lands on the last size it framed for; reading the fullscreenchange event
- * is the upgrade if that shows.
- */
-const RESIZE_SETTLE_MS = 1500;
-/**
  * The establishing shot, which lands about as the connections finish drawing. fsn's
  * runs 2.6 seconds over a skyline that rises for longer.
  */
@@ -1909,17 +1899,17 @@ function CameraRig({
     // it started, so only a new set of bounds is allowed to move it.
     const first = framed.current === null;
     const asked = !first && framed.current?.reframe !== reframe;
-    const resized =
-      settling.current.view !== null && settling.current.view !== view;
-    settling.current.view = view;
-    if (asked) settling.current.until = performance.now() + RESIZE_SETTLE_MS;
-    let action = framingAction(framed.current, { bounds, controls, reframe });
-    if (
-      action === "none" &&
-      resized &&
-      performance.now() < settling.current.until
-    )
-      action = "fly";
+    const resized = settlingResize(
+      settling.current,
+      view,
+      asked,
+      performance.now()
+    );
+    const action = framingAction(
+      framed.current,
+      { bounds, controls, reframe },
+      resized
+    );
     framed.current = { bounds, controls, reframe };
     const back = kept.get(graph);
     const step = framingStep({
@@ -2266,7 +2256,8 @@ function CanvasOverlay({
 
   return (
     <div
-      className={`absolute left-3 z-10 flex flex-col items-start gap-2 ${raised ? "bottom-14" : "bottom-3"}`}
+      // Chrome, which presenting hides; Home still reframes.
+      className={`absolute left-3 z-10 flex flex-col items-start gap-2 in-data-present:hidden ${raised ? "bottom-14" : "bottom-3"}`}
     >
       {hint ? (
         <div className="flex max-w-72 items-start gap-2 border border-line bg-panel py-2 pr-1 pl-3 text-2xs text-phosphor leading-relaxed shadow-panel">
