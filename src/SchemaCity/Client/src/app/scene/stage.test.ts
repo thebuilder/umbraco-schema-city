@@ -14,8 +14,8 @@ import {
   pixelsPerUnit,
   STAMP_BAND,
   STAMP_CAP,
-  settlingResize,
   STAMP_MIN_CAP,
+  settlingResize,
 } from "./stage";
 
 test("no part of the city is in fog, wherever the camera orbits over it", () => {
