@@ -120,20 +120,25 @@ type Shelf = {
 /**
  * Clusters onto shelves no wider than `limit`, first fit: under a cluster already on
  * the open shelf when it fits that cluster's width and the shelf's rows, else to the
- * east of the shelf, else on a new shelf.
+ * east of the shelf, else on a new shelf. The easternmost stack may widen to take a
+ * wider cluster under it, since nothing stands east of it yet.
  */
 function shelve(laid: readonly Laid[], limit: number, spacing: Spacing) {
   const shelves: Shelf[] = [];
   for (const one of laid) {
     const shelf = shelves[shelves.length - 1];
+    const last = shelf?.stacks[shelf.stacks.length - 1];
     const under = shelf?.stacks.find(
       (open) =>
-        one.width <= open.width + 1e-9 &&
-        open.next + one.rows.length <= shelf.rows
+        open.next + one.rows.length <= shelf.rows &&
+        (one.width <= open.width + 1e-9 ||
+          (open === last && open.left + one.width <= limit + 1e-9))
     );
     if (shelf && under) {
       shelf.held.push({ laid: one, stack: under, row: under.next });
       under.next += one.rows.length;
+      under.width = Math.max(under.width, one.width);
+      shelf.used = Math.max(shelf.used, under.left + under.width);
       continue;
     }
     const wider = (shelf?.used ?? 0) + spacing.laneGap + one.width;
@@ -258,10 +263,13 @@ export function layoutNeighbourhoods(
     for (const { laid: one, stack, row } of shelf.held) {
       const centre = stack.left + stack.width / 2 - shelf.used / 2;
       one.rows.forEach((members, r) => {
+        // South edges on one line, the row's own, so the strip in front of a row
+        // where the names print holds no corner of a larger neighbour.
+        const south = (tops[row + r] as number) + (depths[row + r] as number);
         for (const { item, x } of members)
           spots.set(item.id, {
             x: centre + x,
-            z: (tops[row + r] as number) + (depths[row + r] as number) / 2,
+            z: south - item.size / 2,
             row: rowBase + row + r,
           });
       });
