@@ -33,7 +33,11 @@ export function translateFlightEndpoints(
   }
 }
 
-/** The keys the city flies by. Every other key belongs to the app's own handler. */
+/**
+ * The keys the city flies by. Every other key belongs to the app's own handler. The
+ * brackets and PageUp and PageDown orbit rather than fly: without them a keyboard
+ * could pan and rise but never change the angle.
+ */
 export const FLIGHT_CODES: ReadonlySet<string> = new Set([
   "KeyW",
   "KeyA",
@@ -45,6 +49,10 @@ export const FLIGHT_CODES: ReadonlySet<string> = new Set([
   "ArrowDown",
   "ArrowLeft",
   "ArrowRight",
+  "BracketLeft",
+  "BracketRight",
+  "PageUp",
+  "PageDown",
 ]);
 
 /** The parts of a keydown the flight reads, so the decision can be tested without a DOM. */
@@ -211,5 +219,61 @@ export function desiredVelocity(
     x: (axes.forward.x * forward + axes.right.x * right) * scale,
     y: up * scale,
     z: (axes.forward.z * forward + axes.right.z * right) * scale,
+  };
+}
+
+/**
+ * Radians a second the brackets turn the camera round the point it looks at, and
+ * PageUp and PageDown tilt it. A quarter turn a second takes four seconds round the
+ * city, slow enough to stop where you mean to; the tilt range is a quarter of that.
+ */
+const TURN_SPEED = Math.PI / 2;
+const TILT_SPEED = Math.PI / 4;
+
+/**
+ * The turn and tilt the held keys ask for, in radians a second. "[" swings the
+ * camera left round its orbit point and "]" right, and PageUp tilts it up toward
+ * overhead and PageDown down toward the ground. Unlike flight these do not ease:
+ * an orbit that coasts past where the key was let go overshoots the angle you
+ * wanted.
+ */
+export function desiredTurn(held: ReadonlySet<string>): {
+  yaw: number;
+  pitch: number;
+} {
+  const on = (code: string) => Number(held.has(code));
+  return {
+    yaw: (on("BracketRight") - on("BracketLeft")) * TURN_SPEED,
+    pitch: (on("PageUp") - on("PageDown")) * TILT_SPEED,
+  };
+}
+
+/** The highest the camera tilts: just short of looking straight down. */
+const MIN_POLAR = 0.01;
+
+/**
+ * The camera's offset from its orbit point after turning by `yaw` round the vertical
+ * and tilting by `pitch` toward overhead, both in radians. The distance is kept, and
+ * the tilt stops between overhead and `maxPolar`, the angle from straight up the
+ * orbit controls stop at, so the keys never take the camera under the ground.
+ */
+export function orbitOffset(
+  offset: Vec3,
+  yaw: number,
+  pitch: number,
+  maxPolar: number
+): Vec3 {
+  const radius = Math.hypot(offset.x, offset.y, offset.z);
+  if (radius === 0) return offset;
+  const polar = Math.min(
+    maxPolar,
+    Math.max(MIN_POLAR, Math.acos(offset.y / radius) - pitch)
+  );
+  const azimuth = Math.atan2(offset.x, offset.z) + yaw;
+  const across = Math.sin(polar) * radius;
+  return {
+    x: Math.sin(azimuth) * across,
+    y: Math.cos(polar) * radius,
+    z: Math.cos(azimuth) * across,
   };
 }

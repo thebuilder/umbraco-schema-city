@@ -267,7 +267,8 @@ the city as a table.
 
 | Action | Control |
 | --- | --- |
-| Orbit | Drag |
+| Orbit | Drag, or [ and ] |
+| Tilt | Drag, or Page Up and Page Down |
 | Move toward the cursor, or away | Mouse wheel |
 | Pan along the ground | Right-drag, Shift-drag (works on a trackpad), W, A, S, D or arrow keys |
 | Rise and descend | R, F |

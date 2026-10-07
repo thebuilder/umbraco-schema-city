@@ -79,10 +79,12 @@ import {
 import {
   approach,
   BOOST,
+  desiredTurn,
   desiredVelocity,
   flySpeed,
   groundAxes,
   keydownAction,
+  orbitOffset,
   translateFlightEndpoints,
   verticalStep,
 } from "./scene/flight";
@@ -1910,7 +1912,8 @@ const FLIGHT_STEP = new THREE.Vector3();
 /**
  * Keyboard flight, after fsn. Held keys become a velocity that eases in and out,
  * which moves the camera and its orbit target together, so the controls pick the
- * pose back up unchanged the moment a hand goes back to the mouse.
+ * pose back up unchanged the moment a hand goes back to the mouse. The brackets and
+ * PageUp and PageDown orbit the camera round its target instead, at a steady rate.
  *
  * The speed grows with the distance to the target, so a key crosses about the same
  * share of the screen from the overview as from close in.
@@ -1975,6 +1978,20 @@ function Flight({
     // teleport the camera as far as the whole time it was away.
     const step = Math.min(delta, 0.05);
     const boost = boosting.current ? BOOST : 1;
+
+    const turn = desiredTurn(held);
+    if (turn.yaw !== 0 || turn.pitch !== 0) {
+      // A framing flight would write the pose straight back, so turning ends it.
+      cameraFlight.current = null;
+      const turned = orbitOffset(
+        FLIGHT_STEP.subVectors(camera.position, controls.target),
+        turn.yaw * boost * step,
+        turn.pitch * boost * step,
+        MAX_POLAR
+      );
+      camera.position.copy(controls.target).add(turned);
+      camera.lookAt(controls.target);
+    }
 
     const wanted = desiredVelocity(
       held,

@@ -51,6 +51,11 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { keys: ["←", "↑", "↓", "→"], does: "Pan, the same as W, A, S and D" },
       { keys: ["R", "F"], does: "Rise and descend" },
       {
+        keys: ["[", "]"],
+        does: "Orbit left and right around the view's centre",
+      },
+      { keys: ["PgUp", "PgDn"], does: "Tilt the view up and down" },
+      {
         keys: ["Shift"],
         does: "Hold alongside any of these to go twice as fast",
       },

@@ -1,11 +1,13 @@
 import { expect, test } from "vitest";
 import {
   approach,
+  desiredTurn,
   desiredVelocity,
   FLY_SPEED,
   flySpeed,
   groundAxes,
   keydownAction,
+  orbitOffset,
   translateFlightEndpoints,
   verticalStep,
 } from "./flight";
@@ -189,6 +191,37 @@ test("a key another handler took, a chord or a non-flight key stops the flight",
     "release"
   );
   expect(keydownAction(press("KeyL", HOST), HOST)).toBe("release");
+});
+
+test("the brackets orbit and PageUp and PageDown tilt, keeping the distance", () => {
+  const south = { x: 0, y: 10, z: 10 };
+  const maxPolar = Math.PI * 0.49;
+  // "[" swings the camera to its own left, which from the south is west.
+  const left = desiredTurn(held("BracketLeft"));
+  const swung = orbitOffset(south, left.yaw * 0.1, 0, maxPolar);
+  expect(swung.x).toBeLessThan(0);
+  expect(swung.y).toBeCloseTo(10);
+  expect(Math.hypot(swung.x, swung.y, swung.z)).toBeCloseTo(Math.hypot(10, 10));
+  expect(desiredTurn(held("BracketRight")).yaw).toBeCloseTo(-left.yaw);
+  // PageUp looks down from higher up, PageDown from lower.
+  const up = desiredTurn(held("PageUp"));
+  expect(orbitOffset(south, 0, up.pitch * 0.1, maxPolar).y).toBeGreaterThan(10);
+  const down = desiredTurn(held("PageDown"));
+  expect(orbitOffset(south, 0, down.pitch * 0.1, maxPolar).y).toBeLessThan(10);
+  // Nothing held, nothing turns.
+  expect(desiredTurn(held("KeyW"))).toEqual({ yaw: 0, pitch: 0 });
+});
+
+test("a tilt stops short of overhead and at the orbit controls' polar limit", () => {
+  const south = { x: 0, y: 10, z: 10 };
+  const maxPolar = Math.PI * 0.49;
+  const low = orbitOffset(south, 0, -10, maxPolar);
+  expect(Math.acos(low.y / Math.hypot(low.x, low.y, low.z))).toBeCloseTo(
+    maxPolar
+  );
+  const high = orbitOffset(south, 0, 10, maxPolar);
+  expect(high.y).toBeGreaterThan(0);
+  expect(Math.hypot(high.x, high.z)).toBeGreaterThan(0);
 });
 
 test("R stops at the ceiling and F at the ground", () => {
