@@ -12,6 +12,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import * as THREE from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
@@ -1887,10 +1888,18 @@ const MAX_POLAR = Math.PI * 0.49;
  * The dolly range scales with the city, and the horizon moves out with the camera,
  * so no distance in it shows an edge.
  */
-function Controls({ span }: { span: number }) {
+function Controls({
+  reducedMotion,
+  span,
+}: {
+  reducedMotion: boolean;
+  span: number;
+}) {
   return (
     <OrbitControls
       dampingFactor={0.065}
+      // Damping is a glide after the hand lets go, which is motion nobody asked for.
+      enableDamping={!reducedMotion}
       makeDefault
       maxDistance={maxDistanceFor(span)}
       maxPolarAngle={MAX_POLAR}
@@ -1921,11 +1930,14 @@ const FLIGHT_STEP = new THREE.Vector3();
 function Flight({
   cameraFlight,
   host,
+  reducedMotion,
   span,
 }: {
   cameraFlight: RefObject<CameraFlight | null>;
   /** The element around the canvas, which takes focus when the city is clicked. */
   host: RefObject<HTMLDivElement | null>;
+  /** Moves at once and stops at once, with no ease in or coast after a release. */
+  reducedMotion: boolean;
   /** The city's longer side, which is as high as the orbit point flies. */
   span: number;
 }) {
@@ -1998,11 +2010,13 @@ function Flight({
       groundAxes(camera.position, controls.target),
       flySpeed(camera.position.distanceTo(controls.target)) * boost
     );
-    moving.set(
-      approach(moving.x, wanted.x, step),
-      approach(moving.y, wanted.y, step),
-      approach(moving.z, wanted.z, step)
-    );
+    if (reducedMotion) moving.set(wanted.x, wanted.y, wanted.z);
+    else
+      moving.set(
+        approach(moving.x, wanted.x, step),
+        approach(moving.y, wanted.y, step),
+        approach(moving.z, wanted.z, step)
+      );
     // A hundredth of a world unit a second is a stop, and rounding it to one keeps
     // the frame from doing this work on every idle frame for ever.
     if (moving.lengthSq() < 1e-4) {
@@ -2167,6 +2181,15 @@ const TWEEN_MS = 400;
 
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+const prefersReducedMotion = () => window.matchMedia(REDUCED_MOTION).matches;
+/** Read live, so turning the preference on mid-session stops the glide at once. */
+function subscribeReducedMotion(change: () => void) {
+  const query = window.matchMedia(REDUCED_MOTION);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+}
+
 export default function Scene({
   graph,
   grouping = "structure",
@@ -2221,9 +2244,9 @@ export default function Scene({
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const reducedMotion = useMemo(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    []
+  const reducedMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    prefersReducedMotion
   );
   const [bootPhase, setBootPhase] = useState<BootPhase>(
     reducedMotion ? "done" : "trace"
@@ -2747,7 +2770,12 @@ export default function Scene({
             traces={boardMarks.traces}
             usage={usage}
           />
-          <Flight cameraFlight={cameraFlight} host={host} span={span} />
+          <Flight
+            cameraFlight={cameraFlight}
+            host={host}
+            reducedMotion={reducedMotion}
+            span={span}
+          />
           <CameraRig
             bounds={bounds}
             buildingHeight={Math.max(1, ...heights.values())}
@@ -2759,7 +2787,7 @@ export default function Scene({
             selectedAt={selectedAt}
             span={span}
           />
-          <Controls span={span} />
+          <Controls reducedMotion={reducedMotion} span={span} />
         </Canvas>
       ) : null}
       {onReset ? (
