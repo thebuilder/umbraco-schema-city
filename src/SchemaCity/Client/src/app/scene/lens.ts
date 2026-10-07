@@ -7,6 +7,7 @@
 // Element Type under every lens about content instances. Scene.tsx paints those
 // phosphor-dim while a lens is on, so the amber end of a ramp never has an amber
 // district beside it to be confused with.
+import type { Finding } from "../../model/findings";
 import type { SchemaGraph, UsageReport } from "../../model/types";
 
 export type Lens =
@@ -59,20 +60,41 @@ export type LensScale = {
 export function lensScale(
   graph: SchemaGraph,
   usage: UsageReport | undefined,
-  lens: Lens
+  lens: Lens,
+  findings: Finding[] = []
 ): LensScale | null {
   if (!usage || lens === "none") return null;
 
   if (lens === "unused") {
-    // Binary, and the only lens that speaks about Element Types, which have no
-    // content of their own and so are never the ones being called unused here.
-    const t = new Map(
-      graph.nodes.map((node) => [
-        node.id,
-        !node.isElement && (usage.byType[node.id]?.total ?? 0) === 0 ? 1 : 0,
-      ])
+    // The same rules as the findings, so the lens and the drawer never disagree: a
+    // type is unused when an unused check flagged it, and in use when it has
+    // content, a type composes it or a block editor lists it. A dead end or an
+    // unreachable chain is neither, and the lens stays silent about it.
+    const flagged = new Set(
+      findings
+        .filter(
+          (finding) =>
+            finding.kind === "unusedType" ||
+            finding.kind === "unusedElementType"
+        )
+        .map((finding) => finding.nodeId)
     );
-    return { ramp: "binary", t, minLabel: "in use", maxLabel: "no content" };
+    const used = new Set(
+      (graph.edges ?? [])
+        .filter(
+          (edge) =>
+            (edge.kind === "composition" || edge.kind === "block") &&
+            edge.from !== edge.to
+        )
+        .map((edge) => edge.to)
+    );
+    const t = new Map<string, number>();
+    for (const node of graph.nodes) {
+      if (flagged.has(node.id)) t.set(node.id, 1);
+      else if (used.has(node.id) || (usage.byType[node.id]?.total ?? 0) > 0)
+        t.set(node.id, 0);
+    }
+    return { ramp: "binary", t, minLabel: "in use", maxLabel: "unused" };
   }
 
   if (lens === "published") {

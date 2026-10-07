@@ -7,6 +7,7 @@ import type {
   TypeUsage,
   UsageReport,
 } from "../../model/types";
+import { findFindings } from "../../model/findings";
 import { lensScale } from "./lens";
 
 const medium = mediumFixture as unknown as SchemaGraph;
@@ -111,13 +112,29 @@ describe("lensScale", () => {
     expect(scale?.maxLabel).toBe("15");
   });
 
-  it("marks the types with no content and dims everything else", () => {
-    const scale = lensScale(graph, usage, "unused");
+  it("marks the types the unused checks flag, and in use what has content or users", () => {
+    const findings = findFindings(medium, mediumUsage);
+    const scale = lensScale(medium, mediumUsage, "unused", findings);
     expect(scale?.ramp).toBe("binary");
-    expect(scale?.t.get("empty")).toBe(1);
-    expect(scale?.t.get("home")).toBe(0);
-    // An Element Type has no content of its own, so it is never called unused here.
-    expect(scale?.t.get("hero")).toBe(0);
+    expect(scale?.minLabel).toBe("in use");
+    expect(scale?.maxLabel).toBe("unused");
+    // Flagged unusedElementType, so unused even though it holds no content of its own.
+    expect(scale?.t.get(idOf("unusedElementBanner"))).toBe(1);
+    expect(scale?.t.get(idOf("unusedArticleLegacy"))).toBe(1);
+    // Composed by Home and Standard Page, so in use although it has no content.
+    expect(scale?.t.get(idOf("heroComposition"))).toBe(0);
+    expect(scale?.t.get(idOf("home"))).toBe(0);
+    // A dead end is not an unused check, and the lens says nothing about it.
+    expect(scale?.t.has(idOf("deadEndPromo"))).toBe(false);
+    const flagged = findings
+      .filter((f) => f.kind === "unusedType" || f.kind === "unusedElementType")
+      .map((f) => f.nodeId);
+    expect(
+      [...(scale?.t ?? [])]
+        .filter(([, t]) => t === 1)
+        .map(([id]) => id)
+        .sort()
+    ).toEqual([...new Set(flagged)].sort());
   });
 
   it("flattens a ramp where every type has the same number", () => {

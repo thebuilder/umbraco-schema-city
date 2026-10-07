@@ -151,7 +151,8 @@ can still depend on either.
 ### Check content usage
 
 The Lens menu colours buildings by content count, published share, cultures, incoming references,
-or unused status. Select a type to read the counts in the inspector. Usage loads separately from
+or unused status. The Unused lens marks the types the unused checks in Findings flag, and marks
+a type in use when it has content, a type composes it or a block editor lists it. Select a type to read the counts in the inspector. Usage loads separately from
 the schema, so you can explore the model while that request is pending.
 
 ![The Content count lens with Article selected and its usage totals shown in the inspector.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png)

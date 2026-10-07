@@ -339,7 +339,9 @@ describe("findFindings, one rule at a time", () => {
       ]
     );
     const [finding] = findFindings(graph).filter((f) => f.kind === "pureMixin");
-    expect(finding?.summary).toBe("Composed by 1 type, and 1 more through them");
+    expect(finding?.summary).toBe(
+      "Composed by 1 type, and 1 more through them"
+    );
     expect(finding?.related).toEqual(["article", "press"]);
   });
 
