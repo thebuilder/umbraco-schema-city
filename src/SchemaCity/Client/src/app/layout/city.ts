@@ -14,6 +14,7 @@ import type {
   SchemaNode,
 } from "../../model/types";
 import { LABEL_STRIP } from "../scene/board-labels";
+import { FLOOR_HEIGHT } from "../scene/buildings";
 import { STAMP_BAND } from "../scene/stage";
 
 /** What a district mostly holds. The scene colours and labels from this. */
@@ -64,15 +65,22 @@ export type CityBounds = {
   centre: { x: number; z: number };
 };
 
-/** Base size before own properties and the overview readability multiplier. */
-const FOOTPRINT = 2;
 /**
- * Ground between two buildings in the same row or grid. Three quarters of a
- * footprint: wide enough for a road to thread a column between two neighbours, and
- * narrow enough that a block reads as a block. At one and a half footprints, with a
- * nine-unit street, the seeded city covered its plates about 8 percent.
+ * Footprint of a type with no own properties. At 2.4 the smallest buildings were a
+ * few pixels across in the overview and their printed names had nowhere to stand.
  */
-const GAP = FOOTPRINT * 0.75;
+export const MIN_FOOTPRINT = 3.2;
+/** Footprint added per square root of an own property. */
+const FOOTPRINT_STEP = 0.8;
+/** Own properties past this count no longer widen a building. */
+const PROPERTY_CAP = 16;
+/**
+ * Ground between two buildings in the same row or grid: wide enough for a road to
+ * thread a column between two neighbours, and narrow enough that a block reads as a
+ * block. At one and a half footprints, with a nine-unit street, the seeded city
+ * covered its plates about 8 percent.
+ */
+const GAP = 1.5;
 /**
  * Ground between two rows of one block: the gap plus the strip each building's
  * printed name lies in, south of it. Only rows a gap apart need it; a street already
@@ -102,7 +110,6 @@ export const ISLAND_PAD = 2;
  * writes no depth, so a row standing on it would eat the letters.
  */
 const STAMP_MARGIN = Math.max(0, STAMP_BAND - ISLAND_PAD);
-const FLOOR_HEIGHT = 0.6;
 /** Buildings in one row, everywhere. A wider rank folds onto more rows. */
 export const ROW_LIMIT = 8;
 /**
@@ -231,8 +238,16 @@ const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const compareByAlias = (a: SchemaNode, b: SchemaNode) =>
   compare(a.alias, b.alias);
 
-const footprintOf = (node: SchemaNode) =>
-  1.2 * (FOOTPRINT + 0.25 * Math.min(Math.max(node.ownPropertyCount, 0), 12));
+/**
+ * A building's side, in world units. It grows with the square root of the type's own
+ * properties, so a type of sixteen is twice as wide as an empty one rather than five
+ * times, and the size still says which types carry more without a few large ones
+ * pushing the rest of the city apart.
+ */
+export const footprintOf = (node: { ownPropertyCount: number }) =>
+  MIN_FOOTPRINT +
+  FOOTPRINT_STEP *
+    Math.sqrt(Math.min(Math.max(node.ownPropertyCount, 0), PROPERTY_CAP));
 
 // ponytail: one floor per group, and a type with no groups still gets a ground floor.
 // M1's building work splits a Tab from a Group; today they are the same slab.

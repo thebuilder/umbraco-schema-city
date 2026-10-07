@@ -7,7 +7,13 @@ import {
   type PropertyTargets,
 } from "../../model/neighbourhood";
 import type { SchemaGraph } from "../../model/types";
-import { cityBounds, ISLAND_PAD, type Placement, ROW_LIMIT } from "./city";
+import {
+  cityBounds,
+  ISLAND_PAD,
+  MIN_FOOTPRINT,
+  type Placement,
+  ROW_LIMIT,
+} from "./city";
 
 /**
  * The street between the focused node and its first band. It stays at the nine units
@@ -24,7 +30,7 @@ const PLATFORM = 3;
 /** Half the angle a ring of parents spans, so an arc covers 120 degrees. */
 const ARC_HALF = Math.PI / 3;
 /** Footprint of an id the city never placed, which only a stale edge can be. */
-const FOOTPRINT = 2;
+const FOOTPRINT = MIN_FOOTPRINT;
 
 /** The ground a focused neighbourhood covers, for the island under it and the camera. */
 export type FocusBounds = {
@@ -211,9 +217,15 @@ export function layoutFocus(
   // in a fixed order, so the answer depends on that order rather than on which
   // arrangement is squarest; a packer that measured every group first and searched is
   // the upgrade, and nothing in the seeded schema pays for it.
-  /** True while an edge reaches at most a street past the ground already covered. */
+  /**
+   * True while an edge reaches at most a street and the smallest building past the
+   * ground already covered. A street alone was tuned on footprints of 2.4; once the
+   * smallest grew to 3.2, a corner pair no longer fit beside one parent and slid
+   * across the centre line.
+   */
   const affordable = (edge: number, sideX: number) =>
-    Math.abs(edge) <= (sideX < 0 ? -box.minX : box.maxX) + FOCUS_STREET;
+    Math.abs(edge) <=
+    (sideX < 0 ? -box.minX : box.maxX) + FOCUS_STREET + MIN_FOOTPRINT;
 
   /**
    * One corner group. It stands beside the group it shares a side with while that

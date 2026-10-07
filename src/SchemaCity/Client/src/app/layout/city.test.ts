@@ -783,10 +783,11 @@ describe("layoutCity", () => {
       ])
     ) as [Placement, Placement];
 
-    expect(wide.footprint).toBeCloseTo(3.6);
+    // 3.2 plus 0.8 per square root of a property, capped at sixteen properties.
+    expect(wide.footprint).toBeCloseTo(4.8);
     expect(wide.floors).toBe(2);
-    expect(wide.height).toBeCloseTo(1.2);
-    expect(capped.footprint).toBeCloseTo(6);
+    expect(wide.height).toBeCloseTo(1.6);
+    expect(capped.footprint).toBeCloseTo(6.4);
     expect(capped.floors).toBe(1);
   });
 
@@ -827,7 +828,7 @@ describe("layoutCity", () => {
       at("child").position.z -
       (at("loner").footprint + at("child").footprint) / 2;
 
-    expect(gap).toBeGreaterThanOrEqual(STREET);
+    expect(gap).toBeGreaterThanOrEqual(STREET - 1e-9);
   });
 
   it("never overlaps two footprints", () => {

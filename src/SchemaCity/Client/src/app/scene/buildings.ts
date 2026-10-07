@@ -77,9 +77,13 @@ export type Connections = {
 
 export type BuildingRole = "page" | "composition" | "element";
 
-/** One group's share of the height: a slab and the gap under it. */
-const FLOOR_HEIGHT = 0.6;
-const GAP = 0.1;
+/**
+ * One group's share of the height: a slab and the gap under it. At 0.6 a building of
+ * three groups stood under two units and read as flat from the overview, so the
+ * heights said little; 0.8 keeps the stack a count rather than a tower.
+ */
+export const FLOOR_HEIGHT = 0.8;
+const GAP = 0.12;
 const SLAB_HEIGHT = FLOOR_HEIGHT - GAP;
 const PLINTH_HEIGHT = 0.14;
 const LID_HEIGHT = 0.06;
@@ -244,8 +248,9 @@ function pushWindows(
  * A row of pins along each side of the plinth, centred like a chip's leads, from the
  * plinth's edge out to the footprint's.
  *
- * ponytail: a side holds `(plinth - 2 * PIN_MARGIN) / PIN_PITCH + 1` pins, 9 on the
- * smallest footprint, and a longer row is cut there. The inspector has the full count.
+ * ponytail: a side holds `(plinth - 2 * PIN_MARGIN) / PIN_PITCH + 1` pins, 13 on the
+ * smallest footprint (3.2 units, a 2.88-unit plinth), and a longer row is cut there.
+ * The inspector has the full count.
  */
 function pushPins(
   out: FloorCell[],
