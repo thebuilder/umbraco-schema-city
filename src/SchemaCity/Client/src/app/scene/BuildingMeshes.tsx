@@ -496,7 +496,8 @@ function useBuildingMaterials(reducedMotion: boolean) {
     for (const [material, resting] of fading)
       material.opacity = opacity * resting;
   });
-  return { materials, plain };
+  // The unit shapes come with the materials, made and disposed per mount the same way.
+  return { materials, plain, shapes: useUnitShapes() };
 }
 
 export function Buildings({
@@ -532,8 +533,7 @@ export function Buildings({
   onHover: (id: string | null) => void;
 }) {
   const meshes = useRef<Meshes>(new Map());
-  const shapes = useUnitShapes();
-  const { materials, plain } = useBuildingMaterials(reducedMotion);
+  const { materials, plain, shapes } = useBuildingMaterials(reducedMotion);
   const parts = useMemo(
     () => partsOf(cells, windows, plazas, placements, heights),
     [cells, windows, plazas, placements, heights]
@@ -551,19 +551,12 @@ export function Buildings({
   const held = meshes.current;
   return (
     <>
-      {KINDS.map((kind) => (
-        <Instances
-          castShadow={LOOKS[kind].castShadow}
-          count={parts.byKind[kind].length}
-          geometry={shapes.box}
-          held={held}
-          key={`${kind}|${parts.byKind[kind].length}`}
-          material={materials.get(kind)}
-          // Glass draws after every solid part, so the core shows through it.
-          renderOrder={LOOKS[kind].glass ? 1 : 0}
-          slot={kind}
-        />
-      ))}
+      <BoxInstances
+        box={shapes.box}
+        held={held}
+        materials={materials}
+        parts={parts}
+      />
       <Instances
         count={windows.length}
         geometry={shapes.plane}
@@ -587,6 +580,33 @@ export function Buildings({
       />
     </>
   );
+}
+
+/** One instanced mesh of unit boxes per kind of part. */
+function BoxInstances({
+  parts,
+  box,
+  held,
+  materials,
+}: {
+  parts: Parts;
+  box: THREE.BufferGeometry;
+  held: Meshes;
+  materials: Map<(typeof KINDS)[number], THREE.Material>;
+}) {
+  return KINDS.map((kind) => (
+    <Instances
+      castShadow={LOOKS[kind].castShadow}
+      count={parts.byKind[kind].length}
+      geometry={box}
+      held={held}
+      key={`${kind}|${parts.byKind[kind].length}`}
+      material={materials.get(kind)}
+      // Glass draws after every solid part, so the core shows through it.
+      renderOrder={Number(Boolean(LOOKS[kind].glass))}
+      slot={kind}
+    />
+  ));
 }
 
 /** One invisible box per building, which is what hover, click and double-click hit. */

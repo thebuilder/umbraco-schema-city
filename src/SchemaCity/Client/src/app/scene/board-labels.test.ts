@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  arrangeNames,
   BASE_OPACITY,
   boardTextPx,
   byPriority,
@@ -7,6 +8,7 @@ import {
   DIMMED,
   fitName,
   fittedFontPx,
+  footprintRect,
   graphemes,
   LABEL_INSET,
   LOD_HIDE_PX,
@@ -17,15 +19,19 @@ import {
   labelOpacity,
   labelRoom,
   labelsFlipped,
+  labelTier,
   MAX_EM,
   MIN_EM,
   MONO_ADVANCE,
+  PRINT_LEVELS,
   packAtlas,
   placeLabels,
   printCorners,
   printLevel,
   printRect,
+  printsFor,
   type Ranked,
+  type Standing,
   sharedPrefix,
   type Want,
   worthPrinting,
@@ -503,5 +509,172 @@ describe("packAtlas", () => {
 
   it("takes no room for no names", () => {
     expect(packAtlas([], 10, 100, 2)).toEqual({ spots: [], height: 0 });
+  });
+});
+
+describe("printsFor", () => {
+  const at = (id: string, x: number, district = "d"): Standing => ({
+    id,
+    position: { x, z: 0 },
+    footprint: 4,
+    district,
+  });
+
+  it("prepares every name at each size, the whole name where it fits", () => {
+    const prints = printsFor([at("a", 0)], () => "Home", mono);
+    const sizes = prints.get("a") ?? [];
+    expect(sizes).toHaveLength(PRINT_LEVELS.length);
+    for (const size of sizes)
+      expect(size.prints).toEqual([{ text: "Home", full: true }]);
+    expect((sizes[0]?.em ?? 0) < (sizes[2]?.em ?? 0)).toBe(true);
+  });
+
+  it("cuts a long name further for a building hemmed in by neighbours", () => {
+    const name = "Product Comparison Landing Page";
+    const alone = printsFor([at("a", 0)], () => name, mono).get("a");
+    const crowded = printsFor(
+      [at("a", 0), at("b", 5), at("c", -5)],
+      () => name,
+      mono
+    ).get("a");
+    const narrowest = (sizes: typeof alone) =>
+      Math.min(...(sizes?.[0]?.prints ?? []).map((one) => mono(one.text)));
+    expect(narrowest(crowded)).toBeLessThan(narrowest(alone));
+  });
+
+  it("drops the leading word a board's names share before it cuts", () => {
+    const names: Record<string, string> = {
+      a: "Element Accordion Item With Long Name",
+      b: "Element Card",
+      c: "Element Quote",
+    };
+    const prints = printsFor(
+      [at("a", 0, "e"), at("b", 30, "e"), at("c", 60, "e")],
+      (id) => names[id],
+      mono
+    );
+    const texts = (prints.get("a") ?? []).flatMap((size) =>
+      size.prints.map((one) => one.text)
+    );
+    expect(texts.some((text) => text.startsWith("Accordion"))).toBe(true);
+  });
+
+  it("prints nothing for a type it has no name for", () => {
+    expect(printsFor([at("a", 0)], () => undefined, mono).has("a")).toBe(false);
+  });
+});
+
+describe("labelTier", () => {
+  const rest = {
+    hovered: null,
+    selected: null,
+    neighbours: null,
+    hoveredNeighbours: null,
+  };
+
+  it("ranks the hovered and selected, then their neighbours, then the rest", () => {
+    const now = {
+      ...rest,
+      selected: "s",
+      hovered: "h",
+      neighbours: new Set(["n"]),
+      hoveredNeighbours: new Set(["m"]),
+    };
+    expect(labelTier("s", now)).toBe(0);
+    expect(labelTier("h", now)).toBe(0);
+    expect(labelTier("n", now)).toBe(1);
+    expect(labelTier("m", now)).toBe(1);
+    expect(labelTier("x", now)).toBe(2);
+    expect(labelTier("x", rest)).toBe(2);
+  });
+});
+
+describe("arrangeNames", () => {
+  const rest = {
+    hovered: null,
+    selected: null,
+    neighbours: null,
+    hoveredNeighbours: null,
+  };
+  const at = (id: string, x: number, extra: Partial<Standing> = {}) => ({
+    id,
+    position: { x, z: 0 },
+    footprint: 4,
+    district: "d",
+    ...extra,
+  });
+  const sizes = new Map(
+    ["a", "b", "flat"].map((id) => [
+      id,
+      {
+        ems: [0.8, 1.6],
+        levels: [[{ width: 3, height: 1 }], [{ width: 6, height: 2 }]],
+      },
+    ])
+  );
+
+  it("prints the smallest size that reads, and the larger one further out", () => {
+    const near = arrangeNames(
+      [at("a", 0)],
+      sizes,
+      () => 12,
+      rest,
+      () => 0,
+      false
+    );
+    const far = arrangeNames(
+      [at("a", 0)],
+      sizes,
+      () => 6,
+      rest,
+      () => 0,
+      false
+    );
+    expect(near.get("a")?.level).toBe(0);
+    expect(near.get("a")?.px).toBeCloseTo(9.6);
+    expect(far.get("a")?.level).toBe(1);
+    expect(far.get("a")?.px).toBeCloseTo(9.6);
+  });
+
+  it("prints nothing too small to read, and nothing for a flattened building", () => {
+    const placed = arrangeNames(
+      [at("a", 0), at("flat", 20, { flatten: 1 })],
+      sizes,
+      (one) => (one.id === "a" ? 1 : 12),
+      rest,
+      () => 0,
+      false
+    );
+    expect(placed.size).toBe(0);
+  });
+
+  it("gives the selected type the board first when two names compete", () => {
+    // Side by side, close enough that only one print fits each strip... and
+    // a wall behind both, so each has only its front.
+    const standing = [at("a", 0), at("b", 1)];
+    const placed = arrangeNames(
+      standing,
+      sizes,
+      () => 6,
+      { ...rest, selected: "b" },
+      () => 0,
+      false
+    );
+    expect(placed.has("b")).toBe(true);
+  });
+
+  it("puts a print beside its footprint, never over it", () => {
+    const one = at("a", 0);
+    const placed = arrangeNames(
+      [one],
+      sizes,
+      () => 6,
+      rest,
+      () => 0,
+      false
+    );
+    const rect = placed.get("a")?.rect;
+    const footprint = footprintRect(one);
+    expect(rect && rect.minZ >= footprint.maxZ).toBe(true);
   });
 });

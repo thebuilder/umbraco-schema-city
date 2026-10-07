@@ -285,7 +285,7 @@ const compareByAlias = (a: SchemaNode, b: SchemaNode) =>
  * times, and the size still says which types carry more without a few large ones
  * pushing the rest of the city apart.
  */
-export const footprintOf = (node: { ownPropertyCount: number }) =>
+const footprintOf = (node: { ownPropertyCount: number }) =>
   MIN_FOOTPRINT +
   FOOTPRINT_STEP *
     Math.sqrt(Math.min(Math.max(node.ownPropertyCount, 0), PROPERTY_CAP));
@@ -536,27 +536,8 @@ function arrange(laid: Laid[], edges: SchemaEdge[], stack: boolean) {
     // Stacking needs the largest first, so nothing joins the row west of it.
     stack
   );
-  const placed = new Set<Laid>();
-  let x = 0;
-  let middleDepth = 0;
-  // With `stack`, a district that fits under the one before it, inside the depth the
-  // row already has, stands there rather than further east. One root district per
-  // root leaves a row of small islands beside the large one, and a row that long
-  // frames every name in the city too small to read.
-  let column = { x: 0, z: 0, width: 0 };
-  for (const district of row) {
-    const box = boxOf(district.placements);
-    const depth = box.maxZ - box.minZ + STAMP_MARGIN;
-    const under =
-      stack && column.z > 0 && column.z + depth <= middleDepth + 1e-9;
-    if (!under) column = { x, z: 0, width: 0 };
-    const size = moveTo(district, column.x, column.z);
-    column.z += size.depth + DISTRICT_GAP;
-    column.width = Math.max(column.width, size.width);
-    x = column.x + column.width + DISTRICT_GAP;
-    middleDepth = Math.max(middleDepth, size.depth);
-    placed.add(district);
-  }
+  const middleDepth = placeRow(row, stack);
+  const placed = new Set<Laid>(row);
 
   // The mean x of every placed type a district connects to, or null for none.
   const wantedCentre = (district: Laid) => {
@@ -615,6 +596,37 @@ function arrange(laid: Laid[], edges: SchemaEdge[], stack: boolean) {
     placement.position.x -= box.minX;
     placement.position.z -= box.minZ;
   }
+}
+
+/**
+ * Stands the middle row west to east from the origin and returns its depth.
+ *
+ * With `stack`, a district that fits under the one before it, inside the depth the
+ * row already has, stands there rather than further east. One root district per
+ * root leaves a row of small islands beside the large one, and a row that long
+ * frames every name in the city too small to read.
+ */
+function placeRow(row: readonly Laid[], stack: boolean): number {
+  let depth = 0;
+  let column = { x: 0, z: 0, width: 0 };
+  for (const district of row) {
+    const box = boxOf(district.placements);
+    const fits =
+      stack &&
+      column.z > 0 &&
+      column.z + box.maxZ - box.minZ + STAMP_MARGIN <= depth + 1e-9;
+    if (!fits)
+      column = {
+        x: column.width > 0 ? column.x + column.width + DISTRICT_GAP : 0,
+        z: 0,
+        width: 0,
+      };
+    const size = moveTo(district, column.x, column.z);
+    column.z += size.depth + DISTRICT_GAP;
+    column.width = Math.max(column.width, size.width);
+    depth = Math.max(depth, size.depth);
+  }
+  return depth;
 }
 
 const bandOf = (district: Laid) => {

@@ -23,7 +23,7 @@ export type StructureGroup = {
  * beside it in one family. A child with more, or with grandchildren, heads a
  * neighbourhood of its own beside its parent's.
  */
-export const FAMILY_LIMIT = 3;
+const FAMILY_LIMIT = 3;
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -64,7 +64,7 @@ export function structureGroups(
   const roots = nodes
     .filter((node) => node.allowedAsRoot && !node.isElement)
     .map((node) => node.id);
-  const reached = walk(roots, children, new Set(byId.keys()));
+  const reached = walk(roots, children, new Set(byId.keys()), emptyWalk());
 
   const composed = new Set(
     edges.filter((edge) => edge.kind === "composition").map((edge) => edge.to)
@@ -114,11 +114,11 @@ export function structureGroups(
     [...strandedIds].flatMap((id) => children.get(id) ?? [])
   );
   const heads = [...strandedIds].filter((id) => !parented.has(id));
-  const forest = walk(heads, children, strandedIds);
+  const forest = walk(heads, children, strandedIds, emptyWalk());
   for (const node of stranded) {
     if (forest.home.has(node.id)) continue;
-    const more = walk([node.id], children, strandedIds, forest);
-    heads.push(...more.added);
+    heads.push(node.id);
+    walk([node.id], children, strandedIds, forest);
   }
   groups.push({
     id: "unreachable",
@@ -136,47 +136,34 @@ type Walk = {
   home: Map<string, string>;
   /** Children per parent along the walk: each type under the parent it came by. */
   tree: Map<string, string[]>;
-  /** The heads this walk started from, which are new to an earlier walk. */
-  added: string[];
 };
+
+const emptyWalk = (): Walk => ({ home: new Map(), tree: new Map() });
 
 /**
  * Breadth first from every head at once, inside `allowed`, so each type is claimed
- * by the head nearest it and, at equal depth, by the earlier head. Passing `into`
- * carries on an earlier walk instead of starting fresh.
+ * by the head nearest it and, at equal depth, by the earlier head. Carries on
+ * `into`, so a later walk never claims what an earlier one reached.
  */
 function walk(
   heads: readonly string[],
   children: ReadonlyMap<string, string[]>,
   allowed: ReadonlySet<string>,
-  into?: Walk
+  into: Walk
 ): Walk {
-  const result: Walk = into ?? {
-    home: new Map(),
-    tree: new Map(),
-    added: [],
-  };
-  result.added = [];
-  const queue: string[] = [];
-  for (const head of heads) {
-    if (result.home.has(head) || !allowed.has(head)) continue;
-    result.home.set(head, head);
-    result.added.push(head);
-    queue.push(head);
-  }
+  const open = (id: string) => allowed.has(id) && !into.home.has(id);
+  const queue = heads.filter(open);
+  for (const head of queue) into.home.set(head, head);
   // biome-ignore lint/style/useForOf: the loop re-reads the length the body appends to.
   for (let i = 0; i < queue.length; i++) {
     const parent = queue[i] as string;
-    for (const child of children.get(parent) ?? []) {
-      if (result.home.has(child) || !allowed.has(child)) continue;
-      result.home.set(child, result.home.get(parent) as string);
-      const list = result.tree.get(parent) ?? [];
-      list.push(child);
-      result.tree.set(parent, list);
-      queue.push(child);
-    }
+    const claimed = (children.get(parent) ?? []).filter(open);
+    for (const child of claimed)
+      into.home.set(child, into.home.get(parent) as string);
+    if (claimed.length > 0) into.tree.set(parent, claimed);
+    queue.push(...claimed);
   }
-  return result;
+  return into;
 }
 
 /**
@@ -229,8 +216,52 @@ function gatherLoners(clusters: IdCluster[]): IdCluster[] {
   ];
 }
 
-/** Where an Element Type is offered, counted by block editor. */
-type Offers = { content: number; settings: number; name: string };
+/** One property offering one Element Type, as content or as settings. */
+type Offer = {
+  element: string;
+  editor: string;
+  name: string;
+  role: "content" | "settings";
+};
+
+/** Every block editor property's offer of an Element Type, across the schema. */
+function offersOf(
+  nodes: readonly SchemaNode[],
+  isElement: ReadonlySet<string>
+): Offer[] {
+  return nodes.flatMap((host) =>
+    (host.groups ?? []).flatMap((group) =>
+      (group.properties ?? []).flatMap((property) =>
+        (property.targets ?? []).flatMap((target) =>
+          target.role !== "picker" && isElement.has(target.nodeId)
+            ? [
+                {
+                  element: target.nodeId,
+                  editor: property.dataTypeId,
+                  name: property.dataTypeName ?? "",
+                  role: target.role,
+                },
+              ]
+            : []
+        )
+      )
+    )
+  );
+}
+
+/** How often each editor offers one Element Type, as content and as settings. */
+type Tally = {
+  editor: string;
+  name: string;
+  content: number;
+  settings: number;
+};
+
+const byOffers = (a: Tally, b: Tally) =>
+  b.content - a.content ||
+  b.settings - a.settings ||
+  compare(a.name, b.name) ||
+  compare(a.editor, b.editor);
 
 /**
  * The block editor each Element Type is grouped under: the Data Type that offers it
@@ -242,39 +273,25 @@ export function socketsOf(
   nodes: readonly SchemaNode[],
   elements: readonly SchemaNode[]
 ): Map<string, string> {
-  const isElement = new Set(elements.map((node) => node.id));
-  const offers = new Map<string, Map<string, Offers>>();
-  for (const host of nodes) {
-    for (const group of host.groups ?? []) {
-      for (const property of group.properties ?? []) {
-        for (const target of property.targets ?? []) {
-          if (target.role === "picker" || !isElement.has(target.nodeId))
-            continue;
-          const byEditor = offers.get(target.nodeId) ?? new Map();
-          offers.set(target.nodeId, byEditor);
-          const count: Offers = byEditor.get(property.dataTypeId) ?? {
-            content: 0,
-            settings: 0,
-            name: property.dataTypeName ?? "",
-          };
-          count[target.role] += 1;
-          byEditor.set(property.dataTypeId, count);
-        }
-      }
-    }
+  const tallies = new Map<string, Map<string, Tally>>();
+  for (const offer of offersOf(nodes, new Set(elements.map((n) => n.id)))) {
+    const byEditor = tallies.get(offer.element) ?? new Map<string, Tally>();
+    tallies.set(offer.element, byEditor);
+    const tally = byEditor.get(offer.editor) ?? {
+      editor: offer.editor,
+      name: offer.name,
+      content: 0,
+      settings: 0,
+    };
+    tally[offer.role] += 1;
+    byEditor.set(offer.editor, tally);
   }
-  const sockets = new Map<string, string>();
-  for (const [element, byEditor] of offers) {
-    const [main] = [...byEditor].sort(
-      ([idA, a], [idB, b]) =>
-        b.content - a.content ||
-        b.settings - a.settings ||
-        compare(a.name, b.name) ||
-        compare(idA, idB)
-    );
-    if (main) sockets.set(element, main[0]);
-  }
-  return sockets;
+  return new Map(
+    [...tallies].map(([element, byEditor]) => [
+      element,
+      ([...byEditor.values()].sort(byOffers)[0] as Tally).editor,
+    ])
+  );
 }
 
 /**

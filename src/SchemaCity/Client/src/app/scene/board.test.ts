@@ -150,4 +150,8 @@ describe("holeSpots", () => {
       { x: 10 - HOLE_INSET, z: 10 - HOLE_INSET },
     ]);
   });
+
+  it("drills none in a board too small to keep four holes apart", () => {
+    expect(holeSpots({ minX: 0, maxX: 30, minZ: 0, maxZ: 3 })).toEqual([]);
+  });
 });

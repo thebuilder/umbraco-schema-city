@@ -178,9 +178,7 @@ export function separateCrossings(segments: RoadSegment[]): RoadSegment[] {
       result.push(segment);
       continue;
     }
-    result.push(
-      ...splitAtCuts(segment, crossingCuts(segment, vertical, xs))
-    );
+    result.push(...splitAtCuts(segment, crossingCuts(segment, vertical, xs)));
   }
   return result;
 }

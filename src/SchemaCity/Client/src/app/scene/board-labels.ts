@@ -137,6 +137,12 @@ export function sharedPrefix(names: readonly string[]): string {
   return best;
 }
 
+/**
+ * Characters of the name a cut print keeps before it says too little to tell one
+ * type from another. Below this the print is left off rather than drawn.
+ */
+const MIN_KEPT = 5;
+
 export type Fitted = {
   /** What is printed. */
   text: string;
@@ -157,10 +163,9 @@ export function fitName(
   prefix = ""
 ): Fitted {
   if (measure(name) <= room) return { text: name, full: true };
-  const trimmed =
-    prefix && name.startsWith(prefix) && name.length > prefix.length
-      ? name.slice(prefix.length)
-      : name;
+  // The prefix goes only when what is left still reads as a name of its own.
+  const rest = name.startsWith(prefix) ? name.slice(prefix.length) : name;
+  const trimmed = graphemes(rest).length >= MIN_KEPT ? rest : name;
   if (measure(trimmed) <= room) return { text: trimmed, full: false };
   const characters = graphemes(trimmed);
   // The most characters kept, split three to two in favour of the start, that
@@ -175,12 +180,6 @@ export function fitName(
   }
   return { text: "…", full: false };
 }
-
-/**
- * Characters of the name a cut print keeps before it says too little to tell one
- * type from another. Below this the print is left off rather than drawn.
- */
-const MIN_KEPT = 5;
 
 /** True for a whole name, and for a cut one that keeps enough of it to read. */
 export const worthPrinting = (fitted: Fitted) =>
@@ -229,7 +228,7 @@ export function labelRoom(
 }
 
 /** The widest a name prints when it stands clear of its neighbours. */
-export const longRoom = (footprint: number) => footprint + MAX_OVERHANG * 2;
+const longRoom = (footprint: number) => footprint + MAX_OVERHANG * 2;
 
 /**
  * How tall print of size `em`, lying flat at `anchor`, comes out on screen in CSS
@@ -675,4 +674,172 @@ export function fittedFontPx(
     minPx,
     Math.floor(fontPx * Math.sqrt(maxHeight / height) * 0.97)
   );
+}
+
+/** A building as the names see it: where it stands, how big, on which board. */
+export type Standing = {
+  id: string;
+  position: { x: number; z: number };
+  footprint: number;
+  district: string;
+  y?: number;
+  /** 1 once focus mode has pressed it to a flat plate. */
+  flatten?: number;
+};
+
+/** A name at one size: the size, and its prints at that size, widest first. */
+export type Sized = { em: number; prints: Fitted[] };
+
+/**
+ * What each building prints at each of its sizes, smallest size first: as much of
+ * its name as fits clear of its neighbours, half way to its own column, and in its
+ * own column, less any cut too short to read or the same as a wider one. Names on
+ * one board share their leading words more often than not, Element on the elements
+ * board, so a cut drops those first.
+ */
+export function printsFor(
+  standing: readonly Standing[],
+  nameOf: (id: string) => string | undefined,
+  measure: (text: string) => number
+): Map<string, Sized[]> {
+  const room = labelRoom(standing);
+  const names = new Map<string, string[]>();
+  for (const one of standing) {
+    const list = names.get(one.district) ?? [];
+    list.push(nameOf(one.id) ?? "");
+    names.set(one.district, list);
+  }
+  const prefixes = new Map(
+    [...names].map(([district, list]) => [district, sharedPrefix(list)])
+  );
+  const prints = new Map<string, Sized[]>();
+  for (const one of standing) {
+    const name = nameOf(one.id);
+    if (name === undefined) continue;
+    const rooms = [
+      longRoom(one.footprint),
+      (longRoom(one.footprint) + one.footprint) / 2,
+      room.get(one.id) ?? one.footprint,
+    ];
+    const prefix = prefixes.get(one.district) ?? "";
+    prints.set(
+      one.id,
+      PRINT_LEVELS.map((share) => {
+        const em = labelEm(one.footprint) * share;
+        return {
+          em,
+          prints: distinctReadable(
+            rooms.map((width) => fitName(name, width / em, measure, prefix))
+          ),
+        };
+      })
+    );
+  }
+  return prints;
+}
+
+/** The prints worth printing, each text once, in the order given. */
+const distinctReadable = (fitted: readonly Fitted[]) =>
+  fitted.filter(
+    (one, i) =>
+      worthPrinting(one) &&
+      fitted.findIndex((other) => other.text === one.text) === i
+  );
+
+/**
+ * Where a name stands in the queue for board space: 0 for the hovered or selected
+ * type, 1 for a neighbour of either, 2 for the rest.
+ */
+export function labelTier(id: string, now: Interaction): number {
+  if (id === now.hovered || id === now.selected) return 0;
+  const related = now.neighbours?.has(id) || now.hoveredNeighbours?.has(id);
+  return related ? 1 : 2;
+}
+
+/** A building's footprint as a rectangle on the board. */
+export const footprintRect = (one: Standing): Rect => ({
+  minX: one.position.x - one.footprint / 2,
+  maxX: one.position.x + one.footprint / 2,
+  minZ: one.position.z - one.footprint / 2,
+  maxZ: one.position.z + one.footprint / 2,
+});
+
+/** A building pressed this far flat by focus mode is a map, not a part with a name. */
+const FLAT = 0.5;
+
+/** One name's place for a view: its size, its print at that size, where, how tall. */
+export type Arranged = Placed & { level: number; px: number };
+
+/** A name's sizes, smallest first, and its prints' widths and heights at each. */
+export type Sizes = {
+  ems: readonly number[];
+  levels: readonly (readonly { width: number; height: number }[])[];
+};
+
+/**
+ * Every name's place for one view. Each standing building's name takes the size
+ * `printLevel` picks from how many pixels one unit of print comes to there, and
+ * `placeLabels` lays as many as fit in priority order. A flattened building takes
+ * no space and prints nothing.
+ */
+export function arrangeNames(
+  standing: readonly Standing[],
+  sizes: ReadonlyMap<string, Sizes>,
+  pxPerEm: (one: Standing) => number,
+  interaction: Interaction,
+  usageOf: (id: string) => number,
+  flipped: boolean
+): Map<string, Arranged> {
+  const upright = standing.filter((one) => (one.flatten ?? 0) < FLAT);
+  const chosen = new Map<string, { level: number; px: number }>();
+  const wants = upright.flatMap((one): (Want & Ranked)[] => {
+    const size = sizes.get(one.id);
+    const perEm = size ? pxPerEm(one) : 0;
+    const level = size ? printLevel(perEm, size.ems) : -1;
+    if (!size || level < 0) return [];
+    chosen.set(one.id, { level, px: perEm * (size.ems[level] as number) });
+    return [
+      {
+        id: one.id,
+        tier: labelTier(one.id, interaction),
+        footprint: one.footprint,
+        usage: usageOf(one.id),
+        centre: one.position,
+        prints: size.levels[level] ?? [],
+      },
+    ];
+  });
+  wants.sort(byPriority);
+  const placed = placeLabels(
+    wants,
+    upright.map((one) => ({ id: one.id, rect: footprintRect(one) })),
+    flipped
+  );
+  return new Map(
+    [...placed].map(([id, spot]) => [
+      id,
+      { ...spot, ...(chosen.get(id) as { level: number; px: number }) },
+    ])
+  );
+}
+
+/** How solid a courtyard line is at rest: an outline, under everything it frames. */
+const COURTYARD_OPACITY = 0.22;
+
+/**
+ * How solid a type's print and its courtyard are: the print only when it was placed
+ * and no floating label already says its name, both under the hover's light, the
+ * intro and focus mode's flattening.
+ */
+export function printStrength(
+  spot: { px: number } | undefined,
+  floated: boolean,
+  light: number,
+  reveal: number,
+  flatten: number
+): { print: number; courtyard: number } {
+  return {
+    print: spot && !floated ? labelOpacity(spot.px, light, reveal, flatten) : 0,
+    courtyard: COURTYARD_OPACITY * light * reveal * (1 - flatten),
+  };
 }

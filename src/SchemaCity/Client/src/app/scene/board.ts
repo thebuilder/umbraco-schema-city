@@ -100,8 +100,13 @@ export function traceVias(
   return [...vias.values()];
 }
 
-/** The centres of a board's four mounting holes, inset from its corners. */
+/**
+ * The centres of a board's four mounting holes, inset from its corners. A board too
+ * small to hold four holes clear of each other gets none.
+ */
 export function holeSpots(island: Island): { x: number; z: number }[] {
+  const roomy = Math.min(island.maxX - island.minX, island.maxZ - island.minZ);
+  if (roomy <= HOLE_INSET * 4) return [];
   return [
     { x: island.minX + HOLE_INSET, z: island.minZ + HOLE_INSET },
     { x: island.maxX - HOLE_INSET, z: island.minZ + HOLE_INSET },

@@ -9,32 +9,23 @@ import * as THREE from "three";
 import type { SchemaNode, UsageReport } from "../../model/types";
 import type { Placement } from "../layout/city";
 import {
+  type Arranged,
+  arrangeNames,
   boardTextPx,
-  byPriority,
   COURTYARD_SEGMENTS,
   courtyard,
-  type Fitted,
-  fitName,
   fittedFontPx,
   type Interaction,
   LINE_HEIGHT,
-  labelEm,
   labelLight,
-  labelOpacity,
-  labelRoom,
   labelsFlipped,
-  longRoom,
-  type Placed,
-  PRINT_LEVELS,
   packAtlas,
-  placeLabels,
   printCorners,
-  printLevel,
-  type Ranked,
+  printStrength,
+  printsFor,
   type Rect,
-  sharedPrefix,
-  type Want,
-  worthPrinting,
+  type Sizes,
+  type Standing,
 } from "./board-labels";
 import { revealAt } from "./reveal";
 import { FOLDER_TINT_HEIGHT } from "./stage";
@@ -66,12 +57,8 @@ const ATLAS_PAD = 4;
 const LABEL_Y = FOLDER_TINT_HEIGHT + 0.01;
 /** The courtyard lines stand with the print. */
 const COURTYARD_Y = LABEL_Y;
-/** How solid a courtyard line is at rest: an outline, under everything it frames. */
-const COURTYARD_OPACITY = 0.22;
 /** How far an Element Type's print leans toward amber, the colour of its building. */
 const ELEMENT_TINT = 0.35;
-/** A building pressed this far flat by focus mode is a map, not a part with a name. */
-const FLAT = 0.5;
 
 /**
  * The types that have a floating label right now, which the label layer rewrites on
@@ -89,81 +76,22 @@ export type Floated = {
 /** One print in the atlas: whose it is, where it sits in the texture, its size. */
 type Entry = {
   id: string;
-  /** Its place among the prints of its size, widest first. */
-  print: number;
   full: boolean;
   uv: [number, number, number, number];
   width: number;
   height: number;
 };
 
-/** A name at one size: the size, and its prints at that size, widest first. */
-type Level = { em: number; entries: number[] };
-
 type Atlas = {
   texture: THREE.CanvasTexture;
   entries: Entry[];
-  /** Each type's sizes, smallest first. */
-  labels: Map<string, { ems: number[]; levels: Level[] }>;
+  /** Per type, every entry of its prints. */
+  all: Map<string, number[]>;
+  /** The entry of one print, by `printKey`. */
+  byPrint: Map<string, number>;
+  /** Per type, its sizes and its prints' measures, as the placement reads them. */
+  sizes: Map<string, Sizes>;
 };
-
-/**
- * What each type prints at each of its sizes: its whole name, or as much of it as
- * fits clear of its neighbours, half way to its own column, and in its own column.
- */
-function printsOf(
-  placements: readonly Placement[],
-  nodesById: Map<string, SchemaNode>,
-  measure: (text: string) => number
-): Map<string, { em: number; prints: Fitted[] }[]> {
-  const room = labelRoom(placements);
-  // Names on one board share their leading words more often than not, Element on
-  // the elements board, so a cut drops those first.
-  const names = new Map<string, string[]>();
-  for (const placement of placements) {
-    const name = nodesById.get(placement.id)?.name;
-    if (name === undefined) continue;
-    const list = names.get(placement.district) ?? [];
-    list.push(name);
-    names.set(placement.district, list);
-  }
-  const prefixes = new Map(
-    [...names].map(([district, list]) => [district, sharedPrefix(list)])
-  );
-
-  const prints = new Map<string, { em: number; prints: Fitted[] }[]>();
-  for (const placement of placements) {
-    const node = nodesById.get(placement.id);
-    if (!node) continue;
-    const full = labelEm(placement.footprint);
-    const prefix = prefixes.get(placement.district) ?? "";
-    // Widest first, so a name clear of its neighbours prints as much as it can, and
-    // one hemmed in by them still has a shorter cut to try.
-    const rooms = [
-      longRoom(placement.footprint),
-      (longRoom(placement.footprint) + placement.footprint) / 2,
-      room.get(node.id) ?? placement.footprint,
-    ];
-    prints.set(
-      node.id,
-      PRINT_LEVELS.map((share) => {
-        const em = full * share;
-        const fitted = rooms.map((width) =>
-          fitName(node.name, width / em, measure, prefix)
-        );
-        return {
-          em,
-          prints: fitted.filter(
-            (one, i) =>
-              worthPrinting(one) &&
-              fitted.findIndex((other) => other.text === one.text) === i
-          ),
-        };
-      })
-    );
-  }
-  return prints;
-}
 
 /** Each print's width at `fontPx`, and where the rows put it. */
 function measureAll(
@@ -186,6 +114,10 @@ function measureAll(
   };
 }
 
+/** One print's key: the type, its size and its place among that size's prints. */
+const printKey = (id: string, at: { level: number; print: number }) =>
+  `${id}|${at.level}|${at.print}`;
+
 /** Decides every print and rasterises them all into one texture, packed in rows. */
 function buildAtlas(
   placements: readonly Placement[],
@@ -200,10 +132,14 @@ function buildAtlas(
   // emoji, takes the room it really needs rather than a mono cell's.
   context.font = `${ATLAS_WEIGHT} 100px ${font}`;
   const measure = (text: string) => context.measureText(text).width / 100;
-  const decided = printsOf(placements, nodesById, measure);
+  const decided = printsFor(
+    placements,
+    (id) => nodesById.get(id)?.name,
+    measure
+  );
 
-  const planned = [...decided].flatMap(([id, levels]) =>
-    levels.flatMap(({ em, prints }, level) =>
+  const planned = [...decided].flatMap(([id, sized]) =>
+    sized.flatMap(({ em, prints }, level) =>
       prints.map((fitted, print) => ({ id, level, print, fitted, em }))
     )
   );
@@ -252,22 +188,17 @@ function buildAtlas(
     if (spot.y + fit.rowHeight <= canvas.height)
       context.fillText(text, spot.x, spot.y + fit.rowHeight / 2);
   });
-  const labels = new Map<string, { ems: number[]; levels: Level[] }>();
-  for (const [id, levels] of decided)
-    labels.set(id, {
-      ems: levels.map((level) => level.em),
-      levels: levels.map((level) => ({ em: level.em, entries: [] })),
-    });
+  const levels = new Map(
+    [...decided].map(([id, sized]) => [id, sized.map((): number[] => [])])
+  );
   const entries = planned.map((one, i): Entry => {
     const at = slot.get(one.fitted.text) as number;
     const spot = fit.packed.spots[at] as { x: number; y: number };
     const w = fit.widths[at] as number;
     const clipped = spot.y + fit.rowHeight > canvas.height;
-    const label = labels.get(one.id) as { levels: Level[] };
-    (label.levels[one.level] as Level).entries.push(i);
+    levels.get(one.id)?.[one.level]?.push(i);
     return {
       id: one.id,
-      print: one.print,
       full: one.fitted.full,
       // The texture is flipped on upload, so the canvas's top row is v = 1.
       uv: [
@@ -287,7 +218,22 @@ function buildAtlas(
   // The print lies on the ground and is always read at an angle; a plain mipmap
   // smears the letters along the view, anisotropic filtering keeps them.
   texture.anisotropy = gl.capabilities.getMaxAnisotropy();
-  return { texture, entries, labels };
+  const sizes = new Map(
+    [...decided].map(([id, sized]): [string, Sizes] => [
+      id,
+      {
+        ems: sized.map((one) => one.em),
+        levels: (levels.get(id) ?? []).map((level) =>
+          level.map((e) => entries[e] as Entry)
+        ),
+      },
+    ])
+  );
+  const all = new Map([...levels].map(([id, sized]) => [id, sized.flat()]));
+  const byPrint = new Map(
+    planned.map((one, i) => [printKey(one.id, one), i] as const)
+  );
+  return { texture, entries, all, byPrint, sizes };
 }
 
 /** The mesh's buffers for one atlas: positions and opacities are rewritten later. */
@@ -360,9 +306,8 @@ type Inputs = {
   atlas: Atlas;
   geometry: THREE.BufferGeometry;
   courtyards: THREE.BufferGeometry;
-  /** The buildings the city laid out, in a fixed order the courtyards follow. */
-  order: string[];
-  placementsById: Map<string, Placement>;
+  /** Every building where it stands now, in the city's order the courtyards follow. */
+  standing: Placement[];
   interaction: Interaction;
   usage: UsageReport | undefined;
 };
@@ -370,6 +315,113 @@ type Inputs = {
 const SCRATCH = new THREE.Vector3();
 const CORNERS: number[] = [];
 const SEGMENTS = new Float32Array(COURTYARD_SEGMENTS * 4);
+
+/** How many pixels one unit of print comes to at a building's ground, in this view. */
+function pxPerEmAt(one: Standing, view: View): number {
+  SCRATCH.set(one.position.x, groundOf(one), one.position.z);
+  return boardTextPx(1, view.viewportHeight, view.camera.position, SCRATCH);
+}
+
+/** True when a building's ground point is inside the viewport and in front of it. */
+function onScreen(one: Standing, camera: THREE.Camera): boolean {
+  SCRATCH.set(one.position.x, groundOf(one), one.position.z).project(camera);
+  return (
+    Math.max(Math.abs(SCRATCH.x), Math.abs(SCRATCH.y)) <= 1 && SCRATCH.z < 1
+  );
+}
+
+/** Lays one entry's quad on its rectangle, at the height of its building's ground. */
+function writeQuad(
+  positions: Float32Array,
+  entry: number,
+  rect: Rect,
+  flipped: boolean,
+  y: number
+) {
+  printCorners(rect, flipped, CORNERS);
+  for (let k = 0; k < 4; k++)
+    positions.set(
+      [CORNERS[k * 2] as number, y, CORNERS[k * 2 + 1] as number],
+      entry * 12 + k * 3
+    );
+}
+
+/** Sets the opacity of all four corners of one entry's quad. */
+function writeAlpha(colours: Float32Array, entry: number, alpha: number) {
+  for (let k = 0; k < 4; k++) colours[entry * 16 + k * 4 + 3] = alpha;
+}
+
+/** The entry placed for a type, or -1 for none. */
+const placedEntry = (atlas: Atlas, id: string, spot: Arranged | undefined) =>
+  spot ? (atlas.byPrint.get(printKey(id, spot)) ?? -1) : -1;
+
+const NONE: number[] = [];
+
+/**
+ * Writes one type's prints: the one placed, if any, on its rectangle at `alpha`,
+ * and every other entry of the type hidden.
+ */
+function writeName(
+  inputs: Inputs,
+  one: Standing,
+  spot: Arranged | undefined,
+  alpha: number,
+  flipped: boolean
+) {
+  const positions = inputs.geometry.getAttribute("position")
+    .array as Float32Array;
+  const colours = inputs.geometry.getAttribute("color").array as Float32Array;
+  for (const entry of inputs.atlas.all.get(one.id) ?? NONE)
+    writeAlpha(colours, entry, 0);
+  const shown = placedEntry(inputs.atlas, one.id, spot);
+  if (shown < 0) return;
+  writeQuad(
+    positions,
+    shown,
+    (spot as Arranged).rect,
+    flipped,
+    groundOf(one) + LABEL_Y
+  );
+  writeAlpha(colours, shown, alpha);
+}
+
+/** Writes the courtyard in slot `slot`: round the part, and its print when it has one. */
+function writeCourtyard(
+  courtyards: THREE.BufferGeometry,
+  slot: number,
+  one: Standing,
+  spot: Arranged | undefined,
+  strength: number
+) {
+  const positions = courtyards.getAttribute("position").array as Float32Array;
+  const colours = courtyards.getAttribute("color").array as Float32Array;
+  SEGMENTS.fill(0);
+  courtyard(one.position, one.footprint, spot?.rect ?? null, SEGMENTS, 0);
+  const base = slot * COURTYARD_SEGMENTS * 2;
+  const y = groundOf(one) + COURTYARD_Y;
+  for (let v = 0; v < COURTYARD_SEGMENTS * 2; v++) {
+    positions.set(
+      [SEGMENTS[v * 2] as number, y, SEGMENTS[v * 2 + 1] as number],
+      (base + v) * 3
+    );
+    colours[(base + v) * 4 + 3] = strength;
+  }
+}
+
+/**
+ * True when a type's whole name is printed, visible, with its building's ground
+ * on screen, which is what lets the floating label layer leave it out.
+ */
+function printedWhole(
+  inputs: Inputs,
+  one: Standing,
+  spot: Arranged | undefined,
+  alpha: number,
+  camera: THREE.Camera
+) {
+  const entry = inputs.atlas.entries[placedEntry(inputs.atlas, one.id, spot)];
+  return alpha > 0 && entry?.full === true && onScreen(one, camera);
+}
 
 /**
  * Places the names for one view and writes their quads, their opacities and the
@@ -379,141 +431,41 @@ const SEGMENTS = new Float32Array(COURTYARD_SEGMENTS * 4);
 function repaint(
   inputs: Inputs,
   view: View,
-  floated: Set<string>,
-  px: Float32Array,
-  chosen: Int8Array
+  floated: Set<string>
 ): Set<string> {
-  const { atlas, geometry, courtyards, order, placementsById, interaction } =
-    inputs;
-  const { camera, viewportHeight, flipped, reveal } = view;
-  const active =
-    interaction.hovered !== null ||
-    interaction.selected !== null ||
-    interaction.neighbours !== null;
-
-  // How tall each type's print stands on screen, and which are worth placing.
-  const wants: (Want & Ranked)[] = [];
-  const buildings: { id: string; rect: Rect }[] = [];
-  order.forEach((id, i) => {
-    const placement = placementsById.get(id);
-    const label = atlas.labels.get(id);
-    px[i] = 0;
-    chosen[i] = -1;
-    if (!(placement && label) || (placement.flatten ?? 0) >= FLAT) return;
-    const half = placement.footprint / 2;
-    const { x, z } = placement.position;
-    buildings.push({
-      id,
-      rect: { minX: x - half, maxX: x + half, minZ: z - half, maxZ: z + half },
-    });
-    SCRATCH.set(x, groundOf(placement), z);
-    const perEm = boardTextPx(1, viewportHeight, camera.position, SCRATCH);
-    const level = printLevel(perEm, label.ems);
-    if (level < 0) return;
-    chosen[i] = level;
-    px[i] = perEm * (label.ems[level] as number);
-    const tier =
-      id === interaction.hovered || id === interaction.selected
-        ? 0
-        : active &&
-            (interaction.neighbours?.has(id) ||
-              interaction.hoveredNeighbours?.has(id))
-          ? 1
-          : 2;
-    wants.push({
-      id,
-      tier,
-      footprint: placement.footprint,
-      usage: inputs.usage?.byType[id]?.total ?? 0,
-      centre: placement.position,
-      prints: (label.levels[level] as Level).entries.map(
-        (e) => atlas.entries[e] as Entry
-      ),
-    });
-  });
-  wants.sort(byPriority);
-  const placed = placeLabels(wants, buildings, flipped);
-
-  const position = geometry.getAttribute("position") as THREE.BufferAttribute;
-  const colour = geometry.getAttribute("color") as THREE.BufferAttribute;
-  const positions = position.array as Float32Array;
-  const colours = colour.array as Float32Array;
-  const linePositions = courtyards.getAttribute("position")
-    .array as Float32Array;
-  const lineColours = courtyards.getAttribute("color").array as Float32Array;
+  const arranged = arrangeNames(
+    inputs.standing,
+    inputs.atlas.sizes,
+    (one) => pxPerEmAt(one, view),
+    inputs.interaction,
+    (id) => inputs.usage?.byType[id]?.total ?? 0,
+    view.flipped
+  );
   const printed = new Set<string>();
-
-  order.forEach((id, i) => {
-    const placement = placementsById.get(id);
-    const label = atlas.labels.get(id);
-    const spot: Placed | undefined = placed.get(id);
-    const flatten = placement ? (placement.flatten ?? 0) : 1;
-    const light = labelLight(id, interaction);
-    const levels = label?.levels ?? [];
-    for (let lv = 0; lv < levels.length; lv++)
-      for (const index of (levels[lv] as Level).entries) {
-        const entry = atlas.entries[index] as Entry;
-        const shown =
-          spot !== undefined && lv === chosen[i] && spot.print === entry.print;
-        if (shown) {
-          printCorners(spot.rect, flipped, CORNERS);
-          const y = groundOf(placement as Placement) + LABEL_Y;
-          for (let k = 0; k < 4; k++) {
-            positions[index * 12 + k * 3] = CORNERS[k * 2] as number;
-            positions[index * 12 + k * 3 + 1] = y;
-            positions[index * 12 + k * 3 + 2] = CORNERS[k * 2 + 1] as number;
-          }
-        }
-        // A name floating over its building is not printed under it as well.
-        const alpha =
-          shown && !floated.has(id)
-            ? labelOpacity(px[i] as number, light, reveal, flatten)
-            : 0;
-        for (let k = 0; k < 4; k++) colours[index * 16 + k * 4 + 3] = alpha;
-        if (shown && entry.full && alpha > 0) {
-          SCRATCH.set(
-            (placement as Placement).position.x,
-            groundOf(placement as Placement),
-            (placement as Placement).position.z
-          ).project(camera);
-          if (
-            Math.abs(SCRATCH.x) <= 1 &&
-            Math.abs(SCRATCH.y) <= 1 &&
-            SCRATCH.z < 1
-          )
-            printed.add(id);
-        }
-      }
-
-    // The courtyard round the part, and round its print when it has one.
-    SEGMENTS.fill(0);
-    if (placement) {
-      courtyard(
-        placement.position,
-        placement.footprint,
-        spot?.rect ?? null,
-        SEGMENTS,
-        0
-      );
-    }
-    const base = i * COURTYARD_SEGMENTS * 2;
-    const y = placement ? groundOf(placement) + COURTYARD_Y : 0;
-    const strength = placement
-      ? COURTYARD_OPACITY * light * reveal * (1 - flatten)
-      : 0;
-    for (let s = 0; s < COURTYARD_SEGMENTS * 2; s++) {
-      linePositions[(base + s) * 3] = SEGMENTS[s * 2] as number;
-      linePositions[(base + s) * 3 + 1] = y;
-      linePositions[(base + s) * 3 + 2] = SEGMENTS[s * 2 + 1] as number;
-      lineColours[(base + s) * 4 + 3] = strength;
-    }
+  inputs.standing.forEach((one, slot) => {
+    const spot = arranged.get(one.id);
+    const strength = printStrength(
+      spot,
+      floated.has(one.id),
+      labelLight(one.id, inputs.interaction),
+      view.reveal,
+      one.flatten ?? 0
+    );
+    writeName(inputs, one, spot, strength.print, view.flipped);
+    writeCourtyard(inputs.courtyards, slot, one, spot, strength.courtyard);
+    if (printedWhole(inputs, one, spot, strength.print, view.camera))
+      printed.add(one.id);
   });
-  position.needsUpdate = true;
-  colour.needsUpdate = true;
-  courtyards.getAttribute("position").needsUpdate = true;
-  courtyards.getAttribute("color").needsUpdate = true;
+  for (const geometry of [inputs.geometry, inputs.courtyards]) {
+    geometry.getAttribute("position").needsUpdate = true;
+    geometry.getAttribute("color").needsUpdate = true;
+  }
   return printed;
 }
+
+/** True when two sets hold the same ids. */
+const sameIds = (a: Set<string>, b: Set<string>) =>
+  a.size === b.size && [...a].every((id) => b.has(id));
 
 /**
  * The atlas, the meshes' geometries and their materials, each built when what it
@@ -624,8 +576,11 @@ export function BoardLabels({
       atlas,
       geometry,
       courtyards,
-      order: cityPlacements.map((placement) => placement.id),
-      placementsById,
+      // A building the screen has not reached yet, for the one render a new schema
+      // takes, stands where the city put it.
+      standing: cityPlacements.map(
+        (placement) => placementsById.get(placement.id) ?? placement
+      ),
       interaction,
       usage,
     }),
@@ -639,26 +594,9 @@ export function BoardLabels({
       usage,
     ]
   );
-  // Each type's print height on screen and the size it prints at, rewritten in
-  // place every repaint.
-  const px = useMemo(
-    () => new Float32Array(cityPlacements.length),
-    [cityPlacements]
-  );
-  const chosen = useMemo(
-    () => new Int8Array(cityPlacements.length),
-    [cityPlacements]
-  );
   // What the last repaint was made from, so a still frame can tell it has nothing
   // to write.
-  const written = useRef({
-    inputs: null as Inputs | null,
-    reveal: -1,
-    floated: -1,
-    flipped: false,
-    height: 0,
-    camera: new THREE.Matrix4(),
-  });
+  const written = useRef({ key: [] as unknown[], camera: new THREE.Matrix4() });
   const flipped = useRef(false);
   const forward = useMemo(() => new THREE.Vector3(), []);
 
@@ -666,35 +604,23 @@ export function BoardLabels({
     camera.getWorldDirection(forward);
     flipped.current = labelsFlipped(forward.x, forward.z, flipped.current);
     const reveal = revealAt(state.clock.elapsedTime, reducedMotion).links;
+    const key = [inputs, reveal, floated.version, flipped.current, height];
     const last = written.current;
     if (
-      last.inputs === inputs &&
-      last.reveal === reveal &&
-      last.floated === floated.version &&
-      last.flipped === flipped.current &&
-      last.height === height &&
+      key.every((value, i) => value === last.key[i]) &&
       camera.matrixWorld.equals(last.camera)
     )
       return;
     const printed = repaint(
       inputs,
       { camera, viewportHeight: height, flipped: flipped.current, reveal },
-      floated.ids,
-      px,
-      chosen
+      floated.ids
     );
-    const same =
-      printed.size === floated.printed.size &&
-      [...printed].every((id) => floated.printed.has(id));
-    if (!same) {
+    if (!sameIds(printed, floated.printed)) {
       floated.printed = printed;
       floated.printedVersion += 1;
     }
-    last.inputs = inputs;
-    last.reveal = reveal;
-    last.floated = floated.version;
-    last.flipped = flipped.current;
-    last.height = height;
+    last.key = key;
     last.camera.copy(camera.matrixWorld);
   });
 

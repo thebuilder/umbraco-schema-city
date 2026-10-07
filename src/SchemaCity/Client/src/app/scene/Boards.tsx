@@ -17,7 +17,7 @@ import {
   type DistrictKind,
   ISLAND_PAD,
 } from "../layout/city";
-import { type Finger, HOLE_INSET, holeSpots, type Island } from "./board";
+import { type Finger, holeSpots, type Island } from "./board";
 import { labelsFlipped } from "./board-labels";
 import { revealAt } from "./reveal";
 import { districtStamp, FOLDER_TINT_HEIGHT } from "./stage";
@@ -194,7 +194,7 @@ export const islandOf = (district: District): Island => ({
  * A board's outline as a shape in x and -z, so that extruding it along +z and
  * turning it flat stands it on the ground the right way round.
  */
-function outline(island: Island, holes: boolean): THREE.Shape {
+function outline(island: Island): THREE.Shape {
   const r = Math.min(
     CORNER,
     (island.maxX - island.minX) / 2,
@@ -214,16 +214,11 @@ function outline(island: Island, holes: boolean): THREE.Shape {
   shape.absarc(x0 + r, y1 - r, r, Math.PI / 2, Math.PI, false);
   shape.lineTo(x0, y0 + r);
   shape.absarc(x0 + r, y0 + r, r, Math.PI, Math.PI * 1.5, false);
-  // A board too small to hold four holes clear of each other gets none.
-  const roomy =
-    island.maxX - island.minX > HOLE_INSET * 4 &&
-    island.maxZ - island.minZ > HOLE_INSET * 4;
-  if (holes && roomy)
-    for (const spot of holeSpots(island)) {
-      const hole = new THREE.Path();
-      hole.absarc(spot.x, -spot.z, HOLE_RADIUS, 0, Math.PI * 2, true);
-      shape.holes.push(hole);
-    }
+  for (const spot of holeSpots(island)) {
+    const hole = new THREE.Path();
+    hole.absarc(spot.x, -spot.z, HOLE_RADIUS, 0, Math.PI * 2, true);
+    shape.holes.push(hole);
+  }
   return shape;
 }
 
@@ -237,7 +232,7 @@ function boardLayer(
   top: number
 ): THREE.BufferGeometry | null {
   const parts = boards.map(({ island, colour }) => {
-    const geometry = new THREE.ExtrudeGeometry(outline(island, true), {
+    const geometry = new THREE.ExtrudeGeometry(outline(island), {
       depth: top - bottom,
       bevelEnabled: false,
       curveSegments: 6,
@@ -260,15 +255,12 @@ function boardLayer(
 /** The plated rings round every board's mounting holes, as one flat geometry. */
 function holeRings(islands: readonly Island[]): THREE.BufferGeometry | null {
   const rings = islands.flatMap((island) =>
-    island.maxX - island.minX > HOLE_INSET * 4 &&
-    island.maxZ - island.minZ > HOLE_INSET * 4
-      ? holeSpots(island).map((spot) => {
-          const ring = new THREE.RingGeometry(HOLE_RADIUS, RING_RADIUS, 20);
-          ring.rotateX(-Math.PI / 2);
-          ring.translate(spot.x, 0.004, spot.z);
-          return ring;
-        })
-      : []
+    holeSpots(island).map((spot) => {
+      const ring = new THREE.RingGeometry(HOLE_RADIUS, RING_RADIUS, 20);
+      ring.rotateX(-Math.PI / 2);
+      ring.translate(spot.x, 0.004, spot.z);
+      return ring;
+    })
   );
   if (rings.length === 0) return null;
   const merged = mergeGeometries(rings);
@@ -365,12 +357,10 @@ function fingerSpot(finger: Finger) {
   }
 }
 
-function trackMaterial<T extends THREE.Material>(
-  materials: Map<string, T>,
-  key: string
-) {
-  return (material: T | null) => {
-    if (material) materials.set(key, material);
+/** A ref that keeps `materials` holding what React mounted under `key`. */
+function trackMaterial<T>(materials: Map<string, T>, key: string) {
+  return (held: T | null) => {
+    if (held) materials.set(key, held);
     else materials.delete(key);
   };
 }
@@ -440,6 +430,205 @@ function useFlippedStamps(meshes: Map<string, THREE.Mesh>) {
   });
 }
 
+type Materials = Map<string, THREE.Material>;
+
+/** A board material that fades in with the boards, tracked by `name`. */
+function Solid({
+  materials,
+  name,
+  ...look
+}: THREE.MeshStandardMaterialParameters & {
+  materials: Materials;
+  name: string;
+}) {
+  return (
+    <meshStandardMaterial
+      depthWrite
+      metalness={0}
+      opacity={0}
+      ref={trackMaterial(materials, name)}
+      roughness={1}
+      transparent
+      {...look}
+    />
+  );
+}
+
+/** One layer of every board, or nothing when there are no boards. */
+function Layer({
+  geometry,
+  materials,
+  name,
+  look,
+}: {
+  geometry: THREE.BufferGeometry | null;
+  materials: Materials;
+  name: string;
+  look: THREE.MeshStandardMaterialParameters;
+}) {
+  if (!geometry) return null;
+  return (
+    <mesh geometry={geometry} receiveShadow renderOrder={-1}>
+      <Solid materials={materials} name={name} {...look} />
+    </mesh>
+  );
+}
+
+/**
+ * A nested folder or a block editor's socket is a patch on the board its members
+ * stand on, which is what says where one block of a district ends and the next
+ * starts.
+ */
+function Patches({
+  folders,
+  colour,
+  materials,
+}: {
+  folders: (CityBounds & { id: string })[];
+  colour: THREE.Color;
+  materials: Materials;
+}) {
+  return folders.map((folder) => (
+    <mesh
+      key={folder.id}
+      position={[
+        folder.centre.x,
+        FOLDER_TINT_HEIGHT / 2 - MASK / 2,
+        folder.centre.z,
+      ]}
+      receiveShadow
+      renderOrder={-1}
+    >
+      <boxGeometry
+        args={[folder.width, MASK + FOLDER_TINT_HEIGHT, folder.depth]}
+      />
+      <Solid
+        color={colour}
+        materials={materials}
+        name={`folder|${folder.id}`}
+      />
+    </mesh>
+  ));
+}
+
+/** The gold fingers and the vias, one instanced mesh each. */
+function Marks({
+  fingers,
+  vias,
+  shapes,
+  palette,
+  materials,
+}: {
+  fingers: Finger[];
+  vias: { x: number; z: number }[];
+  shapes: { box: THREE.BufferGeometry; via: THREE.BufferGeometry };
+  palette: BoardPalette;
+  materials: Materials;
+}) {
+  const fingerSpots = useMemo(() => fingers.map(fingerSpot), [fingers]);
+  const viaSpots = useMemo(
+    () => vias.map((via) => ({ ...via, y: VIA_Y })),
+    [vias]
+  );
+  const fingerMesh = useInstances(fingerSpots, FINGER_SCALE);
+  const viaMesh = useInstances(viaSpots, UNIT_SCALE);
+  const colours = useMemo(
+    () => ({
+      gold: tint(palette.land, GOLD_COLOUR, 0.55),
+      copper: tint(palette.land, COPPER_COLOUR, 0.4),
+    }),
+    [palette]
+  );
+  return (
+    <>
+      <instancedMesh
+        args={[shapes.box, undefined, Math.max(1, fingerSpots.length)]}
+        frustumCulled={false}
+        ref={fingerMesh}
+        renderOrder={-1}
+      >
+        <Solid
+          color={colours.gold}
+          materials={materials}
+          metalness={0.6}
+          name="fingers"
+          roughness={0.45}
+        />
+      </instancedMesh>
+      <instancedMesh
+        args={[shapes.via, undefined, Math.max(1, viaSpots.length)]}
+        frustumCulled={false}
+        ref={viaMesh}
+        renderOrder={-1}
+      >
+        <Solid
+          color={colours.copper}
+          materials={materials}
+          metalness={0.5}
+          name="vias"
+          roughness={0.5}
+        />
+      </instancedMesh>
+    </>
+  );
+}
+
+/**
+ * The district's name printed flat on its board, in the band the layout held clear
+ * along its south edge. It writes no depth, so the buildings, the traces and every
+ * link stand over it, and it turns in place when the camera is behind it, as the
+ * type names do.
+ *
+ * ponytail: the print holds its strength through a selection and through focus mode,
+ * where the buildings around it fade. Fading it too means telling the boards which
+ * districts are lit, which is a prop and a set they have no other use for.
+ */
+function Stamps({
+  districts,
+  palette,
+  materials,
+}: {
+  districts: District[];
+  palette: BoardPalette;
+  materials: Materials;
+}) {
+  const meshes = useRef(new Map<string, THREE.Mesh>());
+  useFlippedStamps(meshes.current);
+  // One rasterised name per district, with the quad it prints on. The name is fixed
+  // to its board, so the search for its spot runs once rather than every frame.
+  const names = useMemo(
+    () =>
+      districts.map((district) => {
+        const texture = stampTexture(district.name.toUpperCase(), palette.mono);
+        const stamp = districtStamp(
+          islandOf(district),
+          texture.image.width / texture.image.height
+        );
+        return { id: district.id, texture, stamp };
+      }),
+    [districts, palette.mono]
+  );
+  return names.map(({ id, stamp, texture }) => (
+    <mesh
+      key={id}
+      position={[stamp.x, STAMP_Y, stamp.z]}
+      ref={trackMaterial(meshes.current, id)}
+      renderOrder={1}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <planeGeometry args={[stamp.width, stamp.height]} />
+      <meshBasicMaterial
+        color={palette.dim}
+        depthWrite={false}
+        map={texture}
+        opacity={0}
+        ref={trackMaterial(materials, `stamp|${id}`)}
+        transparent
+      />
+    </mesh>
+  ));
+}
+
 export function Boards({
   districts,
   folders,
@@ -459,40 +648,14 @@ export function Boards({
   reducedMotion: boolean;
 }) {
   const { parts, shapes } = useBoardGeometry(districts, palette);
-  const materials = useRef(new Map<string, THREE.Material>());
-  const stampMeshes = useRef(new Map<string, THREE.Mesh>());
-  const folderColour = useMemo(
-    () => tint(palette.land, WHITE, 0.15),
+  const materials = useRef<Materials>(new Map());
+  const colours = useMemo(
+    () => ({
+      patch: tint(palette.land, WHITE, 0.15),
+      copper: tint(palette.land, COPPER_COLOUR, 0.4),
+    }),
     [palette]
   );
-  const copper = useMemo(
-    () => tint(palette.land, COPPER_COLOUR, 0.4),
-    [palette]
-  );
-  const gold = useMemo(() => tint(palette.land, GOLD_COLOUR, 0.55), [palette]);
-
-  // One rasterised name per district, with the quad it prints on. The name is fixed
-  // to its board, so the search for its spot runs once rather than every frame.
-  const stampsOf = useMemo(
-    () =>
-      districts.map((district) => {
-        const texture = stampTexture(district.name.toUpperCase(), palette.mono);
-        const stamp = districtStamp(
-          islandOf(district),
-          texture.image.width / texture.image.height
-        );
-        return { id: district.id, texture, stamp };
-      }),
-    [districts, palette.mono]
-  );
-  const fingerSpots = useMemo(() => fingers.map(fingerSpot), [fingers]);
-  const viaSpots = useMemo(
-    () => vias.map((via) => ({ ...via, y: VIA_Y })),
-    [vias]
-  );
-  const fingerMesh = useInstances(fingerSpots, FINGER_SCALE);
-  const viaMesh = useInstances(viaSpots, UNIT_SCALE);
-  useFlippedStamps(stampMeshes.current);
 
   // Everything here fades in with the boards, and the names with the traces.
   useFrame((state) => {
@@ -503,111 +666,42 @@ export function Boards({
         : progress.districts;
   });
 
-  const solid = (key: string, extra: THREE.MeshStandardMaterialParameters) => (
-    <meshStandardMaterial
-      depthWrite
-      metalness={0}
-      opacity={0}
-      ref={trackMaterial(materials.current, key)}
-      roughness={1}
-      transparent
-      {...extra}
-    />
-  );
-
+  const held = materials.current;
   return (
     <>
-      {parts.mask ? (
-        <mesh geometry={parts.mask} receiveShadow renderOrder={-1}>
-          {solid("mask", { vertexColors: true, map: parts.hatch })}
-        </mesh>
-      ) : null}
-      {parts.copper ? (
-        <mesh geometry={parts.copper} renderOrder={-1}>
-          {solid("copper", {
-            vertexColors: true,
-            metalness: 0.5,
-            roughness: 0.5,
-          })}
-        </mesh>
-      ) : null}
-      {parts.core ? (
-        <mesh geometry={parts.core} renderOrder={-1}>
-          {solid("core", { vertexColors: true })}
-        </mesh>
-      ) : null}
-      {parts.rings ? (
-        <mesh geometry={parts.rings} renderOrder={-1}>
-          {solid("rings", { color: copper, metalness: 0.5, roughness: 0.5 })}
-        </mesh>
-      ) : null}
-      {/* A nested folder or a block editor's socket is a lighter patch on the board
-          its members stand on, which is what says where one block of a district
-          ends and the next starts. */}
-      {folders.map((folder) => (
-        <mesh
-          key={folder.id}
-          position={[
-            folder.centre.x,
-            FOLDER_TINT_HEIGHT / 2 - MASK / 2,
-            folder.centre.z,
-          ]}
-          receiveShadow
-          renderOrder={-1}
-        >
-          <boxGeometry
-            args={[folder.width, MASK + FOLDER_TINT_HEIGHT, folder.depth]}
-          />
-          {solid(`folder|${folder.id}`, { color: folderColour })}
-        </mesh>
-      ))}
-      <instancedMesh
-        args={[shapes.box, undefined, Math.max(1, fingerSpots.length)]}
-        frustumCulled={false}
-        ref={fingerMesh}
-        renderOrder={-1}
-      >
-        {solid("fingers", { color: gold, metalness: 0.6, roughness: 0.45 })}
-      </instancedMesh>
-      <instancedMesh
-        args={[shapes.via, undefined, Math.max(1, viaSpots.length)]}
-        frustumCulled={false}
-        ref={viaMesh}
-        renderOrder={-1}
-      >
-        {solid("vias", { color: copper, metalness: 0.5, roughness: 0.5 })}
-      </instancedMesh>
-      {/* The district's name printed flat on its board, in the band the layout held
-          clear along its south edge. It writes no depth, so the buildings, the
-          traces and every link stand over it, and it turns in place when the camera
-          is behind it, as the type names do.
-
-          ponytail: the print holds its strength through a selection and through focus
-          mode, where the buildings around it fade. Fading it too means telling the
-          boards which districts are lit, which is a prop and a set they have no other
-          use for. */}
-      {stampsOf.map(({ id, stamp, texture }) => (
-        <mesh
-          key={id}
-          position={[stamp.x, STAMP_Y, stamp.z]}
-          ref={(mesh) => {
-            if (mesh) stampMeshes.current.set(id, mesh);
-            else stampMeshes.current.delete(id);
-          }}
-          renderOrder={1}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <planeGeometry args={[stamp.width, stamp.height]} />
-          <meshBasicMaterial
-            color={palette.dim}
-            depthWrite={false}
-            map={texture}
-            opacity={0}
-            ref={trackMaterial(materials.current, `stamp|${id}`)}
-            transparent
-          />
-        </mesh>
-      ))}
+      <Layer
+        geometry={parts.mask}
+        look={{ vertexColors: true, map: parts.hatch }}
+        materials={held}
+        name="mask"
+      />
+      <Layer
+        geometry={parts.copper}
+        look={{ vertexColors: true, metalness: 0.5, roughness: 0.5 }}
+        materials={held}
+        name="copper"
+      />
+      <Layer
+        geometry={parts.core}
+        look={{ vertexColors: true }}
+        materials={held}
+        name="core"
+      />
+      <Layer
+        geometry={parts.rings}
+        look={{ color: colours.copper, metalness: 0.5, roughness: 0.5 }}
+        materials={held}
+        name="rings"
+      />
+      <Patches colour={colours.patch} folders={folders} materials={held} />
+      <Marks
+        fingers={fingers}
+        materials={held}
+        palette={palette}
+        shapes={shapes}
+        vias={vias}
+      />
+      <Stamps districts={districts} materials={held} palette={palette} />
     </>
   );
 }
