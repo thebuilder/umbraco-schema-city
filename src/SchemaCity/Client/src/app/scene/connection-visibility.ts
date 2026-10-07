@@ -6,13 +6,24 @@ export type ConnectionTrace = {
   opacity: number;
 };
 
+/**
+ * Seconds from the canvas's first frame to the end of the opening, which the
+ * connections' boot ends last: the boards, the buildings and the names are all in
+ * by then.
+ */
+const BOOT_END = 2.65;
+
+/** Whether the opening is still drawing, so the canvas keeps rendering through it. */
+export const introPlaying = (elapsed: number, reducedMotion: boolean) =>
+  !reducedMotion && elapsed < BOOT_END;
+
 export function connectionBootAt(
   elapsed: number,
   reducedMotion: boolean
 ): { phase: BootPhase; trace: number } {
   if (reducedMotion) return { phase: "done", trace: 1 };
   return {
-    phase: elapsed < 2.1 ? "trace" : elapsed < 2.65 ? "fade" : "done",
+    phase: elapsed < 2.1 ? "trace" : elapsed < BOOT_END ? "fade" : "done",
     trace: Math.min(1, Math.max(0, (elapsed - 1.35) / 0.65)),
   };
 }
@@ -28,7 +39,7 @@ export function connectionTraceAt(
   const fadeOut = Math.min(1, Math.max(0, (elapsed - 2.1) / 0.55));
   return {
     trace,
-    opacity: elapsed >= 2.65 ? 0 : Math.max(0, fadeIn * (1 - fadeOut)),
+    opacity: elapsed >= BOOT_END ? 0 : Math.max(0, fadeIn * (1 - fadeOut)),
   };
 }
 export function visibleConnections(

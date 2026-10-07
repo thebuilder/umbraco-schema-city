@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using SchemaCity.Graph;
+using SchemaCity.Review;
 using SchemaCity.Usage;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
@@ -24,5 +25,8 @@ public class SchemaCityComposer : IComposer
         // Also a singleton for its cache, but it expires on a timer rather than on a notification,
         // because content changes far more often than the content model does.
         builder.Services.AddSingleton<UsageCollector>();
+
+        // Holds nothing but the key-value service, so one instance serves every request.
+        builder.Services.AddSingleton<DecisionStore>();
     }
 }

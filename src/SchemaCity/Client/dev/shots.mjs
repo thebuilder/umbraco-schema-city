@@ -8,7 +8,8 @@
 // Every shot starts from a fresh navigation, because the app reads the query string
 // once on mount. `medium.json` is the harness's first fixture, so it is the one the
 // picker already has, and its usage report loads with it.
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { plannedBaseline } from "./planned-baseline.ts";
 import { quantise } from "./quantise.mjs";
 
 const out = process.argv[2] ?? ".";
@@ -62,6 +63,35 @@ const clickButton = (pattern, nth = 1) =>
     hits[${nth} - 1].click();
     return "ok";
   })()`);
+
+/**
+ * Opens Compare and imports the medium schema as it stood before four planned
+ * edits, through the drawer's own file input, as a reader would.
+ */
+async function importBaseline() {
+  const medium = JSON.parse(
+    readFileSync(new URL("./fixtures/medium.json", import.meta.url), "utf8")
+  );
+  const snapshot = JSON.stringify({
+    format: "schema-city",
+    version: 1,
+    capturedAt: "2026-10-01T09:00:00.000Z",
+    host: "live.example.com",
+    graph: plannedBaseline(medium),
+  });
+  await clickButton("/^Compare/");
+  await wait(600);
+  await run(`(() => {
+    const input = document.querySelector('input[type="file"]');
+    if (!input) return "miss";
+    const files = new DataTransfer();
+    files.items.add(new File([${JSON.stringify(snapshot)}], "baseline.json", { type: "application/json" }));
+    input.files = files.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return "ok";
+  })()`);
+  await wait(1500);
+}
 
 /** Drag across the canvas, which orbits the camera: sideways turns it, upwards lowers it. */
 async function orbit(from, to) {
@@ -126,6 +156,27 @@ const shots = [
       await wait(900);
     },
   },
+  // One finding marked as intentional and the reason form open on the next. The
+  // harness keeps decisions in memory, so the shot records them itself.
+  {
+    name: "review",
+    query: "?layers=structure",
+    async after() {
+      await clickButton("/^Findings/i");
+      await wait(900);
+      await clickButton("/^Mark as intentional/i");
+      await send("Input.insertText", {
+        text: "Waiting on the block library rewrite, which removes this editor.",
+      });
+      await clickButton("/^Save$/i");
+      await wait(400);
+      await clickButton("/^Mark as intentional/i");
+      await send("Input.insertText", {
+        text: "The importer maps both seoTitle sources on purpose.",
+      });
+      await wait(400);
+    },
+  },
   // The Content count lens with Article selected, so the inspector prints its usage.
   { name: "lens", query: "?type=article&lens=count&layers=structure" },
   // The table, sorted by own properties, most first. The first click sorts ascending.
@@ -149,6 +200,59 @@ const shots = [
     name: "datatypes",
     query: "?view=datatypes&dataType=7fa85b72-1d36-24f2-763f-e1719f0e9c41",
   },
+  // Seo Composition's impact with a planned seoTitle, which collides on Dup Alias
+  // Page, over the types that get its properties.
+  {
+    name: "impact",
+    query: "?view=impact&type=seoComposition",
+    async after() {
+      await run(`(() => {
+        const field = document.querySelector("input[aria-describedby]");
+        if (!field) return "miss";
+        field.focus();
+        return "ok";
+      })()`);
+      await send("Input.insertText", { text: "seoTitle" });
+      await wait(400);
+    },
+  },
+  // Compare against a baseline from before four planned edits, three of them
+  // marked planned from a pasted list, and Press Release opened on its side
+  // effects. The change layer colours the city behind the drawer.
+  {
+    name: "compare",
+    query: "?layers=structure",
+    async after() {
+      await importBaseline();
+      await clickButton("/^Paste a plan$/");
+      await run(`(() => {
+        const field = document.querySelector("textarea");
+        if (!field) return "miss";
+        const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+        set.call(field, "pressRelease, seoComposition, article");
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        return "ok";
+      })()`);
+      await clickButton("/^Mark as planned$/");
+      await clickButton("/^Paste a plan$/");
+      await clickButton("/^▸Press Release/");
+      await wait(900);
+    },
+  },
+  // Presenting Home's neighbourhood from a shared link: no toolbar, larger names,
+  // the caption card, and the bar a pointer move brings back.
+  {
+    name: "present",
+    query: "?type=home&focus=1&layers=structure&present=1",
+    async after() {
+      await send("Input.dispatchMouseEvent", {
+        type: "mouseMoved",
+        x: 1560,
+        y: 960,
+      });
+      await wait(500);
+    },
+  },
   // Orbited round and down to a few degrees above the ground, where the city meets
   // the horizon.
   {
@@ -162,8 +266,8 @@ const shots = [
 ];
 
 await send("Page.enable");
-// The harness's fixture picker is scaffolding, not product, so it stays out of the
-// shots. Injected on every navigation, before the app mounts, so the scene measures
+// The harness's sample picker in the footer is scaffolding, not product, so it
+// stays out of the shots. Injected on every navigation, before the app mounts, so the scene measures
 // the viewport it is actually photographed at.
 await send("Page.addScriptToEvaluateOnNewDocument", {
   // The first-visit hint is for people, not for the README, so every shot is a
@@ -171,10 +275,13 @@ await send("Page.addScriptToEvaluateOnNewDocument", {
   source: `try { localStorage.setItem("schema-city:hint-seen", "1"); } catch {}
   document.addEventListener("DOMContentLoaded", () => {
     const style = document.createElement("style");
-    style.textContent = ".demo-footer { display: none }";
+    style.textContent = ".demo-picker { display: none }";
     document.head.append(style);
   });`,
 });
+// Times in the app are shown in the viewer's zone, so the shots fix it to UTC and
+// come out the same on every machine.
+await send("Emulation.setTimezoneOverride", { timezoneId: "UTC" });
 await send("Emulation.setDeviceMetricsOverride", {
   width: 1600,
   height: 1000,

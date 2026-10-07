@@ -61,33 +61,44 @@ const overlaps = (a: LabelBox, b: LabelBox) =>
  * best rank first and a candidate is dropped when its building is too small,
  * when its anchor is off screen, or when its box lands on one already kept.
  *
- * Ties keep the order they came in, because Array.prototype.sort is stable, so
- * the caller decides what a group of equal rank means.
+ * Within a rank the labels in `kept` last time go first, so of two that meet the
+ * one already showing stays, and a small camera move does not swap them back and
+ * forth. Other ties keep the order they came in, because Array.prototype.sort is
+ * stable, so the caller decides what a group of equal rank means.
  */
 export function pickLabels(
   candidates: LabelCandidate[],
   options: {
     charPx?: number;
+    /** Box height, larger than `LABEL_HEIGHT_PX` when presentation mode scales the text. */
+    labelHeight?: number;
     cap?: number;
     minBuildingPx?: number;
     /** Viewport in CSS pixels. Anchors outside it are dropped. */
     width?: number;
     height?: number;
+    /** The ids kept last time, which win a tie in rank. */
+    shown?: ReadonlySet<string>;
   } = {}
 ): LabelBox[] {
   const {
     charPx = CHAR_PX,
+    labelHeight = LABEL_HEIGHT_PX,
     cap = LABEL_CAP,
     minBuildingPx = MIN_BUILDING_PX,
     width = Number.POSITIVE_INFINITY,
     height = Number.POSITIVE_INFINITY,
+    shown,
   } = options;
+  const held = (id: string) => (shown?.has(id) ? 0 : 1);
 
   const kept: LabelBox[] = [];
   // ponytail: every kept box is compared against every other, which is 800
   // comparisons at the cap. A grid or an interval tree pays off past a few
   // hundred labels, and the cap is 40.
-  for (const candidate of [...candidates].sort((a, b) => a.rank - b.rank)) {
+  for (const candidate of [...candidates].sort(
+    (a, b) => a.rank - b.rank || held(a.id) - held(b.id)
+  )) {
     if (kept.length >= cap) break;
     if (!candidate.pinned && candidate.buildingPx < minBuildingPx) continue;
     if (candidate.x < 0 || candidate.x > width) continue;
@@ -99,9 +110,9 @@ export function pickLabels(
       text: candidate.text,
       left: candidate.x - boxWidth / 2,
       // The anchor is the top face of the building, so the box sits above it.
-      top: candidate.y - LABEL_HEIGHT_PX,
+      top: candidate.y - labelHeight,
       width: boxWidth,
-      height: LABEL_HEIGHT_PX,
+      height: labelHeight,
     };
     if (kept.some((other) => overlaps(other, box))) continue;
     kept.push(box);

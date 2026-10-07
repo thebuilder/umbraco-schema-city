@@ -1,7 +1,7 @@
 // The buildings on screen: the instanced parts `buildings.ts` lays out, their glowing
 // edges, and the selection and hover frames. Kept out of Scene.tsx so the buildings
 // and the boards and traces can change without touching each other.
-import { type ThreeEvent, useFrame } from "@react-three/fiber";
+import type { ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
@@ -26,6 +26,8 @@ import {
   WINDOW_WIDTH,
   type WindowCell,
 } from "./buildings";
+import { introPlaying } from "./connection-visibility";
+import { useAnimationFrame } from "./frames";
 import type { LensScale } from "./lens";
 import { buildingRiseAt, revealAt } from "./reveal";
 
@@ -441,11 +443,13 @@ function useRisingParts(meshes: Meshes, parts: Parts, reducedMotion: boolean) {
   useEffect(() => {
     placeParts(meshes, parts, lastRise.current);
   }, [meshes, parts]);
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const rise = buildingRiseAt(state.clock.elapsedTime, reducedMotion);
-    if (rise === lastRise.current) return;
-    lastRise.current = rise;
-    placeParts(meshes, parts, rise);
+    if (rise !== lastRise.current) {
+      lastRise.current = rise;
+      placeParts(meshes, parts, rise);
+    }
+    return introPlaying(state.clock.elapsedTime, reducedMotion);
   });
 }
 
@@ -491,10 +495,11 @@ function useBuildingMaterials(reducedMotion: boolean) {
     },
     [fading]
   );
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const opacity = revealAt(state.clock.elapsedTime, reducedMotion).districts;
     for (const [material, resting] of fading)
       material.opacity = opacity * resting;
+    return introPlaying(state.clock.elapsedTime, reducedMotion);
   });
   // The unit shapes come with the materials, made and disposed per mount the same way.
   return { materials, plain, shapes: useUnitShapes() };
@@ -708,7 +713,7 @@ function BuildingFrame({
     [lines]
   );
 
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const placement = id === null ? undefined : placementsById.get(id);
     const rise = buildingRiseAt(state.clock.elapsedTime, reducedMotion);
     // A building on its way to a flat plate has left the conversation.
@@ -718,6 +723,7 @@ function BuildingFrame({
       lines.position.set(box.x, box.y, box.z);
       lines.scale.set(box.sx, box.sy, box.sz);
     }
+    return introPlaying(state.clock.elapsedTime, reducedMotion);
   });
 
   return <primitive frustumCulled={false} object={lines} />;

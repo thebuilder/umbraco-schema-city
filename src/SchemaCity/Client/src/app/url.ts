@@ -15,7 +15,14 @@ import { LENSES, type Lens } from "./scene/lens";
  * replace the canvas. One value rather than a flag each, because those views have no
  * camera and the camera has no table.
  */
-export type View = "city" | "list" | "tree" | "matrix" | "editor" | "datatypes";
+export type View =
+  | "city"
+  | "list"
+  | "tree"
+  | "matrix"
+  | "editor"
+  | "datatypes"
+  | "impact";
 
 /** The views drawn without the 3D canvas. */
 export const FLAT_VIEWS: readonly View[] = [
@@ -24,9 +31,16 @@ export const FLAT_VIEWS: readonly View[] = [
   "matrix",
   "editor",
   "datatypes",
+  "impact",
 ];
 
 const VIEWS: readonly View[] = ["city", ...FLAT_VIEWS];
+
+/**
+ * The views about one type rather than the whole schema. They open from the selected
+ * type, so a link that names one without a type opens the city instead of an empty page.
+ */
+export const TYPE_PAGES: readonly View[] = ["editor", "impact"];
 
 export type UrlState = {
   /** Alias of the type the view is about, or null when nothing is selected. */
@@ -39,6 +53,8 @@ export type UrlState = {
   group: Grouping;
   /** The Data Type the Data Types view shows, written only while that view is on. */
   dataType: string | null;
+  /** Presentation mode, so a link sent before a meeting opens presenting. */
+  present: boolean;
 };
 
 /**
@@ -66,16 +82,25 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
     // A lens the app does not have, and a link written before the usage report
     // existed, both read as no lens rather than as an error.
     lens: LENSES.find((candidate) => candidate === lens) ?? "none",
-    // A view name the app does not have reads as the city, the same way an unknown
-    // lens reads as no lens. That covers `top` and `explore`, the camera modes older
-    // links carry, which were only ever other angles on the same city.
-    view: VIEWS.find((candidate) => candidate === params.get("view")) ?? "city",
+    view: viewOf(params.get("view"), known),
     // Anything but folders, an old link with no group among them, is the default.
     group: params.get("group") === "folders" ? "folders" : "structure",
     // Kept as given: a key the schema does not have shows the list with nothing
     // chosen, which the view decides, not the parser.
     dataType: params.get("dataType"),
+    present: params.get("present") === "1",
   };
+}
+
+/**
+ * A view name the app does not have reads as the city, the same way an unknown lens
+ * reads as no lens. That covers `top` and `explore`, the camera modes older links
+ * carry, which were only ever other angles on the same city. So does a type page
+ * with no type to be about.
+ */
+export function viewOf(name: string | null | undefined, type: string | null) {
+  const view = VIEWS.find((candidate) => candidate === name) ?? "city";
+  return TYPE_PAGES.includes(view) && !type ? "city" : view;
 }
 
 /**
@@ -106,5 +131,6 @@ export function serialiseUrl(state: UrlState): string {
   if (state.group !== "structure") parts.push(`group=${state.group}`);
   if (state.view === "datatypes" && state.dataType)
     parts.push(`dataType=${encodeURIComponent(state.dataType)}`);
+  if (state.present) parts.push("present=1");
   return `?${parts.join("&")}`;
 }

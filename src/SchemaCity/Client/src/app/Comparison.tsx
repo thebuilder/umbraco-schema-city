@@ -1,36 +1,37 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { dayOf } from "../model/dates";
 import {
-  compareSchemas,
+  type ChangeGroups,
+  type ComparedSides,
+  changesCsv,
+  changesMarkdown,
+  sideLabel,
+} from "../model/changes";
+import {
   createSnapshot,
   readSnapshotFile,
   snapshotFileName,
 } from "../model/snapshots";
 import type { SchemaGraph } from "../model/types";
+import { useHandOff } from "./a11y";
 import { ComparisonResults } from "./ComparisonResults";
+import { READING } from "./InspectorChips";
+import { saveFile } from "./save-file";
+
+/** Where the loaded baseline came from: its host, or its file name when it has none. */
+type BaselineSource = { capturedAt: string; from: string };
 
 /** Saves the snapshot and returns the file name it was saved under. */
 function downloadSnapshot(graph: SchemaGraph): string {
-  const snapshot = createSnapshot(graph);
+  const snapshot = createSnapshot(graph, window.location.hostname);
   const name = snapshotFileName(window.location.hostname, snapshot.capturedAt);
-  const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  saveFile(JSON.stringify(snapshot, null, 2), name, "application/json");
   return name;
 }
 
-/** The file the last export saved, and the last import's error. */
+/** The last export or copy, and the last import's error. */
 function Status({
   error,
   saved,
@@ -42,7 +43,7 @@ function Status({
     <>
       {saved ? (
         <p className="mt-2 text-phosphor text-xs" role="status">
-          Exported {saved}.
+          {saved}
         </p>
       ) : null}
       {error ? (
@@ -54,14 +55,120 @@ function Status({
   );
 }
 
-/** The two snapshot dates. An epoch date is a placeholder, so it is left out. */
-function datesLine(generatedAt: string, baselineCapturedAt: string | null) {
-  const current = dayOf(generatedAt);
-  return `Current graph${current ? `: ${current}` : ""} · baseline ${dayOf(baselineCapturedAt) ?? "loaded"}`;
+/** Both snapshots' origins, the current one by this site's host. */
+const sidesOf = (
+  source: BaselineSource | null,
+  graph: SchemaGraph
+): ComparedSides => ({
+  baseline: source
+    ? sideLabel(source.from, source.capturedAt)
+    : "the loaded snapshot",
+  current: sideLabel(window.location.hostname, graph.generatedAt),
+});
+
+/** Where both snapshots came from, then Copy as Markdown and Export CSV with the plan. */
+function ExportButtons({
+  changes,
+  planned,
+  sides,
+  onDone,
+}: {
+  changes: ChangeGroups | null;
+  planned: ReadonlySet<string>;
+  sides: ComparedSides;
+  onDone: (message: string) => void;
+}) {
+  if (!changes) return null;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        changesMarkdown(changes, planned, sides)
+      );
+      onDone("Copied the changes as Markdown.");
+    } catch {
+      onDone("The browser did not allow copying. Export CSV instead.");
+    }
+  };
+  const exportCsv = () => {
+    const name = snapshotFileName(
+      window.location.hostname,
+      new Date().toISOString(),
+      "changes.csv"
+    );
+    saveFile(
+      changesCsv(changes, planned, sides),
+      name,
+      "text/csv;charset=utf-8"
+    );
+    onDone(`Exported ${name}.`);
+  };
+  return (
+    <>
+      <p className="mt-3 text-faint text-xs">
+        Baseline {sides.baseline}. Current {sides.current}.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button
+          className={READING}
+          onClick={() => void copy()}
+          size="sm"
+          variant="outline"
+        >
+          Copy as Markdown
+        </Button>
+        <Button
+          className={READING}
+          onClick={exportCsv}
+          size="sm"
+          variant="outline"
+        >
+          Export CSV
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/** The causes, or why there are none to list. */
+function ComparisonBody({
+  changes,
+  planned,
+  onPlanned,
+  onSelect,
+}: {
+  changes: ChangeGroups | null;
+  planned: ReadonlySet<string>;
+  onPlanned: (planned: ReadonlySet<string>) => void;
+  onSelect: (id: string) => void;
+}) {
+  if (!changes)
+    return (
+      <p className="px-4 py-4 text-label text-xs">
+        Export this schema first, or import a previous snapshot to begin a
+        comparison.
+      </p>
+    );
+  if (changes.causes.length === 0)
+    return (
+      <p className="mx-4 my-4 border border-line bg-muted px-3 py-2 text-phosphor text-xs">
+        No schema changes between these snapshots.
+      </p>
+    );
+  return (
+    <div className="px-4 py-4">
+      <ComparisonResults
+        changes={changes}
+        onPlanned={onPlanned}
+        onSelect={onSelect}
+        planned={planned}
+      />
+    </div>
+  );
 }
 
 export function Comparison({
   baseline,
+  changes,
   graph,
   onBaselineChange,
   onOpenChange,
@@ -69,6 +176,7 @@ export function Comparison({
   open,
 }: {
   baseline: SchemaGraph | null;
+  changes: ChangeGroups | null;
   graph: SchemaGraph;
   onBaselineChange: (graph: SchemaGraph | null) => void;
   onOpenChange: (open: boolean) => void;
@@ -77,15 +185,22 @@ export function Comparison({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
-  const [baselineCapturedAt, setBaselineCapturedAt] = useState<string | null>(
-    null
-  );
+  const [source, setSource] = useState<BaselineSource | null>(null);
+  // The causes marked planned. It lives as long as the baseline does, and a new
+  // import starts a new review.
+  const [planned, setPlanned] = useState<ReadonlySet<string>>(new Set());
   const input = useRef<HTMLInputElement>(null);
   const importSequence = useRef(0);
-  const comparison = useMemo(
-    () => (baseline ? compareSchemas(baseline, graph) : null),
-    [baseline, graph]
-  );
+  // Inspecting a type closes the drawer, so focus goes to the inspector heading.
+  const handOff = useHandOff(input);
+
+  const sides = sidesOf(source, graph);
+
+  const startOver = (next: BaselineSource | null) => {
+    setSource(next);
+    setPlanned(new Set());
+    setError(null);
+  };
 
   const importSnapshot = async (file: File) => {
     const sequence = ++importSequence.current;
@@ -95,24 +210,34 @@ export function Comparison({
       setError(parsed.error);
       return;
     }
-    setError(null);
-    setBaselineCapturedAt(parsed.snapshot.capturedAt);
+    startOver({
+      capturedAt: parsed.snapshot.capturedAt,
+      from: parsed.snapshot.host ?? file.name,
+    });
     onBaselineChange(parsed.snapshot.graph);
+  };
+
+  const exportCurrent = () => {
+    setSaved(`Exported ${downloadSnapshot(graph)}.`);
   };
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
-      <SheetContent className="w-full gap-0 p-0 sm:max-w-md">
-        <div className="border-line border-b px-4 py-3">
-          <SheetTitle className="text-sm uppercase tracking-terminal-lg">
+      <SheetContent
+        className="w-full gap-0 p-0 font-sans text-[13px] text-prose leading-normal sm:max-w-lg"
+        finalFocus={handOff.finalFocus}
+      >
+        <div className="border-line border-b px-4 pt-4 pb-3">
+          <SheetTitle className="font-sans font-semibold text-[17px] text-foreground">
             Compare schema
           </SheetTitle>
-          <p className="mt-1 text-muted-foreground text-xs">
-            Load a saved schema snapshot to see what changed. This compares
-            schema configuration only.
+          <p className="mt-1 text-label text-xs">
+            Load a saved schema snapshot to see what changed since. This
+            compares schema configuration only and never changes Umbraco.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
+              className={READING}
               onClick={() => input.current?.click()}
               size="sm"
               variant="outline"
@@ -120,7 +245,8 @@ export function Comparison({
               Import snapshot
             </Button>
             <Button
-              onClick={() => setSaved(downloadSnapshot(graph))}
+              className={READING}
+              onClick={exportCurrent}
               size="sm"
               variant="outline"
             >
@@ -128,11 +254,11 @@ export function Comparison({
             </Button>
             {baseline ? (
               <Button
+                className={READING}
                 onClick={() => {
                   importSequence.current += 1;
                   onBaselineChange(null);
-                  setBaselineCapturedAt(null);
-                  setError(null);
+                  startOver(null);
                 }}
                 size="sm"
                 variant="ghost"
@@ -142,6 +268,7 @@ export function Comparison({
             ) : null}
             <input
               accept="application/json,.json"
+              aria-label="Snapshot file"
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -152,25 +279,27 @@ export function Comparison({
               type="file"
             />
           </div>
+          <ExportButtons
+            changes={changes}
+            onDone={setSaved}
+            planned={planned}
+            sides={sides}
+          />
           <Status error={error} saved={saved} />
         </div>
         <ScrollArea
           className="min-h-0 flex-1"
           viewport={{ "aria-label": "Schema changes" }}
         >
-          {comparison ? (
-            <div className="space-y-3 px-3 py-4">
-              <p className="text-3xs text-label">
-                {datesLine(graph.generatedAt, baselineCapturedAt)}
-              </p>
-              <ComparisonResults comparison={comparison} onSelect={onSelect} />
-            </div>
-          ) : (
-            <p className="px-4 py-4 text-muted-foreground text-xs">
-              Export this schema first, or import a previous snapshot to begin a
-              comparison.
-            </p>
-          )}
+          <ComparisonBody
+            changes={changes}
+            onPlanned={setPlanned}
+            onSelect={(id) => {
+              handOff.chose();
+              onSelect(id);
+            }}
+            planned={planned}
+          />
         </ScrollArea>
       </SheetContent>
     </Sheet>

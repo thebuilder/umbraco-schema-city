@@ -71,7 +71,7 @@ describe("findingsCsv", () => {
   it("puts the header row first, with no preamble", () => {
     const [header] = lines(findingsCsv([broken], graph, usage));
     expect(header).toBe(
-      "Kind,Kind code,Severity,Type,Alias,Type key,Folder,Total,Published,Drafts,Trashed,Last edited,Backoffice path,Detail,Explanation,What to do,Related,Unused branch root,Filter,Schema snapshot,Usage snapshot,Data Types,Data Type keys"
+      "Kind,Kind code,Severity,Type,Alias,Type key,Folder,Total,Published,Drafts,Trashed,Last edited,Backoffice path,Detail,Explanation,What to do,Related,Unused branch root,Filter,Schema snapshot,Usage snapshot,Data Types,Data Type keys,Status,Reason,Decided by,Decided at,Reopened"
     );
   });
 
@@ -81,14 +81,16 @@ describe("findingsCsv", () => {
       'Broken block,brokenBlock,problem,"Page, root",page,page,Pages/News,12,9,2,1,2026-09-05,/umbraco/section/settings/workspace/document-type/edit/page,"Blocks, settings\nneed review",'
     );
     expect(output).toContain(
-      ",Missing Element Type deleted-key | Hub,,Broken block,2026-09-06,2026-09-06,,\n"
+      ",Missing Element Type deleted-key | Hub,,Broken block,2026-09-06,2026-09-06,,,open,,,,\n"
     );
   });
 
   it("says when the usage snapshot is missing and the export is not filtered", () => {
     const [, row] = lines(findingsCsv([{ ...broken, summary: "x" }], graph));
     expect(row).toContain(",page,Pages/News,,,,,,/umbraco/");
-    expect(row?.endsWith(",All kinds,2026-09-06,unavailable,,")).toBe(true);
+    expect(row?.endsWith(",All kinds,2026-09-06,unavailable,,,open,,,,")).toBe(
+      true
+    );
   });
 
   it("names the topmost unused ancestor of each unused type, cycle safe", () => {
@@ -112,7 +114,7 @@ describe("findingsCsv", () => {
     ).slice(1);
     // Hub's parent has content, so hub tops its own branch, and leaf is under it.
     // The column is for unused type rows only, not another kind on the same type.
-    expect(rows.map((row) => row.split(",").slice(-6)[0])).toEqual([
+    expect(rows.map((row) => row.split(",").slice(-11)[0])).toEqual([
       "Hub",
       "Hub",
       "",
@@ -152,7 +154,31 @@ describe("findingsCsv", () => {
     expect(row).toContain(
       "Unused Data Type,unusedDataType,note,,,,Legacy,,,,,,/umbraco/section/settings/workspace/data-type/edit/dt-old,"
     );
-    expect(row?.endsWith(",Old Picker,dt-old")).toBe(true);
+    expect(row?.endsWith(",Old Picker,dt-old,open,,,,")).toBe(true);
+  });
+
+  it("ends each row with its review status, escaping the reason", () => {
+    const decided = {
+      findingId: broken.id,
+      status: "intentional" as const,
+      reason: 'Kept, "for now"',
+      decidedBy: "Ada",
+      decidedByKey: "k",
+      decidedAt: "2026-10-07T08:41:00Z",
+      fingerprint: "f",
+    };
+    // The whole output, since the summary of this finding spans two lines.
+    const row = (reopened: boolean, hidden: boolean) =>
+      findingsCsv([broken], graph, usage, [], {
+        of: () => ({ decision: decided, reopened }),
+        hidden,
+      });
+    expect(row(false, true)).toContain(
+      ',All kinds | Reviewed hidden,2026-09-06,2026-09-06,,,intentional,"Kept, ""for now""",Ada,2026-10-07,no\n'
+    );
+    expect(row(true, false)).toContain(
+      ',All kinds,2026-09-06,2026-09-06,,,open,"Kept, ""for now""",Ada,2026-10-07,yes\n'
+    );
   });
 
   it.each(["", "\t", "  ", "\r\n"])(

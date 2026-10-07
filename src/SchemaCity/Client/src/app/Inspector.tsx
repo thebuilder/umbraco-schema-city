@@ -1,8 +1,16 @@
 import { XIcon } from "lucide-react";
-import { type CSSProperties, useId, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  use,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Finding } from "../model/findings";
+import type { Impact } from "../model/impact";
 import {
   connectionGroups,
   contentCountOf,
@@ -11,6 +19,7 @@ import {
   usageState,
 } from "../model/inspector";
 import type { Neighbourhood } from "../model/neighbourhood";
+import { checkCounts } from "../model/review";
 import type {
   SchemaEdge,
   SchemaNode,
@@ -18,6 +27,7 @@ import type {
   UsageReport,
 } from "../model/types";
 import { plural, roving, usePanelFocus } from "./a11y";
+import { ImpactSummary } from "./Impact";
 import {
   READING,
   ROLE,
@@ -31,6 +41,7 @@ import {
 } from "./InspectorFocusControls";
 import { InspectorProperties } from "./InspectorProperties";
 import { Connections, Overview } from "./InspectorTabs";
+import { Reviews } from "./Review";
 import { iconMask } from "./scene/icons";
 
 /**
@@ -106,12 +117,13 @@ function Glyph({ node, svg }: { node: SchemaNode; svg?: string }) {
   );
 }
 
-type Tab = "overview" | "properties" | "connections";
+type Tab = "overview" | "properties" | "connections" | "impact";
 
 const TAB_LABEL: Record<Tab, string> = {
   overview: "Overview",
   properties: "Properties",
   connections: "Connections",
+  impact: "Impact",
 };
 
 export function Inspector({
@@ -121,8 +133,8 @@ export function Inspector({
   node,
   nodesById,
   onClose,
-  editorLayoutOpen,
-  onEditorLayout,
+  editorOpen = false,
+  onEditor,
   onOpenType,
   onSelect,
   onToggleFocus,
@@ -134,7 +146,16 @@ export function Inspector({
   focusCount,
   onExpandFocus,
   canExpandFocus = false,
+  impact,
+  impactOpen = false,
+  onImpact,
 }: {
+  /** What a change to the type reaches, along every relationship. */
+  impact: Impact;
+  /** Whether the Impact page is on, tracing this type. */
+  impactOpen?: boolean;
+  /** Opens the Impact page on this type, or closes it when it is on. */
+  onImpact: () => void;
   focused: boolean;
   /** Umbraco icon name to SVG, the same map the scene puts on the roofs. */
   icons?: Record<string, string>;
@@ -142,9 +163,9 @@ export function Inspector({
   node: SchemaNode;
   nodesById: Map<string, SchemaNode>;
   onClose: () => void;
-  /** Shows the type in the editor view, unless that view is already on. */
-  onEditorLayout?: () => void;
-  editorLayoutOpen?: boolean;
+  /** Opens the Editor page on this type, or closes it when it is on. */
+  onEditor?: () => void;
+  editorOpen?: boolean;
   onOpenType?: (id: string) => void;
   onSelect: (id: string) => void;
   onToggleFocus: () => void;
@@ -173,9 +194,9 @@ export function Inspector({
   const kind = roleOf(node, neighbourhood);
   const role = ROLE[kind];
   const groups = connectionGroups(node, neighbourhood);
-  const problems = findings.filter(
-    (finding) => finding.severity === "problem"
-  ).length;
+  // Reviewed checks stay listed but leave the tab's count and its "!", so the badge
+  // speaks only for what still needs attention.
+  const checks = checkCounts(findings, use(Reviews)?.reviewOf);
   // A type in two groups, an Inherits parent that is also composed, is one type.
   const related = new Set(
     groups.flatMap((group) =>
@@ -185,17 +206,19 @@ export function Inspector({
   const total = node.ownPropertyCount + node.composedPropertyCount;
   const counts: Record<
     Tab,
-    { count: number; spoken: string; problem: boolean }
+    { count: number; spoken: string; problem: boolean; spokenAtZero?: boolean }
   > = {
     overview: {
-      count: findings.length,
+      count: checks.open,
       spoken: [
-        plural(findings.length, "check"),
-        problems > 0 ? plural(problems, "problem") : "",
+        plural(checks.open, "check"),
+        checks.problems > 0 ? plural(checks.problems, "problem") : "",
+        checks.reviewed > 0 ? `${checks.reviewed} reviewed` : "",
       ]
         .filter(Boolean)
         .join(", "),
-      problem: problems > 0,
+      problem: checks.problems > 0,
+      spokenAtZero: checks.reviewed > 0,
     },
     properties: {
       count: total,
@@ -205,6 +228,11 @@ export function Inspector({
     connections: {
       count: related,
       spoken: plural(related, "type"),
+      problem: false,
+    },
+    impact: {
+      count: impact.types,
+      spoken: `reaches ${plural(impact.types, "type")}`,
       problem: false,
     },
   };
@@ -271,17 +299,31 @@ export function Inspector({
             focused={focused}
             onToggleFocus={onToggleFocus}
           />
-          {/* Hidden while the editor view is already showing this type. */}
-          {onEditorLayout && !editorLayoutOpen ? (
+          {/* The two pages about this type, which is why they open from here and
+            not from the header. Pressed while on, and pressing again goes back
+            to the view they were opened from, as E and I do. */}
+          {onEditor ? (
             <Button
-              className={READING}
-              onClick={onEditorLayout}
+              aria-keyshortcuts="E"
+              aria-pressed={editorOpen}
+              className={`${READING} aria-pressed:border-phosphor aria-pressed:text-phosphor-bright`}
+              onClick={onEditor}
               size="sm"
               variant="outline"
             >
-              Editor layout
+              Editor view
             </Button>
           ) : null}
+          <Button
+            aria-keyshortcuts="I"
+            aria-pressed={impactOpen}
+            className={`${READING} aria-pressed:border-phosphor aria-pressed:text-phosphor-bright`}
+            onClick={onImpact}
+            size="sm"
+            variant="outline"
+          >
+            Impact
+          </Button>
           <Button
             className={`ml-auto ${READING} font-semibold`}
             onClick={() => onOpenType?.(node.id)}
@@ -302,15 +344,16 @@ export function Inspector({
         ) : null}
       </header>
 
+      {/* Four tabs and their counts fit the narrow panel only with tighter padding. */}
       <div
         aria-label={`${node.name} details`}
-        className="flex border-line border-b px-2"
+        className="flex border-line border-b px-1 @min-[1024px]:px-2"
         onKeyDown={roving}
         role="tablist"
       >
         {(Object.keys(TAB_LABEL) as Tab[]).map((id) => (
           <TabButton
-            className="px-2 pt-2.5 pb-2"
+            className="px-1 pt-2.5 pb-2 @min-[1024px]:px-2"
             id={`${base}-${id}`}
             key={id}
             onPick={() => setTab(id)}
@@ -322,6 +365,7 @@ export function Inspector({
               count={counts[id].count}
               problem={counts[id].problem}
               spoken={counts[id].spoken}
+              spokenAtZero={counts[id].spokenAtZero}
             />
           </TabButton>
         ))}
@@ -351,6 +395,13 @@ export function Inspector({
           ) : null}
           {tab === "connections" ? (
             <Connections {...tabProps} edges={edges} />
+          ) : null}
+          {tab === "impact" ? (
+            <ImpactSummary
+              impact={impact}
+              nodesById={nodesById}
+              onSelect={onSelect}
+            />
           ) : null}
         </div>
       </ScrollArea>

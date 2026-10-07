@@ -2,6 +2,7 @@
 // a reference designator in silkscreen beside its component, and the courtyard
 // outline around each component that frames its print. Pure: no three.js, no React,
 // no DOM. scene/BoardLabels.tsx rasterises and draws what this decides.
+import { clearOfEdge, type Finger, PRINT_MARGIN } from "./board";
 import { pixelsPerUnit } from "./stage";
 
 /**
@@ -342,7 +343,9 @@ export function rankPrints(fitted: readonly (Fitted | null)[]): Fitted[] {
  * or west, less the spacing, and at most `MAX_OVERHANG`. Beside means sharing some
  * of its north-south extent, which is every building in its row.
  *
- * Both neighbours take half the gap between them, so two names never meet.
+ * Both neighbours take half the gap between them, so two names never meet. Toward
+ * its board's edge, when `islands` gives the board, the overhang stops the print
+ * margin short of it, so a name never hangs off its board into the void.
  *
  * ponytail: every building against every other, about 90,000 pairs on the 300-type
  * fixture, once per layout. Sorting each row by x is the upgrade if a schema of
@@ -353,7 +356,9 @@ export function labelRoom(
     id: string;
     position: { x: number; z: number };
     footprint: number;
-  }[]
+    district?: string;
+  }[],
+  islands?: ReadonlyMap<string, Rect>
 ): Map<string, number> {
   const room = new Map<string, number>();
   for (const one of placements) {
@@ -368,11 +373,29 @@ export function labelRoom(
     }
     const overhang = Math.min(
       MAX_OVERHANG,
-      Math.max(0, open / 2 - NAME_SPACING / 2)
+      Math.max(0, open / 2 - NAME_SPACING / 2),
+      edgeRoom(one, islands?.get(one.district ?? ""))
     );
     room.set(one.id, one.footprint + overhang * 2);
   }
   return room;
+}
+
+/**
+ * How far a name centred under `one` may run past its sides and stay the print
+ * margin inside `island`'s east and west edges: the nearer edge limits both sides.
+ */
+function edgeRoom(
+  one: { position: { x: number }; footprint: number },
+  island: Rect | undefined
+): number {
+  if (!island) return Number.POSITIVE_INFINITY;
+  const half = one.footprint / 2;
+  const edge = Math.min(
+    one.position.x - half - island.minX,
+    island.maxX - one.position.x - half
+  );
+  return Math.max(0, edge - PRINT_MARGIN);
 }
 
 /** The widest a name prints when it stands clear of its neighbours. */
@@ -501,6 +524,82 @@ export function printRect(
   };
 }
 
+/**
+ * A board's edge as the names see it: its ground, the gold fingers on it and the
+ * ground its district's name prints on, when it has room for one.
+ */
+export type Edge = {
+  island: Rect;
+  fingers: readonly Finger[];
+  stamp?: Rect | null;
+};
+
+/**
+ * Whether a print at `rect` stays on its board: the print margin inside its edge,
+ * clear of its mounting holes, its gold fingers and its district's name.
+ */
+export function onBoard(rect: Rect, edge: Edge): boolean {
+  return (
+    clearOfEdge(rect, edge.island, edge.fingers) &&
+    !(edge.stamp && overlapping(edge.stamp, rect, PRINT_MARGIN))
+  );
+}
+
+/**
+ * The places a print of `width` by `height` may take round its building, best first,
+ * each on its board by `fits`. In front or behind, a print centred under its
+ * building that would run off the board's edge slides along it instead, until one
+ * end is flush with the building's side, so a name at the end of a row still reads
+ * as its building's, from inside the board.
+ */
+function placesFor(
+  want: Want,
+  width: number,
+  height: number,
+  flipped: boolean,
+  fits: (id: string, rect: Rect) => boolean
+): Rect[] {
+  const slack = Math.max(0, (width - want.footprint) / 2);
+  return SIDES.flatMap((side) => {
+    const rect = printRect(
+      want.centre,
+      want.footprint,
+      width,
+      height,
+      side,
+      flipped
+    );
+    const along = side === "front" || side === "back";
+    const tries =
+      fits(want.id, rect) || !along || slack === 0
+        ? [rect]
+        : [-slack, slack].map((by) => ({
+            ...rect,
+            minX: rect.minX + by,
+            maxX: rect.maxX + by,
+          }));
+    return tries.filter((one) => fits(want.id, one));
+  });
+}
+
+/** Each district's edge from its board, the fingers on any board and its name's ground. */
+export function boardEdges(
+  islands: ReadonlyMap<string, Rect>,
+  fingers: readonly Finger[],
+  stamps: ReadonlyMap<string, Rect | null>
+): Map<string, Edge> {
+  return new Map(
+    [...islands].map(([id, island]) => [
+      id,
+      {
+        island,
+        fingers: fingers.filter((finger) => finger.district === id),
+        stamp: stamps.get(id),
+      },
+    ])
+  );
+}
+
 /** One name to place: its building, and the prints it may use, best first. */
 export type Want = {
   id: string;
@@ -583,6 +682,9 @@ const overlapping = (a: Rect, b: Rect, gap: number) =>
  * screen and two that do not, do not, whatever the camera. That is what lets the
  * test run on the board rather than in pixels.
  *
+ * `fits` says whether a place lies on the name's own board, clear of its edge and
+ * the parts on it. A place it turns down is never taken, trace or no trace.
+ *
  * ponytail: greedy, with a uniform grid for the lookups. A name kept out by an
  * earlier one never asks it to move; a solver that shifted names along their row is
  * the upgrade if the overview starts dropping names it could have fitted.
@@ -591,7 +693,8 @@ export function placeLabels(
   wants: readonly Want[],
   buildings: readonly { id: string; rect: Rect }[],
   flipped: boolean,
-  crossesTrace: (rect: Rect) => boolean = () => false
+  crossesTrace: (rect: Rect) => boolean = () => false,
+  fits: (id: string, rect: Rect) => boolean = () => true
 ): Map<string, Placed> {
   const grid = new Map<string, Item[]>();
   const cells = (rect: Rect) => cellsOf(rect, PRINT_GAP);
@@ -629,15 +732,7 @@ export function placeLabels(
         width: number;
         height: number;
       };
-      for (const side of SIDES) {
-        const rect = printRect(
-          want.centre,
-          want.footprint,
-          width,
-          height,
-          side,
-          flipped
-        );
+      for (const rect of placesFor(want, width, height, flipped, fits)) {
         if (blocked(want.id, rect)) continue;
         const crosses = crossesTrace(rect);
         if (crosses && !cross) continue;
@@ -1045,15 +1140,18 @@ export type Sized = { em: number; prints: Fitted[] };
  * fitted against the other names on its board, which decide the context a print
  * may drop and the cuts that would read as some other type.
  *
+ * `islands`, each district's board, keeps the narrowest room on the board.
+ *
  * ponytail: every name on a board against every other, about 20,000 readings on the
  * pathological fixture's largest board, once per layout.
  */
 export function printsFor(
   standing: readonly Standing[],
   nameOf: (id: string) => string | undefined,
-  measure: (text: string) => number
+  measure: (text: string) => number,
+  islands?: ReadonlyMap<string, Rect>
 ): Map<string, Sized[]> {
-  const room = labelRoom(standing);
+  const room = labelRoom(standing, islands);
   const boards = new Map<string, { id: string; name: string }[]>();
   for (const one of standing) {
     const name = nameOf(one.id);
@@ -1216,6 +1314,11 @@ function mergeNearest(boards: Map<string, Ground>): boolean {
  * `placeLabels`. A building focus mode has pressed flat takes no space and prints
  * nothing.
  *
+ * `edges`, by district, keeps every name on its own board (`onBoard`): a name runs
+ * over open ground between buildings, but never off the board, over a hole or a
+ * finger, or over its district's name. Focus mode, which lays a
+ * neighbourhood out on an island of its own, passes none.
+ *
  * ponytail: six placements per board per layout. Solving a size lazily, on a
  * board's first switch to it, is the upgrade if a much larger schema makes the
  * first frame stall.
@@ -1224,9 +1327,17 @@ export function solveNames(
   standing: readonly Standing[],
   sizes: ReadonlyMap<string, Sizes>,
   usageOf: (id: string) => number,
-  crossesTrace?: (rect: Rect) => boolean
+  crossesTrace?: (rect: Rect) => boolean,
+  edges?: ReadonlyMap<string, Edge>
 ): Solution {
   const upright = standing.filter((one) => (one.flatten ?? 0) < FLAT);
+  const edgeOf = new Map(
+    upright.map((one) => [one.id, edges?.get(one.district)])
+  );
+  const fits = (id: string, rect: Rect) => {
+    const edge = edgeOf.get(id);
+    return !edge || onBoard(rect, edge);
+  };
   const buildings = upright.map((one) => ({
     id: one.id,
     rect: footprintRect(one),
@@ -1273,7 +1384,8 @@ export function solveNames(
           wants,
           taken,
           flipped,
-          crossesTrace
+          crossesTrace,
+          fits
         )) {
           out.set(id, spot);
           mine.push({ id: `print|${board}`, rect: grow(spot.rect, BOARD_GAP) });

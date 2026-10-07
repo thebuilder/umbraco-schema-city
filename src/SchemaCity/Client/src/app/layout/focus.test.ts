@@ -290,7 +290,7 @@ describe("layoutFocus", () => {
     expect(bounds.centre.z).toBeCloseTo((bounds.minZ + bounds.maxZ) / 2);
   });
 
-  it("fits the seeded Home and its forty-two neighbours into about seventy units square", () => {
+  it("fits the seeded Home and its forty-two neighbours into about seventy by eighty units", () => {
     const home = medium.nodes.find(
       (type) => type.alias === "home"
     ) as SchemaNode;
@@ -298,9 +298,10 @@ describe("layoutFocus", () => {
 
     expect(moved.length).toBe(43);
     // The buildings themselves, before the island's padding around them. It was 65
-    // until the smallest footprint grew from 2.4 to 3.2.
+    // until the smallest footprint grew from 2.4 to 3.2, and the depth grew to about
+    // 81 once every row kept a strip in front of it for its names.
     expect(bounds.maxX - bounds.minX - ISLAND_PAD * 2).toBeLessThan(72);
-    expect(bounds.maxZ - bounds.minZ - ISLAND_PAD * 2).toBeLessThan(72);
+    expect(bounds.maxZ - bounds.minZ - ISLAND_PAD * 2).toBeLessThan(84);
   });
 
   it("gives a node with no neighbours its own footprint plus padding", () => {

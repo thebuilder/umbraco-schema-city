@@ -39,12 +39,39 @@ describe("pickLabels", () => {
     expect(idsOf(kept)).toEqual(["high"]);
   });
 
+  it("keeps the label already showing when two of one rank meet", () => {
+    const pair = [candidate("first", 100, 100), candidate("second", 104, 100)];
+    expect(idsOf(pickLabels(pair))).toEqual(["first"]);
+    expect(idsOf(pickLabels(pair, { shown: new Set(["second"]) }))).toEqual([
+      "second",
+    ]);
+    // Rank still comes first: a label already showing gives way to a better one.
+    const better = [
+      candidate("held", 100, 100, { rank: 2 }),
+      candidate("better", 104, 100, { rank: 1 }),
+    ];
+    expect(idsOf(pickLabels(better, { shown: new Set(["held"]) }))).toEqual([
+      "better",
+    ]);
+  });
+
   it("drops a label stacked half a box above one it kept", () => {
     const kept = pickLabels([
       candidate("ground", 100, 100),
       candidate("roof", 100, 100 - LABEL_HEIGHT_PX / 2),
     ]);
     expect(idsOf(kept)).toEqual(["ground"]);
+  });
+
+  it("keeps taller boxes apart when presentation mode scales the text", () => {
+    const stacked = [
+      candidate("ground", 100, 100),
+      candidate("roof", 100, 100 - LABEL_HEIGHT_PX - 2),
+    ];
+    expect(idsOf(pickLabels(stacked))).toEqual(["ground", "roof"]);
+    expect(
+      idsOf(pickLabels(stacked, { labelHeight: LABEL_HEIGHT_PX * 1.4 }))
+    ).toEqual(["ground"]);
   });
 
   it("stops at the cap even when every label fits", () => {

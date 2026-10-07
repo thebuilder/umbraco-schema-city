@@ -341,6 +341,57 @@ public class SchemaGraphBuilderTests
         Assert.Equal(firstJson, secondJson);
     }
 
+    /// <summary>
+    /// A review decision reopens when its subject's fingerprint changes, so the fingerprint has to
+    /// be the same on every run and move when the type's properties or connections do. The pinned
+    /// value catches a change to the rule itself, which would reopen every stored decision.
+    /// </summary>
+    [Fact]
+    public void Fingerprint_is_stable_and_follows_properties_and_connections()
+    {
+        // The shared default Data Type gets a new key every run, so this one has a fixed key.
+        FakeDataType text = new(new object()) { Key = Guid.Parse("88888888-8888-8888-8888-888888888888") };
+        ContentType home = NewContentType(1100, HomeKey, "home", "Home", parentId: -1);
+        home.AddPropertyType(NewProperty("title", text, id: 1), "content", "Content");
+        home.PropertyGroups["content"].Key = Guid.Parse("66666666-6666-6666-6666-666666666666");
+        ContentType banner = NewContentType(1101, BannerKey, "banner", "Banner", parentId: -1);
+
+        string Of(SchemaGraph graph, Guid key) => graph.Nodes.Single(n => n.Id == key.ToString()).Fingerprint!;
+
+        SchemaGraph before = SchemaGraphBuilder.BuildGraph([home, banner], [], []);
+        Assert.Equal(Of(before, HomeKey), Of(SchemaGraphBuilder.BuildGraph([home, banner], [], []), HomeKey));
+        Assert.Equal("ce33d3efe11e4508", Of(before, HomeKey));
+
+        // A new property changes the type's fingerprint and leaves the unrelated one alone.
+        home.AddPropertyType(NewProperty("intro", text, id: 2), "content", "Content");
+        SchemaGraph withProperty = SchemaGraphBuilder.BuildGraph([home, banner], [], []);
+        Assert.NotEqual(Of(before, HomeKey), Of(withProperty, HomeKey));
+        Assert.Equal(Of(before, BannerKey), Of(withProperty, BannerKey));
+
+        // An allowed child is an edge, so it changes the fingerprint at both ends.
+        home.AllowedContentTypes = [new ContentTypeSort(BannerKey, 0, "banner")];
+        SchemaGraph withChild = SchemaGraphBuilder.BuildGraph([home, banner], [], []);
+        Assert.NotEqual(Of(withProperty, HomeKey), Of(withChild, HomeKey));
+        Assert.NotEqual(Of(withProperty, BannerKey), Of(withChild, BannerKey));
+    }
+
+    [Fact]
+    public void Fingerprint_of_a_data_type_follows_its_own_record()
+    {
+        FakeDataType dataType = new(new object())
+        {
+            Key = Guid.Parse("77777777-7777-7777-7777-777777777777"),
+            Name = "Spare",
+        };
+        string? Of() => Assert.Single(SchemaGraphBuilder.BuildGraph([], [], [dataType]).DataTypes).Fingerprint;
+
+        string? before = Of();
+        Assert.NotNull(before);
+        Assert.Equal(before, Of());
+        dataType.Name = "Spare text";
+        Assert.NotEqual(before, Of());
+    }
+
     private static PropertyType NewProperty(string alias, int id) =>
         NewProperty(alias, DefaultDataType, id);
 

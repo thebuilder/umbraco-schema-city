@@ -1,7 +1,7 @@
 // The editor view: the selected type drawn the way an editor meets it in Umbraco,
 // tabs across the top and groups as panels, so an overloaded tab or a long run of
 // composed fields is visible before anyone opens the backoffice editor.
-import { useId, useState } from "react";
+import { use, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -15,6 +15,7 @@ import {
 } from "../model/editor-layout";
 import { type Finding, type FindingKind, TAB_LIMIT } from "../model/findings";
 import type { Role } from "../model/inspector";
+import { splitReviewed } from "../model/review";
 import type { SchemaNode, SchemaProperty } from "../model/types";
 import { plural, roving, SEARCH_KEY } from "./a11y";
 import {
@@ -26,6 +27,7 @@ import {
   TabButton,
 } from "./InspectorChips";
 import { InspectorChecks } from "./InspectorDiagnostics";
+import { Reviews } from "./Review";
 import { Scroller } from "./TypeTable";
 
 type Lookup = Map<string, SchemaNode>;
@@ -143,7 +145,10 @@ export function EditorLayout({
   onSelect,
   findings,
   roleOf,
+  onImpact,
 }: {
+  /** Opens the impact trace for one of the type's properties, by alias. */
+  onImpact?: (alias: string, from: string | null) => void;
   selected: string | null;
   nodesById: Lookup;
   /** Opens the search palette, the one type picker the app already has. */
@@ -177,6 +182,7 @@ export function EditorLayout({
       key={node.id}
       node={node}
       nodesById={nodesById}
+      onImpact={onImpact}
       onSelect={onSelect}
       role={roleOf(node)}
     />
@@ -198,7 +204,9 @@ function PropertyItem({
   quiet,
   mixed,
   flag,
+  onImpact,
 }: {
+  onImpact?: (alias: string, from: string | null) => void;
   property: SchemaProperty;
   nodesById: Lookup;
   quiet: boolean;
@@ -209,7 +217,7 @@ function PropertyItem({
 }) {
   return (
     <li
-      className="grid grid-cols-[minmax(0,1fr)_minmax(0,14rem)] items-baseline gap-x-4 border-line/40 border-t border-l-2 border-l-transparent px-3 py-1.5 first:border-t-0 data-[flagged=true]:border-l-signal"
+      className="grid grid-cols-[minmax(0,1fr)_minmax(0,14rem)_auto] items-baseline gap-x-4 border-line/40 border-t border-l-2 border-l-transparent px-3 py-1.5 first:border-t-0 data-[flagged=true]:border-l-signal"
       data-flagged={flag !== undefined}
     >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
@@ -233,7 +241,19 @@ function PropertyItem({
           <span className="text-faint"> · varies by culture</span>
         ) : null}
       </DataTypeName>
-      <p className="col-span-2 text-signal text-xs empty:hidden">{flag}</p>
+      {onImpact ? (
+        <button
+          aria-label={`Impact of ${property.alias}`}
+          className="text-phosphor text-xs hover:text-phosphor-bright hover:underline"
+          onClick={() => onImpact(property.alias, property.fromCompositionId)}
+          type="button"
+        >
+          Impact
+        </button>
+      ) : (
+        <span />
+      )}
+      <p className="col-span-3 text-signal text-xs empty:hidden">{flag}</p>
     </li>
   );
 }
@@ -303,7 +323,9 @@ function Panel({
   onToggle,
   overloaded,
   flags,
+  onImpact,
 }: {
+  onImpact?: (alias: string, from: string | null) => void;
   panel: EditorPanel;
   nodesById: Lookup;
   open: boolean;
@@ -319,6 +341,7 @@ function Panel({
           key={rowKey(property)}
           mixed={panelSource(panel) === MIXED}
           nodesById={nodesById}
+          onImpact={onImpact}
           property={property}
           quiet={borrowed(panel)}
         />
@@ -400,7 +423,9 @@ function Layout({
   onSelect,
   findings,
   role,
+  onImpact,
 }: {
+  onImpact?: (alias: string, from: string | null) => void;
   node: SchemaNode;
   nodesById: Lookup;
   onSelect: (id: string) => void;
@@ -410,7 +435,13 @@ function Layout({
   const tabs = editorLayout(node);
   const tabRow = hasTabRow(tabs);
   const base = useId();
-  const flags = propertyFlags(node, findings, nodesById);
+  // Rows mark open findings only: a reviewed one still reads in the checks above,
+  // quietly, and a pink edge on its row would say it still needs work.
+  const flags = propertyFlags(
+    node,
+    splitReviewed(findings, use(Reviews)?.reviewOf).open,
+    nodesById
+  );
   const [open, setOpen] = useState(firstOwnTab(tabs)?.key);
   // Composed groups start folded; a key here is one the reader turned the other way.
   const [allComposed, setAllComposed] = useState(false);
@@ -496,6 +527,7 @@ function Layout({
               flags={flags}
               key={panel.key}
               nodesById={nodesById}
+              onImpact={onImpact}
               onToggle={() => flip(panel.key)}
               open={isOpen(panel)}
               overloaded={!tabRow && panel.properties.length > TAB_LIMIT}

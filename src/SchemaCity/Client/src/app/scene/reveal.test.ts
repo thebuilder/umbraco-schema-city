@@ -124,3 +124,16 @@ it("finishes tracing before solids appear and never retracts completed edges", (
   expect(revealAt(1.2).trace).toBe(1);
   expect(revealAt(1.2).wireframe).toBeLessThan(revealAt(0.8).wireframe);
 });
+
+it("lands an eased fade on its target, so a finished fade stops asking for frames", () => {
+  let opacity = 0;
+  let frames = 0;
+  while (opacity !== 1 && frames < 1000) {
+    opacity = transitionToward(opacity, 1, 1 / 60);
+    frames++;
+  }
+  expect(opacity).toBe(1);
+  // About two thirds of a second at 60 fps, about when the ease always looked done.
+  expect(frames).toBeLessThan(45);
+  expect(transitionToward(0.5, 0, 1 / 60)).toBeGreaterThan(0);
+});

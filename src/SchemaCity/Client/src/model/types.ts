@@ -33,6 +33,8 @@ export type SchemaDataType = {
   isBuiltIn?: boolean;
   /** A few cheap values, such as a block list's min and max. Only for the editors read. */
   configuration?: Record<string, string | number | boolean>;
+  /** What a review decision about it is tied to. Absent from fixtures and older graphs. */
+  fingerprint?: string;
 };
 
 export type SchemaFolder = {
@@ -57,6 +59,11 @@ export type SchemaNode = {
   ownPropertyCount: number;
   composedPropertyCount: number;
   templates: { id: string; alias: string; name: string; isDefault: boolean }[];
+  /**
+   * A hash of this record and every edge in or out of it, which a review decision is
+   * tied to. Absent from fixtures and older graphs.
+   */
+  fingerprint?: string;
 };
 
 export type PropertyGroup = {

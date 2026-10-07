@@ -158,7 +158,7 @@ export function treeRows(
 }
 
 /** Everything reachable from `starts` along `next`, the starts included. Safe in cycles. */
-function closure(
+export function closure(
   starts: Iterable<string>,
   next: ReadonlyMap<string, string[]>
 ): Set<string> {

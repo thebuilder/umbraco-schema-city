@@ -1,3 +1,4 @@
+import { LABEL_STRIP } from "../scene/board-labels";
 import type { Placement } from "./city";
 
 const GAP = 3;
@@ -62,7 +63,7 @@ export function expandFocusLayout(
       ...placement,
       position: {
         x: centreX - rowWidth / 2 + column * pitch + placement.footprint / 2,
-        z: firstZ + row * pitch,
+        z: firstZ + row * (pitch + LABEL_STRIP),
       },
     };
   });

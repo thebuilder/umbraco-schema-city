@@ -6,7 +6,7 @@ import {
   type PaintState,
   paintPart,
 } from "./building-paint";
-import type { LensScale } from "./lens";
+import { CHANGE_STEP, type LensScale } from "./lens";
 
 const colours = buildingColours({
   phosphor: "#00ff80",
@@ -103,5 +103,30 @@ describe("paintPart", () => {
     expect(hovered.g).toBeGreaterThan(plain.g);
     expect(faded.g).toBeCloseTo(plain.g * 0.2);
     expect(flat.g).toBeLessThan(faded.g);
+  });
+});
+
+describe("change layer", () => {
+  it("paints a cause louder than its side effect, and both louder than the rest", () => {
+    const scale: LensScale = {
+      ramp: "change",
+      t: new Map([
+        ["added", CHANGE_STEP.added],
+        ["cause", CHANGE_STEP.changed],
+        ["echo", CHANGE_STEP["side effect"]],
+        ["same", 0],
+      ]),
+      minLabel: "unchanged",
+      maxLabel: "added",
+    };
+    const lit = lensColours(scale, colours);
+    const brightness = (id: string) => {
+      const colour = lit.get(id) as THREE.Color;
+      return colour.r + colour.g + colour.b;
+    };
+    expect(lit.get("added")?.getHexString()).toBe(colours.azure.getHexString());
+    expect(lit.get("cause")?.getHexString()).toBe(colours.amber.getHexString());
+    expect(brightness("echo")).toBeLessThan(brightness("cause") / 2);
+    expect(brightness("same")).toBeLessThan(brightness("echo"));
   });
 });

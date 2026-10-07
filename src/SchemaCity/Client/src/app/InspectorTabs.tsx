@@ -15,7 +15,11 @@ import type { Neighbourhood } from "../model/neighbourhood";
 import type { SchemaEdge, SchemaNode, UsageReport } from "../model/types";
 import { plural } from "./a11y";
 import { DataTypeLink, Heading, TextButton, TypeChips } from "./InspectorChips";
-import { ExplainConnections, InspectorChecks } from "./InspectorDiagnostics";
+import {
+  ExplainConnections,
+  InspectorChecks,
+  useCheckNote,
+} from "./InspectorDiagnostics";
 
 type Lookup = Map<string, SchemaNode>;
 
@@ -188,10 +192,11 @@ export function Overview({
   ...props
 }: TabProps & { findings: Finding[]; onShowConnections: () => void }) {
   const { groups, nodesById, onSelect } = props;
+  const { note } = useCheckNote(findings);
   return (
     <>
       <Section>
-        <Heading>Checks</Heading>
+        <Heading note={note}>Checks</Heading>
         <InspectorChecks
           findings={findings}
           nodesById={nodesById}

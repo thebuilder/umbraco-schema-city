@@ -1,5 +1,12 @@
 import { expect, test } from "vitest";
 import {
+  clearOfEdge,
+  FINGER_REACH,
+  type Finger,
+  PRINT_MARGIN,
+  RING_RADIUS,
+} from "./board";
+import {
   atmosphere,
   districtStamp,
   framingAction,
@@ -7,6 +14,8 @@ import {
   pixelsPerUnit,
   STAMP_BAND,
   STAMP_CAP,
+  STAMP_MIN_CAP,
+  settlingResize,
 } from "./stage";
 
 test("no part of the city is in fog, wherever the camera orbits over it", () => {
@@ -55,6 +64,19 @@ test("only a new framing moves the camera", () => {
   expect(framingAction(at, { ...at, bounds: other })).toBe("fly");
   // Home asks for the city it is already looking at, so nothing but the count moves.
   expect(framingAction(at, { ...at, reframe: 1 })).toBe("fly");
+  // The canvas settling just after a reframe, as entering presentation does.
+  expect(framingAction(at, at, true)).toBe("fly");
+});
+
+test("a resize frames again only just after a reframe", () => {
+  const state = { until: 0, view: null as string | null };
+  expect(settlingResize(state, "small", false, 0)).toBe(false);
+  // A resize with no reframe behind it keeps the reader's camera.
+  expect(settlingResize(state, "large", false, 100)).toBe(false);
+  // The reframe itself is not a resize; the size it settles on next is.
+  expect(settlingResize(state, "large", true, 200)).toBe(false);
+  expect(settlingResize(state, "full", false, 900)).toBe(true);
+  expect(settlingResize(state, "back", false, 5000)).toBe(false);
 });
 
 test("a world unit at twice the distance is half the size on screen", () => {
@@ -64,41 +86,84 @@ test("a world unit at twice the distance is half the size on screen", () => {
   expect(900 / near).toBeCloseTo(2 * 100 * Math.tan((20 * Math.PI) / 180));
 });
 
+/** A stamp's ground as a rectangle, or a test failure when there is none. */
+function stampOf(
+  island: { minX: number; maxX: number; minZ: number; maxZ: number },
+  aspect: number
+) {
+  const stamp = districtStamp(island, aspect);
+  if (!stamp) throw new Error("no stamp");
+  return {
+    ...stamp,
+    minX: stamp.x - stamp.width / 2,
+    maxX: stamp.x + stamp.width / 2,
+    minZ: stamp.z - stamp.height / 2,
+    maxZ: stamp.z + stamp.height / 2,
+  };
+}
+
 test("a district's name prints in the band along the south edge of its island", () => {
   // "PAGES" tracked out, rasterised: about seven cap heights wide.
   const island = { minX: -20, maxX: 40, minZ: -10, maxZ: 30 };
-  const stamp = districtStamp(island, 7);
+  const stamp = stampOf(island, 7);
 
   // A full cap height, with no correction for the angle it is seen at.
   expect(stamp.height).toBeCloseTo(STAMP_CAP);
   expect(stamp.width / stamp.height).toBeCloseTo(7);
-  // Tucked into the south-west corner of the band, an inset in from either edge.
-  expect(stamp.x - stamp.width / 2).toBeCloseTo(island.minX + 0.5);
-  expect(stamp.z + stamp.height / 2).toBeCloseTo(island.maxZ - 0.5);
-  // And the whole of it inside the band, so no row can ever stand over a letter.
-  expect(stamp.z - stamp.height / 2).toBeGreaterThanOrEqual(
-    island.maxZ - STAMP_BAND
+  // Inset from the south and west edges by more than a hole ring's diameter.
+  expect(stamp.minX - island.minX).toBeGreaterThan(
+    RING_RADIUS * 2 + PRINT_MARGIN
   );
+  expect(island.maxZ - stamp.maxZ).toBeGreaterThan(
+    RING_RADIUS * 2 + PRINT_MARGIN
+  );
+  // And past a finger's reach, so a lane leaving by either edge never meets it.
+  expect(stamp.minX - island.minX).toBeGreaterThan(FINGER_REACH + PRINT_MARGIN);
+  // The whole of it inside the band, so no row can ever stand over a letter.
+  expect(stamp.minZ).toBeGreaterThanOrEqual(island.maxZ - STAMP_BAND);
+});
+
+test("a district's name stays clear of every hole, every finger and the edge", () => {
+  const island = { minX: 0, maxX: 30, minZ: 0, maxZ: 24 };
+  // Fingers wherever a lane could leave by the edges the name lies along.
+  const fingers: Finger[] = [];
+  for (let at = 0; at <= 30; at += 0.5)
+    fingers.push(
+      { district: "d", side: "south", x: at, z: island.maxZ },
+      { district: "d", side: "west", x: island.minX, z: Math.min(at, 24) },
+      { district: "d", side: "east", x: island.maxX, z: Math.min(at, 24) }
+    );
+  // From a short name to one that has to shrink to fit its row.
+  for (const aspect of [2, 7, 12, 30, 60]) {
+    const stamp = districtStamp(island, aspect);
+    if (!stamp) continue;
+    expect(clearOfEdge(stampOf(island, aspect), island, fingers)).toBe(true);
+  }
 });
 
 test("the band leaves half a street and a unit between the last row and the name", () => {
   const island = { minX: 0, maxX: 60, minZ: 0, maxZ: 40 };
-  const stamp = districtStamp(island, 7);
+  const stamp = stampOf(island, 7);
   const lastRowEdge = island.maxZ - STAMP_BAND;
-  expect(stamp.z - stamp.height / 2 - lastRowEdge).toBeCloseTo(3.5);
+  expect(stamp.minZ - lastRowEdge).toBeCloseTo(3.5);
 });
 
-test("a name too wide for its island shrinks instead of hanging over the void", () => {
-  const island = { minX: 0, maxX: 14, minZ: 0, maxZ: 14 };
-  const stamp = districtStamp(island, 7);
+test("a name too wide for its island shrinks instead of running over a hole", () => {
+  const island = { minX: 0, maxX: 20, minZ: 0, maxZ: 14 };
+  const stamp = stampOf(island, 7);
 
   expect(stamp.height).toBeLessThan(STAMP_CAP);
-  expect(stamp.x + stamp.width / 2).toBeCloseTo(island.maxX - 0.5);
-  expect(stamp.z - stamp.height / 2).toBeGreaterThanOrEqual(
-    island.maxZ - STAMP_BAND
-  );
+  // It ends as far in from the east edge as it starts from the west.
+  expect(island.maxX - stamp.maxX).toBeCloseTo(stamp.minX - island.minX);
+  expect(stamp.minZ).toBeGreaterThanOrEqual(island.maxZ - STAMP_BAND);
   // Cap height and width shrink together, so the letters keep their shape.
   expect(stamp.width / stamp.height).toBeCloseTo(7);
+});
+
+test("a name that would shrink past the smallest cap is left off its board", () => {
+  const island = { minX: 0, maxX: 10, minZ: 0, maxZ: 14 };
+  expect(districtStamp(island, 30)).toBeNull();
+  expect(stampOf(island, 2).height).toBeGreaterThanOrEqual(STAMP_MIN_CAP);
 });
 
 test("the camera rig snaps, flies, restores or plays the shot as the state asks", () => {

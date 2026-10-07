@@ -7,6 +7,7 @@
 // Element Type under every lens about content instances. Scene.tsx paints those
 // phosphor-dim while a lens is on, so the amber end of a ramp never has an amber
 // district beside it to be confused with.
+import type { ChangeKind } from "../../model/changes";
 import type { Finding } from "../../model/findings";
 import type { SchemaGraph, UsageReport } from "../../model/types";
 
@@ -42,7 +43,7 @@ export const LENS_LABEL: Record<Lens, string> = {
  * the worst pair for colour-vision deficiency, and both of those colours already
  * mean something else in this city.
  */
-export type Ramp = "sequential" | "diverging" | "binary";
+export type Ramp = "sequential" | "diverging" | "binary" | "change";
 
 export type LensScale = {
   ramp: Ramp;
@@ -56,7 +57,8 @@ export type LensScale = {
  * The same rules as the findings, so the lens and the drawer never disagree: a type
  * is unused when an unused check flagged it, and in use when it has content, a type
  * composes it or a block editor lists it. A dead end or an unreachable chain is
- * neither, and the lens stays silent about it.
+ * neither, and the lens stays silent about it. App passes open findings only, so a
+ * type marked intentionally unused falls silent too.
  */
 function unusedScale(
   graph: SchemaGraph,
@@ -102,6 +104,34 @@ export const highlightScale = (
   t: new Map(graph.nodes.map((node) => [node.id, lit.has(node.id) ? 1 : 0])),
   minLabel: "other types",
   maxLabel: "uses it",
+});
+
+/** Where each kind of change sits on the change ramp. Unchanged types sit at 0. */
+export const CHANGE_STEP: Record<ChangeKind, number> = {
+  added: 1,
+  removed: 1,
+  changed: 0.75,
+  "side effect": 0.5,
+};
+
+/**
+ * The change layer while a baseline is loaded: added, changed by its own edit,
+ * changed only as a side effect, and unchanged, each a step on its own ramp. The
+ * scene draws removed types as outlines, since they have no building.
+ */
+export const changeScale = (
+  graph: SchemaGraph,
+  kinds: ReadonlyMap<string, ChangeKind>
+): LensScale => ({
+  ramp: "change",
+  t: new Map(
+    graph.nodes.map((node) => {
+      const kind = kinds.get(node.id);
+      return [node.id, kind ? CHANGE_STEP[kind] : 0];
+    })
+  ),
+  minLabel: "unchanged",
+  maxLabel: "added",
 });
 
 /**

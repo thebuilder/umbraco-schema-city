@@ -134,20 +134,26 @@ export function RoleBadges({ node, role }: { node: SchemaNode; role: Role }) {
 }
 
 /**
- * A dot beside a name that a check flagged: pink for a problem, grey for a note.
- * The title names the checks, so a list row says why without opening the type.
+ * A dot beside a name that a check flagged: pink for a problem, grey for a note,
+ * and a hollow grey ring once every finding there is reviewed, so a decided row
+ * stays findable without competing with the open ones. The title names the checks,
+ * so a list row says why without opening the type.
  */
 export function FindingDot({
   severity = "problem",
+  reviewed = false,
   title,
 }: {
   severity?: FindingSeverity;
+  reviewed?: boolean;
   title: string;
 }) {
+  let fill = severity === "problem" ? "bg-signal" : "bg-label";
+  if (reviewed) fill = "border border-label";
   return (
     <span
       aria-label={title}
-      className={`inline-block size-1.5 shrink-0 rounded-full ${severity === "problem" ? "bg-signal" : "bg-label"}`}
+      className={`inline-block size-1.5 shrink-0 rounded-full ${fill}`}
       role="img"
       title={title}
     />
@@ -166,10 +172,13 @@ export function Heading({
   children,
   count,
   trace,
+  note,
 }: {
   children: ReactNode;
   count?: number;
   trace?: Trace;
+  /** Faint words after the count, such as how many checks are reviewed. */
+  note?: string;
 }) {
   return (
     <h3 className="mb-2 flex items-center gap-2 font-semibold text-label text-xs">
@@ -185,6 +194,9 @@ export function Heading({
           {count.toLocaleString()}
         </span>
       )}
+      {note ? (
+        <span className="font-normal text-2xs text-faint">{note}</span>
+      ) : null}
     </h3>
   );
 }
@@ -251,32 +263,38 @@ export function TabButton({
  * A count read as part of its control's name: "Properties, 26 properties". One that
  * stands for a problem adds a "!" so it differs from a note without its colour.
  * `tone` replaces the faint grey and the pink on a pressed or selected background,
- * where neither reaches 4.5:1.
+ * where neither reaches 4.5:1. A zero shows nothing, and says nothing unless
+ * `spokenAtZero`, for a zero that still means something, such as checks that are
+ * all reviewed.
  */
 export function SpokenCount({
   count,
   spoken,
   problem = false,
   tone,
+  spokenAtZero = false,
 }: {
   count: number;
   spoken: string;
   problem?: boolean;
   tone?: string;
+  spokenAtZero?: boolean;
 }) {
-  if (count === 0) return null;
+  if (count === 0 && !spokenAtZero) return null;
   return (
     <>
       <span className="sr-only">, {spoken}</span>
-      <span
-        aria-hidden
-        className={`font-mono text-2xs ${tone ?? "text-faint"}`}
-      >
-        {count.toLocaleString()}
-        {problem ? (
-          <span className={`font-bold ${tone ?? "text-signal"}`}>!</span>
-        ) : null}
-      </span>
+      {count === 0 ? null : (
+        <span
+          aria-hidden
+          className={`font-mono text-2xs ${tone ?? "text-faint"}`}
+        >
+          {count.toLocaleString()}
+          {problem ? (
+            <span className={`font-bold ${tone ?? "text-signal"}`}>!</span>
+          ) : null}
+        </span>
+      )}
     </>
   );
 }

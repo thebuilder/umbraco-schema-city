@@ -3,6 +3,7 @@
 // it. Below 760 px of room the page goes under the table instead.
 import {
   type RefObject,
+  use,
   useEffect,
   useId,
   useMemo,
@@ -21,8 +22,9 @@ import {
   matchDataTypes,
   storedTotals,
 } from "../model/data-types";
-import { FINDING_LABEL, type Finding } from "../model/findings";
+import type { Finding } from "../model/findings";
 import { chips, contentCountOf, type Role } from "../model/inspector";
+import { findingMark } from "../model/review";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
 import { plural, useAnnounceChange, usePanelFocus } from "./a11y";
 import {
@@ -32,8 +34,9 @@ import {
   RoleKey,
   TypeChips,
 } from "./InspectorChips";
-import { InspectorChecks } from "./InspectorDiagnostics";
+import { InspectorChecks, useCheckNote } from "./InspectorDiagnostics";
 import { Muted, Section, Values } from "./InspectorTabs";
+import { Reviews } from "./Review";
 import {
   FilterField,
   Scroller,
@@ -233,8 +236,9 @@ function ListToolbar({
 }
 
 /**
- * One Data Type in the list, with a dot for its findings: pink when one is a
- * problem, grey for notes only, and the kinds on hover.
+ * One Data Type in the list, with a dot for its findings: pink when an open one is
+ * a problem, grey for open notes only, a hollow ring when all are reviewed, and
+ * the kinds on hover.
  */
 function ListRow({
   row,
@@ -249,7 +253,7 @@ function ListRow({
   findings: Finding[];
   stored: boolean;
 }) {
-  const problem = findings.some((finding) => finding.severity === "problem");
+  const mark = findingMark(findings, use(Reviews)?.reviewOf);
   // On the selected row's background faint falls below 4.5:1, so it steps up.
   const count = (value: number | null) => (
     <td
@@ -278,16 +282,7 @@ function ListRow({
               built-in
             </span>
           ) : null}
-          {findings.length > 0 ? (
-            <FindingDot
-              severity={problem ? "problem" : "note"}
-              title={[
-                ...new Set(
-                  findings.map((finding) => FINDING_LABEL[finding.kind])
-                ),
-              ].join(", ")}
-            />
-          ) : null}
+          {mark ? <FindingDot {...mark} /> : null}
         </span>
       </th>
       <td className={`${CELL} text-label text-xs`}>{row.editor}</td>
@@ -315,6 +310,7 @@ function Detail(props: DetailProps) {
     () => contentCountOf(usage, nodesById, graph.edges ?? []),
     [usage, nodesById, graph.edges]
   );
+  const checks = useCheckNote(findings);
 
   return (
     <article aria-labelledby={headingId} ref={panel}>
@@ -339,7 +335,9 @@ function Detail(props: DetailProps) {
         ) : null}
         <Configuration dataType={dataType} />
         <Section>
-          <Heading count={findings.length}>Findings</Heading>
+          <Heading count={checks.open} note={checks.note}>
+            Findings
+          </Heading>
           <InspectorChecks
             empty="No checks flagged this Data Type."
             findings={findings}

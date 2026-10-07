@@ -3,7 +3,7 @@
 // round the component and its print. One canvas atlas holds every print and one
 // mesh draws them all; `board-labels.ts` decides the text, the size, which names fit
 // without touching and which way up they read.
-import { useFrame, useThree } from "@react-three/fiber";
+import { useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { SchemaNode, UsageReport } from "../../model/types";
@@ -13,6 +13,7 @@ import {
   boardTextPx,
   COURTYARD_SEGMENTS,
   courtyard,
+  type Edge,
   FADE_SECONDS,
   type Fades,
   fittedFontPx,
@@ -43,6 +44,8 @@ import {
   traceIndex,
   updateTiers,
 } from "./board-labels";
+import { introPlaying } from "./connection-visibility";
+import { useAnimationFrame } from "./frames";
 import { revealAt } from "./reveal";
 import { FOLDER_TINT_HEIGHT } from "./stage";
 
@@ -157,7 +160,8 @@ function buildAtlas(
   nodesById: Map<string, SchemaNode>,
   font: string,
   ratio: number,
-  gl: THREE.WebGLRenderer
+  gl: THREE.WebGLRenderer,
+  islands: ReadonlyMap<string, Rect>
 ): Atlas {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d") as CanvasRenderingContext2D;
@@ -168,7 +172,8 @@ function buildAtlas(
   const decided = printsFor(
     placements,
     (id) => nodesById.get(id)?.name,
-    measure
+    measure,
+    islands
   );
 
   const planned = [...decided].flatMap(([id, sized]) =>
@@ -373,6 +378,11 @@ const groundOf = (placement: { y?: number }) => placement.y ?? 0;
 type Frame = {
   camera: THREE.Camera;
   viewportHeight: number;
+  /**
+   * The viewport height a board's print size is chosen for, shorter than the real
+   * one while presenting so a board keeps larger print longer.
+   */
+  tierHeight: number;
   flipped: boolean;
   reveal: number;
   /** How far a fade moves this repaint, 1 for at once. */
@@ -676,7 +686,7 @@ function repaint(inputs: Inputs, frame: Frame, floated: Set<string>): boolean {
     frame.fades,
     inputs.solution.boards,
     frame.camera.position,
-    frame.viewportHeight
+    frame.tierHeight
   );
   frame.fades.moving = false;
   let printedChanged = false;
@@ -694,7 +704,8 @@ function repaint(inputs: Inputs, frame: Frame, floated: Set<string>): boolean {
 function useNameMesh(
   placements: readonly Placement[],
   nodesById: Map<string, SchemaNode>,
-  palette: { bright: string; amber: string; dim: string; mono: string }
+  palette: { bright: string; amber: string; dim: string; mono: string },
+  islands: ReadonlyMap<string, Rect>
 ) {
   const gl = useThree((state) => state.gl);
   const ratio = useThree((state) => state.viewport.dpr);
@@ -714,9 +725,9 @@ function useNameMesh(
   }, [fontsReady]);
 
   const atlas = useMemo(
-    () => buildAtlas(placements, nodesById, palette.mono, ratio, gl),
+    () => buildAtlas(placements, nodesById, palette.mono, ratio, gl, islands),
     // fontsReady is a trigger: the same inputs rasterise differently once it flips.
-    [placements, nodesById, palette.mono, ratio, gl, fontsReady]
+    [placements, nodesById, palette.mono, ratio, gl, islands, fontsReady]
   );
   useEffect(() => () => atlas.texture.dispose(), [atlas]);
   const geometry = useMemo(
@@ -809,7 +820,12 @@ function publishPrinted(inputs: Inputs, fades: Fades, floated: Floated) {
  * set or the way up has moved since the last one, or a fade is still under way, and
  * tells the label layer which whole names the board now prints.
  */
-function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
+function useRepaint(
+  inputs: Inputs,
+  floated: Floated,
+  reducedMotion: boolean,
+  textScale: number
+) {
   const camera = useThree((state) => state.camera);
   const height = useThree((state) => state.size.height);
   // A new solution starts its fades afresh; the hover and the selection do not.
@@ -825,10 +841,11 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
   const flipped = useRef(false);
   const forward = useMemo(() => new THREE.Vector3(), []);
 
-  useFrame((state, delta) => {
+  /** One frame's repaint, if anything moved; true while it needs another frame. */
+  const paint = (elapsed: number, step: number): boolean => {
     camera.getWorldDirection(forward);
     flipped.current = labelsFlipped(forward.x, forward.z, flipped.current);
-    const reveal = revealAt(state.clock.elapsedTime, reducedMotion).links;
+    const reveal = revealAt(elapsed, reducedMotion).links;
     const key = [
       inputs,
       fades,
@@ -836,23 +853,73 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
       floated.version,
       flipped.current,
       height,
+      textScale,
     ];
     const last = written.current;
-    if (unchanged(last, key, camera)) return;
+    if (unchanged(last, key, camera)) return false;
     const frame: Frame = {
       camera,
       viewportHeight: height,
+      // Presenting asks a board for `textScale` times the pixels before it takes a
+      // smaller size, the same sum as a viewport that much shorter. The legibility
+      // cut stays at the real height: raising it too left the overview 5 names.
+      tierHeight: height / textScale,
       flipped: flipped.current,
       reveal,
-      step: reducedMotion ? 1 : delta / FADE_SECONDS,
+      step,
       fades,
     };
-    if (repaint(inputs, frame, floated.ids))
-      publishPrinted(inputs, fades, floated);
+    // A new printed set changes what the floating labels leave out, and they read
+    // it on the next frame, so publishing one asks for that frame.
+    const published = repaint(inputs, frame, floated.ids);
+    if (published) publishPrinted(inputs, fades, floated);
     last.key = key;
     last.camera.copy(camera.matrixWorld);
     last.moving = fades.moving;
-  });
+    return fades.moving || published;
+  };
+
+  useAnimationFrame(
+    (state, delta) =>
+      paint(
+        state.clock.elapsedTime,
+        reducedMotion ? 1 : delta / FADE_SECONDS
+      ) || introPlaying(state.clock.elapsedTime, reducedMotion)
+  );
+}
+
+/**
+ * Where every name prints, solved once per settled layout. Only a new layout, new
+ * traces or new usage solve it again, so a camera move never moves a name.
+ */
+function useSolution(
+  cityPlacements: readonly Placement[],
+  settledById: Map<string, Placement>,
+  atlas: ReturnType<typeof useNameMesh>["atlas"],
+  usage: UsageReport | undefined,
+  traces: readonly Trace[],
+  edges: ReadonlyMap<string, Edge> | undefined
+) {
+  const traceAt = useMemo(() => traceIndex(traces), [traces]);
+  const settled = useMemo(
+    () =>
+      cityPlacements.map(
+        (placement) => settledById.get(placement.id) ?? placement
+      ),
+    [cityPlacements, settledById]
+  );
+  const solution = useMemo(
+    () =>
+      solveNames(
+        settled,
+        atlas.sizes,
+        (id) => usage?.byType[id]?.total ?? 0,
+        (rect) => traceAt(rect).length > 0,
+        edges
+      ),
+    [settled, atlas, usage, traceAt, edges]
+  );
+  return { traceAt, settled, solution };
 }
 
 export function BoardLabels({
@@ -867,6 +934,8 @@ export function BoardLabels({
   reducedMotion,
   traces,
   boardColours,
+  textScale,
+  boards,
 }: {
   /** The city's own placements, which decide every print and its size. */
   cityPlacements: readonly Placement[];
@@ -886,33 +955,34 @@ export function BoardLabels({
   traces: readonly Trace[];
   /** Each board's colour by district id, for the bare board under a print. */
   boardColours: Map<string, THREE.Color>;
+  /** How many times the usual pixels a board targets for its print size, 1.4 when presenting. */
+  textScale: number;
+  /**
+   * Each district's board, which keeps the narrowest of its names' prints on it, and
+   * its edge, which every print stays inside; no edges in focus mode.
+   */
+  boards: {
+    islands: ReadonlyMap<string, Rect>;
+    edges?: ReadonlyMap<string, Edge>;
+  };
 }) {
   const { atlas, geometry, material, courtyards, lineMaterial } = useNameMesh(
     cityPlacements,
     nodesById,
-    palette
+    palette,
+    boards.islands
   );
   const { knockouts, knockoutMaterial } = useKnockouts(
     cityPlacements,
     boardColours
   );
-  const traceAt = useMemo(() => traceIndex(traces), [traces]);
-  const settled = useMemo(
-    () =>
-      cityPlacements.map(
-        (placement) => settledById.get(placement.id) ?? placement
-      ),
-    [cityPlacements, settledById]
-  );
-  const solution = useMemo(
-    () =>
-      solveNames(
-        settled,
-        atlas.sizes,
-        (id) => usage?.byType[id]?.total ?? 0,
-        (rect) => traceAt(rect).length > 0
-      ),
-    [settled, atlas, usage, traceAt]
+  const { traceAt, settled, solution } = useSolution(
+    cityPlacements,
+    settledById,
+    atlas,
+    usage,
+    traces,
+    boards.edges
   );
 
   const inputs = useMemo(
@@ -944,7 +1014,7 @@ export function BoardLabels({
       interaction,
     ]
   );
-  useRepaint(inputs, floated, reducedMotion);
+  useRepaint(inputs, floated, reducedMotion, textScale);
 
   return (
     <>

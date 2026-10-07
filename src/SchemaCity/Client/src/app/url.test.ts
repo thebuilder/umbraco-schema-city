@@ -14,6 +14,7 @@ describe("parseUrl", () => {
       view: "city",
       group: "structure",
       dataType: null,
+      present: false,
     });
   });
 
@@ -28,6 +29,7 @@ describe("parseUrl", () => {
       view: "city",
       group: "structure",
       dataType: null,
+      present: false,
     });
   });
 
@@ -40,6 +42,7 @@ describe("parseUrl", () => {
       view: "city",
       group: "structure",
       dataType: null,
+      present: false,
     });
   });
 
@@ -83,6 +86,7 @@ describe("serialiseUrl", () => {
       view: "city",
       group: "structure",
       dataType: null,
+      present: false,
     });
   });
 
@@ -95,6 +99,7 @@ describe("serialiseUrl", () => {
       view: "city",
       group: "structure",
       dataType: null,
+      present: false,
     });
   });
 
@@ -107,6 +112,7 @@ describe("serialiseUrl", () => {
       view: "city",
       group: "structure",
       dataType: null,
+      present: false,
     });
   });
 
@@ -120,6 +126,7 @@ describe("serialiseUrl", () => {
         view: "city",
         group: "structure",
         dataType: null,
+        present: false,
       })
     ).toBe("?type=article&focus=1&layers=structure,compositions&lens=count");
   });
@@ -134,6 +141,7 @@ describe("serialiseUrl", () => {
         view: "city",
         group: "structure",
         dataType: null,
+        present: false,
       })
     ).toBe("?layers=");
   });
@@ -151,6 +159,7 @@ describe("urlToWrite", () => {
     view: "city",
     group: "structure",
     dataType: null,
+    present: false,
   };
 
   it("writes the query onto the route the app was mounted under", () => {
@@ -178,6 +187,7 @@ describe("the grouping", () => {
         view: "city",
         group: "folders",
         dataType: null,
+        present: false,
       })
     ).toBe("?layers=structure&group=folders");
   });
@@ -188,7 +198,12 @@ describe("the view", () => {
     expect(parseUrl("?view=list", aliases).view).toBe("list");
     expect(parseUrl("?view=tree", aliases).view).toBe("tree");
     expect(parseUrl("?view=matrix", aliases).view).toBe("matrix");
-    expect(parseUrl("?view=editor", aliases).view).toBe("editor");
+    expect(parseUrl("?view=editor&type=home", aliases).view).toBe("editor");
+    expect(parseUrl("?view=impact&type=home", aliases).view).toBe("impact");
+    // A type page is about a type, so without one, or with one the schema lost,
+    // the link opens the city rather than an empty page.
+    expect(parseUrl("?view=editor", aliases).view).toBe("city");
+    expect(parseUrl("?view=impact&type=gone", aliases).view).toBe("city");
     // The old camera modes are angles on the city, so their links open the city.
     expect(parseUrl("?view=top", aliases).view).toBe("city");
     expect(parseUrl("?view=explore", aliases).view).toBe("city");
@@ -202,6 +217,7 @@ describe("the view", () => {
         view: "list",
         group: "structure",
         dataType: null,
+        present: false,
       })
     ).toBe("?layers=structure&view=list");
   });
@@ -215,5 +231,24 @@ describe("the view", () => {
     expect(serialiseUrl({ ...at, view: "list" })).toBe(
       "?layers=structure&view=list"
     );
+  });
+});
+
+describe("presentation mode", () => {
+  it("reads present=1, writes it last, and reads anything else as off", () => {
+    expect(parseUrl("?present=1", aliases).present).toBe(true);
+    expect(parseUrl("?present=yes", aliases).present).toBe(false);
+    expect(
+      serialiseUrl({
+        type: "home",
+        focus: true,
+        layers: ["structure"],
+        lens: "none",
+        view: "matrix",
+        group: "structure",
+        dataType: null,
+        present: true,
+      })
+    ).toBe("?type=home&focus=1&layers=structure&view=matrix&present=1");
   });
 });

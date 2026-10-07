@@ -19,7 +19,7 @@ import * as THREE from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
-import { Button } from "@/components/ui/button";
+import type { ChangeGroups, ChangeKind } from "../model/changes";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaComparison } from "../model/snapshots";
@@ -52,8 +52,8 @@ import { describeRelationship, uniqueConnections } from "./relationship";
 import { BoardLabels, type Floated } from "./scene/BoardLabels";
 import {
   Boards,
+  cityBoards,
   FOLDER_PAD,
-  islandOf,
   rimColour,
   SLAB_HEIGHT,
   slabColour,
@@ -61,8 +61,14 @@ import {
   WHITE,
 } from "./scene/Boards";
 import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
-import { edgeFingers, type Finger, traceVias } from "./scene/board";
-import { tracesOf } from "./scene/board-labels";
+import {
+  edgeFingers,
+  type Finger,
+  type Island,
+  type Traced,
+  traceVias,
+} from "./scene/board";
+import { boardEdges, tracesOf } from "./scene/board-labels";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -76,6 +82,7 @@ import {
   connectionEmphasis,
   connectionPickable,
   connectionTraceAt,
+  introPlaying,
   visibleConnections,
 } from "./scene/connection-visibility";
 import {
@@ -87,10 +94,12 @@ import {
   groundAxes,
   keydownAction,
   orbitOffset,
+  stopped,
   translateFlightEndpoints,
   type Vec3,
   verticalStep,
 } from "./scene/flight";
+import { RedrawOnRender, useAnimationFrame } from "./scene/frames";
 import {
   type Framed,
   MIN_DISTANCE,
@@ -103,6 +112,7 @@ import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
   CHAR_PX,
   LABEL_CAP,
+  LABEL_HEIGHT_PX,
   labelAnchors,
   pickLabels,
   visibleLabelIds,
@@ -138,6 +148,7 @@ import {
   pixelsPerUnit,
   SKY_FRAGMENT_SHADER,
   SKY_VERTEX_SHADER,
+  settlingResize,
 } from "./scene/stage";
 
 /** Retain geometry through exits, then stop drawing a fully hidden layer. */
@@ -150,7 +161,7 @@ function useLayerReveal(
   segmentCount?: number
 ) {
   const opacity = useRef(0);
-  useFrame((state, delta) => {
+  useAnimationFrame((state, delta) => {
     const progress = revealAt(state.clock.elapsedTime, reducedMotion);
     const boot = connectionBootAt(state.clock.elapsedTime, reducedMotion);
     // The bright moving trace owns the entrance; settled paths crossfade under it.
@@ -175,6 +186,10 @@ function useLayerReveal(
     }
     if (material.current) material.current.opacity = opacity.current;
     if (object.current) object.current.visible = opacity.current > 0.001;
+    return (
+      introPlaying(state.clock.elapsedTime, reducedMotion) ||
+      opacity.current !== target
+    );
   });
 }
 
@@ -186,12 +201,13 @@ function BootProgress({
   onPhase: (phase: BootPhase) => void;
 }) {
   const last = useRef<BootPhase>(reducedMotion ? "done" : "trace");
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const { phase } = connectionBootAt(state.clock.elapsedTime, reducedMotion);
     if (phase !== last.current) {
       last.current = phase;
       onPhase(phase);
     }
+    return phase !== "done";
   });
   return null;
 }
@@ -287,7 +303,8 @@ function IntroOutline({
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);
-  useFrame((state) => {
+  useAnimationFrame((state) => {
+    const playing = introPlaying(state.clock.elapsedTime, reducedMotion);
     const reveal = revealAt(state.clock.elapsedTime, reducedMotion);
     const progress =
       phase === "connections"
@@ -295,7 +312,7 @@ function IntroOutline({
         : { trace: reveal.trace, opacity: reveal.wireframe };
     material.opacity = progress.opacity * strength;
     lines.visible = material.opacity > 0.001;
-    if (!lines.visible) return;
+    if (!lines.visible) return playing;
     geometry.instanceCount =
       traceOutlinePositions(positions, traced, progress.trace) / 2;
     if (grow)
@@ -306,6 +323,7 @@ function IntroOutline({
     (
       geometry.getAttribute("instanceStart") as THREE.InterleavedBufferAttribute
     ).data.needsUpdate = true;
+    return playing;
   });
   return <primitive frustumCulled={false} object={lines} />;
 }
@@ -482,7 +500,7 @@ function RoofIcons({
     }
   }, [groups, neighbours, palette]);
 
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const detailOpacity = revealAt(
       state.clock.elapsedTime,
       reducedMotion
@@ -532,6 +550,7 @@ function RoofIcons({
       mesh.instanceMatrix.needsUpdate = true;
     }
     if (plate) plate.instanceMatrix.needsUpdate = true;
+    return introPlaying(state.clock.elapsedTime, reducedMotion);
   });
 
   return (
@@ -614,8 +633,9 @@ function useFadedEdgeColors(
   geometry: RefObject<THREE.BufferGeometry | null>
 ) {
   const fadedColors = useMemo(() => colors.slice(), [colors.length]);
-  useFrame((_, delta) => {
+  useAnimationFrame((_, delta) => {
     const step = reducedMotion ? 1 : Math.min(delta, 0.1);
+    let moving = false;
     for (let i = 0; i < colors.length; i += 4) {
       fadedColors[i] = colors[i] as number;
       fadedColors[i + 1] = colors[i + 1] as number;
@@ -625,9 +645,11 @@ function useFadedEdgeColors(
         colors[i + 3] as number,
         step
       );
+      moving ||= fadedColors[i + 3] !== colors[i + 3];
     }
     const attribute = geometry.current?.getAttribute("color");
     if (attribute) attribute.needsUpdate = true;
+    return moving;
   });
 
   return fadedColors;
@@ -965,9 +987,10 @@ function LinkStrokes({
         new THREE.InstancedBufferAttribute(new Float32Array(alpha), 1)
       );
   }, [colors, geometry]);
-  useFrame((_, delta) => {
+  useAnimationFrame((_, delta) => {
     const attribute = geometry.getAttribute("instanceAlpha");
-    if (!attribute) return;
+    if (!attribute) return false;
+    let moving = false;
     for (let i = 0; i < attribute.count; i++) {
       const target = colors[i * 8 + 3] as number;
       attribute.setX(
@@ -976,8 +999,10 @@ function LinkStrokes({
           ? target
           : transitionToward(attribute.getX(i), target, Math.min(delta, 0.1))
       );
+      moving ||= attribute.getX(i) !== target;
     }
     attribute.needsUpdate = true;
+    return moving;
   });
   // LineSegments2 updates resolution from the active viewport before each draw.
   useEffect(() => () => geometry.dispose(), [geometry]);
@@ -1057,6 +1082,7 @@ function Labels({
   focusNeighbours,
   floated,
   reducedMotion,
+  textScale,
 }: {
   nodesById: Map<string, SchemaNode>;
   placementsById: Map<string, Placement>;
@@ -1072,6 +1098,8 @@ function Labels({
    */
   floated: Floated;
   reducedMotion: boolean;
+  /** How much larger than the chrome's own type the names are, 1.4 when presenting. */
+  textScale: number;
 }) {
   const camera = useThree((state) => state.camera);
   const gl = useThree((state) => state.gl);
@@ -1136,13 +1164,17 @@ function Labels({
     parent.append(layer);
     spans.current = made;
 
+    // Scaled from the class's own size, so presenting keeps the theme's type and
+    // only multiplies it.
+    const style = getComputedStyle(made[0]);
+    const fontPx = Number.parseFloat(style.fontSize) * textScale;
+    for (const span of made) span.style.fontSize = `${fontPx}px`;
     // One measurement of the real font beats a guess at the mono advance, and a
     // wrong width is either labels that touch or labels dropped for nothing.
     const context = document.createElement("canvas").getContext("2d");
     if (context) {
-      const style = getComputedStyle(made[0]);
-      context.font = `${style.fontSize} ${style.fontFamily}`;
-      charPx.current = context.measureText("M").width || CHAR_PX;
+      context.font = `${fontPx}px ${style.fontFamily}`;
+      charPx.current = context.measureText("M").width || CHAR_PX * textScale;
     }
     dirty.current = true;
 
@@ -1151,9 +1183,10 @@ function Labels({
       labelLayer.current = null;
       spans.current = [];
     };
-  }, [gl, reducedMotion]);
+  }, [gl, reducedMotion, textScale]);
 
-  useFrame((state) => {
+  useAnimationFrame((state) => {
+    const playing = introPlaying(state.clock.elapsedTime, reducedMotion);
     if (labelLayer.current)
       labelLayer.current.style.opacity = String(
         revealAt(state.clock.elapsedTime, reducedMotion).links
@@ -1163,7 +1196,7 @@ function Labels({
       printedSeen.current === floated.printedVersion &&
       camera.matrixWorld.equals(framedAt.current)
     )
-      return;
+      return playing;
     dirty.current = false;
     printedSeen.current = floated.printedVersion;
     framedAt.current.copy(camera.matrixWorld);
@@ -1197,7 +1230,13 @@ function Labels({
             buildingPx: behind ? 0 : candidate.footprint * perUnit,
           };
         }),
-      { charPx: charPx.current, width: size.width, height: size.height }
+      {
+        charPx: charPx.current,
+        labelHeight: LABEL_HEIGHT_PX * textScale,
+        width: size.width,
+        height: size.height,
+        shown: floated.ids,
+      }
     );
     // The board leaves out what floats, so a cut print never sits under the whole name.
     floated.ids.clear();
@@ -1214,6 +1253,7 @@ function Labels({
       span.style.transform = `translate(${Math.round(box.left)}px, ${Math.round(box.top)}px)`;
       if (span.textContent !== box.text) span.textContent = box.text;
     });
+    return playing;
   });
 
   return null;
@@ -1263,19 +1303,20 @@ function FocusIsland({
   if (island) shown.current = island;
   const at = shown.current;
 
-  useFrame((_, delta) => {
+  useAnimationFrame((_, delta) => {
     const to = island ? 1 : 0;
     const step = reducedMotion ? 1 : (delta * 1000) / TWEEN_MS;
     grown.current = Math.min(
       1,
       Math.max(0, grown.current + Math.sign(to - grown.current) * step)
     );
-    if (!group.current) return;
+    if (!group.current) return false;
     group.current.visible = grown.current > 0;
     // A group at the anchor scales about it, so the island opens out of the focused
     // node rather than appearing whole. Never exactly zero: a zero scale has no
     // normal matrix and three warns about it.
     group.current.scale.setScalar(Math.max(smootherstep(grown.current), 1e-4));
+    return grown.current !== to;
   });
 
   if (!at) return null;
@@ -1820,6 +1861,7 @@ function CameraRig({
     reframe: number;
   } | null>(null);
   const restored = useRef<View | null>(null);
+  const settling = useRef({ until: 0, view: null as View | null });
   const framing = useMemo(() => JSON.stringify(bounds), [bounds]);
   // The canvas is as wide as the area the panel sizes itself to.
   const covered = inspectorOpen ? inspectorWidthFor(size.width) : 0;
@@ -1863,7 +1905,17 @@ function CameraRig({
     // it started, so only a new set of bounds is allowed to move it.
     const first = framed.current === null;
     const asked = !first && framed.current?.reframe !== reframe;
-    const action = framingAction(framed.current, { bounds, controls, reframe });
+    const resized = settlingResize(
+      settling.current,
+      view,
+      asked,
+      performance.now()
+    );
+    const action = framingAction(
+      framed.current,
+      { bounds, controls, reframe },
+      resized
+    );
     framed.current = { bounds, controls, reframe };
     const back = kept.get(graph);
     const step = framingStep({
@@ -1896,11 +1948,12 @@ function CameraRig({
       flight.current = flightTo(opening, view, INTRO_MS, smootherstep);
       return;
     }
+    const short = asked || resized;
     flight.current = flightTo(
       poseOf(camera, controls, view.target),
       view,
-      asked ? REFRAME_MS : FLIGHT_MS,
-      asked ? smootherstep : easeInOutCubic
+      short ? REFRAME_MS : FLIGHT_MS,
+      short ? smootherstep : easeInOutCubic
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, bounds, controls, reframe, reducedMotion]);
@@ -1919,18 +1972,22 @@ function CameraRig({
 
   useRevealSelection(selectedAt, flight, covered, reducedMotion);
 
-  useFrame(() => {
+  useAnimationFrame(() => {
     const moving = flight.current;
-    if (controls) controls.enabled = moving === null;
-    if (!moving) return;
-    const t = moving.ease(
-      Math.min(1, (performance.now() - moving.started) / moving.ms)
-    );
-    const target = controls?.target ?? LOOSE_TARGET;
-    camera.position.lerpVectors(moving.from.position, moving.to.position, t);
-    target.lerpVectors(moving.from.target, moving.to.target, t);
-    camera.lookAt(target);
-    if (t >= 1) flight.current = null;
+    if (moving) {
+      const t = moving.ease(
+        Math.min(1, (performance.now() - moving.started) / moving.ms)
+      );
+      const target = controls?.target ?? LOOSE_TARGET;
+      camera.position.lerpVectors(moving.from.position, moving.to.position, t);
+      target.lerpVectors(moving.from.target, moving.to.target, t);
+      camera.lookAt(target);
+      if (t >= 1) flight.current = null;
+    }
+    // After the step, so the frame a flight lands on already hands the controls
+    // back: no frame may follow it.
+    if (controls) controls.enabled = flight.current === null;
+    return flight.current !== null;
   });
 
   return null;
@@ -2003,6 +2060,7 @@ function Flight({
 }) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as Rig | null;
+  const invalidate = useThree((state) => state.invalidate);
   const held = useMemo(() => new Set<string>(), []);
   const boosting = useRef(false);
   const velocity = useRef(new THREE.Vector3());
@@ -2023,6 +2081,8 @@ function Flight({
       // Without this the arrows scroll the backoffice around the city.
       event.preventDefault();
       held.add(event.code);
+      // A key press changes nothing React draws, so it wakes the canvas itself.
+      invalidate();
     };
     const up = (event: KeyboardEvent) => {
       boosting.current = event.shiftKey;
@@ -2040,12 +2100,12 @@ function Flight({
       window.removeEventListener("blur", release);
       release();
     };
-  }, [held, host]);
+  }, [held, host, invalidate]);
 
-  useFrame((_, delta) => {
-    if (!controls) return;
+  useAnimationFrame((_, delta) => {
+    if (!controls) return false;
     const moving = velocity.current;
-    if (held.size === 0 && moving.lengthSq() === 0) return;
+    if (held.size === 0 && moving.lengthSq() === 0) return false;
     // A tab that was in the background hands back one enormous delta, which would
     // teleport the camera as far as the whole time it was away.
     const step = Math.min(delta, 0.05);
@@ -2077,11 +2137,9 @@ function Flight({
         approach(moving.y, wanted.y, step),
         approach(moving.z, wanted.z, step)
       );
-    // A hundredth of a world unit a second is a stop, and rounding it to one keeps
-    // the frame from doing this work on every idle frame for ever.
-    if (moving.lengthSq() < 1e-4) {
+    if (stopped(moving)) {
       moving.set(0, 0, 0);
-      return;
+      return held.size > 0;
     }
     FLIGHT_STEP.copy(moving).multiplyScalar(step);
     // The orbit point rises no higher than the city is wide, which from the far
@@ -2100,6 +2158,7 @@ function Flight({
     }
     camera.position.add(FLIGHT_STEP);
     controls.target.add(FLIGHT_STEP);
+    return true;
   });
 
   return null;
@@ -2164,18 +2223,15 @@ function hintSeen(): boolean {
 }
 
 /**
- * The way back for a reader who is lost, over the bottom-left of the canvas: a
- * Reset view button that does what Home does, for the laptops that have no Home
- * key, and on the first visit a hint that says it is there. The hint goes with its
- * close button or the first press, scroll or key on the city.
+ * On the first visit, a hint over the bottom-left of the canvas that says how to
+ * move and where the way back is: Reset view in the footer under it, or Home. It
+ * goes with its close button or the first press, scroll or key on the city.
  */
-function CanvasOverlay({
+function FirstVisitHint({
   host,
-  onReset,
   raised,
 }: {
   host: RefObject<HTMLElement | null>;
-  onReset: () => void;
   /** Whether the comparison legend holds the corner, so this sits above it. */
   raised: boolean;
 }) {
@@ -2201,83 +2257,85 @@ function CanvasOverlay({
     };
   }, [hint, host]);
 
+  if (!hint) return null;
   return (
     <div
-      className={`absolute left-3 z-10 flex flex-col items-start gap-2 ${raised ? "bottom-14" : "bottom-3"}`}
+      // Chrome, which presenting hides.
+      className={`absolute left-3 z-10 flex max-w-72 items-start gap-2 border border-line bg-panel py-2 pr-1 pl-3 text-2xs text-phosphor leading-relaxed shadow-panel in-data-present:hidden ${raised ? "bottom-14" : "bottom-3"}`}
     >
-      {hint ? (
-        <div className="flex max-w-72 items-start gap-2 border border-line bg-panel py-2 pr-1 pl-3 text-2xs text-phosphor leading-relaxed shadow-panel">
-          <p>
-            Drag to orbit, scroll to zoom, click a building. Lost? Reset view.
-          </p>
-          <button
-            aria-label="Dismiss the hint"
-            className="shrink-0 px-1.5 text-phosphor-bright"
-            onClick={dismiss}
-            type="button"
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
-      <Button
-        aria-keyshortcuts="Home"
-        aria-label="Reset view, framing the whole city again"
-        className="bg-panel"
-        onClick={onReset}
-        size="sm"
-        variant="outline"
+      <p>
+        Drag to orbit, scroll to zoom, click a building. Lost? Reset view, in
+        the bar below, or Home.
+      </p>
+      <button
+        aria-label="Dismiss the hint"
+        className="shrink-0 px-1.5 text-phosphor-bright"
+        onClick={dismiss}
+        type="button"
       >
-        Reset view
-      </Button>
+        ×
+      </button>
     </div>
   );
 }
 
+/** A unit box's edges, scaled per removed type, so every outline shares one geometry. */
+const GHOST_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+
+/**
+ * The change layer's marks: a ring round each type with an edit of its own, azure
+ * when added and amber when changed, and an outline where each removed type stood.
+ * A side effect gets no ring, so the causes stand out from their echoes.
+ */
 function ComparisonMarks({
-  comparison,
+  kinds,
+  removed,
   placements,
   palette,
 }: {
-  comparison?: SchemaComparison | null;
+  kinds?: ReadonlyMap<string, ChangeKind>;
+  removed: Placement[];
   placements: Placement[];
   palette: Palette;
 }) {
-  const marks = useMemo(
-    () =>
-      new Map(
-        (comparison ? [...comparison.added, ...comparison.changed] : []).map(
-          (change) => [change.currentId, change.status]
-        )
-      ),
-    [comparison]
-  );
+  const ringed = (at: Placement) => {
+    const kind = kinds?.get(at.id);
+    return (kind === "added" || kind === "changed") && (at.flatten ?? 0) < 0.5;
+  };
   return (
     <group>
-      {placements
-        .filter((at) => marks.has(at.id) && (at.flatten ?? 0) < 0.5)
-        .map((at) => (
-          <mesh
-            key={at.id}
-            position={[at.position.x, (at.y ?? 0) + 0.08, at.position.z]}
-            rotation={[-Math.PI / 2, 0, Math.PI / 4]}
-          >
-            <ringGeometry
-              args={[
-                at.footprint / Math.SQRT2 + 0.45,
-                at.footprint / Math.SQRT2 + 0.7,
-                4,
-              ]}
-            />
-            <meshBasicMaterial
-              color={
-                marks.get(at.id) === "added" ? palette.azure : palette.amber
-              }
-              depthWrite={false}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-        ))}
+      {placements.filter(ringed).map((at) => (
+        <mesh
+          key={at.id}
+          position={[at.position.x, (at.y ?? 0) + 0.08, at.position.z]}
+          rotation={[-Math.PI / 2, 0, Math.PI / 4]}
+        >
+          <ringGeometry
+            args={[
+              at.footprint / Math.SQRT2 + 0.45,
+              at.footprint / Math.SQRT2 + 0.7,
+              4,
+            ]}
+          />
+          <meshBasicMaterial
+            color={
+              kinds?.get(at.id) === "added" ? palette.azure : palette.amber
+            }
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ))}
+      {removed.map((at) => (
+        <lineSegments
+          geometry={GHOST_EDGES}
+          key={at.id}
+          position={[at.position.x, at.height / 2, at.position.z]}
+          scale={[at.footprint, at.height, at.footprint]}
+        >
+          <lineBasicMaterial color={palette.signal} opacity={0.7} transparent />
+        </lineSegments>
+      ))}
     </group>
   );
 }
@@ -2296,21 +2354,70 @@ function subscribeReducedMotion(change: () => void) {
   return () => query.removeEventListener("change", change);
 }
 
+/**
+ * What the boards take from the drawn traces: the runs a printed name keeps off where
+ * it can, a via where a trace turns, a gold finger where one leaves its board, and the
+ * edges the printed names stay inside. A focus lays its neighbourhood out over the
+ * boards, on an island of its own, so off the city (`onCity` false) there are no
+ * fingers and no edges.
+ */
+function boardMarksOf(
+  routes: Traced[],
+  placementsById: Map<string, Placement>,
+  boards: {
+    islands: ReadonlyMap<string, Island>;
+    stamps: ReadonlyMap<string, Island | null>;
+  },
+  onCity: boolean
+) {
+  const fingers = onCity
+    ? edgeFingers(
+        routes,
+        (id) => placementsById.get(id)?.district,
+        boards.islands
+      )
+    : [];
+  return {
+    traces: tracesOf(routes, (id) => placementsById.get(id)?.position),
+    vias: traceVias(routes),
+    fingers,
+    edges: onCity
+      ? boardEdges(boards.islands, fingers, boards.stamps)
+      : undefined,
+  };
+}
+
+/**
+ * The focus the city shows. A link that opens on a focus builds the city first and
+ * gathers the neighbourhood once the opening is done, the way a click on Focus does,
+ * rather than building straight into the focus layout. Back from a 2D view the city
+ * keeps its pose instead, and any other focus shows at once.
+ */
+function useLinkedFocus(
+  asked: string | null,
+  graph: object,
+  boot: BootPhase
+): string | null {
+  const [linked] = useState(() => (kept.has(graph) ? null : asked));
+  return linked !== null && linked === asked && boot !== "done" ? null : asked;
+}
+
 export default function Scene({
   graph,
   grouping = "structure",
   usage,
   baseline,
   comparison,
+  changes,
   focusDepth = 1,
   scale,
   selected,
-  focus,
+  focus: asked,
   layers,
   icons,
   inspectorOpen = false,
+  textScale = 1,
   reframe = 0,
-  onReset,
   onSelect,
   onFocus,
 }: {
@@ -2321,6 +2428,8 @@ export default function Scene({
   usage?: UsageReport;
   baseline?: SchemaGraph | null;
   comparison?: SchemaComparison | null;
+  /** The comparison read as causes and side effects, for the change layer. */
+  changes?: ChangeGroups | null;
   focusDepth?: number;
   /** Umbraco icon name to SVG, for the roofs. The harness usually passes none. */
   icons?: Record<string, string>;
@@ -2336,12 +2445,15 @@ export default function Scene({
    */
   inspectorOpen?: boolean;
   /**
+   * How much larger the floating names are drawn and the printed ones chosen, 1.4 in
+   * presentation mode so they read from the back of a meeting room.
+   */
+  textScale?: number;
+  /**
    * Bumped to frame the whole city again. It is a count rather than a flag because
    * the camera has to answer Home a second time from wherever the reader took it.
    */
   reframe?: number;
-  /** What Home does, for the Reset view button over the canvas. */
-  onReset?: () => void;
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
 }) {
@@ -2357,6 +2469,7 @@ export default function Scene({
   const [bootPhase, setBootPhase] = useState<BootPhase>(
     reducedMotion ? "done" : "trace"
   );
+  const focus = useLinkedFocus(asked, graph, bootPhase);
   const [connectionPick, setConnectionPick] = useState<ConnectionPick | null>(
     null
   );
@@ -2364,7 +2477,7 @@ export default function Scene({
     () =>
       baseline && comparison
         ? comparisonCity(baseline, graph, comparison.matches, grouping)
-        : cityDistricts(graph, grouping),
+        : { ...cityDistricts(graph, grouping), removed: [] },
     [baseline, comparison, graph, grouping]
   );
   // The ground a nested folder's members cover, which tints that patch of its island.
@@ -2631,6 +2744,11 @@ export default function Scene({
     }
     return map;
   }, [routed]);
+  // Each district's board, and the ground its name prints on.
+  const boards = useMemo(
+    () => cityBoards(city.districts, palette),
+    [city, palette]
+  );
   // Where the drawn ground traces turn, for the vias, and where they leave their
   // board for another, for the gold fingers. Read off the plan the traces draw from,
   // which is kept per placement map and edge list, so this routes nothing again.
@@ -2640,23 +2758,8 @@ export default function Scene({
     const routes = planRoutes(routed.placementsById, drawnEdges)
       .routes.filter(({ edge }) => active.has(LAYER_OF[edge.kind]))
       .map(({ edge, points }) => ({ from: edge.from, to: edge.to, points }));
-    const islands = new Map(
-      city.districts.map((district) => [district.id, islandOf(district)])
-    );
-    return {
-      // The runs a printed name keeps off where it can.
-      traces: tracesOf(routes, (id) => routed.placementsById.get(id)?.position),
-      vias: traceVias(routes),
-      fingers:
-        focus === null
-          ? edgeFingers(
-              routes,
-              (id) => routed.placementsById.get(id)?.district,
-              islands
-            )
-          : [],
-    };
-  }, [routed, drawnEdges, active, focus, city]);
+    return boardMarksOf(routes, routed.placementsById, boards, focus === null);
+  }, [routed, drawnEdges, active, focus, boards]);
 
   const boardColours = useMemo(
     () =>
@@ -2694,12 +2797,15 @@ export default function Scene({
   return (
     // Focusable, so the flight keys have somewhere to belong: they fly only while
     // this or nothing has focus, and a click on the city focuses it. Closing the
-    // inspector hands focus back here for the same reason. A named region rather
-    // than an application, so a screen reader stays in its reading mode around it.
+    // inspector hands focus back here for the same reason, and a type picked in the
+    // city leaves focus here (data-keeps-focus) rather than moving it to the
+    // inspector. A named region rather than an application, so a screen reader stays
+    // in its reading mode around it.
     <section
       aria-label="City. W A S D or the arrows move the camera, [ and ] orbit. Press ? for all controls."
       className="absolute inset-0 outline-none focus-visible:outline-2 focus-visible:outline-phosphor-bright focus-visible:outline-offset-[-2px]"
       data-focus-home
+      data-keeps-focus
       ref={host}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the city takes keys, so a keyboard has to be able to reach it.
       tabIndex={0}
@@ -2708,6 +2814,9 @@ export default function Scene({
         <Canvas
           // The far plane is the world's to set, from where the fog ends.
           camera={{ fov: CAMERA_FOV, near: 0.5, far: 1000 }}
+          // Only when something changes: a city left open in the backoffice would
+          // otherwise redraw sixty times a second to show the same picture.
+          frameloop="demand"
           // A click on paving or on the void is a click on nothing, which is how the
           // city goes back the way it was without hunting for a close button.
           onPointerMissed={() => {
@@ -2717,6 +2826,7 @@ export default function Scene({
           shadows="percentage"
         >
           <ReleaseResources />
+          <RedrawOnRender />
           <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
           <Stage
             districts={city.districts}
@@ -2847,9 +2957,10 @@ export default function Scene({
             </Html>
           ) : null}
           <ComparisonMarks
-            comparison={comparison}
+            kinds={changes?.kinds}
             palette={palette}
             placements={placements}
+            removed={city.removed}
           />
           {/* The floating labels first, so the board reads this frame's floated set
               rather than the last one's. */}
@@ -2864,9 +2975,11 @@ export default function Scene({
             placementsById={placementsById}
             reducedMotion={reducedMotion}
             selected={selected}
+            textScale={textScale}
           />
           <BoardLabels
             boardColours={boardColours}
+            boards={{ islands: boards.islands, edges: boardMarks.edges }}
             cityPlacements={city.placements}
             floated={floated}
             interaction={interaction}
@@ -2875,6 +2988,7 @@ export default function Scene({
             placementsById={placementsById}
             reducedMotion={reducedMotion}
             settledById={routed.placementsById}
+            textScale={textScale}
             traces={boardMarks.traces}
             usage={usage}
           />
@@ -2899,13 +3013,7 @@ export default function Scene({
           <Controls reducedMotion={reducedMotion} span={span} />
         </Canvas>
       ) : null}
-      {onReset ? (
-        <CanvasOverlay
-          host={host}
-          onReset={onReset}
-          raised={Boolean(baseline && comparison)}
-        />
-      ) : null}
+      <FirstVisitHint host={host} raised={scale?.ramp === "change"} />
     </section>
   );
 }

@@ -1,6 +1,16 @@
 import { expect, test } from "vitest";
+import mediumFixture from "../../dev/fixtures/medium.json";
+import { plannedBaseline } from "../../dev/planned-baseline";
+import { type ChangeKind, groupChanges } from "../model/changes";
+import { compareSchemas } from "../model/snapshots";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
-import { type SortKey, sortRows, typeRows } from "./TypeTable";
+import {
+  compareRows,
+  type SortKey,
+  sortRows,
+  typeRows,
+  visibleRows,
+} from "./TypeTable";
 
 const node = (id: string, extra: Partial<SchemaNode> = {}): SchemaNode => ({
   id,
@@ -88,4 +98,92 @@ test("clicking a header sorts by it, and clicking it again turns it round", () =
   expect(names("children", true)).toEqual(["Article", "Card", "Home"]);
   // A role sorts as text, by name inside it.
   expect(names("role", true)).toEqual(["Card", "Article", "Home"]);
+});
+
+test("lists a removed type after the current ones, and says how each changed", () => {
+  // The medium schema taken as the baseline this time, so Press Release is removed.
+  const baseline = mediumFixture as SchemaGraph;
+  const current = plannedBaseline(baseline);
+  const changes = groupChanges(compareSchemas(baseline, current));
+  const rows = compareRows(current, undefined, { baseline, changes });
+  const change = (name: string) =>
+    rows.find((row) => row.name === name)?.change;
+  expect(rows).toHaveLength(baseline.nodes.length);
+  expect(rows[rows.length - 1]?.name).toBe("Press Release");
+  expect(change("Press Release")).toBe("removed");
+  expect(change("Seo Composition")).toBe("changed");
+  expect(change("Home")).toBe("side effect");
+  expect(change("Settings")).toBe("none");
+  expect(compareRows(current, undefined, null)[0]?.change).toBeUndefined();
+});
+
+test("sorts the change column by severity, not by spelling", () => {
+  const kinds = new Map<string, ChangeKind>([
+    ["added", "added"],
+    ["effect", "side effect"],
+    ["changed", "changed"],
+    ["removed", "removed"],
+  ]);
+  const rows = typeRows(
+    {
+      ...graph,
+      nodes: ["none", "effect", "added", "changed", "removed", "also"].map(
+        (id) => node(id)
+      ),
+      edges: [],
+    },
+    undefined,
+    kinds
+  );
+  const names = (ascending: boolean) =>
+    sortRows(rows, "change", ascending).map((row) => row.name);
+  // Two unchanged types fall back to the name, as every column does.
+  expect(names(true)).toEqual([
+    "removed",
+    "changed",
+    "added",
+    "effect",
+    "also",
+    "none",
+  ]);
+  expect(names(false)).toEqual([
+    "none",
+    "also",
+    "effect",
+    "added",
+    "changed",
+    "removed",
+  ]);
+});
+
+test("filters by change, and finds a removed type by name but not in focus", () => {
+  const rows = [
+    ...typeRows(
+      { ...graph, nodes: [node("home"), node("card")], edges: [] },
+      undefined,
+      new Map([["home", "changed"]])
+    ),
+    {
+      ...typeRows({ ...graph, nodes: [node("legacy")], edges: [] })[0],
+      change: "removed" as const,
+    },
+  ] as ReturnType<typeof typeRows>;
+  const ids = (options: Partial<Parameters<typeof visibleRows>[1]>) =>
+    visibleRows(rows, {
+      matched: null,
+      query: "",
+      scope: null,
+      filter: "all",
+      ...options,
+    }).map((row) => row.id);
+  expect(ids({})).toEqual(["home", "card", "legacy"]);
+  expect(ids({ filter: "any" })).toEqual(["home", "legacy"]);
+  expect(ids({ filter: "none" })).toEqual(["card"]);
+  expect(ids({ matched: new Set(["card"]), query: "LEG" })).toEqual([
+    "card",
+    "legacy",
+  ]);
+  expect(ids({ matched: new Set(["home"]), scope: new Set(["home"]) })).toEqual(
+    ["home"]
+  );
 });

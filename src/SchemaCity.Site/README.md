@@ -66,11 +66,20 @@ Open http://localhost:5173. The harness uses the checked-in small, medium and pa
 
 ## API routes
 
-The backoffice calls these endpoints from the Settings section. Both require the user's normal
+The backoffice calls these endpoints from the Settings section. All of them require the user's normal
 Umbraco Settings section permission:
 
 - `GET /umbraco/management/api/v1/schema-city/graph`
 - `GET /umbraco/management/api/v1/schema-city/usage`
+- `GET /umbraco/management/api/v1/schema-city/decisions`
+- `PUT /umbraco/management/api/v1/schema-city/decisions/{findingId}` with `{ "reason", "fingerprint" }`
+- `DELETE /umbraco/management/api/v1/schema-city/decisions/{findingId}`
+
+A PUT records the finding as intentional for the signed-in user. It answers 400 for a malformed
+finding id, a reason that is empty or longer than 500 characters, or a type that no longer exists,
+and 409 when the fingerprint no longer matches the type, which means the page is older than the
+schema. Decisions live in `umbracoKeyValue` under `SchemaCity.Decision.`; deleting the demo
+database deletes them too.
 
 The usage endpoint accepts `?refresh=true` to skip its one-minute cache. There is no generated API
 client.

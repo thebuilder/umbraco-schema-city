@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   approach,
+  BOOST,
   desiredTurn,
   desiredVelocity,
   FLY_SPEED,
@@ -8,6 +9,7 @@ import {
   groundAxes,
   keydownAction,
   orbitOffset,
+  stopped,
   translateFlightEndpoints,
   verticalStep,
 } from "./flight";
@@ -241,4 +243,16 @@ test("pressing Shift mid-flight boosts rather than stopping", () => {
     expect(
       keydownAction(press("ShiftLeft", HOST, { key, shiftKey: true }), HOST)
     ).toBe("modifier");
+});
+
+test("a released key coasts to a stop within two seconds, even boosted from far out", () => {
+  // The canvas renders for as long as the camera coasts, so the coast has to end.
+  let speed = flySpeed(400) * BOOST;
+  let frames = 0;
+  while (!stopped({ x: speed, y: 0, z: 0 })) {
+    speed = approach(speed, 0, 1 / 60);
+    frames++;
+  }
+  expect(frames).toBeGreaterThan(30);
+  expect(frames).toBeLessThan(120);
 });

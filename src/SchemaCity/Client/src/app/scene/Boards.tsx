@@ -17,8 +17,19 @@ import {
   type DistrictKind,
   ISLAND_PAD,
 } from "../layout/city";
-import { type Finger, holeSpots, type Island } from "./board";
+import {
+  FINGER_REACH,
+  FINGER_WIDTH,
+  type Finger,
+  fingerRect,
+  HOLE_RADIUS,
+  holeSpots,
+  type Island,
+  RING_RADIUS,
+} from "./board";
 import { labelsFlipped } from "./board-labels";
+import { introPlaying } from "./connection-visibility";
+import { useAnimationFrame } from "./frames";
 import { revealAt } from "./reveal";
 import { districtStamp, FOLDER_TINT_HEIGHT } from "./stage";
 
@@ -39,12 +50,7 @@ const MASK = 0.1;
 const COPPER = 0.035;
 /** Radius of a board's corners. */
 const CORNER = 1.2;
-/** Mounting holes: the drill and the plated ring around it. */
-const HOLE_RADIUS = 0.32;
-const RING_RADIUS = 0.62;
-/** A gold finger: its width along the edge, its reach in from it, and its height. */
-const FINGER_WIDTH = 0.5;
-const FINGER_REACH = 1.4;
+/** A gold finger's height over the mask. */
 const FINGER_HEIGHT = 0.02;
 /** A via's plated ring and its drill. */
 const VIA_RADIUS = 0.2;
@@ -182,13 +188,58 @@ function stampTexture(name: string, font: string): THREE.CanvasTexture {
   return texture;
 }
 
+/**
+ * A district's name's width over its cap height, as `stampTexture` rasterises it in
+ * `font`, which is what `districtStamp` sizes the print by.
+ */
+function stampAspect(name: string, font: string): number {
+  const { image } = stampTexture(name.toUpperCase(), font);
+  return image.width / image.height;
+}
+
 /** A district's board, padding included. */
-export const islandOf = (district: District): Island => ({
+const islandOf = (district: District): Island => ({
   minX: district.minX - ISLAND_PAD,
   maxX: district.maxX + ISLAND_PAD,
   minZ: district.minZ - ISLAND_PAD,
   maxZ: district.maxZ + ISLAND_PAD,
 });
+
+/**
+ * Each district's board, padding included, and the ground its name prints on, for the
+ * type names to keep off: null for a board with no room for its name, and no stamps
+ * at all until the theme's mono face is known, which the names are rasterised in.
+ */
+export function cityBoards(
+  districts: readonly District[],
+  palette: { mono: string } | null
+): {
+  islands: Map<string, Island>;
+  stamps: Map<string, Island | null>;
+} {
+  const islands = new Map(
+    districts.map((district) => [district.id, islandOf(district)])
+  );
+  if (!palette) return { islands, stamps: new Map() };
+  const grounds = new Map(
+    districts.map((district) => {
+      const stamp = districtStamp(
+        islandOf(district),
+        stampAspect(district.name, palette.mono)
+      );
+      return [
+        district.id,
+        stamp && {
+          minX: stamp.x - stamp.width / 2,
+          maxX: stamp.x + stamp.width / 2,
+          minZ: stamp.z - stamp.height / 2,
+          maxZ: stamp.z + stamp.height / 2,
+        },
+      ];
+    })
+  );
+  return { islands, stamps: grounds };
+}
 
 /**
  * A board's outline as a shape in x and -z, so that extruding it along +z and
@@ -334,27 +385,13 @@ const UNIT_SCALE = (): [number, number, number] => [1, 1, 1];
 
 /** A finger stands inside its edge, its long side running in from it. */
 function fingerSpot(finger: Finger) {
-  const inward = FINGER_REACH / 2;
-  switch (finger.side) {
-    case "north":
-      return { x: finger.x, z: finger.z + inward, y: FINGER_HEIGHT / 2 };
-    case "south":
-      return { x: finger.x, z: finger.z - inward, y: FINGER_HEIGHT / 2 };
-    case "west":
-      return {
-        x: finger.x + inward,
-        z: finger.z,
-        y: FINGER_HEIGHT / 2,
-        turn: Math.PI / 2,
-      };
-    default:
-      return {
-        x: finger.x - inward,
-        z: finger.z,
-        y: FINGER_HEIGHT / 2,
-        turn: Math.PI / 2,
-      };
-  }
+  const part = fingerRect(finger);
+  return {
+    x: (part.minX + part.maxX) / 2,
+    z: (part.minZ + part.maxZ) / 2,
+    y: FINGER_HEIGHT / 2,
+    turn: finger.side === "east" || finger.side === "west" ? Math.PI / 2 : 0,
+  };
 }
 
 /** A ref that keeps `materials` holding what React mounted under `key`. */
@@ -598,13 +635,14 @@ function Stamps({
   // to its board, so the search for its spot runs once rather than every frame.
   const names = useMemo(
     () =>
-      districts.map((district) => {
+      districts.flatMap((district) => {
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
         const stamp = districtStamp(
           islandOf(district),
-          texture.image.width / texture.image.height
+          stampAspect(district.name, palette.mono)
         );
-        return { id: district.id, texture, stamp };
+        // A board too narrow for the name at its smallest goes without it.
+        return stamp ? [{ id: district.id, texture, stamp }] : [];
       }),
     [districts, palette.mono]
   );
@@ -658,12 +696,13 @@ export function Boards({
   );
 
   // Everything here fades in with the boards, and the names with the traces.
-  useFrame((state) => {
+  useAnimationFrame((state) => {
     const progress = revealAt(state.clock.elapsedTime, reducedMotion);
     for (const [key, material] of materials.current)
       material.opacity = key.startsWith("stamp")
         ? STAMP_OPACITY * progress.links
         : progress.districts;
+    return introPlaying(state.clock.elapsedTime, reducedMotion);
   });
 
   const held = materials.current;

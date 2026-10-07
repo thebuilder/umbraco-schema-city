@@ -177,6 +177,14 @@ export function approach(
 }
 
 /**
+ * Whether a coast has come to a stop: a hundredth of a world unit a second. The
+ * ease never reaches zero by itself, and the canvas renders for as long as the
+ * camera is still moving.
+ */
+export const stopped = (velocity: Vec3): boolean =>
+  velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2 < 1e-4;
+
+/**
  * The ground directions the screen's up and right lie along, for a camera at `from`
  * looking at `to`. "Up the screen" is the view direction flattened onto the ground,
  * so W flies the way the camera faces however far it is tilted.

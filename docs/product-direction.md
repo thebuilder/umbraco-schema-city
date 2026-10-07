@@ -18,6 +18,9 @@ The current app supports:
 - Revealing a type's direct connections across all layers on hover or selection.
 - Focusing a neighbourhood and expanding it one relationship step at a time.
 - Reviewing configuration findings, following related types, and exporting filtered results.
+- Marking a finding as intentional with a reason. The decision is tied to a fingerprint of the
+  type it is about, so changing the type reopens it, and it is kept in Umbraco's key-value table,
+  apart from the schema.
 - Comparing exported schema snapshots while retaining baseline positions for matched types.
 
 The list and inspector must remain useful without the 3D canvas. Opening a type's Umbraco editor
@@ -74,7 +77,8 @@ timestamp rather than describing a type as safe to delete.
 Export a snapshot before a schema change, then import it as a baseline later or in another
 environment. Review added and removed types, property and group changes, and changed relationships.
 Keep matched buildings at their baseline positions. Snapshot import must remain a comparison
-operation, with no schema changes applied to Umbraco.
+operation, with no schema changes applied to Umbraco. Group side effects under the edit that
+caused them, so a reviewer can mark the planned causes and see what nobody planned.
 
 ## Planned features
 
@@ -88,9 +92,6 @@ These are proposals, not current capabilities, in priority order.
    chains whose descendants have parents. Explain exclusions for compositions and Element Types.
 3. Investigate properties and Data Types. Search by property editor or Data Type, list affected
    properties and types, and link to the Data Type editor where Umbraco provides a supported route.
-4. Record review decisions. Let a team mark a finding as intentional with a reason. Tie that
-   decision to the relevant schema state so a later change reopens the check. Store decisions
-   separately from the Umbraco schema.
 
 Manual pinning and saved layouts could build on the baseline positions used by comparison.
 Decorative models, traffic simulations, and scores can wait. Work that helps explain a schema

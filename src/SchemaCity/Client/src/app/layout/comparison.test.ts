@@ -25,6 +25,10 @@ test("adding and removing types preserves matched baseline coordinates", () => {
   for (const at of result.placements.filter((at) => at.id !== added.id))
     expect(at.position).toEqual(before.get(at.id));
   expect(result.placements.some((at) => at.id === removed.id)).toBe(false);
+  // The removed type keeps its baseline spot, for the outline drawn there.
+  expect(result.removed.map((at) => [at.id, at.position])).toEqual([
+    [removed.id, before.get(removed.id)],
+  ]);
   const east = Math.max(
     ...cityDistricts(baseline).districts.map((d) => d.maxX)
   );

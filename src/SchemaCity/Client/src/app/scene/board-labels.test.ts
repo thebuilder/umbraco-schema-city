@@ -3,7 +3,16 @@ import mediumFixture from "../../../dev/fixtures/medium.json";
 import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import smallFixture from "../../../dev/fixtures/small.json";
 import type { SchemaGraph } from "../../model/types";
-import { layoutCity } from "../layout/city";
+import { cityDistricts, ISLAND_PAD, layoutCity } from "../layout/city";
+import {
+  edgeFingers,
+  type Finger,
+  fingerRect,
+  HOLE_CLEAR,
+  holeSpots,
+  type Island,
+  PRINT_MARGIN,
+} from "./board";
 import {
   BASE_OPACITY,
   type Board,
@@ -14,6 +23,7 @@ import {
   COURTYARD_SEGMENTS,
   courtyard,
   DIMMED,
+  type Edge,
   type Fitted,
   fadeToward,
   fitName,
@@ -36,6 +46,7 @@ import {
   MIN_EM,
   MONO_ADVANCE,
   newFades,
+  onBoard,
   PRINT_LEVELS,
   packAtlas,
   placeLabels,
@@ -57,7 +68,8 @@ import {
   updateTiers,
   type Want,
 } from "./board-labels";
-import { pixelsPerUnit } from "./stage";
+import { planRoutes } from "./roads";
+import { districtStamp, pixelsPerUnit } from "./stage";
 
 const WIDE = /[\u3000-\u9fff]|\p{Extended_Pictographic}/u;
 /** What a print may hold besides the name's own characters. */
@@ -272,6 +284,16 @@ describe("labelRoom", () => {
     const room = labelRoom([at("a", 0, 0), at("b", 3, 0), at("c", -8, 0)]);
     // One unit to b: 0.2 a side.
     expect(room.get("a")).toBeCloseTo(2.4);
+  });
+
+  it("stops the overhang the print margin short of its board's edge", () => {
+    const island = { minX: -3, maxX: 20, minZ: -3, maxZ: 3 };
+    const room = labelRoom(
+      [{ ...at("a", 0, 0), district: "d" }],
+      new Map([["d", island]])
+    );
+    // Two units to the west edge, less the margin, on both sides of a centred name.
+    expect(room.get("a")).toBeCloseTo(2 + (2 - PRINT_MARGIN) * 2);
   });
 });
 
@@ -556,6 +578,34 @@ describe("placeLabels", () => {
     expect(placed.get("a")?.rect).toEqual(
       printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false)
     );
+  });
+
+  it("slides a print along its building rather than off the board's edge", () => {
+    // The board ends a unit east of the building, so a centred print runs off it.
+    const fits = (_: string, rect: Rect) => rect.maxX <= 3;
+    const placed = placeLabels(
+      [want("a", 0, 0, [8])],
+      [building("a", 0, 0)],
+      false,
+      undefined,
+      fits
+    );
+    const rect = placed.get("a")?.rect;
+    // In front still, flush with the building's east side and running west.
+    expect(rect?.minZ).toBeGreaterThan(2);
+    expect(rect?.maxX).toBeCloseTo(2);
+    expect(rect?.minX).toBeCloseTo(-6);
+  });
+
+  it("never takes a place its board turns down, even with no other left", () => {
+    const placed = placeLabels(
+      [want("a", 0, 0, [8, 3])],
+      [building("a", 0, 0)],
+      false,
+      undefined,
+      () => false
+    );
+    expect(placed.has("a")).toBe(false);
   });
 
   it("prints two close neighbours whole on opposite sides", () => {
@@ -1022,6 +1072,180 @@ const printsOverPrints = (prints: readonly Laid[]) =>
       )
       .map((b) => `${a.id}@${a.size} on ${b.id}@${b.size}`)
   );
+
+describe("onBoard", () => {
+  const island = { minX: 0, maxX: 30, minZ: 0, maxZ: 30 };
+  const edge: Edge = {
+    island,
+    fingers: [{ district: "d", side: "east", x: 30, z: 12 }],
+    stamp: { minX: 2, maxX: 14, minZ: 24, maxZ: 28 },
+  };
+  const rect = (minX: number, minZ: number, width = 4, height = 1) => ({
+    minX,
+    maxX: minX + width,
+    minZ,
+    maxZ: minZ + height,
+  });
+
+  it("takes a print well inside its board", () => {
+    expect(onBoard(rect(10, 10), edge)).toBe(true);
+  });
+
+  it("turns down a print within the margin of the edge or past it", () => {
+    expect(onBoard(rect(-1, 10), edge)).toBe(false);
+    expect(onBoard(rect(PRINT_MARGIN / 2, 10), edge)).toBe(false);
+    expect(onBoard(rect(10, 30 - 1 - PRINT_MARGIN / 2), edge)).toBe(false);
+  });
+
+  it("turns down a print over a mounting hole's clear radius", () => {
+    // The north-west hole stands at (1, 1).
+    expect(onBoard(rect(1.5, 1.5), edge)).toBe(false);
+    expect(onBoard(rect(1 + HOLE_CLEAR + 0.01, 0.5), edge)).toBe(true);
+  });
+
+  it("turns down a print beside a gold finger, and takes one past it", () => {
+    expect(onBoard(rect(25.5, 11.8), edge)).toBe(false);
+    expect(onBoard(rect(25.5, 14), edge)).toBe(true);
+  });
+
+  it("turns down a print over the district's name, and takes one past its end", () => {
+    expect(onBoard(rect(8, 23.5), edge)).toBe(false);
+    expect(onBoard(rect(16, 25), edge)).toBe(true);
+  });
+});
+
+/** Every way `rect` leaves its board, as the solver's tests read a board. */
+function offBoard(rect: Rect, island: Island, fingers: readonly Finger[]) {
+  const out: string[] = [];
+  if (
+    rect.minX < island.minX + PRINT_MARGIN - 1e-9 ||
+    rect.maxX > island.maxX - PRINT_MARGIN + 1e-9 ||
+    rect.minZ < island.minZ + PRINT_MARGIN - 1e-9 ||
+    rect.maxZ > island.maxZ - PRINT_MARGIN + 1e-9
+  )
+    out.push("edge");
+  for (const hole of holeSpots(island)) {
+    const dx = Math.max(rect.minX - hole.x, 0, hole.x - rect.maxX);
+    const dz = Math.max(rect.minZ - hole.z, 0, hole.z - rect.maxZ);
+    if (Math.hypot(dx, dz) < HOLE_CLEAR - 1e-9) out.push("hole");
+  }
+  for (const finger of fingers)
+    if (touching(rect, fingerRect(finger))) out.push("finger");
+  return out;
+}
+
+/** The medium mono face's stamp: tracked out by 0.32 em, about 0.7 em to the cap. */
+const stampAspect = (name: string) =>
+  (name.length * (MONO_ADVANCE + 0.32)) / 0.7;
+
+describe("names on the boards of the fixtures", () => {
+  it.each([
+    ["small", smallFixture],
+    ["medium", mediumFixture],
+    ["pathological", pathologicalFixture],
+  ])(
+    "keeps every print and every district name of the %s fixture on its board, at every size either way up",
+    (name, fixture) => {
+      const graph = fixture as unknown as SchemaGraph;
+      const { placements, districts } = cityDistricts(graph);
+      const byId = new Map(placements.map((one) => [one.id, one]));
+      const islands = new Map(
+        districts.map((d): [string, Island] => [
+          d.id,
+          {
+            minX: d.minX - ISLAND_PAD,
+            maxX: d.maxX + ISLAND_PAD,
+            minZ: d.minZ - ISLAND_PAD,
+            maxZ: d.maxZ + ISLAND_PAD,
+          },
+        ])
+      );
+      // Every layer drawn at once, which puts the most fingers on the edges.
+      const routes = planRoutes(byId, graph.edges ?? []).routes.map(
+        ({ edge, points }) => ({ from: edge.from, to: edge.to, points })
+      );
+      const fingers = edgeFingers(
+        routes,
+        (id) => byId.get(id)?.district,
+        islands
+      );
+      const stamps = districts.flatMap((district) => {
+        const island = islands.get(district.id) as Island;
+        const stamp = districtStamp(
+          island,
+          stampAspect(district.name.toUpperCase())
+        );
+        return stamp
+          ? [
+              {
+                district,
+                island,
+                rect: {
+                  minX: stamp.x - stamp.width / 2,
+                  maxX: stamp.x + stamp.width / 2,
+                  minZ: stamp.z - stamp.height / 2,
+                  maxZ: stamp.z + stamp.height / 2,
+                },
+              },
+            ]
+          : [];
+      });
+      const edges = new Map(
+        [...islands].map(([id, island]): [string, Edge] => [
+          id,
+          {
+            island,
+            fingers: fingers.filter((f) => f.district === id),
+            stamp: stamps.find((one) => one.district.id === id)?.rect,
+          },
+        ])
+      );
+      const names = new Map(graph.nodes.map((node) => [node.id, node.name]));
+      const named = sizesOf(
+        printsFor(placements, (id) => names.get(id), mono, islands)
+      );
+      const solved = solveNames(
+        placements,
+        named,
+        (id) => id.length,
+        undefined,
+        edges
+      );
+
+      // Only a board too narrow for the name at its smallest goes without it, and
+      // the medium fixture has none.
+      if (name === "medium") expect(stamps).toHaveLength(districts.length);
+      const misses = stamps.flatMap(({ district, island, rect }) =>
+        offBoard(rect, island, edges.get(district.id)?.fingers ?? []).map(
+          (why) => `stamp ${district.name} over ${why}`
+        )
+      );
+
+      let count = 0;
+      solved.placed.forEach((way, flipped) => {
+        way.forEach((level, size) => {
+          for (const [id, spot] of level) {
+            count++;
+            const district = byId.get(id)?.district as string;
+            const island = islands.get(district) as Island;
+            const where = `${id}@${size}${flipped ? " flipped" : ""}`;
+            for (const why of offBoard(
+              spot.rect,
+              island,
+              edges.get(district)?.fingers ?? []
+            ))
+              misses.push(`${where} over ${why}`);
+            for (const stamp of stamps)
+              if (touching(spot.rect, stamp.rect))
+                misses.push(`${where} over the ${stamp.district.name} stamp`);
+          }
+        });
+      });
+      expect(count).toBeGreaterThan(placements.length);
+      expect(misses).toEqual([]);
+    }
+  );
+});
 
 describe("solveNames", () => {
   const at = (id: string, x: number, extra: Partial<Standing> = {}) => ({

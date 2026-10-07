@@ -20,6 +20,24 @@ export type Finger = { district: string; side: Side; x: number; z: number };
 
 /** Distance from a board corner to the centre of its mounting hole. */
 export const HOLE_INSET = 1;
+/** Mounting holes: the drill and the plated ring around it. */
+export const HOLE_RADIUS = 0.32;
+export const RING_RADIUS = 0.62;
+/** A gold finger: its width along the edge and its reach in from it. */
+export const FINGER_WIDTH = 0.5;
+export const FINGER_REACH = 1.4;
+/**
+ * Bare board kept between anything printed on a board and its edge, a hole's ring or
+ * a finger, so the print never reads as running into the hardware.
+ */
+export const PRINT_MARGIN = 0.4;
+/**
+ * The clear radius round a hole's centre that no print enters. With the margin it
+ * also takes in the board's rounded corner, which comes no further in than the hole.
+ */
+export const HOLE_CLEAR = RING_RADIUS + PRINT_MARGIN;
+/** How far in from a board's edge its rings and fingers reach. */
+export const EDGE_PARTS = Math.max(HOLE_INSET + RING_RADIUS, FINGER_REACH);
 
 /** Positions closer than this are one finger or one via. */
 const SAME = 0.05;
@@ -113,4 +131,79 @@ export function holeSpots(island: Island): { x: number; z: number }[] {
     { x: island.minX + HOLE_INSET, z: island.maxZ - HOLE_INSET },
     { x: island.maxX - HOLE_INSET, z: island.maxZ - HOLE_INSET },
   ];
+}
+
+/** The ground a finger covers, from its edge to the end of its reach. */
+export function fingerRect(finger: Finger): Island {
+  const half = FINGER_WIDTH / 2;
+  switch (finger.side) {
+    case "north":
+      return {
+        minX: finger.x - half,
+        maxX: finger.x + half,
+        minZ: finger.z,
+        maxZ: finger.z + FINGER_REACH,
+      };
+    case "south":
+      return {
+        minX: finger.x - half,
+        maxX: finger.x + half,
+        minZ: finger.z - FINGER_REACH,
+        maxZ: finger.z,
+      };
+    case "west":
+      return {
+        minX: finger.x,
+        maxX: finger.x + FINGER_REACH,
+        minZ: finger.z - half,
+        maxZ: finger.z + half,
+      };
+    default:
+      return {
+        minX: finger.x - FINGER_REACH,
+        maxX: finger.x,
+        minZ: finger.z - half,
+        maxZ: finger.z + half,
+      };
+  }
+}
+
+/** Distance from a point to the nearest point of a rectangle, 0 inside it. */
+function distanceTo(rect: Island, x: number, z: number): number {
+  const dx = Math.max(rect.minX - x, 0, x - rect.maxX);
+  const dz = Math.max(rect.minZ - z, 0, z - rect.maxZ);
+  return Math.hypot(dx, dz);
+}
+
+/**
+ * Whether `rect` lies on `island` with the margin to spare all round, and clear of
+ * its mounting holes and of `fingers`, the gold fingers on its edge.
+ */
+export function clearOfEdge(
+  rect: Island,
+  island: Island,
+  fingers: readonly Finger[]
+): boolean {
+  if (
+    rect.minX < island.minX + PRINT_MARGIN ||
+    rect.maxX > island.maxX - PRINT_MARGIN ||
+    rect.minZ < island.minZ + PRINT_MARGIN ||
+    rect.maxZ > island.maxZ - PRINT_MARGIN
+  )
+    return false;
+  if (
+    holeSpots(island).some(
+      (hole) => distanceTo(rect, hole.x, hole.z) < HOLE_CLEAR
+    )
+  )
+    return false;
+  return fingers.every((finger) => {
+    const part = fingerRect(finger);
+    return (
+      rect.maxX <= part.minX - PRINT_MARGIN ||
+      rect.minX >= part.maxX + PRINT_MARGIN ||
+      rect.maxZ <= part.minZ - PRINT_MARGIN ||
+      rect.minZ >= part.maxZ + PRINT_MARGIN
+    );
+  });
 }

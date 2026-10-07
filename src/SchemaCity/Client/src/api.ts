@@ -1,4 +1,5 @@
 import type { UmbClassInterface } from "@umbraco-cms/backoffice/class-api";
+import type { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { UMB_EDIT_DATA_TYPE_WORKSPACE_PATH_PATTERN } from "@umbraco-cms/backoffice/data-type";
 import { UMB_EDIT_DOCUMENT_TYPE_WORKSPACE_PATH_PATTERN } from "@umbraco-cms/backoffice/document-type";
 import { loadManifestPlainJs } from "@umbraco-cms/backoffice/extension-api";
@@ -8,6 +9,12 @@ import {
   UMB_ICON_REGISTRY_CONTEXT,
   type UmbIconModule,
 } from "@umbraco-cms/backoffice/icon";
+import { tryExecute, UmbApiError } from "@umbraco-cms/backoffice/resources";
+import {
+  type Decision,
+  type DecisionStore,
+  failureMessage,
+} from "./model/review.js";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
 
 /**
@@ -31,6 +38,59 @@ export const getUsage = (refresh = false) =>
     security: [{ type: "http", scheme: "bearer" }],
     url: `/umbraco/management/api/v1/schema-city/usage?refresh=${refresh}`,
   });
+
+const DECISIONS = "/umbraco/management/api/v1/schema-city/decisions";
+
+/**
+ * The decisions endpoint as the app's DecisionStore. tryExecute's own notification
+ * is off, because the app says what failed beside the finding, keeping the reason.
+ */
+export const serverDecisions = (host: UmbControllerHost): DecisionStore => {
+  const call = async <D>(doing: string, request: Promise<{ data?: D }>) => {
+    const { data, error } = await tryExecute(host, request, {
+      disableNotifications: true,
+    });
+    if (error)
+      throw new Error(
+        UmbApiError.isUmbApiError(error)
+          ? failureMessage(doing, error.status, error.problemDetails?.title)
+          : failureMessage(doing)
+      );
+    return data;
+  };
+  return {
+    load: () =>
+      call(
+        "Loading review decisions",
+        umbHttpClient.get<{ 200: Decision[] }>({
+          security: [{ type: "http", scheme: "bearer" }],
+          url: DECISIONS,
+        })
+      ).then((list) => list ?? []),
+    save: async (findingId, reason, fingerprint) => {
+      const saved = await call(
+        "Saving the decision",
+        umbHttpClient.put<{ 200: Decision }>({
+          security: [{ type: "http", scheme: "bearer" }],
+          url: `${DECISIONS}/${encodeURIComponent(findingId)}`,
+          body: { reason, fingerprint },
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+      if (!saved) throw new Error("Saving the decision failed: no reply.");
+      return saved;
+    },
+    remove: async (findingId) => {
+      await call(
+        "Undoing the decision",
+        umbHttpClient.delete<{ 204: unknown }>({
+          security: [{ type: "http", scheme: "bearer" }],
+          url: `${DECISIONS}/${encodeURIComponent(findingId)}`,
+        })
+      );
+    },
+  };
+};
 
 /**
  * Both wrappers hand this to the app as `onOpenType`. The path pattern is Umbraco's own,

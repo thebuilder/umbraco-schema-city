@@ -5,8 +5,10 @@ import {
   connectionEmphasis,
   connectionPickable,
   connectionTraceAt,
+  introPlaying,
   visibleConnections,
 } from "./connection-visibility";
+import { buildingRiseAt, revealAt } from "./reveal";
 
 const edges: SchemaEdge[] = [
   { kind: "composition", from: "a", to: "b" },
@@ -107,4 +109,17 @@ test("connection picking follows visibility and vertex alpha", () => {
   expect(connectionPickable(false, 1, 1, 1, colors)).toBe(false);
   expect(connectionPickable(true, 0, 1, 1, colors)).toBe(false);
   expect(connectionPickable(true, 1, null, 1, colors)).toBe(false);
+});
+
+test("the opening plays until every part of it has settled, and not at all when motion is reduced", () => {
+  expect(introPlaying(0, false)).toBe(true);
+  expect(introPlaying(2.6, false)).toBe(true);
+  expect(introPlaying(0, true)).toBe(false);
+  // Past the end every channel is at rest, so nothing still moves once frames stop.
+  const end = 2.65;
+  expect(introPlaying(end, false)).toBe(false);
+  expect(revealAt(end)).toEqual(revealAt(60));
+  expect(buildingRiseAt(end)).toBe(1);
+  expect(connectionBootAt(end, false).phase).toBe("done");
+  expect(connectionTraceAt(end).opacity).toBe(0);
 });
