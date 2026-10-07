@@ -49,7 +49,6 @@ public class DecisionsController : ManagementApiControllerBase
     [HttpPut("decisions/{findingId}")]
     [ProducesResponseType<ReviewDecision>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public IActionResult Put(string findingId, [FromBody] DecisionRequest request)
     {
@@ -69,7 +68,11 @@ public class DecisionsController : ManagementApiControllerBase
         string? current = _builder.FingerprintOf(DecisionStore.SubjectOf(findingId));
         if (current is null)
         {
-            return Problem(title: "The type or Data Type this finding is about no longer exists.", statusCode: StatusCodes.Status404NotFound);
+            // A 400 rather than a 404: the Management API swaps a 404's problem title for a
+            // generic one, and this title is what the user reads.
+            return Problem(
+                title: "The type or Data Type this finding is about no longer exists. Reload Schema City.",
+                statusCode: StatusCodes.Status400BadRequest);
         }
 
         if (request.Fingerprint != current)
