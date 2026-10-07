@@ -340,10 +340,23 @@ function writeQuad(
 ) {
   printCorners(rect, flipped, CORNERS);
   for (let k = 0; k < 4; k++)
-    positions.set(
-      [CORNERS[k * 2] as number, y, CORNERS[k * 2 + 1] as number],
-      entry * 12 + k * 3
-    );
+    writePoint(positions, entry * 4 + k, CORNERS, k, y);
+}
+
+/**
+ * Writes the `k`th x, z pair of `pairs` at height `y` as vertex `vertex`, in place,
+ * so a repaint while the camera moves allocates nothing per name.
+ */
+function writePoint(
+  positions: Float32Array,
+  vertex: number,
+  pairs: ArrayLike<number>,
+  k: number,
+  y: number
+) {
+  positions[vertex * 3] = pairs[k * 2] as number;
+  positions[vertex * 3 + 1] = y;
+  positions[vertex * 3 + 2] = pairs[k * 2 + 1] as number;
 }
 
 /** Sets the opacity of all four corners of one entry's quad. */
@@ -400,10 +413,7 @@ function writeCourtyard(
   const base = slot * COURTYARD_SEGMENTS * 2;
   const y = groundOf(one) + COURTYARD_Y;
   for (let v = 0; v < COURTYARD_SEGMENTS * 2; v++) {
-    positions.set(
-      [SEGMENTS[v * 2] as number, y, SEGMENTS[v * 2 + 1] as number],
-      (base + v) * 3
-    );
+    writePoint(positions, base + v, SEGMENTS, v, y);
     colours[(base + v) * 4 + 3] = strength;
   }
 }
