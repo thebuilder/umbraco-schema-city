@@ -24,9 +24,6 @@ export type RoadSegment = {
   width?: number;
 };
 
-const edgeKey = (edge: SchemaEdge) =>
-  `${edge.kind}|${edge.from}|${edge.to}|${edge.propertyAlias ?? ""}|${edge.role ?? ""}`;
-
 /**
  * The rows of buildings and the streets between them, read off the placements.
  *
@@ -158,47 +155,83 @@ export function roadTracePositions(
  * vertical ribbon. This is deliberately render-only: planRoads keeps continuous
  * provenance for hit testing and route validation, while the scene can still
  * fade ranges independently after this geometry is built.
+ *
+ * The vertical runs are sorted by x once, so each horizontal run reads only the
+ * verticals inside its own span, and each run's sources and targets are collected
+ * once rather than per pair. Comparing every pair, with a set built per pair, took
+ * about 150 ms on the pathological fixture.
  */
 export function separateCrossings(segments: RoadSegment[]): RoadSegment[] {
-  const vertical = segments.filter(
-    (segment) => Math.abs(segment.x1 - segment.x0) < EPS
-  );
+  const vertical = segments
+    .filter((segment) => Math.abs(segment.x1 - segment.x0) < EPS)
+    .map((segment) => ({
+      segment,
+      x: segment.x0,
+      low: Math.min(segment.z0, segment.z1),
+      high: Math.max(segment.z0, segment.z1),
+    }))
+    .sort((a, b) => a.x - b.x);
+  const xs = vertical.map((run) => run.x);
   const result: RoadSegment[] = [];
   for (const segment of segments) {
     if (Math.abs(segment.z1 - segment.z0) >= EPS) {
       result.push(segment);
       continue;
     }
-    result.push(...splitAtCuts(segment, crossingCuts(segment, vertical)));
+    result.push(
+      ...splitAtCuts(segment, crossingCuts(segment, vertical, xs))
+    );
   }
   return result;
 }
 
+type Vertical = { segment: RoadSegment; x: number; low: number; high: number };
+
+/** The first index in sorted `xs` whose value is above `x`. */
+function firstAbove(xs: readonly number[], x: number): number {
+  let low = 0;
+  let high = xs.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if ((xs[mid] as number) <= x) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
 function crossingCuts(
   segment: RoadSegment,
-  vertical: RoadSegment[]
+  vertical: readonly Vertical[],
+  xs: readonly number[]
 ): [number, number][] {
   const low = Math.min(segment.x0, segment.x1);
   const high = Math.max(segment.x0, segment.x1);
   const halfGap = Math.max((segment.width ?? ROAD_WIDTH) * 0.75, 0.12);
-  const cuts = vertical.flatMap((crossing) => {
-    if (crossing === segment || sharesConnection(segment, crossing)) return [];
-    const x = crossing.x0;
-    const zLow = Math.min(crossing.z0, crossing.z1);
-    const zHigh = Math.max(crossing.z0, crossing.z1);
-    if (x <= low + halfGap || x >= high - halfGap) return [];
-    if (segment.z0 <= zLow || segment.z0 >= zHigh) return [];
-    return [[x - halfGap, x + halfGap] as [number, number]];
-  });
-  return cuts
-    .sort((a, b) => a[0] - b[0])
-    .reduce<[number, number][]>((merged, cut) => {
-      const previous = merged[merged.length - 1];
-      if (previous && cut[0] <= previous[1] + EPS)
-        previous[1] = Math.max(previous[1], cut[1]);
-      else merged.push([...cut]);
-      return merged;
-    }, []);
+  // Two runs that share a source or a target are one connection's trunk and its
+  // fork, which meet rather than cross. A shared edge shares both, so this covers it.
+  const sources = new Set(segment.edges.map((edge) => edge.from));
+  const targets = new Set(segment.edges.map((edge) => edge.to));
+  const cuts: [number, number][] = [];
+  for (let i = firstAbove(xs, low + halfGap); i < vertical.length; i++) {
+    const crossing = vertical[i] as Vertical;
+    if (crossing.x >= high - halfGap) break;
+    if (segment.z0 <= crossing.low || segment.z0 >= crossing.high) continue;
+    if (
+      crossing.segment.edges.some(
+        (edge) => sources.has(edge.from) || targets.has(edge.to)
+      )
+    )
+      continue;
+    cuts.push([crossing.x - halfGap, crossing.x + halfGap]);
+  }
+  // Already in x order, so overlapping cuts merge in one pass.
+  return cuts.reduce<[number, number][]>((merged, cut) => {
+    const previous = merged[merged.length - 1];
+    if (previous && cut[0] <= previous[1] + EPS)
+      previous[1] = Math.max(previous[1], cut[1]);
+    else merged.push([...cut]);
+    return merged;
+  }, []);
 }
 
 function splitAtCuts(segment: RoadSegment, cuts: [number, number][]) {
@@ -223,17 +256,6 @@ function splitAtCuts(segment: RoadSegment, cuts: [number, number][]) {
     });
   }
   return pieces;
-}
-
-function sharesConnection(horizontal: RoadSegment, vertical: RoadSegment) {
-  const horizontalKeys = new Set(horizontal.edges.map(edgeKey));
-  return vertical.edges.some(
-    (edge) =>
-      horizontalKeys.has(edgeKey(edge)) ||
-      horizontal.edges.some(
-        (other) => other.from === edge.from || other.to === edge.to
-      )
-  );
 }
 
 /** The corners one connection turns, from its source's face to its target's. */

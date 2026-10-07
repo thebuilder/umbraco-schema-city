@@ -2662,21 +2662,33 @@ export default function Scene({
   const active = useMemo(() => new Set<Layer>(layers), [layers]);
   const interactionActive = selected !== null || hovered !== null;
   const pickConnection: PickConnection = (pick) => setConnectionPick(pick);
+  // The traces route over where the buildings have settled rather than over every
+  // frame of a focus tween. Routing is the costly part of a trace, and a 400 ms
+  // tween rebuilt every layer about 25 times, so the old routes stay up until the
+  // buildings arrive and are rebuilt once there.
+  const settled = useRef({ placements, placementsById, heights });
+  if (
+    placements === target &&
+    (settled.current.placementsById !== placementsById ||
+      settled.current.heights !== heights)
+  )
+    settled.current = { placements, placementsById, heights };
+  const routed = settled.current;
   // A link leaves from the roof of the building it belongs to, so it stays visible
-  // over a tall neighbour and moves with the focus tween.
+  // over a tall neighbour.
   const anchors = useMemo(() => {
     const map = new Map<string, Anchor>();
-    for (const placement of placements) {
+    for (const placement of routed.placements) {
       map.set(placement.id, {
         x: placement.position.x,
         y:
           (placement.y ?? 0) +
-          (heights.get(placement.id) ?? placement.height) * 0.8,
+          (routed.heights.get(placement.id) ?? placement.height) * 0.8,
         z: placement.position.z,
       });
     }
     return map;
-  }, [placements, heights]);
+  }, [routed]);
 
   // The scene colours are the theme's own tokens, read once from an element inside
   // the shadow root, so the city and the chrome can never drift apart.
@@ -2774,7 +2786,7 @@ export default function Scene({
             hovered={hovered}
             onPick={pickConnection}
             palette={palette}
-            placementsById={placementsById}
+            placementsById={routed.placementsById}
             reducedMotion={reducedMotion}
             selected={selected}
             visible={active.has("structure") || interactionActive}
@@ -2792,7 +2804,7 @@ export default function Scene({
               layer={layer}
               onPick={pickConnection}
               opacity={opacity}
-              placementsById={placementsById}
+              placementsById={routed.placementsById}
               reducedMotion={reducedMotion}
               selected={selected}
               visible={active.has(layer) || interactionActive}

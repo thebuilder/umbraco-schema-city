@@ -594,6 +594,21 @@ describe("render crossing breaks", () => {
     expect(sharedParent).toHaveLength(2);
     expect(sharedTarget).toHaveLength(2);
   });
+
+  it("separates every crossing on the pathological fixture in a few milliseconds", () => {
+    const graph = pathologicalFixture as unknown as SchemaGraph;
+    const byId = new Map(
+      cityDistricts(graph, "folders").placements.map((p) => [p.id, p] as const)
+    );
+    const segments = planRoads(byId, graph.edges);
+    // Warm up once, so the timing is the work rather than the first compile.
+    separateCrossings(segments);
+    const started = performance.now();
+    const separated = separateCrossings(segments);
+
+    expect(performance.now() - started).toBeLessThan(30);
+    expect(separated.length).toBeGreaterThan(segments.length);
+  });
 });
 
 describe("road rendering clearance", () => {
