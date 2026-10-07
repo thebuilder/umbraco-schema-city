@@ -1,7 +1,7 @@
 // The editor view: the selected type drawn the way an editor meets it in Umbraco,
 // tabs across the top and groups as panels, so an overloaded tab or a long run of
 // composed fields is visible before anyone opens the backoffice editor.
-import { useId, useState } from "react";
+import { use, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -15,6 +15,7 @@ import {
 } from "../model/editor-layout";
 import { type Finding, type FindingKind, TAB_LIMIT } from "../model/findings";
 import type { Role } from "../model/inspector";
+import { splitReviewed } from "../model/review";
 import type { SchemaNode, SchemaProperty } from "../model/types";
 import { plural, roving, SEARCH_KEY } from "./a11y";
 import {
@@ -26,6 +27,7 @@ import {
   TabButton,
 } from "./InspectorChips";
 import { InspectorChecks } from "./InspectorDiagnostics";
+import { Reviews } from "./Review";
 import { Scroller } from "./TypeTable";
 
 type Lookup = Map<string, SchemaNode>;
@@ -433,7 +435,13 @@ function Layout({
   const tabs = editorLayout(node);
   const tabRow = hasTabRow(tabs);
   const base = useId();
-  const flags = propertyFlags(node, findings, nodesById);
+  // Rows mark open findings only: a reviewed one still reads in the checks above,
+  // quietly, and a pink edge on its row would say it still needs work.
+  const flags = propertyFlags(
+    node,
+    splitReviewed(findings, use(Reviews)?.reviewOf).open,
+    nodesById
+  );
   const [open, setOpen] = useState(firstOwnTab(tabs)?.key);
   // Composed groups start folded; a key here is one the reader turned the other way.
   const [allComposed, setAllComposed] = useState(false);

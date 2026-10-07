@@ -57,7 +57,8 @@ export type LensScale = {
  * The same rules as the findings, so the lens and the drawer never disagree: a type
  * is unused when an unused check flagged it, and in use when it has content, a type
  * composes it or a block editor lists it. A dead end or an unreachable chain is
- * neither, and the lens stays silent about it.
+ * neither, and the lens stays silent about it. App passes open findings only, so a
+ * type marked intentionally unused falls silent too.
  */
 function unusedScale(
   graph: SchemaGraph,

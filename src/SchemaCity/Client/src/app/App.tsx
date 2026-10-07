@@ -33,7 +33,7 @@ import { findFindings } from "../model/findings";
 import { impactOf } from "../model/impact";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
-import type { DecisionStore } from "../model/review";
+import { type DecisionStore, splitReviewed } from "../model/review";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import {
@@ -384,9 +384,17 @@ export function App({
     compare,
     layer: changeLayer,
   } = useComparison(baseline, graph);
+  // The Unused lens weighs open findings only, so a type kept unused on purpose
+  // goes quiet instead of lighting up as a problem again.
   const lensColours = useMemo(
-    () => lensScale(graph, usage, lens, findings),
-    [graph, usage, lens, findings]
+    () =>
+      lensScale(
+        graph,
+        usage,
+        lens,
+        splitReviewed(findings, reviewing?.reviewOf).open
+      ),
+    [graph, usage, lens, findings, reviewing]
   );
   const scale = useMemo(
     () => cityScale(graph, lensColours, highlight?.ids ?? null, changeLayer),

@@ -10,11 +10,12 @@ import {
   type TreeRow,
   treeRows,
 } from "../model/creation-tree";
-import { problemLabels } from "../model/findings";
 import { chips, contentCountOf } from "../model/inspector";
+import type { FindingMark } from "../model/review";
 import type { SchemaNode } from "../model/types";
 import { plural } from "./a11y";
 import { FindingDot, Heading, READING, TypeChips } from "./InspectorChips";
+import { useProblemMarks } from "./Review";
 import { FilterField, type ListProps, Scroller, useMatches } from "./TypeTable";
 
 /**
@@ -40,12 +41,13 @@ type Marks = {
   onSelect: (id: string) => void;
   /** Content items of a type, or nothing while usage is loading. */
   countOf: (id: string) => number | undefined;
-  problems: Map<string, string>;
+  problems: Map<string, FindingMark>;
 };
 
 /**
  * The type's name, quieter when the usage snapshot counts no content of it, so the
- * branches where content lives stand out. A pink dot names its problems.
+ * branches where content lives stand out. A pink dot names its problems, and a
+ * hollow ring the ones already reviewed.
  */
 function TypeName({ id, marks }: { id: string; marks: Marks }) {
   const node = marks.names.get(id);
@@ -63,7 +65,7 @@ function TypeName({ id, marks }: { id: string; marks: Marks }) {
       >
         {node?.name ?? id}
       </button>
-      {problems ? <FindingDot title={problems} /> : null}
+      {problems ? <FindingDot {...problems} /> : null}
     </>
   );
 }
@@ -306,7 +308,7 @@ export function CreationTree(props: ListProps) {
     () => contentCountOf(usage, names, graph.edges ?? []),
     [usage, names, graph.edges]
   );
-  const problems = useMemo(() => problemLabels(findings), [findings]);
+  const problems = useProblemMarks(findings);
   // Roots start open: a closed list of three names says less than the level below.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(
     () => new Set(tree.roots)

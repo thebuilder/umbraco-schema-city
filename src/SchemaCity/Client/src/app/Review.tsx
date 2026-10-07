@@ -21,6 +21,7 @@ import {
   type Decision,
   type DecisionStore,
   MAX_REASON,
+  problemMarks,
   type Review,
   reviewsOf,
   subjectFingerprints,
@@ -109,6 +110,15 @@ export function useReviewing(
       failed,
     };
   }, [store, findings, decisions, graph, failed]);
+}
+
+/**
+ * The List's and Tree's problem dot per type, quiet once its problems are
+ * reviewed, and following every save and undo.
+ */
+export function useProblemMarks(findings: Finding[]) {
+  const reviewOf = use(Reviews)?.reviewOf;
+  return useMemo(() => problemMarks(findings, reviewOf), [findings, reviewOf]);
 }
 
 /** The name of what a finding is about: its type, or for a Data Type finding the Data Type. */

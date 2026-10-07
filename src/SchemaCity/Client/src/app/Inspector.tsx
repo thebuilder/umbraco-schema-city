@@ -1,5 +1,12 @@
 import { XIcon } from "lucide-react";
-import { type CSSProperties, useId, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  use,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Finding } from "../model/findings";
@@ -12,6 +19,7 @@ import {
   usageState,
 } from "../model/inspector";
 import type { Neighbourhood } from "../model/neighbourhood";
+import { checkCounts } from "../model/review";
 import type {
   SchemaEdge,
   SchemaNode,
@@ -33,6 +41,7 @@ import {
 } from "./InspectorFocusControls";
 import { InspectorProperties } from "./InspectorProperties";
 import { Connections, Overview } from "./InspectorTabs";
+import { Reviews } from "./Review";
 import { iconMask } from "./scene/icons";
 
 /**
@@ -182,9 +191,9 @@ export function Inspector({
   const kind = roleOf(node, neighbourhood);
   const role = ROLE[kind];
   const groups = connectionGroups(node, neighbourhood);
-  const problems = findings.filter(
-    (finding) => finding.severity === "problem"
-  ).length;
+  // Reviewed checks stay listed but leave the tab's count and its "!", so the badge
+  // speaks only for what still needs attention.
+  const checks = checkCounts(findings, use(Reviews)?.reviewOf);
   // A type in two groups, an Inherits parent that is also composed, is one type.
   const related = new Set(
     groups.flatMap((group) =>
@@ -194,17 +203,19 @@ export function Inspector({
   const total = node.ownPropertyCount + node.composedPropertyCount;
   const counts: Record<
     Tab,
-    { count: number; spoken: string; problem: boolean }
+    { count: number; spoken: string; problem: boolean; spokenAtZero?: boolean }
   > = {
     overview: {
-      count: findings.length,
+      count: checks.open,
       spoken: [
-        plural(findings.length, "check"),
-        problems > 0 ? plural(problems, "problem") : "",
+        plural(checks.open, "check"),
+        checks.problems > 0 ? plural(checks.problems, "problem") : "",
+        checks.reviewed > 0 ? `${checks.reviewed} reviewed` : "",
       ]
         .filter(Boolean)
         .join(", "),
-      problem: problems > 0,
+      problem: checks.problems > 0,
+      spokenAtZero: checks.reviewed > 0,
     },
     properties: {
       count: total,
@@ -337,6 +348,7 @@ export function Inspector({
               count={counts[id].count}
               problem={counts[id].problem}
               spoken={counts[id].spoken}
+              spokenAtZero={counts[id].spokenAtZero}
             />
           </TabButton>
         ))}

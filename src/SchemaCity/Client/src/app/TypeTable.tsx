@@ -12,13 +12,15 @@ import {
 } from "react";
 import { Input } from "@/components/ui/input";
 import type { ChangeGroups, ChangeKind } from "../model/changes";
-import { type Finding, problemLabels } from "../model/findings";
+import type { Finding } from "../model/findings";
 import { contentCountOf, type Role, roleOf } from "../model/inspector";
 import { neighbourhoods } from "../model/neighbourhood";
+import type { FindingMark } from "../model/review";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { useAnnounceChange } from "./a11y";
 import { FindingDot, RoleKey } from "./InspectorChips";
+import { useProblemMarks } from "./Review";
 
 export type TypeRow = {
   id: string;
@@ -184,7 +186,7 @@ function NameCell({
 }: {
   row: TypeRow;
   on: boolean;
-  flagged: string | undefined;
+  flagged: FindingMark | undefined;
   onSelect: (id: string) => void;
 }) {
   return (
@@ -201,7 +203,7 @@ function NameCell({
             {row.name}
           </button>
         )}
-        {flagged ? <FindingDot title={flagged} /> : null}
+        {flagged ? <FindingDot {...flagged} /> : null}
       </span>
     </th>
   );
@@ -497,7 +499,7 @@ export function TypeTable({
     () => compareRows(graph, usage, compare),
     [graph, usage, compare]
   );
-  const problems = useMemo(() => problemLabels(findings), [findings]);
+  const problems = useProblemMarks(findings);
   // The same ranking the palette uses, kept only as a set: the table's own sort
   // decides the order, and searchNodes decides what is in it.
   const matched = useMatches(graph, query, scope);
