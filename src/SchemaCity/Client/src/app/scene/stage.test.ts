@@ -20,6 +20,18 @@ test("no part of the city is in fog, wherever the camera orbits over it", () => 
   }
 });
 
+test("no part of the city is in fog with the orbit point raised over it", () => {
+  // A raised orbit point puts the ground that much further from the camera.
+  for (const span of [4, 87, 400]) {
+    for (const lift of [0, span / 2, span]) {
+      const distance = span * 3;
+      expect(atmosphere(span, distance, lift).near).toBeGreaterThan(
+        distance + lift + span * Math.SQRT2
+      );
+    }
+  }
+});
+
 test("the horizon moves out with the camera, so dollying out never finds an edge", () => {
   const close = atmosphere(87, 20);
   const far = atmosphere(87, 300);

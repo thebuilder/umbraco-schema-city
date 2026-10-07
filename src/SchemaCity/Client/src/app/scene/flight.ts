@@ -102,6 +102,28 @@ export function keydownAction(
   return tag === "BODY" || tag === "HTML" ? "fly" : "release";
 }
 
+/** How low the camera may fly, in world units above the ground. */
+const MIN_EYE = 1;
+
+/**
+ * The vertical part of one frame's flight, `rise`, cut short so neither the camera
+ * at height `eye` nor the point it orbits at height `target` goes under the ground,
+ * and the orbit point goes no higher than `ceiling`.
+ *
+ * R moves the camera and its orbit point together. Without a ceiling, holding it
+ * carried both up until the city was gone in the fog, and orbiting from there
+ * swung the camera around a point in the empty sky.
+ */
+export function verticalStep(
+  rise: number,
+  eye: number,
+  target: number,
+  ceiling: number
+): number {
+  const floor = Math.max(Math.min(0, MIN_EYE - eye), Math.min(0, -target));
+  return Math.min(Math.max(rise, floor), Math.max(0, ceiling - target));
+}
+
 /**
  * The slowest the keys fly, world units per second. A street is 9 units wide.
  */

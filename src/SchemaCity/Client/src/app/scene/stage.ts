@@ -32,12 +32,17 @@ export const CAMERA_FOV = 40;
  * the orbit point leaves all of it crisp wherever the camera orbits over it. Three
  * times that is where the ground has become the horizon, which is also as far as
  * the camera needs to see.
+ *
+ * `lift` is how far the orbit point is above the ground. R raises it, and the city
+ * is then that much further from the camera than the orbit point is, so the fog
+ * starts that much further out too.
  */
 export function atmosphere(
   span: number,
-  distance: number
+  distance: number,
+  lift = 0
 ): { near: number; far: number } {
-  const near = distance + span * 1.5;
+  const near = distance + Math.max(0, lift) + span * 1.5;
   return { near, far: near * 3 };
 }
 

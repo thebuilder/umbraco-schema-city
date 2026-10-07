@@ -7,6 +7,7 @@ import {
   groundAxes,
   keydownAction,
   translateFlightEndpoints,
+  verticalStep,
 } from "./flight";
 
 /** The default framing's pose: standing south-east of the city, looking at it. */
@@ -188,6 +189,18 @@ test("a key another handler took, a chord or a non-flight key stops the flight",
     "release"
   );
   expect(keydownAction(press("KeyL", HOST), HOST)).toBe("release");
+});
+
+test("R stops at the ceiling and F at the ground", () => {
+  // Free to rise below the ceiling, and only as far as it.
+  expect(verticalStep(2, 40, 10, 100)).toBe(2);
+  expect(verticalStep(5, 120, 98, 100)).toBeCloseTo(2);
+  expect(verticalStep(5, 130, 100, 100)).toBe(0);
+  // Descending stops with the orbit point on the ground or the eye a unit above it.
+  expect(verticalStep(-5, 40, 3, 100)).toBe(-3);
+  expect(verticalStep(-5, 2, 30, 100)).toBe(-1);
+  // Already under the ground is not pulled further down, and not pushed up.
+  expect(verticalStep(-1, 0.5, 0, 100)).toBe(0);
 });
 
 test("pressing Shift mid-flight boosts rather than stopping", () => {

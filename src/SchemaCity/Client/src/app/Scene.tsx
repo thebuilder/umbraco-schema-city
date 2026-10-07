@@ -83,6 +83,7 @@ import {
   groundAxes,
   keydownAction,
   translateFlightEndpoints,
+  verticalStep,
 } from "./scene/flight";
 import {
   type Framed,
@@ -1408,7 +1409,7 @@ function World({ palette, span }: { palette: Palette; span: number }) {
   useFrame(() => {
     const target = controls?.target ?? ORIGIN;
     const distance = camera.position.distanceTo(target);
-    const { near, far } = atmosphere(span, distance);
+    const { near, far } = atmosphere(span, distance, target.y);
     if (fog.current) {
       fog.current.near = near;
       fog.current.far = far;
@@ -1904,8 +1905,6 @@ function Controls({ span }: { span: number }) {
 
 /** Scratch, so flying allocates nothing per frame. */
 const FLIGHT_STEP = new THREE.Vector3();
-/** How low the camera may fly, in world units above the ground. */
-const MIN_EYE = 1;
 
 /**
  * Keyboard flight, after fsn. Held keys become a velocity that eases in and out,
@@ -1918,10 +1917,13 @@ const MIN_EYE = 1;
 function Flight({
   cameraFlight,
   host,
+  span,
 }: {
   cameraFlight: RefObject<CameraFlight | null>;
   /** The element around the canvas, which takes focus when the city is clicked. */
   host: RefObject<HTMLDivElement | null>;
+  /** The city's longer side, which is as high as the orbit point flies. */
+  span: number;
 }) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as Rig | null;
@@ -1990,11 +1992,13 @@ function Flight({
       return;
     }
     FLIGHT_STEP.copy(moving).multiplyScalar(step);
-    // Neither the camera nor the point it orbits goes under the ground.
-    FLIGHT_STEP.y = Math.max(
+    // The orbit point rises no higher than the city is wide, which from the far
+    // end of the dolly range still has the city on screen.
+    FLIGHT_STEP.y = verticalStep(
       FLIGHT_STEP.y,
-      Math.min(0, MIN_EYE - camera.position.y),
-      Math.min(0, -controls.target.y)
+      camera.position.y,
+      controls.target.y,
+      span
     );
     // Keep a framing flight's endpoints in the same translated frame as the camera,
     // so a held key moves the view during the flight without the interpolation
@@ -2639,7 +2643,7 @@ export default function Scene({
             traces={boardMarks.traces}
             usage={usage}
           />
-          <Flight cameraFlight={cameraFlight} host={host} />
+          <Flight cameraFlight={cameraFlight} host={host} span={span} />
           <CameraRig
             bounds={bounds}
             buildingHeight={Math.max(1, ...heights.values())}
