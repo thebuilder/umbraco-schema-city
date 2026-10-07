@@ -1,5 +1,5 @@
 {
-  "generatedAt": "1970-01-01T00:00:00+00:00",
+  "generatedAt": "2026-09-01T12:00:00+00:00",
   "folders": [
     {
       "id": "5ad35381-24f6-f0d7-355f-c6b54c9a3e32",
@@ -326,11 +326,20 @@
           ]
         },
         {
-          "id": "5f143411-4946-1cf4-d247-ce1d57383c28",
+          "id": "2ca6ef7b-242c-c473-dcf1-b9ba41f37e2a",
+          "alias": "social",
+          "name": "Social",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
+          "properties": []
+        },
+        {
+          "id": "3ffc957e-7f59-85fe-3a5f-c372762874a6",
           "alias": "openGraph",
           "name": "Open Graph",
           "type": "Group",
-          "parentAlias": null,
+          "parentAlias": "social",
           "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
           "properties": [
             {
@@ -950,11 +959,20 @@
           ]
         },
         {
-          "id": "5f143411-4946-1cf4-d247-ce1d57383c28",
+          "id": "2ca6ef7b-242c-c473-dcf1-b9ba41f37e2a",
+          "alias": "social",
+          "name": "Social",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
+          "properties": []
+        },
+        {
+          "id": "3ffc957e-7f59-85fe-3a5f-c372762874a6",
           "alias": "openGraph",
           "name": "Open Graph",
           "type": "Group",
-          "parentAlias": null,
+          "parentAlias": "social",
           "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
           "properties": [
             {
@@ -2262,11 +2280,20 @@
           ]
         },
         {
-          "id": "5f143411-4946-1cf4-d247-ce1d57383c28",
+          "id": "2ca6ef7b-242c-c473-dcf1-b9ba41f37e2a",
+          "alias": "social",
+          "name": "Social",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
+          "properties": []
+        },
+        {
+          "id": "3ffc957e-7f59-85fe-3a5f-c372762874a6",
           "alias": "openGraph",
           "name": "Open Graph",
           "type": "Group",
-          "parentAlias": null,
+          "parentAlias": "social",
           "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
           "properties": [
             {
@@ -5825,11 +5852,20 @@
           ]
         },
         {
-          "id": "5f143411-4946-1cf4-d247-ce1d57383c28",
+          "id": "2ca6ef7b-242c-c473-dcf1-b9ba41f37e2a",
+          "alias": "social",
+          "name": "Social",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
+          "properties": []
+        },
+        {
+          "id": "3ffc957e-7f59-85fe-3a5f-c372762874a6",
           "alias": "openGraph",
           "name": "Open Graph",
           "type": "Group",
-          "parentAlias": null,
+          "parentAlias": "social",
           "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
           "properties": [
             {
@@ -6721,11 +6757,20 @@
           ]
         },
         {
-          "id": "5f143411-4946-1cf4-d247-ce1d57383c28",
+          "id": "2ca6ef7b-242c-c473-dcf1-b9ba41f37e2a",
+          "alias": "social",
+          "name": "Social",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
+          "properties": []
+        },
+        {
+          "id": "3ffc957e-7f59-85fe-3a5f-c372762874a6",
           "alias": "openGraph",
           "name": "Open Graph",
           "type": "Group",
-          "parentAlias": null,
+          "parentAlias": "social",
           "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
           "properties": [
             {
@@ -8397,11 +8442,20 @@
       "description": null,
       "groups": [
         {
-          "id": "5f143411-4946-1cf4-d247-ce1d57383c28",
+          "id": "2ca6ef7b-242c-c473-dcf1-b9ba41f37e2a",
+          "alias": "social",
+          "name": "Social",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": null,
+          "properties": []
+        },
+        {
+          "id": "3ffc957e-7f59-85fe-3a5f-c372762874a6",
           "alias": "openGraph",
           "name": "Open Graph",
           "type": "Group",
-          "parentAlias": null,
+          "parentAlias": "social",
           "fromCompositionId": null,
           "properties": [
             {
@@ -9676,11 +9730,20 @@
           ]
         },
         {
-          "id": "5f143411-4946-1cf4-d247-ce1d57383c28",
+          "id": "2ca6ef7b-242c-c473-dcf1-b9ba41f37e2a",
+          "alias": "social",
+          "name": "Social",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
+          "properties": []
+        },
+        {
+          "id": "3ffc957e-7f59-85fe-3a5f-c372762874a6",
           "alias": "openGraph",
           "name": "Open Graph",
           "type": "Group",
-          "parentAlias": null,
+          "parentAlias": "social",
           "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
           "properties": [
             {
@@ -10840,11 +10903,20 @@
           ]
         },
         {
-          "id": "5f143411-4946-1cf4-d247-ce1d57383c28",
+          "id": "2ca6ef7b-242c-c473-dcf1-b9ba41f37e2a",
+          "alias": "social",
+          "name": "Social",
+          "type": "Tab",
+          "parentAlias": null,
+          "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
+          "properties": []
+        },
+        {
+          "id": "3ffc957e-7f59-85fe-3a5f-c372762874a6",
           "alias": "openGraph",
           "name": "Open Graph",
           "type": "Group",
-          "parentAlias": null,
+          "parentAlias": "social",
           "fromCompositionId": "8943f601-65ad-0664-b69e-cf8f3a0599ab",
           "properties": [
             {
@@ -11757,7 +11829,7 @@
       "allowedAsRoot": true,
       "variesByCulture": false,
       "variesBySegment": false,
-      "description": "Seeded Site.",
+      "description": "Seeded Site, seed version 2026-10-07.",
       "groups": [
         {
           "id": "31ac64c5-6e14-83a1-dfe2-f37b5dde5965",
