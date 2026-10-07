@@ -105,7 +105,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       },
       {
         keys: ["Inspector"],
-        does: "The pages about one type, Editor and Impact, open from its buttons. A line over the page leads back to the view you came from",
+        does: "The pages about one type, Editor and Impact, open from its Editor view and Impact buttons. A line over the page leads back to the view you came from",
       },
       {
         keys: ["Footer"],
@@ -122,7 +122,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       },
       { keys: ["Open in editor"], does: "Opens the Document Type editor" },
       {
-        keys: ["Editor"],
+        keys: ["Editor view"],
         does: "In the inspector: the type's tabs, groups and properties as an editor sees them",
       },
       { keys: ["Findings"], does: "Opens the drawer of problems and notes" },

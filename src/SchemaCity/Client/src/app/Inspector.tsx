@@ -311,7 +311,7 @@ export function Inspector({
               size="sm"
               variant="outline"
             >
-              Editor
+              Editor view
             </Button>
           ) : null}
           <Button
