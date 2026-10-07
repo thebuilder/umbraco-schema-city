@@ -1,0 +1,54 @@
+[
+  {
+    "kind": "brokenBlock",
+    "alias": "brokenBlockHost"
+  },
+  {
+    "kind": "cultureMismatch",
+    "alias": "localisedBlockHost"
+  },
+  {
+    "kind": "deadEnd",
+    "alias": "deadEndPromo"
+  },
+  {
+    "kind": "deadEnd",
+    "alias": "legacyHub"
+  },
+  {
+    "kind": "deadEnd",
+    "alias": "unusedSeoComposition"
+  },
+  {
+    "kind": "duplicateAlias",
+    "alias": "dupAliasPage"
+  },
+  {
+    "kind": "emptyBlock",
+    "alias": "elementSpacer"
+  },
+  {
+    "kind": "nearDuplicateDataType",
+    "alias": "nearDuplicatePage"
+  },
+  {
+    "kind": "noProperties",
+    "alias": "emptyType"
+  },
+  {
+    "kind": "overloadedTab",
+    "alias": "overloadedTabPage"
+  },
+  {
+    "kind": "unreachableChain",
+    "alias": "legacyHubPage"
+  },
+  {
+    "kind": "unusedElementType",
+    "alias": "unusedElementBanner"
+  },
+  {
+    "kind": "unusedType",
+    "alias": "unusedArticleLegacy"
+  }
+]

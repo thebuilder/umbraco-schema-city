@@ -43,10 +43,9 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 {
     /// <summary>
     /// The findings the seed data is built to produce, as (kind, Document Type alias), with the
-    /// client's kind ids. The findings test asserts that its own output contains all of these.
-    /// It cannot assert equality:
-    /// the no-template rule matches every creatable type the seeder leaves without one, and giving
-    /// 60 Document Types a template would write 60 .cshtml files into the site.
+    /// client's kind ids. The export writes them to medium-planted.json, and the client's findings
+    /// test asserts that its output on medium.json contains every one. Containment, not equality:
+    /// the rules find more than what is planted, such as the unused types the content leaves.
     /// </summary>
     public static readonly (string Kind, string Alias)[] PlantedFindings =
     [
@@ -59,7 +58,6 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         ("emptyBlock", "elementSpacer"),
         ("nearDuplicateDataType", "nearDuplicatePage"),
         ("noProperties", "emptyType"),
-        ("noTemplate", "noTemplatePage"),
         ("overloadedTab", "overloadedTabPage"),
         ("unreachableChain", "legacyHubPage"),
         ("unusedElementType", "unusedElementBanner"),
@@ -810,6 +808,11 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
                 row => row.Key,
                 row => row.Value.LastEdited is null ? row.Value : row.Value with { LastEdited = FixtureDate.UtcDateTime }),
         };
+
+        string plantedPath = Path.Combine(directory, "medium-planted.json");
+        System.IO.File.WriteAllText(
+            plantedPath,
+            JsonSerializer.Serialize(PlantedFindings.Select(p => new { p.Kind, p.Alias }), FixtureJson));
 
         string usagePath = Path.Combine(directory, "medium-usage.json");
         System.IO.File.WriteAllText(usagePath, JsonSerializer.Serialize(pinned, FixtureJson));

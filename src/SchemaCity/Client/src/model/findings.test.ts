@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import mediumFixture from "../../dev/fixtures/medium.json";
+import mediumPlantedFixture from "../../dev/fixtures/medium-planted.json";
 import mediumUsageFixture from "../../dev/fixtures/medium-usage.json";
 import pathologicalFixture from "../../dev/fixtures/pathological.json";
 import pathologicalUsageFixture from "../../dev/fixtures/pathological-usage.json";
@@ -916,21 +917,10 @@ describe("findFindings on the seeded medium.json", () => {
     "unusedSeoComposition",
     "deadEndPromo",
   ]);
-  const planted: [string, FindingKind][] = [
-    ["unusedArticleLegacy", "unusedType"],
-    ["unusedElementBanner", "unusedElementType"],
-    ["unusedSeoComposition", "deadEnd"],
-    ["deadEndPromo", "deadEnd"],
-    ["dupAliasPage", "duplicateAlias"],
-    ["brokenBlockHost", "brokenBlock"],
-    ["emptyType", "noProperties"],
-    ["legacyHub", "deadEnd"],
-    ["legacyHubPage", "unreachableChain"],
-    ["localisedBlockHost", "cultureMismatch"],
-    ["nearDuplicatePage", "nearDuplicateDataType"],
-    ["overloadedTabPage", "overloadedTab"],
-    ["elementSpacer", "emptyBlock"],
-  ];
+  // SchemaSeeder.PlantedFindings, written out by the seeder's fixture export.
+  const planted = (
+    mediumPlantedFixture as { kind: FindingKind; alias: string }[]
+  ).map(({ kind, alias }) => [alias, kind] as const);
 
   it("treats the sample as headless and leaves the template note out", () => {
     // 54 of the 59 types an editor can reach have no template, noTemplatePage among them.
