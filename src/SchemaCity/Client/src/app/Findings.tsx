@@ -19,14 +19,17 @@ import {
   KIND_NEXT_STEP,
 } from "../model/findings";
 import { findingsCsv } from "../model/findings-export";
+import { isReviewed } from "../model/review";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
 import {
   DATA_TYPE_HEADING,
   plural,
+  useAnnounce,
   useAnnounceChange,
   useHandOff,
 } from "./a11y";
 import { DataTypeLinks, READING, SpokenCount } from "./InspectorChips";
+import { ReviewControl, Reviews, subjectName } from "./Review";
 import { saveFile } from "./save-file";
 
 /**
@@ -62,18 +65,21 @@ export function snapshotDate(iso: string | undefined): string | null {
  * is the type and what is particular to it. Clicking selects the type, which for a
  * broken block reference is the host: the missing Element Type has no building. A
  * finding about a Data Type alone opens that Data Type's page instead, and the Data
- * Types a type's finding names are links under it.
+ * Types a type's finding names are links under it. Its review status and action
+ * sit at the bottom.
  */
 function Row({
   finding,
   name,
   onSelect,
   onDataType,
+  onReviewed,
 }: {
   finding: Finding;
   name: string;
   onSelect: (id: string) => void;
   onDataType: (id: string) => void;
+  onReviewed: (id: string) => void;
 }) {
   const { nodeId, dataTypeIds = [] } = finding;
   return (
@@ -98,6 +104,13 @@ function Row({
           ))}
         </p>
       ) : null}
+      <div className="px-3 pb-2 empty:hidden">
+        <ReviewControl
+          finding={finding}
+          onChange={() => onReviewed(finding.id)}
+          subject={name}
+        />
+      </div>
     </div>
   );
 }
@@ -143,6 +156,7 @@ function Group({
   nodesById,
   onSelect,
   onDataType,
+  onReviewed,
 }: {
   kind: FindingKind;
   open: boolean;
@@ -150,13 +164,11 @@ function Group({
   nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
   onDataType: (id: string) => void;
+  onReviewed: (id: string) => void;
 }) {
   const tone = TONE[rows[0]?.severity ?? "note"];
   const links = use(DataTypeLinks);
-  const nameOf = (finding: Finding) =>
-    finding.nodeId
-      ? (nodesById.get(finding.nodeId)?.name ?? "a deleted type")
-      : (links?.nameOf(finding.dataTypeIds?.[0] ?? "") ?? "a Data Type");
+  const nameOf = (finding: Finding) => subjectName(finding, nodesById, links);
   return (
     <details className={`border-l-2 bg-muted ${tone.border}`} open={open}>
       <summary className="flex cursor-pointer items-baseline gap-2 px-3 pt-2.5 pb-1">
@@ -177,6 +189,7 @@ function Group({
             key={finding.id}
             name={nameOf(finding)}
             onDataType={onDataType}
+            onReviewed={onReviewed}
             onSelect={onSelect}
           />
         ))}
@@ -185,21 +198,30 @@ function Group({
   );
 }
 
-/** The drawer's title, its counts, when the snapshots were taken, and the export. */
+/**
+ * The drawer's title, its counts, when the snapshots were taken, and the export.
+ * Reviewed findings are decided and current; the rest, reopened ones included, are
+ * open, and the problem count is of the open ones.
+ */
 function Header({
   findings,
+  open,
   shown,
   graph,
   usage,
+  failed,
   onExport,
 }: {
   findings: Finding[];
+  open: Finding[];
   shown: number;
   graph: SchemaGraph;
   usage?: UsageReport;
+  failed?: string | null;
   onExport: () => void;
 }) {
-  const problems = problemCount(findings);
+  const problems = problemCount(open);
+  const reviewed = findings.length - open.length;
   const dates = [
     ["Schema read", snapshotDate(graph.generatedAt)],
     ["usage counted", snapshotDate(usage?.generatedAt)],
@@ -211,9 +233,10 @@ function Header({
       </SheetTitle>
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <p className="text-label">
-          {plural(findings.length, "finding")},{" "}
+          {plural(findings.length, "finding")}, {reviewed.toLocaleString()}{" "}
+          reviewed, {open.length.toLocaleString()} open,{" "}
           <span className={problems > 0 ? "text-signal" : ""}>
-            {plural(problems, "problem")}
+            {plural(problems, "open problem")}
           </span>
           {shown === findings.length ? null : `, ${shown} shown`}
         </p>
@@ -234,9 +257,18 @@ function Header({
           Usage snapshot unavailable; usage-dependent checks are omitted.
         </p>
       )}
+      {failed ? (
+        <p className="mt-1 text-signal text-xs">
+          Review decisions did not load. {failed}
+        </p>
+      ) : null}
     </div>
   );
 }
+
+/** A filter chip, which reads as pressed while its filter is on. */
+const CHIP =
+  "inline-flex items-baseline gap-1 border border-line bg-muted px-1.5 py-0.5 text-prose text-xs hover:border-phosphor hover:text-phosphor aria-pressed:border-phosphor aria-pressed:bg-accent aria-pressed:text-phosphor-bright";
 
 /** One chip per kind that has rows. None pressed means every kind. */
 function KindChips({
@@ -263,7 +295,7 @@ function KindChips({
         return (
           <button
             aria-pressed={on}
-            className="inline-flex items-baseline gap-1 border border-line bg-muted px-1.5 py-0.5 text-prose text-xs hover:border-phosphor hover:text-phosphor aria-pressed:border-phosphor aria-pressed:bg-accent aria-pressed:text-phosphor-bright"
+            className={CHIP}
             key={kind}
             onClick={() => onToggle(kind)}
             type="button"
@@ -290,10 +322,11 @@ function downloadCsv(
   rows: Finding[],
   graph: SchemaGraph,
   usage: UsageReport | undefined,
-  kinds: FindingKind[]
+  kinds: FindingKind[],
+  review: Parameters<typeof findingsCsv>[4]
 ) {
   saveFile(
-    findingsCsv(rows, graph, usage, kinds),
+    findingsCsv(rows, graph, usage, kinds, review),
     "schema-city-findings.csv",
     "text/csv;charset=utf-8"
   );
@@ -309,7 +342,7 @@ export function Findings({
   findings,
   nodesById,
   onSelect,
-  open,
+  open: isOpen,
   onOpenChange,
   usage,
 }: {
@@ -322,11 +355,22 @@ export function Findings({
   usage?: UsageReport;
 }) {
   const [kinds, setKinds] = useState<FindingKind[]>([]);
-  const { active, matched } = filterFindings(findings, kinds);
+  const reviewing = use(Reviews);
+  const [hideReviewed, setHideReviewed] = useState(true);
+  // Rows reviewed while the drawer is open stay in view until it closes, so the
+  // row a keyboard user just saved does not vanish from under them.
+  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
+  const reviewed = (finding: Finding) =>
+    isReviewed(reviewing?.reviewOf(finding));
+  const open = findings.filter((finding) => !reviewed(finding));
+  const listed = hideReviewed
+    ? findings.filter((finding) => !reviewed(finding) || kept.has(finding.id))
+    : findings;
+  const { active, matched } = filterFindings(listed, kinds);
   // findFindings already sorts rows inside a kind strongest first, so grouping
   // keeps that.
   const groups = findingGroups(matched);
-  const problems = problemCount(findings);
+  const problems = problemCount(open);
   const toggle = (kind: FindingKind) =>
     setKinds(
       active.includes(kind)
@@ -338,6 +382,16 @@ export function Findings({
       ? `${matched.length} of ${plural(findings.length, "finding")} shown`
       : "All findings shown"
   );
+  const announce = useAnnounce();
+  const toggleReviewed = () => {
+    const hide = !hideReviewed;
+    setHideReviewed(hide);
+    announce(hide ? "Reviewed findings hidden" : "Reviewed findings shown");
+  };
+  const setOpen = (next: boolean) => {
+    setKept(new Set());
+    onOpenChange(next);
+  };
 
   const trigger = useRef<HTMLButtonElement>(null);
   // A chosen row opens the inspector, so focus goes to its heading.
@@ -345,27 +399,28 @@ export function Findings({
   const pick = (id: string) => {
     handOff.chose();
     onSelect(id);
-    onOpenChange(false);
+    setOpen(false);
   };
   // A Data Type opens its page, so focus goes to that page's heading.
   const links = use(DataTypeLinks);
   const pickDataType = (id: string) => {
     handOff.chose(DATA_TYPE_HEADING);
     links?.open(id);
-    onOpenChange(false);
+    setOpen(false);
   };
 
   return (
-    <Sheet onOpenChange={onOpenChange} open={open}>
+    <Sheet onOpenChange={setOpen} open={isOpen}>
       <SheetTrigger
         ref={trigger}
         render={<Button data-trigger size="sm" variant="outline" />}
       >
         Findings
         <Badge variant={problems > 0 ? "signal" : "outline"}>
-          <span aria-hidden>{findings.length}</span>
+          <span aria-hidden>{open.length}</span>
           <span className="sr-only">
-            {plural(findings.length, "finding")}, {plural(problems, "problem")}
+            {plural(open.length, "open finding")},{" "}
+            {plural(problems, "open problem")}
           </span>
         </Badge>
       </SheetTrigger>
@@ -374,13 +429,40 @@ export function Findings({
         finalFocus={handOff.finalFocus}
       >
         <Header
+          failed={reviewing?.failed}
           findings={findings}
           graph={graph}
-          onExport={() => downloadCsv(matched, graph, usage, active)}
+          onExport={() =>
+            downloadCsv(
+              matched,
+              graph,
+              usage,
+              active,
+              reviewing
+                ? { of: reviewing.reviewOf, hidden: hideReviewed }
+                : undefined
+            )
+          }
+          open={open}
           shown={matched.length}
           usage={usage}
         />
-        <KindChips active={active} findings={findings} onToggle={toggle} />
+        {reviewing ? (
+          <div className="px-4 pt-3">
+            <button
+              aria-pressed={hideReviewed}
+              className={CHIP}
+              onClick={toggleReviewed}
+              type="button"
+            >
+              Hide reviewed
+              <span className="font-mono text-2xs text-faint">
+                {findings.length - open.length}
+              </span>
+            </button>
+          </div>
+        ) : null}
+        <KindChips active={active} findings={listed} onToggle={toggle} />
 
         <ScrollArea
           className="min-h-0 flex-1"
@@ -388,7 +470,7 @@ export function Findings({
         >
           <div className="space-y-2 px-4 pb-4">
             <p className="text-faint text-xs empty:hidden">
-              {emptyLine(findings.length, matched.length)}
+              {emptyLine(findings.length, listed.length, matched.length)}
             </p>
             {groups.map(({ kind, rows }) => (
               <Group
@@ -396,6 +478,7 @@ export function Findings({
                 kind={kind}
                 nodesById={nodesById}
                 onDataType={pickDataType}
+                onReviewed={(id) => setKept((ids) => new Set(ids).add(id))}
                 onSelect={pick}
                 open={rows[0]?.severity === "problem" || active.includes(kind)}
                 rows={rows}
@@ -409,9 +492,10 @@ export function Findings({
 }
 
 /** Why the list is empty, or nothing when it is not. */
-function emptyLine(total: number, shown: number) {
+function emptyLine(total: number, listed: number, shown: number) {
   if (shown > 0) return "";
-  return total === 0
-    ? "Nothing to report about this schema."
+  if (total === 0) return "Nothing to report about this schema.";
+  return listed === 0
+    ? "Every finding is reviewed. Turn off Hide reviewed to see them."
     : "No finding of those kinds.";
 }

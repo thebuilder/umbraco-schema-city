@@ -13,6 +13,7 @@ import {
   openDataTypeInEditor,
   openTypeInEditor,
   resolveIcons,
+  serverDecisions,
 } from "./api.js";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
@@ -29,6 +30,8 @@ class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
   #usage?: UsageReport;
   #icons?: Record<string, string>;
   #failed?: string;
+  // One store for the element's life, so a redraw does not load the decisions again.
+  readonly #decisions = serverDecisions(this);
 
   override connectedCallback() {
     super.connectedCallback();
@@ -93,6 +96,7 @@ class SchemaCityWorkspaceElement extends UmbElementMixin(LitElement) {
     this.#root.render(
       this.#graph ? (
         <App
+          decisions={this.#decisions}
           graph={this.#graph}
           icons={this.#icons}
           onOpenDataType={openDataTypeInEditor}

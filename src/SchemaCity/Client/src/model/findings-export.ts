@@ -7,6 +7,7 @@ import {
   KIND_EXPLANATION,
   KIND_NEXT_STEP,
 } from "./findings";
+import type { Review } from "./review";
 import type { SchemaGraph, TypeUsage, UsageReport } from "./types";
 
 const FORMULA = /^\s*[=+\-@]/;
@@ -51,6 +52,11 @@ const HEADER = [
   "Usage snapshot",
   "Data Types",
   "Data Type keys",
+  "Status",
+  "Reason",
+  "Decided by",
+  "Decided at",
+  "Reopened",
 ];
 
 export const DOCUMENT_TYPE_PATH =
@@ -60,13 +66,18 @@ const DATA_TYPE_PATH = "/umbraco/section/settings/workspace/data-type/edit/";
 /**
  * The findings currently visible to the developer, as CSV. `kinds` is the drawer's
  * filter, empty for every kind. Usage columns stay empty while the usage report is
- * unavailable, and the usage snapshot column says so.
+ * unavailable, and the usage snapshot column says so. `review` gives each row's
+ * decision, and whether reviewed rows were hidden, which the filter column says.
  */
 export function findingsCsv(
   findings: Finding[],
   graph: SchemaGraph,
   usage?: UsageReport,
-  kinds: FindingKind[] = []
+  kinds: FindingKind[] = [],
+  review?: {
+    of: (finding: Finding) => Review | undefined;
+    hidden: boolean;
+  }
 ): string {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const folders = new Map(graph.folders.map((folder) => [folder.id, folder]));
@@ -92,10 +103,14 @@ export function findingsCsv(
       )
       .join(" | ");
   const branchRoot = unusedBranchRoots(findings, graph);
-  const filter =
+  const filter = [
     kinds.length === 0
       ? "All kinds"
-      : kinds.map((kind) => FINDING_LABEL[kind]).join(" | ");
+      : kinds.map((kind) => FINDING_LABEL[kind]).join(" | "),
+    review?.hidden ? "Reviewed hidden" : "",
+  ]
+    .filter(Boolean)
+    .join(" | ");
   const schemaDate = dayOf(graph.generatedAt) ?? "";
   const usageDate = usage ? (dayOf(usage.generatedAt) ?? "") : "unavailable";
 
@@ -148,9 +163,25 @@ export function findingsCsv(
     schemaDate,
     usageDate,
     ...dataTypeCells(finding.dataTypeIds),
+    ...reviewCells(review?.of(finding)),
   ]);
   return `${[HEADER, ...rows].map((row) => row.map(csv).join(",")).join("\n")}\n`;
 }
+
+/**
+ * Status, reason, decided by, decided at and reopened. A reopened decision is open
+ * again, so its status says so and the old decision stays beside it.
+ */
+const reviewCells = (review: Review | undefined) =>
+  review
+    ? [
+        review.reopened ? "open" : review.decision.status,
+        review.decision.reason,
+        review.decision.decidedBy,
+        dayOf(review.decision.decidedAt) ?? "",
+        review.reopened ? "yes" : "no",
+      ]
+    : ["open", "", "", "", ""];
 
 /** Total, published, drafts, trashed and last edited, or blanks without usage. */
 const usageCells = (counts: TypeUsage | undefined) =>

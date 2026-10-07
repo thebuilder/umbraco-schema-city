@@ -51,6 +51,9 @@ export function LiveRegion({
   );
 }
 
+/** Says one line in the live region, for the result of an action. */
+export const useAnnounce = () => use(Announce);
+
 /**
  * Announces `message` whenever it changes, but not on mount: a view that opens is
  * not news, a filter that narrows it is. Null says nothing.

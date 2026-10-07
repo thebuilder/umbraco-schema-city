@@ -4,6 +4,7 @@
 import { createRoot } from "react-dom/client";
 import { App } from "../src/app/App.tsx";
 import appStyles from "../src/app/styles.css?inline";
+import type { Decision, DecisionStore } from "../src/model/review.ts";
 import type { SchemaGraph, UsageReport } from "../src/model/types.ts";
 
 const sheet = new CSSStyleSheet();
@@ -37,6 +38,31 @@ const icons = {
     '<path d="M3.6 11h24.8M3.6 21h24.8"/></svg>',
 };
 
+// LOCAL TO THIS DEMO PAGE. The harness has no server, so review decisions live in
+// memory under a made-up user and are gone on reload. In the backoffice they are
+// kept in Umbraco's key-value table through the decisions endpoint.
+const saved = new Map<string, Decision>();
+const demoDecisions: DecisionStore = {
+  load: () => Promise.resolve([...saved.values()]),
+  save: (findingId, reason, fingerprint) => {
+    const decision: Decision = {
+      findingId,
+      status: "intentional",
+      reason,
+      decidedBy: "Demo user",
+      decidedByKey: "00000000-0000-0000-0000-000000000000",
+      decidedAt: new Date().toISOString(),
+      fingerprint,
+    };
+    saved.set(findingId, decision);
+    return Promise.resolve(decision);
+  },
+  remove: (findingId) => {
+    saved.delete(findingId);
+    return Promise.resolve();
+  },
+};
+
 const picker = document.querySelector("select") as HTMLSelectElement;
 const root = createRoot(document.querySelector("#app") as HTMLElement);
 
@@ -59,6 +85,7 @@ async function show(path: string) {
   const usage = usageOf(path);
   root.render(
     <App
+      decisions={demoDecisions}
       graph={graph}
       icons={icons}
       key={path}

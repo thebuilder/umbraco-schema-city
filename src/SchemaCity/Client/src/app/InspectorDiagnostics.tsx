@@ -1,12 +1,16 @@
+import { use } from "react";
 import {
   FINDING_LABEL,
   type Finding,
   KIND_EXPLANATION,
   KIND_NEXT_STEP,
 } from "../model/findings";
+import { isReviewed } from "../model/review";
 import type { SchemaEdge, SchemaNode } from "../model/types";
 import { plural } from "./a11y";
 import { FindingRelations } from "./FindingRelations";
+import { DataTypeLinks } from "./InspectorChips";
+import { ReviewControl, Reviews, subjectName } from "./Review";
 import {
   connectionKey,
   describeRelationship,
@@ -18,7 +22,8 @@ type Lookup = Map<string, SchemaNode>;
 /**
  * The findings about this type, problems first as findFindings sorts them. On a
  * Data Type's page the findings are about several types, so `subjects` names the
- * type each one is on, as a link.
+ * type each one is on, as a link. Each check carries its review status and action,
+ * the same as its row in the findings drawer.
  */
 export function InspectorChecks({
   findings,
@@ -37,46 +42,71 @@ export function InspectorChecks({
     return <p className="text-faint text-xs">{empty}</p>;
   return (
     <ul className="space-y-2">
-      {findings.map((finding) => {
-        const problem = finding.severity === "problem";
-        return (
-          <li
-            className={`border-l-2 bg-muted px-3 py-2.5 ${problem ? "border-signal" : "border-label"}`}
-            key={finding.id}
-          >
-            <p
-              className={`font-semibold text-2xs uppercase tracking-terminal-xs ${problem ? "text-signal" : "text-label"}`}
-            >
-              {problem ? "Problem" : "Note"} · {FINDING_LABEL[finding.kind]}
-            </p>
-            {subjects && finding.nodeId ? (
-              <p className="mt-0.5 text-label text-xs">
-                On{" "}
-                <button
-                  className="text-phosphor hover:text-phosphor-bright hover:underline"
-                  onClick={() => onSelect(finding.nodeId ?? "")}
-                  type="button"
-                >
-                  {nodesById.get(finding.nodeId)?.name ?? "a deleted type"}
-                </button>
-              </p>
-            ) : null}
-            <p className="mt-0.5 text-prose">{finding.summary}</p>
-            <p className="mt-1.5 text-faint text-xs">
-              {KIND_EXPLANATION[finding.kind]}
-            </p>
-            <p className="mt-1 text-faint text-xs">
-              What to do: {KIND_NEXT_STEP[finding.kind]}
-            </p>
-            <FindingRelations
-              finding={finding}
-              nodesById={nodesById}
-              onSelect={onSelect}
-            />
-          </li>
-        );
-      })}
+      {findings.map((finding) => (
+        <Check
+          finding={finding}
+          key={finding.id}
+          nodesById={nodesById}
+          onSelect={onSelect}
+          subjects={subjects}
+        />
+      ))}
     </ul>
+  );
+}
+
+/** One check: its kind, what it means, what to do, and its review. */
+function Check({
+  finding,
+  nodesById,
+  onSelect,
+  subjects,
+}: {
+  finding: Finding;
+  nodesById: Lookup;
+  onSelect: (id: string) => void;
+  subjects: boolean;
+}) {
+  const reviewing = use(Reviews);
+  const subject = subjectName(finding, nodesById, use(DataTypeLinks));
+  const tone =
+    finding.severity === "problem"
+      ? { border: "border-signal", text: "text-signal", word: "Problem" }
+      : { border: "border-label", text: "text-label", word: "Note" };
+  return (
+    <li className={`border-l-2 bg-muted px-3 py-2.5 ${tone.border}`}>
+      <p
+        className={`font-semibold text-2xs uppercase tracking-terminal-xs ${tone.text}`}
+      >
+        {tone.word} · {FINDING_LABEL[finding.kind]}
+        {isReviewed(reviewing?.reviewOf(finding)) ? " · Reviewed" : ""}
+      </p>
+      {subjects && finding.nodeId ? (
+        <p className="mt-0.5 text-label text-xs">
+          On{" "}
+          <button
+            className="text-phosphor hover:text-phosphor-bright hover:underline"
+            onClick={() => onSelect(finding.nodeId ?? "")}
+            type="button"
+          >
+            {subject}
+          </button>
+        </p>
+      ) : null}
+      <p className="mt-0.5 text-prose">{finding.summary}</p>
+      <p className="mt-1.5 text-faint text-xs">
+        {KIND_EXPLANATION[finding.kind]}
+      </p>
+      <p className="mt-1 text-faint text-xs">
+        What to do: {KIND_NEXT_STEP[finding.kind]}
+      </p>
+      <FindingRelations
+        finding={finding}
+        nodesById={nodesById}
+        onSelect={onSelect}
+      />
+      <ReviewControl finding={finding} subject={subject} />
+    </li>
   );
 }
 

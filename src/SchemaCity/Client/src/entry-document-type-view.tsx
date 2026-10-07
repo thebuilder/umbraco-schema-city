@@ -14,6 +14,7 @@ import {
   openDataTypeInEditor,
   openTypeInEditor,
   resolveIcons,
+  serverDecisions,
 } from "./api.js";
 import { App } from "./app/App.js";
 import appStyles from "./app/styles.css?inline";
@@ -31,6 +32,8 @@ class SchemaCityDocumentTypeViewElement extends UmbElementMixin(LitElement) {
   #icons?: Record<string, string>;
   #unique?: string;
   #failed?: string;
+  // One store for the element's life, so a redraw does not load the decisions again.
+  readonly #decisions = serverDecisions(this);
 
   constructor() {
     super();
@@ -107,6 +110,7 @@ class SchemaCityDocumentTypeViewElement extends UmbElementMixin(LitElement) {
     this.#root.render(
       this.#graph && this.#unique ? (
         <App
+          decisions={this.#decisions}
           graph={this.#graph}
           icons={this.#icons}
           initial={{ type: this.#unique, focus: true }}

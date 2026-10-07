@@ -33,6 +33,7 @@ import { findFindings } from "../model/findings";
 import { impactOf } from "../model/impact";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
+import type { DecisionStore } from "../model/review";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import {
@@ -50,9 +51,10 @@ import {
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_INSET, Inspector } from "./Inspector";
-import { DataTypeLinks, TextButton } from "./InspectorChips";
+import { TextButton } from "./InspectorChips";
 import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
+import { FindingLinks, useReviewing } from "./Review";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   highlightScale,
@@ -133,6 +135,7 @@ export function App({
   icons,
   onOpenType,
   onOpenDataType,
+  decisions,
   initial,
   onStateChange,
 }: {
@@ -147,6 +150,8 @@ export function App({
   onOpenType?: (id: string) => void;
   /** Opens a Data Type in the backoffice editor. */
   onOpenDataType?: (id: string) => void;
+  /** Where review decisions are kept, the same object every render. Optional. */
+  decisions?: DecisionStore;
   /**
    * Where to start. Left out, the app reads its own query string. `type` is a node
    * id or an alias, because the Document Type editor knows the key it is on and a
@@ -371,6 +376,7 @@ export function App({
           : "bg-phosphor-dim";
   }, [graph.edges]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
+  const reviewing = useReviewing(decisions, graph, findings);
   const dataTypeName = useMemo(() => dataTypeNames(graph), [graph]);
   const {
     comparison,
@@ -490,7 +496,7 @@ export function App({
 
   return (
     <LiveRegion portal={portal}>
-      <DataTypeLinks value={dataTypeLinks}>
+      <FindingLinks dataTypes={dataTypeLinks} reviews={reviewing}>
         <section
           aria-label="Schema City"
           className="flex h-full flex-col bg-background font-mono text-foreground"
@@ -926,7 +932,7 @@ export function App({
 
           <div ref={portal} />
         </section>
-      </DataTypeLinks>
+      </FindingLinks>
     </LiveRegion>
   );
 }
