@@ -531,6 +531,43 @@ export function onBoard(rect: Rect, edge: Edge): boolean {
   );
 }
 
+/**
+ * The places a print of `width` by `height` may take round its building, best first,
+ * each on its board by `fits`. In front or behind, a print centred under its
+ * building that would run off the board's edge slides along it instead, until one
+ * end is flush with the building's side, so a name at the end of a row still reads
+ * as its building's, from inside the board.
+ */
+function placesFor(
+  want: Want,
+  width: number,
+  height: number,
+  flipped: boolean,
+  fits: (id: string, rect: Rect) => boolean
+): Rect[] {
+  const slack = Math.max(0, (width - want.footprint) / 2);
+  return SIDES.flatMap((side) => {
+    const rect = printRect(
+      want.centre,
+      want.footprint,
+      width,
+      height,
+      side,
+      flipped
+    );
+    const along = side === "front" || side === "back";
+    const tries =
+      fits(want.id, rect) || !along || slack === 0
+        ? [rect]
+        : [-slack, slack].map((by) => ({
+            ...rect,
+            minX: rect.minX + by,
+            maxX: rect.maxX + by,
+          }));
+    return tries.filter((one) => fits(want.id, one));
+  });
+}
+
 /** One name to place: its building, and the prints it may use, best first. */
 export type Want = {
   id: string;
@@ -663,16 +700,8 @@ export function placeLabels(
         width: number;
         height: number;
       };
-      for (const side of SIDES) {
-        const rect = printRect(
-          want.centre,
-          want.footprint,
-          width,
-          height,
-          side,
-          flipped
-        );
-        if (!fits(want.id, rect) || blocked(want.id, rect)) continue;
+      for (const rect of placesFor(want, width, height, flipped, fits)) {
+        if (blocked(want.id, rect)) continue;
         const crosses = crossesTrace(rect);
         if (crosses && !cross) continue;
         // Its own building no longer counts against it, so it gets another id.

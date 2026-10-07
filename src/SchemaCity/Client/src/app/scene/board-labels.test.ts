@@ -580,6 +580,34 @@ describe("placeLabels", () => {
     );
   });
 
+  it("slides a print along its building rather than off the board's edge", () => {
+    // The board ends a unit east of the building, so a centred print runs off it.
+    const fits = (_: string, rect: Rect) => rect.maxX <= 3;
+    const placed = placeLabels(
+      [want("a", 0, 0, [8])],
+      [building("a", 0, 0)],
+      false,
+      undefined,
+      fits
+    );
+    const rect = placed.get("a")?.rect;
+    // In front still, flush with the building's east side and running west.
+    expect(rect?.minZ).toBeGreaterThan(2);
+    expect(rect?.maxX).toBeCloseTo(2);
+    expect(rect?.minX).toBeCloseTo(-6);
+  });
+
+  it("never takes a place its board turns down, even with no other left", () => {
+    const placed = placeLabels(
+      [want("a", 0, 0, [8, 3])],
+      [building("a", 0, 0)],
+      false,
+      undefined,
+      () => false
+    );
+    expect(placed.has("a")).toBe(false);
+  });
+
   it("prints two close neighbours whole on opposite sides", () => {
     // Two buildings 5.5 apart: their whole names would meet in front.
     const placed = placeLabels(
