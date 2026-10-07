@@ -437,21 +437,37 @@ export function byPriority(a: Ranked, b: Ranked): number {
 
 export type Rect = { minX: number; maxX: number; minZ: number; maxZ: number };
 
+/** The four places a print can lie round its building, as the reader sees them. */
+export type Side = "front" | "back" | "left" | "right";
+
+/** The order a name tries its places in: in front, behind, then beside. */
+const SIDES: readonly Side[] = ["front", "back", "left", "right"];
+
 /**
  * Where a print of `width` by `height` lies beside its building: in front of the
- * edge facing the camera, or behind the one facing away. Upright, front is south,
- * the side the default camera looks at; flipped, front is north.
+ * edge facing the camera, behind the one facing away, or level with it to the
+ * reader's left or right. Upright, front is south, the side the default camera looks
+ * at, and left is west; flipped, front is north and left is east.
  */
 export function printRect(
   centre: { x: number; z: number },
   footprint: number,
   width: number,
   height: number,
-  side: "front" | "back",
+  side: Side,
   flipped: boolean
 ): Rect {
-  const south = (side === "front") !== flipped;
   const near = footprint / 2 + LABEL_INSET;
+  if (side === "left" || side === "right") {
+    const west = (side === "left") !== flipped;
+    return {
+      minX: west ? centre.x - near - width : centre.x + near,
+      maxX: west ? centre.x - near : centre.x + near + width,
+      minZ: centre.z - height / 2,
+      maxZ: centre.z + height / 2,
+    };
+  }
+  const south = (side === "front") !== flipped;
   return {
     minX: centre.x - width / 2,
     maxX: centre.x + width / 2,
@@ -466,10 +482,20 @@ export type Want = {
   centre: { x: number; z: number };
   footprint: number;
   /** Width and height of each print, in world units, best first. */
-  prints: readonly { width: number; height: number }[];
+  prints: readonly {
+    width: number;
+    height: number;
+    /** True for whole leading words and an ellipsis. */
+    cut?: boolean;
+  }[];
 };
 
-export type Placed = { print: number; rect: Rect };
+export type Placed = {
+  print: number;
+  rect: Rect;
+  /** True when no place clear of the drawn traces was left, so a trace runs under it. */
+  crosses: boolean;
+};
 
 /**
  * Board kept clear between a print and a building. Under the print's own inset from
@@ -487,6 +513,23 @@ const CELL = 6;
 
 type Item = { id: string; rect: Rect; gap: number };
 
+/** The grid cells a rectangle grown by `margin` touches. */
+function cellsOf(rect: Rect, margin: number): string[] {
+  const out: string[] = [];
+  for (
+    let x = Math.floor((rect.minX - margin) / CELL);
+    x <= Math.floor((rect.maxX + margin) / CELL);
+    x++
+  )
+    for (
+      let z = Math.floor((rect.minZ - margin) / CELL);
+      z <= Math.floor((rect.maxZ + margin) / CELL);
+      z++
+    )
+      out.push(`${x}|${z}`);
+  return out;
+}
+
 const overlapping = (a: Rect, b: Rect, gap: number) =>
   a.minX < b.maxX + gap &&
   a.maxX > b.minX - gap &&
@@ -497,9 +540,14 @@ const overlapping = (a: Rect, b: Rect, gap: number) =>
  * Places as many names as fit, none over another or over any building but its own,
  * in two passes in the order given. The first gives every name the least of its
  * prints that fits, trying the rest only when that one does not, in front of its
- * building or else behind it, so as many names as possible get a place. The second
- * moves each placed name, in the same order, to its best print that fits the board
- * the first pass left. A name no print of which fits is left off.
+ * building, behind it, or beside it, so as many names as possible get a place. The
+ * second moves each placed name, in the same order, to its best print that fits the
+ * board the first pass left. A name no print of which fits is left off.
+ *
+ * Both passes take a place clear of the drawn traces, which `crossesTrace` tests,
+ * over one a trace runs through, so a print and a trace never share board where
+ * the board leaves a choice. Where it does not, the print takes a place over a
+ * trace and says so, and the scene draws bare board under it.
  *
  * One pass that took each name's best print first let the first long names take
  * the strips later short ones needed. The first pass tries more than the least
@@ -517,24 +565,11 @@ const overlapping = (a: Rect, b: Rect, gap: number) =>
 export function placeLabels(
   wants: readonly Want[],
   buildings: readonly { id: string; rect: Rect }[],
-  flipped: boolean
+  flipped: boolean,
+  crossesTrace: (rect: Rect) => boolean = () => false
 ): Map<string, Placed> {
   const grid = new Map<string, Item[]>();
-  const cells = (rect: Rect) => {
-    const out: string[] = [];
-    for (
-      let x = Math.floor((rect.minX - PRINT_GAP) / CELL);
-      x <= Math.floor((rect.maxX + PRINT_GAP) / CELL);
-      x++
-    )
-      for (
-        let z = Math.floor((rect.minZ - PRINT_GAP) / CELL);
-        z <= Math.floor((rect.maxZ + PRINT_GAP) / CELL);
-        z++
-      )
-        out.push(`${x}|${z}`);
-    return out;
-  };
+  const cells = (rect: Rect) => cellsOf(rect, PRINT_GAP);
   const add = (item: Item) => {
     for (const cell of cells(item.rect)) {
       const list = grid.get(cell);
@@ -559,14 +594,17 @@ export function placeLabels(
   for (const building of buildings) add({ ...building, gap: CLEAR });
 
   const placed = new Map<string, Placed & { item: Item }>();
-  /** The first of `prints` that fits, in front or behind, placed and returned. */
-  const place = (want: Want, prints: readonly number[]) => {
+  /**
+   * The first of `prints` that fits on any side, placed and returned; with `cross`
+   * false, only on a side no trace runs through.
+   */
+  const place = (want: Want, prints: readonly number[], cross: boolean) => {
     for (const print of prints) {
       const { width, height } = want.prints[print] as {
         width: number;
         height: number;
       };
-      for (const side of ["front", "back"] as const) {
+      for (const side of SIDES) {
         const rect = printRect(
           want.centre,
           want.footprint,
@@ -576,35 +614,204 @@ export function placeLabels(
           flipped
         );
         if (blocked(want.id, rect)) continue;
+        const crosses = crossesTrace(rect);
+        if (crosses && !cross) continue;
         // Its own building no longer counts against it, so it gets another id.
         const item = { id: `print|${want.id}`, rect, gap: PRINT_GAP };
         add(item);
-        placed.set(want.id, { print, rect, item });
+        placed.set(want.id, { print, rect, crosses, item });
         return true;
       }
     }
     return false;
   };
 
-  for (const want of wants)
-    place(
-      want,
-      want.prints.map((_, i) => want.prints.length - 1 - i)
-    );
+  for (const want of wants) {
+    const least = want.prints.map((_, i) => want.prints.length - 1 - i);
+    if (!place(want, least, false)) place(want, least, true);
+  }
   for (const want of wants) {
     const held = placed.get(want.id);
     if (!held || held.print === 0) continue;
     remove(held.item);
     placed.delete(want.id);
     const wider = Array.from({ length: held.print }, (_, i) => i);
-    if (!place(want, wider)) {
+    // A better print may run over a trace where the one it replaces did, and to
+    // print more than a cut: a whole name over bare board reads better than its
+    // first word clear of the trace.
+    const over = held.crosses
+      ? wider
+      : wider.filter(
+          (i) => want.prints[held.print]?.cut && !want.prints[i]?.cut
+        );
+    if (!(place(want, wider, false) || place(want, over, true))) {
       add(held.item);
       placed.set(want.id, held);
     }
   }
   return new Map(
-    [...placed].map(([id, { print, rect }]) => [id, { print, rect }])
+    [...placed].map(([id, { print, rect, crosses }]) => [
+      id,
+      { print, rect, crosses },
+    ])
   );
+}
+
+/** A drawn trace's run on the ground, and the types at the ends of its connection. */
+export type Trace = {
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  from: string;
+  to: string;
+};
+
+/**
+ * Every run of the given routes, from the centre of the building a connection
+ * leaves, through the corners it turns, to the centre of the one it reaches. The
+ * first and last runs stand for the drop off a roof and the rise to one, which a
+ * link layer draws from the roof, and lie under the building for a road, where no
+ * print goes.
+ */
+export function tracesOf(
+  routes: readonly {
+    from: string;
+    to: string;
+    points: readonly { x: number; z: number }[];
+  }[],
+  centreOf: (id: string) => { x: number; z: number } | undefined
+): Trace[] {
+  return routes.flatMap((route) => {
+    const from = centreOf(route.from);
+    const to = centreOf(route.to);
+    const path = [
+      ...(from ? [from] : []),
+      ...route.points,
+      ...(to ? [to] : []),
+    ];
+    return path.slice(1).map((end, i) => {
+      const start = path[i] as { x: number; z: number };
+      return {
+        x0: start.x,
+        z0: start.z,
+        x1: end.x,
+        z1: end.z,
+        from: route.from,
+        to: route.to,
+      };
+    });
+  });
+}
+
+/**
+ * Board kept between a print and a trace's centre line: half the widest trace, a
+ * road at 0.3, and a little bare board.
+ */
+const TRACE_CLEAR = 0.25;
+
+/** A trace's run as a rectangle, grown by the clearance a print keeps from it. */
+const traceRect = (trace: Trace): Rect => ({
+  minX: Math.min(trace.x0, trace.x1) - TRACE_CLEAR,
+  maxX: Math.max(trace.x0, trace.x1) + TRACE_CLEAR,
+  minZ: Math.min(trace.z0, trace.z1) - TRACE_CLEAR,
+  maxZ: Math.max(trace.z0, trace.z1) + TRACE_CLEAR,
+});
+
+/**
+ * The traces whose runs pass through a rectangle, found through the same grid the
+ * placement uses. A run is taken as its bounding box, which is exact for the runs
+ * along the streets and generous for a drop off a roof, which is diagonal only
+ * where it crosses its own building.
+ */
+export function traceIndex(traces: readonly Trace[]): (rect: Rect) => Trace[] {
+  const grid = new Map<string, { trace: Trace; rect: Rect }[]>();
+  for (const trace of traces) {
+    const item = { trace, rect: traceRect(trace) };
+    for (const cell of cellsOf(item.rect, 0)) {
+      const list = grid.get(cell);
+      if (list) list.push(item);
+      else grid.set(cell, [item]);
+    }
+  }
+  return (rect) => {
+    const found = new Set<Trace>();
+    for (const cell of cellsOf(rect, 0))
+      for (const item of grid.get(cell) ?? [])
+        if (overlapping(item.rect, rect, 0)) found.add(item.trace);
+    return [...found];
+  };
+}
+
+/**
+ * How solid the bare board under a print is: `alpha` when the print lies over a
+ * trace and no trace under it is lit by the hover or the selection, so a lit path
+ * shows the whole way, and 0 otherwise.
+ */
+export function knockoutAlpha(
+  spot: { rect: Rect; crosses: boolean } | undefined,
+  alpha: number,
+  traceAt: (rect: Rect) => readonly Trace[],
+  now: { hovered: string | null; selected: string | null }
+): number {
+  if (!spot?.crosses) return 0;
+  const lit = (id: string) => id === now.hovered || id === now.selected;
+  return traceAt(spot.rect).some((trace) => lit(trace.from) || lit(trace.to))
+    ? 0
+    : alpha;
+}
+
+/** The knockout's corner radius, and how far it reaches past the text's ends. */
+const KNOCKOUT_RADIUS = 0.3;
+const KNOCKOUT_PAD = 0.2;
+/** How far the knockout sits inside the print's line height, top and bottom. */
+const KNOCKOUT_INSET = 0.1;
+/** Points along each rounded corner, ends included. */
+const KNOCKOUT_ARC = 4;
+/** Vertices one knockout takes: a fan of one triangle per point round its edge. */
+export const KNOCKOUT_VERTICES = 4 * KNOCKOUT_ARC * 3;
+
+/**
+ * The patch of bare board drawn under a print that a trace runs through, so the
+ * trace reads as passing under the print: a rounded rectangle a little inside the
+ * print's line height and a little past its ends, as a triangle list of x, z pairs.
+ * Writes `KNOCKOUT_VERTICES` vertices into `out` from vertex `at`.
+ */
+export function knockout(rect: Rect, out: Float32Array, at: number): void {
+  const minX = rect.minX - KNOCKOUT_PAD;
+  const maxX = rect.maxX + KNOCKOUT_PAD;
+  const minZ = rect.minZ + KNOCKOUT_INSET;
+  const maxZ = rect.maxZ - KNOCKOUT_INSET;
+  const r = Math.max(
+    0,
+    Math.min(KNOCKOUT_RADIUS, (maxX - minX) / 2, (maxZ - minZ) / 2)
+  );
+  const cx = (minX + maxX) / 2;
+  const cz = (minZ + maxZ) / 2;
+  // Corner centres, each with the quarter turn it sweeps, clockwise from north-east.
+  const corners: [number, number, number][] = [
+    [maxX - r, minZ + r, -Math.PI / 2],
+    [maxX - r, maxZ - r, 0],
+    [minX + r, maxZ - r, Math.PI / 2],
+    [minX + r, minZ + r, Math.PI],
+  ];
+  const ring: [number, number][] = corners.flatMap(([x, z, start]) =>
+    Array.from({ length: KNOCKOUT_ARC }, (_, k): [number, number] => {
+      const angle = start + ((Math.PI / 2) * k) / (KNOCKOUT_ARC - 1);
+      return [x + r * Math.cos(angle), z + r * Math.sin(angle)];
+    })
+  );
+  let i = at * 2;
+  ring.forEach(([x, z], k) => {
+    const [nx, nz] = ring[(k + 1) % ring.length] as [number, number];
+    // Centre, next, this: counter-clockwise seen from above, so the face is up.
+    out[i++] = cx;
+    out[i++] = cz;
+    out[i++] = nx;
+    out[i++] = nz;
+    out[i++] = x;
+    out[i++] = z;
+  });
 }
 
 /**
@@ -659,7 +866,18 @@ export function courtyard(
     maxZ: centre.z + half,
   };
   const corners: [number, number][] = [];
-  if (print) {
+  const beside =
+    print !== null &&
+    (print.maxX <= centre.x - footprint / 2 ||
+      print.minX >= centre.x + footprint / 2);
+  if (print && beside) {
+    // A print to the left or right: one outline round the part and the print.
+    const minX = Math.min(a.minX, print.minX - CLEAR);
+    const maxX = Math.max(a.maxX, print.maxX + CLEAR);
+    const minZ = Math.min(a.minZ, print.minZ - CLEAR);
+    const maxZ = Math.max(a.maxZ, print.maxZ + CLEAR);
+    corners.push([minX, minZ], [maxX, minZ], [maxX, maxZ], [minX, maxZ]);
+  } else if (print) {
     const b = {
       minX: Math.min(print.minX, centre.x) - CLEAR,
       maxX: Math.max(print.maxX, centre.x) + CLEAR,
@@ -903,7 +1121,8 @@ export function arrangeNames(
   pxPerEm: (one: Standing) => number,
   interaction: Interaction,
   usageOf: (id: string) => number,
-  flipped: boolean
+  flipped: boolean,
+  crossesTrace?: (rect: Rect) => boolean
 ): Map<string, Arranged> {
   const upright = standing.filter((one) => (one.flatten ?? 0) < FLAT);
   const chosen = new Map<string, { level: number; px: number }>();
@@ -928,7 +1147,8 @@ export function arrangeNames(
   const placed = placeLabels(
     wants,
     upright.map((one) => ({ id: one.id, rect: footprintRect(one) })),
-    flipped
+    flipped,
+    crossesTrace
   );
   return new Map(
     [...placed].map(([id, spot]) => [

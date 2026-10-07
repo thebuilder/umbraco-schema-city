@@ -10,12 +10,16 @@ import {
   type Board,
   boardTextPx,
   byPriority,
+  COURTYARD_SEGMENTS,
   courtyard,
   DIMMED,
   type Fitted,
   fitName,
   fittedFontPx,
   footprintRect,
+  KNOCKOUT_VERTICES,
+  knockout,
+  knockoutAlpha,
   LABEL_INSET,
   LOD_HIDE_PX,
   LOD_SHOW_PX,
@@ -41,6 +45,9 @@ import {
   readings,
   type Standing,
   sharedContext,
+  type Trace,
+  traceIndex,
+  tracesOf,
   type Want,
 } from "./board-labels";
 
@@ -510,8 +517,14 @@ describe("placeLabels", () => {
   it("leaves a name off when no print of it fits", () => {
     const placed = placeLabels(
       [want("a", 0, 0, [6]), want("b", 0.5, 0, [6])],
-      // A wall over the strip behind, so b has neither side.
-      [building("a", 0, 0), building("b", 0.5, 30), building("wall", 0, -4)],
+      // A wall over the strip behind and one to the east, and a's building to the
+      // west, so b has no side.
+      [
+        building("a", 0, 0),
+        building("b", 0.5, 30),
+        building("wall", 0, -4),
+        building("east", 6, 0),
+      ],
       false
     );
     expect(placed.has("a")).toBe(true);
@@ -525,6 +538,132 @@ describe("placeLabels", () => {
       true
     );
     expect(placed.get("a")?.rect.maxZ).toBeCloseTo(-2 - LABEL_INSET);
+  });
+});
+
+describe("traces under the prints", () => {
+  const want = (id: string, x: number, widths: number[]): Want => ({
+    id,
+    centre: { x, z: 0 },
+    footprint: 4,
+    prints: widths.map((width) => ({ width, height: 2 })),
+  });
+  const building = (id: string, x: number, z: number) => ({
+    id,
+    rect: { minX: x - 2, maxX: x + 2, minZ: z - 2, maxZ: z + 2 },
+  });
+  // A road along the street in front of the building, east to west.
+  const road: Trace = { x0: -20, z0: 3, x1: 20, z1: 3, from: "p", to: "c" };
+
+  it("reads every run of a route, from its source's centre to its target's", () => {
+    const centres = new Map([
+      ["p", { x: 0, z: 0 }],
+      ["c", { x: 10, z: 10 }],
+    ]);
+    const traces = tracesOf(
+      [
+        {
+          from: "p",
+          to: "c",
+          points: [
+            { x: 0, z: 5 },
+            { x: 10, z: 5 },
+          ],
+        },
+      ],
+      (id) => centres.get(id)
+    );
+    expect(traces.map(({ x0, z0, x1, z1 }) => [x0, z0, x1, z1])).toEqual([
+      [0, 0, 0, 5],
+      [0, 5, 10, 5],
+      [10, 5, 10, 10],
+    ]);
+  });
+
+  it("finds the traces through a rectangle and none beside it", () => {
+    const at = traceIndex([road]);
+    expect(at({ minX: -1, maxX: 1, minZ: 2.5, maxZ: 4 })).toEqual([road]);
+    expect(at({ minX: -1, maxX: 1, minZ: 4, maxZ: 6 })).toEqual([]);
+  });
+
+  it("takes a side clear of the traces over one a trace runs through", () => {
+    const at = traceIndex([road]);
+    const placed = placeLabels(
+      [want("a", 0, [6])],
+      [building("a", 0, 0)],
+      false,
+      (rect) => at(rect).length > 0
+    );
+    expect(placed.get("a")).toEqual({
+      print: 0,
+      rect: printRect({ x: 0, z: 0 }, 4, 6, 2, "back", false),
+      crosses: false,
+    });
+  });
+
+  it("prints over a trace when no side is clear, and says so", () => {
+    const placed = placeLabels(
+      [want("a", 0, [6])],
+      [building("a", 0, 0)],
+      false,
+      () => true
+    );
+    expect(placed.get("a")?.crosses).toBe(true);
+    expect(placed.get("a")?.rect).toEqual(
+      printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false)
+    );
+  });
+
+  it("puts a print beside its building when front and back are taken", () => {
+    const placed = placeLabels(
+      [want("a", 0, [3])],
+      [building("a", 0, 0), building("north", 0, -4), building("south", 0, 4)],
+      false
+    );
+    expect(placed.get("a")?.rect).toEqual(
+      printRect({ x: 0, z: 0 }, 4, 3, 2, "left", false)
+    );
+  });
+
+  it("swaps left and right when the names are flipped", () => {
+    const left = printRect({ x: 0, z: 0 }, 4, 3, 2, "left", false);
+    expect(left.maxX).toBeCloseTo(-2 - LABEL_INSET);
+    expect(printRect({ x: 0, z: 0 }, 4, 3, 2, "left", true).minX).toBeCloseTo(
+      2 + LABEL_INSET
+    );
+    expect(left.minZ).toBe(-1);
+  });
+
+  it("frames a print beside its part in one outline round both", () => {
+    const out = new Float32Array(COURTYARD_SEGMENTS * 4);
+    const print = printRect({ x: 0, z: 0 }, 4, 3, 2, "right", false);
+    expect(courtyard({ x: 0, z: 0 }, 4, print, out, 0)).toBe(16);
+    const xs = Array.from(out.slice(0, 16)).filter((_, i) => i % 2 === 0);
+    expect(Math.max(...xs)).toBeCloseTo(print.maxX + 0.05);
+  });
+
+  it("clears the board under a print over a trace, unless the trace is lit", () => {
+    const at = traceIndex([road]);
+    const rect = printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false);
+    const rest = { hovered: null, selected: null };
+    const over = { rect, crosses: true };
+    expect(knockoutAlpha(over, 0.8, at, rest)).toBe(0.8);
+    expect(knockoutAlpha({ rect, crosses: false }, 0.8, at, rest)).toBe(0);
+    expect(knockoutAlpha(undefined, 0.8, at, rest)).toBe(0);
+    expect(knockoutAlpha(over, 0.8, at, { ...rest, hovered: "c" })).toBe(0);
+    expect(knockoutAlpha(over, 0.8, at, { ...rest, selected: "x" })).toBe(0.8);
+  });
+
+  it("lays a knockout a little inside the print's lines and past its ends", () => {
+    const rect = { minX: 0, maxX: 6, minZ: 0, maxZ: 2 };
+    const out = new Float32Array(KNOCKOUT_VERTICES * 2);
+    knockout(rect, out, 0);
+    const xs = Array.from(out).filter((_, i) => i % 2 === 0);
+    const zs = Array.from(out).filter((_, i) => i % 2 === 1);
+    expect(Math.min(...xs)).toBeCloseTo(-0.2);
+    expect(Math.max(...xs)).toBeCloseTo(6.2);
+    expect(Math.min(...zs)).toBeCloseTo(0.1);
+    expect(Math.max(...zs)).toBeCloseTo(1.9);
   });
 });
 

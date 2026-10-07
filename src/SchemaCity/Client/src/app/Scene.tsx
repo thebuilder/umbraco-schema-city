@@ -59,6 +59,7 @@ import {
 } from "./scene/Boards";
 import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
 import { edgeFingers, type Finger, traceVias } from "./scene/board";
+import { tracesOf } from "./scene/board-labels";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -2420,6 +2421,8 @@ export default function Scene({
       city.districts.map((district) => [district.id, islandOf(district)])
     );
     return {
+      // The runs a printed name keeps off where it can.
+      traces: tracesOf(routes, (id) => routed.placementsById.get(id)?.position),
       vias: traceVias(routes),
       fingers:
         focus === null
@@ -2431,6 +2434,19 @@ export default function Scene({
           : [],
     };
   }, [routed, drawnEdges, active, focus, city]);
+
+  const boardColours = useMemo(
+    () =>
+      new Map(
+        palette
+          ? city.districts.map((district) => [
+              district.id,
+              slabColour(district.kind, palette),
+            ])
+          : []
+      ),
+    [city, palette]
+  );
 
   // The scene colours are the theme's own tokens, read once from an element inside
   // the shadow root, so the city and the chrome can never drift apart.
@@ -2615,6 +2631,7 @@ export default function Scene({
             selected={selected}
           />
           <BoardLabels
+            boardColours={boardColours}
             cityPlacements={city.placements}
             floated={floated}
             interaction={interaction}
@@ -2622,6 +2639,7 @@ export default function Scene({
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}
+            traces={boardMarks.traces}
             usage={usage}
           />
           <Flight cameraFlight={cameraFlight} />

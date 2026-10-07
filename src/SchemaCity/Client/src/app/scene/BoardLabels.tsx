@@ -11,11 +11,15 @@ import type { Placement } from "../layout/city";
 import {
   type Arranged,
   arrangeNames,
+  BASE_OPACITY,
   boardTextPx,
   COURTYARD_SEGMENTS,
   courtyard,
   fittedFontPx,
   type Interaction,
+  KNOCKOUT_VERTICES,
+  knockout,
+  knockoutAlpha,
   LINE_HEIGHT,
   LINE_STEP,
   labelLight,
@@ -27,6 +31,8 @@ import {
   type Rect,
   type Sizes,
   type Standing,
+  type Trace,
+  traceIndex,
 } from "./board-labels";
 import { revealAt } from "./reveal";
 import { FOLDER_TINT_HEIGHT } from "./stage";
@@ -60,6 +66,12 @@ const LABEL_Y = FOLDER_TINT_HEIGHT + 0.01;
 const COURTYARD_Y = LABEL_Y;
 /** How far an Element Type's print leans toward amber, the colour of its building. */
 const ELEMENT_TINT = 0.35;
+/**
+ * How solid the bare board under a print over a trace is, against the print's own
+ * strength: enough to push the trace under the letters, and a little of the trace
+ * still shows through, so it reads as passing under rather than stopping.
+ */
+const KNOCKOUT_OPACITY = 0.85;
 
 /**
  * The types that have a floating label right now, which the label layer rewrites on
@@ -78,6 +90,8 @@ export type Floated = {
 type Entry = {
   id: string;
   full: boolean;
+  /** True for whole leading words and an ellipsis. */
+  cut: boolean;
   uv: [number, number, number, number];
   width: number;
   height: number;
@@ -224,6 +238,7 @@ function buildAtlas(
     return {
       id: one.id,
       full: one.fitted.full,
+      cut: !one.fitted.full && one.fitted.text.endsWith("…"),
       // The texture is flipped on upload, so the canvas's top row is v = 1.
       uv: [
         spot.x / width,
@@ -292,6 +307,39 @@ function buildGeometry(
   return geometry;
 }
 
+/**
+ * The bare board under the prints that lie over a trace: one rounded patch per
+ * building in its board's colour, lit like the board, rewritten in place.
+ */
+function buildKnockouts(
+  placements: readonly Placement[],
+  boardColours: Map<string, THREE.Color>
+) {
+  const vertices = placements.length * KNOCKOUT_VERTICES;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(vertices * 3), 3).setUsage(
+      THREE.DynamicDrawUsage
+    )
+  );
+  const normals = new Float32Array(vertices * 3);
+  for (let i = 0; i < vertices; i++) normals[i * 3 + 1] = 1;
+  geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+  const colours = new Float32Array(vertices * 4);
+  placements.forEach((placement, slot) => {
+    const { r, g, b } =
+      boardColours.get(placement.district) ?? new THREE.Color();
+    for (let v = 0; v < KNOCKOUT_VERTICES; v++)
+      colours.set([r, g, b, 0], (slot * KNOCKOUT_VERTICES + v) * 4);
+  });
+  geometry.setAttribute(
+    "color",
+    new THREE.BufferAttribute(colours, 4).setUsage(THREE.DynamicDrawUsage)
+  );
+  return geometry;
+}
+
 /** The courtyard lines: a fixed number of segments per building, rewritten in place. */
 function buildCourtyards(count: number, colour: THREE.Color) {
   const vertices = count * COURTYARD_SEGMENTS * 2;
@@ -330,6 +378,9 @@ type Inputs = {
   atlas: Atlas;
   geometry: THREE.BufferGeometry;
   courtyards: THREE.BufferGeometry;
+  knockouts: THREE.BufferGeometry;
+  /** The drawn traces through a rectangle on the board. */
+  traceAt: (rect: Rect) => Trace[];
   /** Every building where it stands now, in the city's order the courtyards follow. */
   standing: Placement[];
   interaction: Interaction;
@@ -339,6 +390,7 @@ type Inputs = {
 const SCRATCH = new THREE.Vector3();
 const CORNERS: number[] = [];
 const SEGMENTS = new Float32Array(COURTYARD_SEGMENTS * 4);
+const PATCH = new Float32Array(KNOCKOUT_VERTICES * 2);
 
 /** How many pixels one unit of print comes to at a building's ground, in this view. */
 function pxPerEmAt(one: Standing, view: View): number {
@@ -443,6 +495,32 @@ function writeCourtyard(
 }
 
 /**
+ * Writes the knockout in slot `slot`: under the print when it lies over a trace, at
+ * `alpha`, and gone otherwise. A trace the hover or the selection lights keeps its
+ * print's knockout off, so the lit path shows the whole way.
+ */
+function writeKnockout(
+  inputs: Inputs,
+  slot: number,
+  one: Standing,
+  spot: Arranged | undefined,
+  alpha: number
+) {
+  const positions = inputs.knockouts.getAttribute("position")
+    .array as Float32Array;
+  const colours = inputs.knockouts.getAttribute("color").array as Float32Array;
+  const shown = knockoutAlpha(spot, alpha, inputs.traceAt, inputs.interaction);
+  // A hidden knockout keeps whatever corners the last one left; it draws nothing.
+  if (spot && shown > 0) knockout(spot.rect, PATCH, 0);
+  const base = slot * KNOCKOUT_VERTICES;
+  const y = groundOf(one) + LABEL_Y;
+  for (let v = 0; v < KNOCKOUT_VERTICES; v++) {
+    writePoint(positions, base + v, PATCH, v, y);
+    colours[(base + v) * 4 + 3] = shown;
+  }
+}
+
+/**
  * True when a type's whole name is printed, visible, with its building's ground
  * on screen, which is what lets the floating label layer leave it out.
  */
@@ -473,7 +551,8 @@ function repaint(
     (one) => pxPerEmAt(one, view),
     inputs.interaction,
     (id) => inputs.usage?.byType[id]?.total ?? 0,
-    view.flipped
+    view.flipped,
+    (rect) => inputs.traceAt(rect).length > 0
   );
   const printed = new Set<string>();
   inputs.standing.forEach((one, slot) => {
@@ -487,10 +566,21 @@ function repaint(
     );
     writeName(inputs, one, spot, strength.print, view.flipped);
     writeCourtyard(inputs.courtyards, slot, one, spot, strength.courtyard);
+    writeKnockout(
+      inputs,
+      slot,
+      one,
+      spot,
+      (KNOCKOUT_OPACITY * strength.print) / BASE_OPACITY
+    );
     if (printedWhole(inputs, one, spot, strength.print, view.camera))
       printed.add(one.id);
   });
-  for (const geometry of [inputs.geometry, inputs.courtyards]) {
+  for (const geometry of [
+    inputs.geometry,
+    inputs.courtyards,
+    inputs.knockouts,
+  ]) {
     geometry.getAttribute("position").needsUpdate = true;
     geometry.getAttribute("color").needsUpdate = true;
   }
@@ -574,6 +664,32 @@ function useNameMesh(
   return { atlas, geometry, material, courtyards, lineMaterial };
 }
 
+/** The knockouts' geometry and material, each built when what it depends on changes. */
+function useKnockouts(
+  placements: readonly Placement[],
+  boardColours: Map<string, THREE.Color>
+) {
+  const knockouts = useMemo(
+    () => buildKnockouts(placements, boardColours),
+    [placements, boardColours]
+  );
+  useEffect(() => () => knockouts.dispose(), [knockouts]);
+  // Lit like the board's own mask, so the patch matches the board under it.
+  const knockoutMaterial = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        roughness: 1,
+        metalness: 0,
+      }),
+    []
+  );
+  useEffect(() => () => knockoutMaterial.dispose(), [knockoutMaterial]);
+  return { knockouts, knockoutMaterial };
+}
+
 export function BoardLabels({
   cityPlacements,
   nodesById,
@@ -583,6 +699,8 @@ export function BoardLabels({
   usage,
   palette,
   reducedMotion,
+  traces,
+  boardColours,
 }: {
   /** The city's own placements, which decide every print and its size. */
   cityPlacements: readonly Placement[];
@@ -596,6 +714,10 @@ export function BoardLabels({
   usage: UsageReport | undefined;
   palette: { bright: string; amber: string; dim: string; mono: string };
   reducedMotion: boolean;
+  /** The ground traces of the layers drawn now, which a print keeps off where it can. */
+  traces: readonly Trace[];
+  /** Each board's colour by district id, for the bare board under a print. */
+  boardColours: Map<string, THREE.Color>;
 }) {
   const camera = useThree((state) => state.camera);
   const height = useThree((state) => state.size.height);
@@ -604,12 +726,19 @@ export function BoardLabels({
     nodesById,
     palette
   );
+  const { knockouts, knockoutMaterial } = useKnockouts(
+    cityPlacements,
+    boardColours
+  );
+  const traceAt = useMemo(() => traceIndex(traces), [traces]);
 
   const inputs = useMemo(
     (): Inputs => ({
       atlas,
       geometry,
       courtyards,
+      knockouts,
+      traceAt,
       // A building the screen has not reached yet, for the one render a new schema
       // takes, stands where the city put it.
       standing: cityPlacements.map(
@@ -622,6 +751,8 @@ export function BoardLabels({
       atlas,
       geometry,
       courtyards,
+      knockouts,
+      traceAt,
       cityPlacements,
       placementsById,
       interaction,
@@ -668,10 +799,19 @@ export function BoardLabels({
       />
       <mesh
         frustumCulled={false}
+        geometry={knockouts}
+        material={knockoutMaterial}
+        receiveShadow
+        // Over the traces, under the print it clears the board for.
+        renderOrder={0.4}
+      />
+      <mesh
+        frustumCulled={false}
         geometry={geometry}
         material={material}
-        // After the boards, before the buildings and the traces, which draw over it.
-        renderOrder={-0.5}
+        // After the boards and the traces, which pass under it, and before glass
+        // and the roof icons.
+        renderOrder={0.5}
       />
     </>
   );
