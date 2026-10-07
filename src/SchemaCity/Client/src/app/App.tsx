@@ -195,6 +195,37 @@ function Legend() {
       </section>
 
       <section>
+        <LegendTitle>Boards</LegendTitle>
+        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
+          <LegendRow
+            mark={<span className="h-2 w-5 border border-phosphor-dim" />}
+          >
+            Courtyard round a type and its printed name
+          </LegendRow>
+          <LegendRow mark={<span className="h-3 w-1.5 bg-[#d9b24a]/70" />}>
+            Gold finger: a trace leaving for another board, one per lane
+          </LegendRow>
+          <LegendRow
+            mark={
+              <span className="size-2 rounded-full border-2 border-[#c8823a]/70" />
+            }
+          >
+            Via: a trace turning
+          </LegendRow>
+          <LegendRow mark={<Tint className="bg-phosphor-dim/40" />}>
+            Lighter patch: one block editor's Element Types, or a nested folder
+          </LegendRow>
+        </ul>
+        <p className="mt-2 text-muted-foreground text-xs">
+          Group by Structure puts each root and what it can create on its own
+          board, a parent with its children around it, with boards for
+          Compositions, Elements and anything no root reaches. Group by Folders
+          follows the schema's folders. Names print beside their types as far as
+          they fit without touching; the full name is in the inspector.
+        </p>
+      </section>
+
+      <section>
         <LegendTitle>Layers</LegendTitle>
         <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
           <LegendRow
