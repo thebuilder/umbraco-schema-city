@@ -281,6 +281,13 @@ describe("aliasImpact", () => {
     ]);
   });
 
+  it("traces the row a duplicate alias names by its source", () => {
+    const own = aliasImpact(graph, "dup", "title", usage, null);
+    expect(own?.source).toBe("dup");
+    expect(own?.carriers.map((row) => row.id)).toEqual(["dup"]);
+    expect(own?.collisions).toEqual([{ id: "dup", name: "Dup", from: "Seo" }]);
+  });
+
   it("treats a new alias as landing from the start type", () => {
     const planned = aliasImpact(graph, "article", "subtitle", usage);
     expect(planned).toMatchObject({ source: "article", exists: false });

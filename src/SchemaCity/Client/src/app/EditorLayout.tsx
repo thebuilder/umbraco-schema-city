@@ -146,7 +146,7 @@ export function EditorLayout({
   onImpact,
 }: {
   /** Opens the impact trace for one of the type's properties, by alias. */
-  onImpact?: (alias: string) => void;
+  onImpact?: (alias: string, from: string | null) => void;
   selected: string | null;
   nodesById: Lookup;
   /** Opens the search palette, the one type picker the app already has. */
@@ -204,7 +204,7 @@ function PropertyItem({
   flag,
   onImpact,
 }: {
-  onImpact?: (alias: string) => void;
+  onImpact?: (alias: string, from: string | null) => void;
   property: SchemaProperty;
   nodesById: Lookup;
   quiet: boolean;
@@ -243,7 +243,7 @@ function PropertyItem({
         <button
           aria-label={`Impact of ${property.alias}`}
           className="text-phosphor text-xs hover:text-phosphor-bright hover:underline"
-          onClick={() => onImpact(property.alias)}
+          onClick={() => onImpact(property.alias, property.fromCompositionId)}
           type="button"
         >
           Impact
@@ -323,7 +323,7 @@ function Panel({
   flags,
   onImpact,
 }: {
-  onImpact?: (alias: string) => void;
+  onImpact?: (alias: string, from: string | null) => void;
   panel: EditorPanel;
   nodesById: Lookup;
   open: boolean;
@@ -423,7 +423,7 @@ function Layout({
   role,
   onImpact,
 }: {
-  onImpact?: (alias: string) => void;
+  onImpact?: (alias: string, from: string | null) => void;
   node: SchemaNode;
   nodesById: Lookup;
   onSelect: (id: string) => void;

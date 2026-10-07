@@ -178,7 +178,7 @@ export function FlatView({
   /** What the Impact view needs beyond the lists' props. */
   impact: Pick<ImpactViewProps, "start" | "alias" | "onAlias" | "onShowInCity">;
   /** Opens the Impact view on a property of the type the editor view shows. */
-  onImpact?: (alias: string) => void;
+  onImpact?: (alias: string, from: string | null) => void;
   /** What the Data Types view needs beyond the lists' props. */
   dataTypes: Pick<
     DataTypesProps,

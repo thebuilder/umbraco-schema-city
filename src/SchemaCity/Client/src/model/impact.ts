@@ -465,13 +465,16 @@ const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
  * type's properties. For an alias the start type does not have yet, the start is the
  * source, so this is where a planned property would land. A carrier that already has
  * the alias from another source is a collision: Umbraco compares aliases without
- * case, and a type cannot hold one alias twice.
+ * case, and a type cannot hold one alias twice. `from` picks which of two rows with
+ * one alias, a duplicate already, is meant: the composition it comes from, or null
+ * for the start type's own.
  */
 export function aliasImpact(
   graph: SchemaGraph,
   start: string,
   alias: string,
-  usage?: UsageReport
+  usage?: UsageReport,
+  from?: string | null
 ): AliasImpact | null {
   const wanted = alias.trim();
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
@@ -479,9 +482,15 @@ export function aliasImpact(
   if (!(startNode && wanted)) return null;
   const propertiesOf = (node: SchemaNode) =>
     node.groups.flatMap((group) => group.properties);
-  const existing = propertiesOf(startNode).find((property) =>
+  const matches = propertiesOf(startNode).filter((property) =>
     same(property.alias, wanted)
   );
+  const existing =
+    matches.find(
+      (property) =>
+        from !== undefined &&
+        (property.fromCompositionId ?? start) === (from ?? start)
+    ) ?? matches[0];
   const source = existing?.fromCompositionId ?? start;
   const sourceNode = nodes.get(source) ?? startNode;
   const users =
@@ -502,11 +511,11 @@ export function aliasImpact(
               (property.fromCompositionId ?? node.id) !== source
           )
           .map((property) => {
-            const from = property.fromCompositionId ?? node.id;
+            const declaredOn = property.fromCompositionId ?? node.id;
             return {
               id: node.id,
               name: node.name,
-              from: nodes.get(from)?.name ?? from,
+              from: nodes.get(declaredOn)?.name ?? declaredOn,
             };
           })
       : [];
@@ -525,6 +534,19 @@ const DEPTH_WORD = (depth: number) =>
   Number.isFinite(depth) ? `${depth}` : "all";
 
 /** "37 types, 188 content items". */
+/**
+ * "Content stores it in 38 blocks: 33 in SC Body Blocks, 5 in SC Rich Text With
+ * Blocks.", or null for a type with none counted.
+ */
+export function storedLine({ stored, partial }: Impact): string | null {
+  if (stored.length === 0) return null;
+  const total = stored.reduce((sum, row) => sum + row.blocks, 0);
+  const parts = [...stored]
+    .sort((a, b) => b.blocks - a.blocks)
+    .map((row) => `${row.blocks.toLocaleString()} in ${row.name}`);
+  return `Content stores it in ${total.toLocaleString()} ${total === 1 ? "block" : "blocks"}: ${parts.join(", ")}${partial ? ". The count stopped early, so these are lower bounds" : ""}.`;
+}
+
 export const totalsLine = (types: number, content: number) =>
   `${types.toLocaleString()} ${types === 1 ? "type" : "types"}, ${content.toLocaleString()} content ${content === 1 ? "item" : "items"}`;
 
@@ -573,11 +595,8 @@ export function impactMarkdown(
       "",
       `${start?.name ?? impact.start} has ${impact.own.toLocaleString()} content ${impact.own === 1 ? "item" : "items"} of its own.`
     );
-  if (impact.stored.length > 0)
-    lines.push(
-      "",
-      `Stored blocks of it: ${impact.stored.map((row) => `${row.blocks.toLocaleString()} in ${row.name}`).join(", ")}${impact.partial ? " (partial count, lower bounds)" : ""}.`
-    );
+  const stored = storedLine(impact);
+  if (stored) lines.push("", stored);
   for (const group of impact.groups)
     lines.push(
       "",

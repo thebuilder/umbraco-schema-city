@@ -189,7 +189,10 @@ export function App({
   // alias it checks. Clicking a row there selects that type without moving the
   // trace; anywhere else the view traces the selection.
   const [impactStart, setImpactStart] = useState<string | null>(null);
-  const [impactAlias, setImpactAlias] = useState("");
+  const [impactAlias, setImpactAlias] = useState<{
+    text: string;
+    from?: string | null;
+  }>({ text: "" });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [findingsOpen, setFindingsOpen] = useState(false);
@@ -431,10 +434,20 @@ export function App({
   };
 
   // The Impact view on one type, and on one of its property aliases when given.
-  const openImpact = (id: string | null, alias = "") => {
+  const openImpact = (
+    id: string | null,
+    alias: { text: string; from?: string | null } = { text: "" }
+  ) => {
     setImpactStart(id);
     setImpactAlias(alias);
     setView("impact");
+    // The button that asked may be gone with the view it was in, the editor's
+    // property rows, so the reader is put on the page's heading after the commit.
+    requestAnimationFrame(() =>
+      portal.current?.parentElement
+        ?.querySelector<HTMLElement>("[data-impact-heading]")
+        ?.focus({ preventScroll: true })
+    );
   };
   // Leaving the view lets go of the type it was opened for, so coming back with I
   // or the switcher traces whatever is selected then.
@@ -711,12 +724,14 @@ export function App({
                   impact={{
                     start: impactStart ?? selected,
                     alias: impactAlias,
-                    onAlias: setImpactAlias,
+                    onAlias: (text) => setImpactAlias({ text }),
                     onShowInCity: showInCity,
                   }}
                   neighbourhoodById={neighbourhoodById}
                   nodesById={nodesById}
-                  onImpact={(alias) => openImpact(selected, alias)}
+                  onImpact={(text, from) =>
+                    openImpact(selected, { text, from })
+                  }
                   onPick={() => setPaletteOpen(true)}
                   onQuery={setQuery}
                   onSelect={setSelected}

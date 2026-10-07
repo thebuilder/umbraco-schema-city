@@ -20,6 +20,7 @@ import {
   RELATION_LABEL,
   RELATIONS,
   type Relation,
+  storedLine,
   totalsLine,
 } from "../model/impact";
 import type { Trace } from "../model/inspector";
@@ -343,7 +344,7 @@ function AliasCheck({
           className="h-8 w-64 bg-secondary px-2 font-mono text-prose text-xs placeholder:text-faint focus-visible:border-phosphor md:text-xs"
           id={id}
           onChange={(event) => onAlias(event.target.value)}
-          placeholder="seoTitle"
+          placeholder="Type an alias"
           spellCheck={false}
           type="text"
           value={alias}
@@ -465,7 +466,8 @@ export type ImpactViewProps = {
   usage?: UsageReport;
   /** The type the trace starts from. */
   start: string | null;
-  alias: string;
+  /** The alias field, and which source a property row named when it opened the view. */
+  alias: { text: string; from?: string | null };
   onAlias: (alias: string) => void;
   nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
@@ -514,7 +516,7 @@ function TracePage({
     [graph, node.id, direction, relations, depth, usage]
   );
   const aliasResult = useMemo(
-    () => aliasImpact(graph, node.id, alias, usage),
+    () => aliasImpact(graph, node.id, alias.text, usage, alias.from),
     [graph, node.id, alias, usage]
   );
   const nameOf = (id: string) => nodesById.get(id)?.name ?? id;
@@ -541,6 +543,7 @@ function TracePage({
         <div className={COLUMN}>
           <h2
             className="font-semibold text-[17px] text-foreground leading-tight outline-none"
+            data-impact-heading=""
             ref={heading}
             tabIndex={-1}
           >
@@ -556,9 +559,7 @@ function TracePage({
             {impact.own === undefined
               ? ""
               : ` ${node.name} has ${plural(impact.own, "content item")} of its own.`}
-            {impact.stored.length > 0
-              ? ` Stored blocks of it: ${impact.stored.map((row) => `${row.blocks.toLocaleString()} in ${row.name}`).join(", ")}${impact.partial ? ", a partial count" : ""}.`
-              : ""}
+            {impact.stored.length > 0 ? ` ${storedLine(impact)}` : ""}
           </p>
           <div className="mt-3">
             <Controls
@@ -612,7 +613,7 @@ function TracePage({
       <Scroller label={`Impact of ${node.name}`}>
         <div className={`${COLUMN} pb-6`}>
           <AliasCheck
-            alias={alias}
+            alias={alias.text}
             nameOf={nameOf}
             onAlias={onAlias}
             onSelect={onSelect}

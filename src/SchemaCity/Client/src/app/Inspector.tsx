@@ -316,15 +316,16 @@ export function Inspector({
         ) : null}
       </header>
 
+      {/* Four tabs and their counts fit the narrow panel only with tighter padding. */}
       <div
         aria-label={`${node.name} details`}
-        className="flex border-line border-b px-2"
+        className="flex border-line border-b px-1 @min-[1024px]:px-2"
         onKeyDown={roving}
         role="tablist"
       >
         {(Object.keys(TAB_LABEL) as Tab[]).map((id) => (
           <TabButton
-            className="px-2 pt-2.5 pb-2"
+            className="px-1 pt-2.5 pb-2 @min-[1024px]:px-2"
             id={`${base}-${id}`}
             key={id}
             onPick={() => setTab(id)}
