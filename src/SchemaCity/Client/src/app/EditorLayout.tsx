@@ -1,7 +1,7 @@
 // The editor view: the selected type drawn the way an editor meets it in Umbraco,
 // tabs across the top and groups as panels, so an overloaded tab or a long run of
 // composed fields is visible before anyone opens the backoffice editor.
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -17,9 +17,16 @@ import {
 import { type Finding, TAB_LIMIT } from "../model/findings";
 import type { Role } from "../model/inspector";
 import type { SchemaNode, SchemaProperty } from "../model/types";
-import { SEARCH_KEY } from "./a11y";
-import { FindingDot, READING, RoleBadges } from "./InspectorChips";
+import { plural, roving, SEARCH_KEY } from "./a11y";
+import {
+  FindingDot,
+  READING,
+  RoleBadges,
+  SpokenCount,
+  TabButton,
+} from "./InspectorChips";
 import { InspectorChecks } from "./InspectorDiagnostics";
+import { Scroller } from "./TypeTable";
 
 type Lookup = Map<string, SchemaNode>;
 
@@ -40,6 +47,88 @@ function borrowed(panel: EditorPanel) {
 }
 
 const OVERLOADED = `More than ${TAB_LIMIT} properties, see the Overloaded tab note`;
+
+/** A property row's key, the same one the panel renders it under. */
+const rowKey = (property: SchemaProperty) =>
+  `${property.fromCompositionId ?? ""}:${property.alias}`;
+
+/**
+ * What the type's findings say about single property rows, by row key: both rows
+ * of a duplicate alias, a block property that lists a deleted Element Type, and a
+ * property whose culture variance the invariant type ignores. Only kinds the
+ * findings report are marked, so the rows never say more than the checks above.
+ */
+export function propertyFlags(
+  node: SchemaNode,
+  findings: Finding[],
+  nodesById: Lookup
+): Map<string, string> {
+  const kinds = new Set(findings.map((finding) => finding.kind));
+  const properties = node.groups.flatMap((group) => group.properties);
+  const flags = new Map<string, string[]>();
+  const flag = (property: SchemaProperty, text: string) =>
+    flags.set(rowKey(property), [...(flags.get(rowKey(property)) ?? []), text]);
+  const source = (property: SchemaProperty) =>
+    property.fromCompositionId
+      ? (nodesById.get(property.fromCompositionId)?.name ?? "a deleted type")
+      : "this type";
+  const editor = (property: SchemaProperty) =>
+    property.dataTypeName ?? property.editorAlias;
+
+  if (kinds.has("duplicateAlias"))
+    for (const property of properties) {
+      const others = properties.filter(
+        (other) =>
+          other.alias === property.alias &&
+          other.fromCompositionId !== property.fromCompositionId
+      );
+      if (others.length === 0) continue;
+      const differ = others.filter(
+        (other) => other.dataTypeId !== property.dataTypeId
+      );
+      flag(
+        property,
+        `Duplicate alias: ${property.alias} also comes from ${others.map(source).join(", ")}${
+          differ.length > 0
+            ? `, with a different editor (${differ.map(editor).join(", ")})`
+            : ""
+        }`
+      );
+    }
+
+  if (kinds.has("brokenBlock"))
+    for (const property of properties)
+      if (
+        property.targets.some(
+          (target) => target.role !== "picker" && !nodesById.has(target.nodeId)
+        )
+      )
+        flag(
+          property,
+          "Broken block: lists an Element Type that no longer exists"
+        );
+
+  if (kinds.has("cultureMismatch") && !node.variesByCulture)
+    for (const property of properties) {
+      if (property.variesByCulture)
+        flag(
+          property,
+          "Culture mismatch: varies by culture on a type that does not"
+        );
+      const variant = property.targets.filter(
+        (target) =>
+          target.role !== "picker" &&
+          nodesById.get(target.nodeId)?.variesByCulture
+      );
+      if (variant.length > 0)
+        flag(
+          property,
+          `Culture mismatch: lists ${[...new Set(variant.map((target) => nodesById.get(target.nodeId)?.name))].join(", ")}, which varies by culture`
+        );
+    }
+
+  return new Map([...flags].map(([key, texts]) => [key, texts.join(". ")]));
+}
 
 export function EditorLayout({
   selected,
@@ -102,15 +191,20 @@ function PropertyItem({
   nodesById,
   quiet,
   mixed,
+  flag,
 }: {
   property: SchemaProperty;
   nodesById: Lookup;
   quiet: boolean;
   /** The panel mixes origins, so this row names its own. */
   mixed: boolean;
+  /** What a check found on this row, if anything. */
+  flag?: string;
 }) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_minmax(0,14rem)] items-baseline gap-x-4 border-line/40 border-t px-3 py-1.5 first:border-t-0">
+    <li
+      className={`grid grid-cols-[minmax(0,1fr)_minmax(0,14rem)] items-baseline gap-x-4 border-line/40 border-t border-l-2 px-3 py-1.5 first:border-t-0 ${flag ? "border-l-signal" : "border-l-transparent"}`}
+    >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <span className={quiet ? "text-label" : "text-prose"}>
           {property.name}
@@ -128,16 +222,22 @@ function PropertyItem({
         ) : null}
       </div>
       {/* The Data Type is what an editor recognises; the editor alias behind it
-          stays one hover away. */}
+          is on hover for a mouse and read after it for a screen reader. */}
       <span
         className="truncate text-label text-xs"
         title={editorLabel(property)}
       >
         {property.dataTypeName ?? property.editorAlias}
+        {property.dataTypeName ? (
+          <span className="sr-only">
+            , editor {property.editorUiAlias ?? property.editorAlias}
+          </span>
+        ) : null}
         {property.variesByCulture ? (
           <span className="text-faint"> · varies by culture</span>
         ) : null}
       </span>
+      {flag ? <p className="col-span-2 text-signal text-xs">{flag}</p> : null}
     </li>
   );
 }
@@ -152,20 +252,26 @@ function Panel({
   open,
   onToggle,
   overloaded,
+  flags,
 }: {
   panel: EditorPanel;
   nodesById: Lookup;
   open: boolean;
   onToggle: () => void;
   overloaded: boolean;
+  flags: Map<string, string>;
 }) {
   const source = panelSource(panel);
   const composed = borrowed(panel);
+  const flagged = panel.properties.filter((property) =>
+    flags.has(rowKey(property))
+  ).length;
   const rows = (
     <ul>
       {panel.properties.map((property) => (
         <PropertyItem
-          key={`${property.fromCompositionId ?? ""}:${property.alias}`}
+          flag={flags.get(rowKey(property))}
+          key={rowKey(property)}
           mixed={source === MIXED}
           nodesById={nodesById}
           property={property}
@@ -200,6 +306,12 @@ function Panel({
           {overloaded ? (
             <FindingDot severity="note" title={OVERLOADED} />
           ) : null}
+          {/* A folded group still says a row inside it was flagged. */}
+          {flagged > 0 ? (
+            <FindingDot
+              title={`${flagged} flagged ${flagged === 1 ? "property" : "properties"}`}
+            />
+          ) : null}
           {composed && source ? (
             <span className="ml-auto shrink-0">
               <From id={source} nodesById={nodesById} />
@@ -227,6 +339,8 @@ function Layout({
 }) {
   const tabs = editorLayout(node);
   const tabRow = hasTabRow(tabs);
+  const base = useId();
+  const flags = propertyFlags(node, findings, nodesById);
   const [open, setOpen] = useState(firstOwnTab(tabs)?.key);
   // Composed groups start folded; a key here is one the reader turned the other way.
   const [allComposed, setAllComposed] = useState(false);
@@ -257,7 +371,7 @@ function Layout({
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      <Scroller label={`${node.name} as an editor sees it`}>
         {findings.length > 0 ? (
           <div className={`${COLUMN} pt-3`}>
             <InspectorChecks
@@ -273,31 +387,29 @@ function Layout({
         >
           {tabRow ? (
             <div
-              aria-label="Tabs"
+              aria-label={`${node.name} tabs`}
               className="flex flex-wrap border-line border-b"
+              onKeyDown={roving}
               role="tablist"
             >
-              {tabs.map((tab) => (
-                <button
-                  aria-selected={tab === shown}
-                  className={`-mb-px flex items-center gap-1.5 border-b-2 px-2.5 pt-3 pb-2 ${
-                    tab === shown
-                      ? "border-phosphor text-prose"
-                      : "border-transparent text-label hover:text-prose"
-                  }`}
+              {tabs.map((tab, index) => (
+                <TabButton
+                  className="px-2.5 pt-3 pb-2"
+                  id={`${base}-${index}`}
                   key={tab.key}
-                  onClick={() => setOpen(tab.key)}
-                  role="tab"
-                  type="button"
+                  onPick={() => setOpen(tab.key)}
+                  panel={`${base}-panel`}
+                  selected={tab === shown}
                 >
                   {tab.name}
-                  <span className="font-mono text-2xs text-faint">
-                    {tab.count}
-                  </span>
+                  <SpokenCount
+                    count={tab.count}
+                    spoken={plural(tab.count, "property", "properties")}
+                  />
                   {tab.count > TAB_LIMIT ? (
                     <FindingDot severity="note" title={OVERLOADED} />
                   ) : null}
-                </button>
+                </TabButton>
               ))}
             </div>
           ) : (
@@ -319,12 +431,23 @@ function Layout({
           ) : null}
         </div>
 
-        <div className={`${COLUMN} space-y-2 py-3`}>
+        <div
+          className={`${COLUMN} space-y-2 py-3`}
+          id={`${base}-panel`}
+          // A tab panel only when there is a tab row to label it.
+          {...(tabRow && shown
+            ? {
+                role: "tabpanel",
+                "aria-labelledby": `${base}-${tabs.indexOf(shown)}`,
+              }
+            : {})}
+        >
           {shown ? null : (
             <p className="text-faint text-xs">This type has no properties.</p>
           )}
           {shown?.panels.map((panel) => (
             <Panel
+              flags={flags}
               key={panel.key}
               nodesById={nodesById}
               onToggle={() => flip(panel.key)}
@@ -334,7 +457,7 @@ function Layout({
             />
           ))}
         </div>
-      </div>
+      </Scroller>
     </div>
   );
 }
