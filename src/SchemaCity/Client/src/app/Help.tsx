@@ -89,6 +89,17 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   },
 ];
 
+function GroupTitle({ children }: { children: string }) {
+  return (
+    <h3 className="mb-1.5 font-bold text-3xs text-phosphor uppercase tracking-terminal-xl">
+      <span aria-hidden className="text-phosphor-dim">
+        ──{" "}
+      </span>
+      {children}
+    </h3>
+  );
+}
+
 /**
  * The control reference, and the toolbar button that opens it. Controlled, because
  * `?` opens it from the app's keyboard handler as well as this button.
@@ -138,19 +149,15 @@ export function Help({
 
         {/* Focusable because it scrolls: a pane a mouse can reach a keyboard must
             too. Borrowed from fsn's help screen, along with the group rules. */}
-        <div
+        <section
+          aria-label="Controls, findings and snapshots"
           className="max-h-[60vh] overflow-y-auto bg-panel-sunken px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-phosphor-bright"
           // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable pane has to be reachable by keyboard.
           tabIndex={0}
         >
           {GROUPS.map((group) => (
             <section className="mt-5 first:mt-0" key={group.title}>
-              <h3 className="mb-1.5 font-bold text-3xs text-phosphor uppercase tracking-terminal-xl">
-                <span aria-hidden className="text-phosphor-dim">
-                  ──{" "}
-                </span>
-                {group.title}
-              </h3>
+              <GroupTitle>{group.title}</GroupTitle>
               <dl className="grid grid-cols-1 gap-x-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
                 {group.rows.map((row) => (
                   <Fragment key={row.does}>
@@ -169,7 +176,25 @@ export function Help({
               </dl>
             </section>
           ))}
-        </div>
+          <section className="mt-5">
+            <GroupTitle>Findings and snapshots</GroupTitle>
+            <div className="space-y-1.5 pt-1.5 text-muted-foreground text-xs leading-relaxed">
+              <p>
+                A finding is something a check noticed in the schema: a problem,
+                such as a block editor that lists a deleted Element Type, or a
+                note worth a look, such as a tab with too many properties. It is
+                a reason to investigate, not an instruction to delete.
+              </p>
+              <p>
+                The schema is read when the page loads. Content usage is a
+                separate snapshot that the server keeps for one minute. It
+                counts the content items of each type, published, drafts and
+                trashed items included, and the references between them. The
+                Findings drawer says when each snapshot was taken.
+              </p>
+            </div>
+          </section>
+        </section>
       </DialogContent>
     </Dialog>
   );
