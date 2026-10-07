@@ -7,6 +7,7 @@
 // ending in a ring or an edge, and the grid comes from world position rather than
 // from the geometry, so one plane can be re-centred on the camera every frame
 // without the lines appearing to slide.
+import { EDGE_PARTS, PRINT_MARGIN } from "./board";
 
 /** Highest board surface; ground traces must sit above nested folder tints. */
 export const FOLDER_TINT_HEIGHT = 0.02;
@@ -151,10 +152,18 @@ export function framingStep(state: {
 export const STAMP_CAP = 4;
 
 /**
- * Ground between the name and the two island edges it sits near: the west edge it is
- * aligned to and the south edge below it.
+ * Smallest cap height a district's name shrinks to on a narrow board. Under it the
+ * name is left off rather than printed over a hole or past the edge.
  */
-const STAMP_INSET = 0.5;
+export const STAMP_MIN_CAP = 1;
+
+/**
+ * Ground between the name and every edge of its board: past the plated rings in the
+ * corners and the gold fingers along the edges, with the margin every print keeps.
+ * At this inset on both axes the name also stays outside every hole's keep-out, so it
+ * stops short of the corner holes however long it runs.
+ */
+const STAMP_INSET = EDGE_PARTS + PRINT_MARGIN;
 
 /**
  * Ground between the name and the last row, which holds the outer street a road
@@ -170,36 +179,55 @@ const STAMP_CLEARANCE = 3.5;
  */
 export const STAMP_BAND = STAMP_INSET + STAMP_CAP + STAMP_CLEARANCE;
 
+type Ground = { minX: number; maxX: number; minZ: number; maxZ: number };
+
 /**
- * Where a district's name lies on its island and how big it is, in world units.
- * `island` is the district's box with its padding already added, and `aspect` is the
- * rasterised name's width over its cap height.
+ * The row of a board's band its name may print in, edge to edge between the insets
+ * and a full cap height deep, whatever the name's length. The printed type names keep
+ * off all of it.
+ *
+ * ponytail: the whole row rather than the name's own width, so a print east of a
+ * short name is kept out too. The width needs the rasterised name, which only the
+ * scene has; pass it in if the names start missing room there.
+ */
+export function stampRow(island: Ground): Ground {
+  return {
+    minX: island.minX + STAMP_INSET,
+    maxX: island.maxX - STAMP_INSET,
+    minZ: island.maxZ - STAMP_INSET - STAMP_CAP,
+    maxZ: island.maxZ - STAMP_INSET,
+  };
+}
+
+/**
+ * Where a district's name lies on its island and how big it is, in world units, or
+ * null when it would have to shrink under `STAMP_MIN_CAP`. `island` is the district's
+ * box with its padding already added, and `aspect` is the rasterised name's width
+ * over its cap height.
  *
  * The name is a fixed part of the city rather than a label: it lies flat along the
- * island's south edge, tucked into the south-west corner of the band the layout
- * holds clear, and it does not turn, grow or move with the camera.
+ * island's south edge, at the west end of its stamp row, and it does not grow or move
+ * with the camera. It turns in place, so the flipped name covers the same ground.
  *
  * Lying square to the island is what contains it: its footprint is its own width and
  * height, so the band holds all of it and no building can ever stand over a letter.
  *
- * A name wider than its island shrinks until it fits, which is what a district of two
- * types would otherwise hang over the void.
+ * A name wider than its row shrinks until it fits, which is what a district of two
+ * types would otherwise hang over the holes and the void.
  */
 export function districtStamp(
-  island: { minX: number; maxX: number; minZ: number; maxZ: number },
+  island: Ground,
   aspect: number,
   cap = STAMP_CAP
-): { x: number; z: number; width: number; height: number } {
-  const across = island.maxX - island.minX - STAMP_INSET * 2;
-  let height = cap;
-  let width = height * aspect;
+): { x: number; z: number; width: number; height: number } | null {
+  const row = stampRow(island);
   // Cap height and width shrink together, so the letters keep their shape.
-  const fit = Math.min(1, across / width);
-  width *= fit;
-  height *= fit;
+  const height = Math.min(cap, (row.maxX - row.minX) / aspect);
+  if (height < STAMP_MIN_CAP) return null;
+  const width = height * aspect;
   return {
-    x: island.minX + STAMP_INSET + width / 2,
-    z: island.maxZ - STAMP_INSET - height / 2,
+    x: row.minX + width / 2,
+    z: row.maxZ - height / 2,
     width,
     height,
   };

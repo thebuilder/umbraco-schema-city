@@ -17,7 +17,16 @@ import {
   type DistrictKind,
   ISLAND_PAD,
 } from "../layout/city";
-import { type Finger, holeSpots, type Island } from "./board";
+import {
+  FINGER_REACH,
+  FINGER_WIDTH,
+  type Finger,
+  fingerRect,
+  HOLE_RADIUS,
+  holeSpots,
+  type Island,
+  RING_RADIUS,
+} from "./board";
 import { labelsFlipped } from "./board-labels";
 import { introPlaying } from "./connection-visibility";
 import { useAnimationFrame } from "./frames";
@@ -41,12 +50,7 @@ const MASK = 0.1;
 const COPPER = 0.035;
 /** Radius of a board's corners. */
 const CORNER = 1.2;
-/** Mounting holes: the drill and the plated ring around it. */
-const HOLE_RADIUS = 0.32;
-const RING_RADIUS = 0.62;
-/** A gold finger: its width along the edge, its reach in from it, and its height. */
-const FINGER_WIDTH = 0.5;
-const FINGER_REACH = 1.4;
+/** A gold finger's height over the mask. */
 const FINGER_HEIGHT = 0.02;
 /** A via's plated ring and its drill. */
 const VIA_RADIUS = 0.2;
@@ -336,27 +340,13 @@ const UNIT_SCALE = (): [number, number, number] => [1, 1, 1];
 
 /** A finger stands inside its edge, its long side running in from it. */
 function fingerSpot(finger: Finger) {
-  const inward = FINGER_REACH / 2;
-  switch (finger.side) {
-    case "north":
-      return { x: finger.x, z: finger.z + inward, y: FINGER_HEIGHT / 2 };
-    case "south":
-      return { x: finger.x, z: finger.z - inward, y: FINGER_HEIGHT / 2 };
-    case "west":
-      return {
-        x: finger.x + inward,
-        z: finger.z,
-        y: FINGER_HEIGHT / 2,
-        turn: Math.PI / 2,
-      };
-    default:
-      return {
-        x: finger.x - inward,
-        z: finger.z,
-        y: FINGER_HEIGHT / 2,
-        turn: Math.PI / 2,
-      };
-  }
+  const part = fingerRect(finger);
+  return {
+    x: (part.minX + part.maxX) / 2,
+    z: (part.minZ + part.maxZ) / 2,
+    y: FINGER_HEIGHT / 2,
+    turn: finger.side === "east" || finger.side === "west" ? Math.PI / 2 : 0,
+  };
 }
 
 /** A ref that keeps `materials` holding what React mounted under `key`. */
@@ -600,13 +590,14 @@ function Stamps({
   // to its board, so the search for its spot runs once rather than every frame.
   const names = useMemo(
     () =>
-      districts.map((district) => {
+      districts.flatMap((district) => {
         const texture = stampTexture(district.name.toUpperCase(), palette.mono);
         const stamp = districtStamp(
           islandOf(district),
           texture.image.width / texture.image.height
         );
-        return { id: district.id, texture, stamp };
+        // A board too narrow for the name at its smallest goes without it.
+        return stamp ? [{ id: district.id, texture, stamp }] : [];
       }),
     [districts, palette.mono]
   );
