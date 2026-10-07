@@ -5,7 +5,6 @@ import smallFixture from "../../../dev/fixtures/small.json";
 import type { SchemaGraph } from "../../model/types";
 import { layoutCity } from "../layout/city";
 import {
-  approach,
   BASE_OPACITY,
   type Board,
   boardDistance,
@@ -16,6 +15,7 @@ import {
   courtyard,
   DIMMED,
   type Fitted,
+  fadeToward,
   fitName,
   fittedFontPx,
   footprintRect,
@@ -35,6 +35,7 @@ import {
   MAX_EM,
   MIN_EM,
   MONO_ADVANCE,
+  newFades,
   PRINT_LEVELS,
   packAtlas,
   placeLabels,
@@ -49,9 +50,11 @@ import {
   type Standing,
   sharedContext,
   solveNames,
+  stepName,
   type Trace,
   traceIndex,
   tracesOf,
+  updateTiers,
   type Want,
 } from "./board-labels";
 import { pixelsPerUnit } from "./stage";
@@ -303,10 +306,10 @@ describe("level of detail", () => {
   });
 
   it("fades toward its target by a step at a time, and lands on it", () => {
-    expect(approach(0, 1, 0.25)).toBe(0.25);
-    expect(approach(0.9, 1, 0.25)).toBe(1);
-    expect(approach(0.5, 0, 0.25)).toBe(0.25);
-    expect(approach(0.5, 0, 1)).toBe(0);
+    expect(fadeToward(0, 1, 0.25)).toBe(0.25);
+    expect(fadeToward(0.9, 1, 0.25)).toBe(1);
+    expect(fadeToward(0.5, 0, 0.25)).toBe(0.25);
+    expect(fadeToward(0.5, 0, 1)).toBe(0);
   });
 
   it("projects larger when closer and smaller when seen at a grazing angle", () => {
@@ -989,6 +992,37 @@ function sizesOf(prints: Map<string, { em: number; prints: Fitted[] }[]>) {
 const touching = (a: Rect, b: Rect) =>
   a.minX < b.maxX && b.minX < a.maxX && a.minZ < b.maxZ && b.minZ < a.maxZ;
 
+type Laid = { id: string; size: number; board?: string; rect: Rect };
+
+/** Every print lying over a building other than its own. */
+const printsOverBuildings = (
+  prints: readonly Laid[],
+  placements: readonly Standing[]
+) =>
+  prints.flatMap((one) =>
+    placements
+      .filter(
+        (building) =>
+          building.id !== one.id && touching(one.rect, footprintRect(building))
+      )
+      .map((building) => `${one.id} over ${building.id}`)
+  );
+
+/**
+ * Every two prints that touch and can show at once: on one board at one size, or on
+ * two boards at any two sizes, since each board picks its own size.
+ */
+const printsOverPrints = (prints: readonly Laid[]) =>
+  prints.flatMap((a, i) =>
+    prints
+      .slice(i + 1)
+      .filter(
+        (b) =>
+          (a.board !== b.board || a.size === b.size) && touching(a.rect, b.rect)
+      )
+      .map((b) => `${a.id}@${a.size} on ${b.id}@${b.size}`)
+  );
+
 describe("solveNames", () => {
   const at = (id: string, x: number, extra: Partial<Standing> = {}) => ({
     id,
@@ -1026,6 +1060,21 @@ describe("solveNames", () => {
     expect(solved.boards.get("d")?.rect.maxX).toBe(2);
   });
 
+  it("counts districts laid out close together as one board", () => {
+    const solved = solveNames(
+      [
+        at("a", 0),
+        at("b", 8, { district: "e" }),
+        at("far", 80, { district: "f" }),
+      ],
+      sizes,
+      () => 0
+    );
+    expect(solved.boardOf.get("a")).toBe(solved.boardOf.get("b"));
+    expect(solved.boardOf.get("far")).not.toBe(solved.boardOf.get("a"));
+    expect(solved.boards.size).toBe(2);
+  });
+
   it("gives the larger type the board first when two names compete", () => {
     const solved = solveNames(
       [at("a", 0), at("b", 0.5, { footprint: 4.5 })],
@@ -1049,36 +1098,101 @@ describe("solveNames", () => {
       const usage = (id: string) => id.length;
       const solved = solveNames(placements, named, usage);
       expect(solveNames(placements, named, usage)).toEqual(solved);
-      const district = new Map(placements.map((one) => [one.id, one.district]));
-      const footprints = placements.map((one) => ({
-        id: one.id,
-        rect: footprintRect(one),
-      }));
-      const clashes: string[] = [];
-      for (const way of solved.placed) {
+      const clashes = solved.placed.flatMap((way) => {
         const prints = way.flatMap((level, size) =>
-          [...level].map(([id, spot]) => ({ id, size, rect: spot.rect }))
+          [...level].map(([id, spot]) => ({
+            id,
+            size,
+            board: solved.boardOf.get(id),
+            rect: spot.rect,
+          }))
         );
         expect(prints.length).toBeGreaterThan(placements.length);
-        for (const one of prints)
-          for (const building of footprints)
-            if (building.id !== one.id && touching(one.rect, building.rect))
-              clashes.push(`${one.id} over ${building.id}`);
-        // On one board at one size, or on two boards at any two sizes, since each
-        // board picks its own size.
-        for (let i = 0; i < prints.length; i++)
-          for (let j = i + 1; j < prints.length; j++) {
-            const a = prints[i] as (typeof prints)[number];
-            const b = prints[j] as (typeof prints)[number];
-            const together =
-              district.get(a.id) === district.get(b.id)
-                ? a.size === b.size
-                : true;
-            if (together && touching(a.rect, b.rect))
-              clashes.push(`${a.id}@${a.size} on ${b.id}@${b.size}`);
-          }
-      }
+        return [
+          ...printsOverBuildings(prints, placements),
+          ...printsOverPrints(prints),
+        ];
+      });
       expect(clashes).toEqual([]);
     }
   );
+});
+
+describe("stepName", () => {
+  const one = (id: string, x: number): Standing => ({
+    id,
+    position: { x, z: 0 },
+    footprint: 4,
+    district: "d",
+  });
+  const sizes = new Map([
+    [
+      "a",
+      {
+        ems: [0.64, 1, 1.6],
+        levels: [
+          [{ width: 2, height: 1 }],
+          [{ width: 3, height: 1.5 }],
+          [{ width: 5, height: 2 }],
+        ],
+      },
+    ],
+  ]);
+  const solution = solveNames([one("a", 0)], sizes, () => 0);
+  const name = { id: "a", perEm: 10, ems: sizes.get("a")?.ems ?? [] };
+  const upright = { flipped: false, step: 0.5 };
+
+  it("shows a name at its board's size once it reads, fading in a step at a time", () => {
+    const fades = newFades(1);
+    fades.tiers.set("d", 2);
+    expect(stepName(fades, solution, 0, name, upright)).toBe(2);
+    expect(Array.from(fades.presence)).toEqual([0, 0, 0.5]);
+    expect(fades.moving).toBe(true);
+    fades.moving = false;
+    stepName(fades, solution, 0, name, upright);
+    expect(fades.presence[2]).toBe(1);
+    expect(fades.moving).toBe(false);
+  });
+
+  it("cross-fades the old size out while the new one fades in", () => {
+    const fades = newFades(1);
+    fades.tiers.set("d", 2);
+    stepName(fades, solution, 0, name, { flipped: false, step: 1 });
+    fades.tiers.set("d", 1);
+    expect(stepName(fades, solution, 0, name, upright)).toBe(1);
+    expect(Array.from(fades.presence)).toEqual([0, 0.5, 0.5]);
+  });
+
+  it("keeps a name that read through the band, and fades it only under it", () => {
+    const fades = newFades(1);
+    fades.tiers.set("d", 2);
+    const at = (px: number) => ({ ...name, perEm: px / 1.6 });
+    const still = { flipped: false, step: 1 };
+    expect(stepName(fades, solution, 0, at(6.5), still)).toBe(-1);
+    expect(stepName(fades, solution, 0, at(7), still)).toBe(2);
+    expect(stepName(fades, solution, 0, at(6.2), still)).toBe(2);
+    expect(stepName(fades, solution, 0, at(5.9), still)).toBe(-1);
+    expect(fades.presence[2]).toBe(0);
+  });
+
+  it("shows nothing on a board the camera has not sized yet", () => {
+    expect(stepName(newFades(1), solution, 0, name, upright)).toBe(-1);
+  });
+});
+
+describe("updateTiers", () => {
+  it("sizes each board from the camera's distance to it, and keeps it through a wobble", () => {
+    const fades = newFades(0);
+    const boards = new Map([
+      ["near", { rect: { minX: 0, maxX: 10, minZ: 0, maxZ: 10 }, y: 0 }],
+      ["far", { rect: { minX: 500, maxX: 510, minZ: 0, maxZ: 10 }, y: 0 }],
+    ]);
+    updateTiers(fades, boards, { x: 5, y: 20, z: 5 }, 1000);
+    expect(fades.tiers.get("near")).toBe(0);
+    expect(fades.tiers.get("far")).toBe(2);
+    const near = fades.tiers.get("near");
+    for (const y of [21, 19, 22, 20])
+      updateTiers(fades, boards, { x: 5, y, z: 5 }, 1000);
+    expect(fades.tiers.get("near")).toBe(near);
+  });
 });

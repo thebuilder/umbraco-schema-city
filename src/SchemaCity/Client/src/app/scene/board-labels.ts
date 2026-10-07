@@ -148,7 +148,11 @@ export function legible(px: number, was: boolean): boolean {
 }
 
 /** `value` moved toward `target` by at most `step`, for a fade. */
-export function approach(value: number, target: number, step: number): number {
+export function fadeToward(
+  value: number,
+  target: number,
+  step: number
+): number {
   return value < target
     ? Math.min(target, value + step)
     : Math.max(target, value - step);
@@ -1168,7 +1172,7 @@ const SAME_BOARD = MAX_OVERHANG * 2;
  * `SAME_BOARD` merged into one.
  */
 function boardsOf(upright: readonly Standing[]) {
-  const boards = new Map<string, { rect: Rect; y: number; ids: string[] }>();
+  const boards = new Map<string, Ground>();
   for (const one of upright) {
     const board = boards.get(one.district);
     const ground = footprintRect(one);
@@ -1178,21 +1182,27 @@ function boardsOf(upright: readonly Standing[]) {
       ids: [...(board?.ids ?? []), one.id],
     });
   }
-  for (let merged = true; merged; ) {
-    merged = false;
-    for (const [a, one] of boards)
-      for (const [b, other] of boards)
-        if (a < b && gapBetween(one.rect, other.rect) < SAME_BOARD) {
-          boards.set(a, {
-            rect: union(one.rect, other.rect),
-            y: Math.max(one.y, other.y),
-            ids: [...one.ids, ...other.ids],
-          });
-          boards.delete(b);
-          merged = true;
-        }
-  }
+  let merging = true;
+  while (merging) merging = mergeNearest(boards);
   return boards;
+}
+
+type Ground = { rect: Rect; y: number; ids: string[] };
+
+/** Merges the first two boards closer than `SAME_BOARD`; false when none are. */
+function mergeNearest(boards: Map<string, Ground>): boolean {
+  for (const [a, one] of boards)
+    for (const [b, other] of boards) {
+      if (a >= b || gapBetween(one.rect, other.rect) >= SAME_BOARD) continue;
+      boards.set(a, {
+        rect: union(one.rect, other.rect),
+        y: Math.max(one.y, other.y),
+        ids: [...one.ids, ...other.ids],
+      });
+      boards.delete(b);
+      return true;
+    }
+  return false;
 }
 
 /**
@@ -1280,24 +1290,127 @@ export function solveNames(
   };
 }
 
+/**
+ * What the board shows now, kept between repaints for one solution: each board's
+ * print size, and per name and size, three to a slot, whether it reads and how far
+ * it has faded in.
+ */
+export type Fades = {
+  tiers: Map<string, number>;
+  /** Per name and size, 1 when it read at the last repaint. */
+  legible: Uint8Array;
+  /** Per name and size, 0 gone to 1 shown. */
+  presence: Float32Array;
+  /** Per name, 1 when its whole name prints legibly at its board's size. */
+  printed: Uint8Array;
+  /** True while a fade is under way, as `stepName` last found. */
+  moving: boolean;
+  /** True until the first repaint, which shows everything at once. */
+  fresh: boolean;
+};
+
+const LEVELS = PRINT_LEVELS.length;
+
+export const newFades = (count: number): Fades => ({
+  tiers: new Map(),
+  legible: new Uint8Array(count * LEVELS),
+  presence: new Float32Array(count * LEVELS),
+  printed: new Uint8Array(count),
+  moving: false,
+  fresh: true,
+});
+
+/** Each board's print size for a camera at `camera`, from its nearest point. */
+export function updateTiers(
+  fades: Fades,
+  boards: Solution["boards"],
+  camera: { x: number; y: number; z: number },
+  viewportHeight: number
+): void {
+  boards.forEach((board, id) => {
+    const distance = boardDistance(camera, board.rect, board.y);
+    fades.tiers.set(
+      id,
+      boardTier(
+        pixelsPerUnit(viewportHeight, distance),
+        fades.tiers.get(id) ?? -1
+      )
+    );
+  });
+}
+
+/** A name's place at one size, upright or flipped, or undefined. */
+export const placedAt = (
+  solution: Solution,
+  flipped: boolean,
+  level: number,
+  id: string
+): Placed | undefined => solution.placed[flipped ? 1 : 0]?.[level]?.get(id);
+
+/** One name as a repaint sees it: pixels per unit of print at its ground, its sizes. */
+export type NameView = { id: string; perEm: number; ems: readonly number[] };
+
+/** Whether size `k` of a name reads at `px`, kept between repaints for the band. */
+function readsAt(fades: Fades, k: number, px: number): boolean {
+  const reads = legible(px, fades.legible[k] === 1);
+  fades.legible[k] = reads ? 1 : 0;
+  return reads;
+}
+
+/** Size `k` of a name faded a step toward showing or not. */
+function fadeAt(fades: Fades, k: number, show: boolean, step: number): void {
+  const target = show ? 1 : 0;
+  const presence = fadeToward(fades.presence[k] as number, target, step);
+  fades.presence[k] = presence;
+  if (presence !== target) fades.moving = true;
+}
+
+/**
+ * Moves the name in slot `slot` a step: per size, whether it reads, and how far it
+ * has faded toward showing, which only its board's size does, when the name is
+ * placed at that size and reads. A size the board has just left fades out while
+ * the new one fades in. Returns the size it shows at, or -1.
+ */
+export function stepName(
+  fades: Fades,
+  solution: Solution,
+  slot: number,
+  name: NameView,
+  view: { flipped: boolean; step: number }
+): number {
+  const tier = fades.tiers.get(solution.boardOf.get(name.id) ?? "") ?? -1;
+  let shown = -1;
+  for (let level = 0; level < LEVELS; level++) {
+    const k = slot * LEVELS + level;
+    const reads = readsAt(fades, k, name.perEm * (name.ems[level] as number));
+    const show =
+      reads &&
+      level === tier &&
+      placedAt(solution, view.flipped, level, name.id) !== undefined;
+    if (show) shown = level;
+    fadeAt(fades, k, show, view.step);
+  }
+  return shown;
+}
+
 /** How solid a courtyard line is at rest: an outline, under everything it frames. */
 const COURTYARD_OPACITY = 0.22;
 
 /**
  * How solid a type's print and its courtyard are: the print unless its floating
  * label already says its name, both under the hover's light, the intro and focus
- * mode's flattening. The fades for legibility and for a change of size multiply
- * the print on top of this.
+ * mode's flattening, written into `out` so a repaint allocates nothing. The fades
+ * for legibility and for a change of size multiply the print on top of this.
  */
 export function printStrength(
   floated: boolean,
   light: number,
   reveal: number,
-  flatten: number
+  flatten: number,
+  out = { print: 0, courtyard: 0 }
 ): { print: number; courtyard: number } {
   const shown = light * reveal * (1 - flatten);
-  return {
-    print: floated ? 0 : BASE_OPACITY * shown,
-    courtyard: COURTYARD_OPACITY * shown,
-  };
+  out.print = floated ? 0 : BASE_OPACITY * shown;
+  out.courtyard = COURTYARD_OPACITY * shown;
+  return out;
 }

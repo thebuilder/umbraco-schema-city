@@ -9,14 +9,12 @@ import * as THREE from "three";
 import type { SchemaNode, UsageReport } from "../../model/types";
 import type { Placement } from "../layout/city";
 import {
-  approach,
   BASE_OPACITY,
-  boardDistance,
   boardTextPx,
-  boardTier,
   COURTYARD_SEGMENTS,
   courtyard,
   FADE_SECONDS,
+  type Fades,
   fittedFontPx,
   type Interaction,
   KNOCKOUT_VERTICES,
@@ -26,10 +24,12 @@ import {
   LINE_STEP,
   labelLight,
   labelsFlipped,
-  legible,
+  type NameView,
+  newFades,
   type Placed,
   PRINT_LEVELS,
   packAtlas,
+  placedAt,
   printCorners,
   printStrength,
   printsFor,
@@ -38,11 +38,13 @@ import {
   type Solution,
   type Standing,
   solveNames,
+  stepName,
   type Trace,
   traceIndex,
+  updateTiers,
 } from "./board-labels";
 import { revealAt } from "./reveal";
-import { FOLDER_TINT_HEIGHT, pixelsPerUnit } from "./stage";
+import { FOLDER_TINT_HEIGHT } from "./stage";
 
 /**
  * Font size the names are rasterised at, in CSS pixels before the device pixel
@@ -368,13 +370,14 @@ function buildCourtyards(count: number, colour: THREE.Color) {
 const groundOf = (placement: { y?: number }) => placement.y ?? 0;
 
 /** Where the camera is and what it is looking at, read once per repaint. */
-type View = {
+type Frame = {
   camera: THREE.Camera;
   viewportHeight: number;
   flipped: boolean;
   reveal: number;
   /** How far a fade moves this repaint, 1 for at once. */
   step: number;
+  fades: Fades;
 };
 
 /** Everything a repaint needs that does not change with the camera. */
@@ -393,43 +396,26 @@ type Inputs = {
   interaction: Interaction;
 };
 
-/**
- * What the board shows now, kept between repaints for one solution: each board's
- * print size, and per name and size whether it reads and how far it has faded in.
- */
-type Fades = {
-  tiers: Map<string, number>;
-  /** Per name and size, 1 when it reads at the last repaint. */
-  legible: Uint8Array;
-  /** Per name and size, 0 gone to 1 shown. */
-  presence: Float32Array;
-  /** Per name, 1 when its whole name prints legibly at its board's size. */
-  printed: Uint8Array;
-  /** True until the first repaint, which shows everything at once. */
-  fresh: boolean;
-};
-
 const LEVELS = PRINT_LEVELS.length;
-
-const newFades = (count: number): Fades => ({
-  tiers: new Map(),
-  legible: new Uint8Array(count * LEVELS),
-  presence: new Float32Array(count * LEVELS),
-  printed: new Uint8Array(count),
-  fresh: true,
-});
-
 const SCRATCH = new THREE.Vector3();
 const CORNERS: number[] = [];
 const SEGMENTS = new Float32Array(COURTYARD_SEGMENTS * 4);
 const PATCH = new Float32Array(KNOCKOUT_VERTICES * 2);
 const SHIFTED: Rect = { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
-const NONE: number[] = [];
+const STRENGTH = { print: 0, courtyard: 0 };
+const NOW: NameView = { id: "", perEm: 0, ems: [] };
+const NO_ENTRIES: number[][] = [];
+const NO_EMS: readonly number[] = [];
+
+const positionsOf = (geometry: THREE.BufferGeometry) =>
+  geometry.getAttribute("position").array as Float32Array;
+const coloursOf = (geometry: THREE.BufferGeometry) =>
+  geometry.getAttribute("color").array as Float32Array;
 
 /** How many pixels one unit of print comes to at a building's ground, in this view. */
-function pxPerEmAt(one: Standing, view: View): number {
+function pxPerEmAt(one: Standing, frame: Frame): number {
   SCRATCH.set(one.position.x, groundOf(one), one.position.z);
-  return boardTextPx(1, view.viewportHeight, view.camera.position, SCRATCH);
+  return boardTextPx(1, frame.viewportHeight, frame.camera.position, SCRATCH);
 }
 
 /**
@@ -480,86 +466,67 @@ function writeAlpha(colours: Float32Array, entry: number, alpha: number) {
   for (let k = 0; k < 4; k++) colours[entry * 16 + k * 4 + 3] = alpha;
 }
 
-/** Each board's print size for this view, from its nearest point's distance. */
-function updateTiers(inputs: Inputs, fades: Fades, view: View) {
-  inputs.solution.boards.forEach((board, id) => {
-    const distance = boardDistance(view.camera.position, board.rect, board.y);
-    fades.tiers.set(
-      id,
-      boardTier(
-        pixelsPerUnit(view.viewportHeight, distance),
-        fades.tiers.get(id) ?? -1
-      )
-    );
-  });
+/** The atlas entry of a type's print at one size, or -1. */
+const entryAt = (
+  atlas: Atlas,
+  id: string,
+  level: number,
+  spot: Placed | undefined
+) => (spot ? (atlas.index.get(id)?.[level]?.[spot.print] ?? -1) : -1);
+
+/**
+ * Writes the print of the type in slot `slot` at one size, on its place, at `alpha`
+ * times how far that size has faded in. A size faded out writes nothing.
+ */
+function writeLevel(
+  inputs: Inputs,
+  frame: Frame,
+  slot: number,
+  level: number,
+  alpha: number
+) {
+  const one = inputs.standing[slot] as Placement;
+  const spot = placedAt(inputs.solution, frame.flipped, level, one.id);
+  const entry = entryAt(inputs.atlas, one.id, level, spot);
+  const presence = frame.fades.presence[slot * LEVELS + level] as number;
+  if (entry < 0 || presence === 0) return;
+  writeQuad(
+    positionsOf(inputs.geometry),
+    entry,
+    shifted((spot as Placed).rect, one, inputs.settled[slot] as Placement),
+    frame.flipped,
+    groundOf(one) + LABEL_Y
+  );
+  writeAlpha(coloursOf(inputs.geometry), entry, alpha * presence);
+}
+
+/** Every print of a type hidden, before the ones that show are written. */
+function hideName(inputs: Inputs, id: string) {
+  const colours = coloursOf(inputs.geometry);
+  for (const level of inputs.atlas.index.get(id) ?? NO_ENTRIES)
+    for (const entry of level) writeAlpha(colours, entry, 0);
 }
 
 /**
- * What `writeName` hands back, one object reused so a repaint allocates nothing:
- * the place of the print at the board's size when that one reads, how far it has
- * faded in, whether it is the whole name, and whether any fade is under way.
- */
-const NAME: {
-  spot: Placed | undefined;
-  presence: number;
-  full: boolean;
-  moving: boolean;
-} = { spot: undefined, presence: 0, full: false, moving: false };
-
-/**
- * Fades one type's prints toward what its board shows now and writes them: the one
- * at its board's size when it reads, and the one at the size before while it fades
- * out. Returns the place of the print at the board's size when that one reads, and
- * whether any of its fades is still under way.
+ * Fades the type in slot `slot` toward what its board shows now and writes its
+ * prints: the one at its board's size when it reads, and the one at the size before
+ * while it fades out. Returns the size it shows at, or -1.
  */
 function writeName(
   inputs: Inputs,
-  fades: Fades,
-  view: View,
+  frame: Frame,
   slot: number,
   alpha: number
-): typeof NAME {
+): number {
   const one = inputs.standing[slot] as Placement;
-  const settled = inputs.settled[slot] as Placement;
-  const positions = inputs.geometry.getAttribute("position")
-    .array as Float32Array;
-  const colours = inputs.geometry.getAttribute("color").array as Float32Array;
-  const entries = inputs.atlas.index.get(one.id);
-  const ems = inputs.atlas.sizes.get(one.id)?.ems;
-  const tier = fades.tiers.get(inputs.solution.boardOf.get(one.id) ?? "") ?? -1;
-  const perEm = ems ? pxPerEmAt(one, view) : 0;
-  const ways = inputs.solution.placed[view.flipped ? 1 : 0];
-  NAME.spot = undefined;
-  NAME.presence = 0;
-  NAME.full = false;
-  NAME.moving = false;
-  for (let level = 0; level < LEVELS; level++) {
-    const k = slot * LEVELS + level;
-    for (const entry of entries?.[level] ?? NONE) writeAlpha(colours, entry, 0);
-    const placed = ways?.[level]?.get(one.id);
-    const reads = legible(perEm * (ems?.[level] ?? 0), fades.legible[k] === 1);
-    fades.legible[k] = reads ? 1 : 0;
-    const target = placed && level === tier && reads ? 1 : 0;
-    const presence = approach(fades.presence[k] as number, target, view.step);
-    fades.presence[k] = presence;
-    if (presence !== target) NAME.moving = true;
-    const entry = placed ? entries?.[level]?.[placed.print] : undefined;
-    if (target === 1) {
-      NAME.spot = placed;
-      NAME.presence = presence;
-      NAME.full = entry !== undefined && !!inputs.atlas.entries[entry]?.full;
-    }
-    if (!placed || entry === undefined || presence === 0) continue;
-    writeQuad(
-      positions,
-      entry,
-      shifted(placed.rect, one, settled),
-      view.flipped,
-      groundOf(one) + LABEL_Y
-    );
-    writeAlpha(colours, entry, alpha * presence);
-  }
-  return NAME;
+  NOW.id = one.id;
+  NOW.perEm = pxPerEmAt(one, frame);
+  NOW.ems = inputs.atlas.sizes.get(one.id)?.ems ?? NO_EMS;
+  const shown = stepName(frame.fades, inputs.solution, slot, NOW, frame);
+  hideName(inputs, one.id);
+  for (let level = 0; level < LEVELS; level++)
+    writeLevel(inputs, frame, slot, level, alpha);
+  return shown;
 }
 
 /** Writes the courtyard in slot `slot`: round the part, and its print when it has one. */
@@ -570,9 +537,8 @@ function writeCourtyard(
   strength: number
 ) {
   const one = inputs.standing[slot] as Placement;
-  const positions = inputs.courtyards.getAttribute("position")
-    .array as Float32Array;
-  const colours = inputs.courtyards.getAttribute("color").array as Float32Array;
+  const positions = positionsOf(inputs.courtyards);
+  const colours = coloursOf(inputs.courtyards);
   SEGMENTS.fill(0);
   courtyard(
     one.position,
@@ -601,9 +567,8 @@ function writeKnockout(
   alpha: number
 ) {
   const one = inputs.standing[slot] as Placement;
-  const positions = inputs.knockouts.getAttribute("position")
-    .array as Float32Array;
-  const colours = inputs.knockouts.getAttribute("color").array as Float32Array;
+  const positions = positionsOf(inputs.knockouts);
+  const colours = coloursOf(inputs.knockouts);
   const shown = knockoutAlpha(spot, alpha, inputs.traceAt, inputs.interaction);
   // A hidden knockout keeps whatever corners the last one left; it draws nothing.
   if (spot && shown > 0)
@@ -621,46 +586,74 @@ function writeKnockout(
 }
 
 /**
- * Writes every name's quads and opacities and the courtyards for one view. The
- * places come from the solution, so the camera only picks each board's size, which
- * prints read, and how far each fade has gone. Returns whether a fade is still under
- * way and whether the set of whole names printed legibly changed.
+ * How solid a type's print and courtyard are now. Only the hovered or selected type
+ * gives its print up to its floating label; every other name stays where it is.
  */
-function repaint(
+function strengthOf(
+  inputs: Inputs,
+  frame: Frame,
+  floated: Set<string>,
+  one: Placement
+) {
+  const { hovered, selected } = inputs.interaction;
+  const own = one.id === hovered || one.id === selected;
+  return printStrength(
+    own && floated.has(one.id),
+    labelLight(one.id, inputs.interaction),
+    frame.reveal,
+    one.flatten ?? 0,
+    STRENGTH
+  );
+}
+
+/**
+ * Records whether the type in slot `slot` prints its whole name legibly at its
+ * board's size, and returns true when that changed.
+ */
+function notePrinted(
   inputs: Inputs,
   fades: Fades,
-  view: View,
-  floated: Set<string>
-): { moving: boolean; printedChanged: boolean } {
-  if (fades.fresh) view.step = 1;
-  updateTiers(inputs, fades, view);
-  const { hovered, selected } = inputs.interaction;
-  let moving = false;
-  let printedChanged = false;
-  for (let slot = 0; slot < inputs.standing.length; slot++) {
-    const one = inputs.standing[slot] as Placement;
-    // Only the hovered or selected type gives its print up to its floating label;
-    // every other name stays where it is.
-    const own = one.id === hovered || one.id === selected;
-    const strength = printStrength(
-      own && floated.has(one.id),
-      labelLight(one.id, inputs.interaction),
-      view.reveal,
-      one.flatten ?? 0
-    );
-    const name = writeName(inputs, fades, view, slot, strength.print);
-    moving ||= name.moving;
-    writeCourtyard(inputs, slot, name.spot, strength.courtyard);
-    writeKnockout(
-      inputs,
-      slot,
-      name.spot,
-      (KNOCKOUT_OPACITY * strength.print * name.presence) / BASE_OPACITY
-    );
-    const printed = name.full ? 1 : 0;
-    if (fades.printed[slot] !== printed) printedChanged = true;
-    fades.printed[slot] = printed;
-  }
+  slot: number,
+  level: number,
+  spot: Placed | undefined
+): boolean {
+  const { id } = inputs.standing[slot] as Placement;
+  const entry = entryAt(inputs.atlas, id, level, spot);
+  const printed = inputs.atlas.entries[entry]?.full ? 1 : 0;
+  const changed = fades.printed[slot] !== printed;
+  fades.printed[slot] = printed;
+  return changed;
+}
+
+/**
+ * Writes the type in slot `slot`: its prints, its courtyard and its knockout.
+ * Returns true when whether it prints its whole name legibly changed.
+ */
+function paintName(
+  inputs: Inputs,
+  frame: Frame,
+  floated: Set<string>,
+  slot: number
+): boolean {
+  const one = inputs.standing[slot] as Placement;
+  const strength = strengthOf(inputs, frame, floated, one);
+  const shown = writeName(inputs, frame, slot, strength.print);
+  const spot = placedAt(inputs.solution, frame.flipped, shown, one.id);
+  const presence = spot
+    ? (frame.fades.presence[slot * LEVELS + shown] as number)
+    : 0;
+  writeCourtyard(inputs, slot, spot, strength.courtyard);
+  writeKnockout(
+    inputs,
+    slot,
+    spot,
+    (KNOCKOUT_OPACITY * strength.print * presence) / BASE_OPACITY
+  );
+  return notePrinted(inputs, frame.fades, slot, shown, spot);
+}
+
+/** Tells three.js the names', courtyards' and knockouts' buffers have been written. */
+function markWritten(inputs: Inputs) {
   for (const geometry of [
     inputs.geometry,
     inputs.courtyards,
@@ -669,8 +662,29 @@ function repaint(
     geometry.getAttribute("position").needsUpdate = true;
     geometry.getAttribute("color").needsUpdate = true;
   }
-  fades.fresh = false;
-  return { moving, printedChanged };
+}
+
+/**
+ * Writes every name's quads and opacities and the courtyards for one view. The
+ * places come from the solution, so the camera only picks each board's size, which
+ * prints read, and how far each fade has gone. Returns true when the set of whole
+ * names printed legibly changed.
+ */
+function repaint(inputs: Inputs, frame: Frame, floated: Set<string>): boolean {
+  if (frame.fades.fresh) frame.step = 1;
+  updateTiers(
+    frame.fades,
+    inputs.solution.boards,
+    frame.camera.position,
+    frame.viewportHeight
+  );
+  frame.fades.moving = false;
+  let printedChanged = false;
+  for (let slot = 0; slot < inputs.standing.length; slot++)
+    printedChanged = paintName(inputs, frame, floated, slot) || printedChanged;
+  markWritten(inputs);
+  frame.fades.fresh = false;
+  return printedChanged;
 }
 
 /**
@@ -772,6 +786,24 @@ function useKnockouts(
   return { knockouts, knockoutMaterial };
 }
 
+/** What the last repaint was made from, so a still frame can tell it has nothing to write. */
+type Written = { key: unknown[]; camera: THREE.Matrix4; moving: boolean };
+
+const unchanged = (last: Written, key: unknown[], camera: THREE.Camera) =>
+  !last.moving &&
+  key.every((value, i) => value === last.key[i]) &&
+  camera.matrixWorld.equals(last.camera);
+
+/** Hands the label layer the types whose whole name the board now prints legibly. */
+function publishPrinted(inputs: Inputs, fades: Fades, floated: Floated) {
+  floated.printed = new Set(
+    inputs.standing
+      .filter((_, slot) => fades.printed[slot] === 1)
+      .map((one) => one.id)
+  );
+  floated.printedVersion += 1;
+}
+
 /**
  * Repaints the names on every frame the camera, the inputs, the intro, the floated
  * set or the way up has moved since the last one, or a fade is still under way, and
@@ -785,10 +817,8 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
     () => newFades(inputs.standing.length),
     [inputs.solution, inputs.standing.length]
   );
-  // What the last repaint was made from, so a still frame can tell it has nothing
-  // to write.
-  const written = useRef({
-    key: [] as unknown[],
+  const written = useRef<Written>({
+    key: [],
     camera: new THREE.Matrix4(),
     moving: false,
   });
@@ -808,35 +838,20 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
       height,
     ];
     const last = written.current;
-    if (
-      !last.moving &&
-      key.every((value, i) => value === last.key[i]) &&
-      camera.matrixWorld.equals(last.camera)
-    )
-      return;
-    const { moving, printedChanged } = repaint(
-      inputs,
+    if (unchanged(last, key, camera)) return;
+    const frame: Frame = {
+      camera,
+      viewportHeight: height,
+      flipped: flipped.current,
+      reveal,
+      step: reducedMotion ? 1 : delta / FADE_SECONDS,
       fades,
-      {
-        camera,
-        viewportHeight: height,
-        flipped: flipped.current,
-        reveal,
-        step: reducedMotion ? 1 : delta / FADE_SECONDS,
-      },
-      floated.ids
-    );
-    if (printedChanged) {
-      floated.printed = new Set(
-        inputs.standing
-          .filter((_, slot) => fades.printed[slot] === 1)
-          .map((one) => one.id)
-      );
-      floated.printedVersion += 1;
-    }
+    };
+    if (repaint(inputs, frame, floated.ids))
+      publishPrinted(inputs, fades, floated);
     last.key = key;
     last.camera.copy(camera.matrixWorld);
-    last.moving = moving;
+    last.moving = fades.moving;
   });
 }
 
