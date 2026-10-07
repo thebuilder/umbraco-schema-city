@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import mediumFixture from "../../dev/fixtures/medium.json";
 import { plannedBaseline } from "../../dev/planned-baseline";
-import { groupChanges } from "../model/changes";
+import { type ChangeKind, groupChanges } from "../model/changes";
 import { compareSchemas } from "../model/snapshots";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
 import {
@@ -115,6 +115,45 @@ test("lists a removed type after the current ones, and says how each changed", (
   expect(change("Home")).toBe("side effect");
   expect(change("Settings")).toBe("none");
   expect(compareRows(current, undefined, null)[0]?.change).toBeUndefined();
+});
+
+test("sorts the change column by severity, not by spelling", () => {
+  const kinds = new Map<string, ChangeKind>([
+    ["added", "added"],
+    ["effect", "side effect"],
+    ["changed", "changed"],
+    ["removed", "removed"],
+  ]);
+  const rows = typeRows(
+    {
+      ...graph,
+      nodes: ["none", "effect", "added", "changed", "removed", "also"].map(
+        (id) => node(id)
+      ),
+      edges: [],
+    },
+    undefined,
+    kinds
+  );
+  const names = (ascending: boolean) =>
+    sortRows(rows, "change", ascending).map((row) => row.name);
+  // Two unchanged types fall back to the name, as every column does.
+  expect(names(true)).toEqual([
+    "removed",
+    "changed",
+    "added",
+    "effect",
+    "also",
+    "none",
+  ]);
+  expect(names(false)).toEqual([
+    "none",
+    "also",
+    "effect",
+    "added",
+    "changed",
+    "removed",
+  ]);
 });
 
 test("filters by change, and finds a removed type by name but not in focus", () => {
