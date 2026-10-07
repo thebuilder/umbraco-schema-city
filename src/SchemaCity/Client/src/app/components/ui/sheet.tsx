@@ -42,7 +42,9 @@ function SheetContent({
         className="fixed inset-0 z-50 bg-scrim backdrop-blur-[5px] backdrop-saturate-[0.65] data-closed:animate-fade-out data-open:animate-fade-in"
         data-slot="sheet-overlay"
       />
+      {/* Patched: modal like the dialog, and said to be. */}
       <SheetPrimitive.Popup
+        aria-modal="true"
         className={cn(
           "fixed z-50 flex flex-col gap-4 bg-popover p-6 text-popover-foreground shadow-panel outline-none",
           SIDES[side],

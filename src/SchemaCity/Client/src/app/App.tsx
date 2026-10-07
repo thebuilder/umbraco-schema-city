@@ -47,7 +47,14 @@ import { reachableWithin } from "../model/reach";
 import { searchNodes } from "../model/search";
 import { compareSchemas } from "../model/snapshots";
 import type { SchemaGraph, UsageReport } from "../model/types";
-import { citySummary, LiveRegion, Say } from "./a11y";
+import {
+  citySummary,
+  inspectorHeading,
+  LiveRegion,
+  plural,
+  Say,
+  SEARCH_KEY,
+} from "./a11y";
 import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
@@ -554,7 +561,9 @@ export function App({
   // whole layout with it. The lists you are reading are what you fly between.
   const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
 
+  const picked = useRef(false);
   const pick = (id: string) => {
+    picked.current = true;
     followLink(id);
     openPalette(false);
   };
@@ -759,7 +768,7 @@ export function App({
                 flying away. The shortcut goes in the button instead. */}
             <Button data-trigger onClick={() => openPalette(true)} size="sm">
               Search
-              <Kbd>⌘K</Kbd>
+              <Kbd>{SEARCH_KEY}</Kbd>
             </Button>
           </div>
         </div>
@@ -892,20 +901,29 @@ export function App({
             you type and the list scrolls inside it. */}
         <CommandDialog
           className="h-[60vh] min-h-80 sm:max-w-xl"
+          description="Type a name, an alias or a property alias, then choose a type to open it in the inspector."
+          // A chosen row opens the inspector, so focus goes to its heading, not
+          // back to the Search button.
+          finalFocus={() => {
+            const chose = picked.current;
+            picked.current = false;
+            return chose ? inspectorHeading(portal.current) : true;
+          }}
           onOpenChange={openPalette}
           open={paletteOpen}
+          title="Search types"
         >
           {/* Afterglow's CommandDialog is the dialog only, so the cmdk root is ours.
               Filtering is ours too: cmdk scores its own item labels, which would
               miss the property aliases the rows do not print. */}
-          <Command shouldFilter={false}>
+          <Command label="Find a type or a property alias" shouldFilter={false}>
             <CommandInput
               onValueChange={setQuery}
               placeholder="Find a type or a property alias…"
               trailing={<Kbd className="shrink-0">Esc</Kbd>}
               value={query}
             />
-            <div className="flex justify-end border-line border-b px-3 py-1 font-bold text-3xs text-phosphor-dim uppercase tracking-terminal">
+            <div className="flex justify-end border-line border-b px-3 py-1 font-bold text-3xs text-label uppercase tracking-terminal">
               {hits.length} of {nodes.length} types
             </div>
             <CommandList
@@ -918,37 +936,49 @@ export function App({
                   No type or property matches
                 </CommandEmpty>
               ) : (
-                hits.map((hit) => (
-                  <CommandItem
-                    className="group"
-                    key={hit.node.id}
-                    onSelect={() => pick(hit.node.id)}
-                    value={hit.node.id}
-                  >
-                    <span
-                      aria-hidden
-                      className={`size-2.5 shrink-0 ${swatchOf(hit.node)}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs">
-                        {hit.node.name}
-                      </span>
-                      <span className="block truncate text-3xs text-phosphor-dim">
-                        {hit.node.alias}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-2xs text-phosphor-dim">
-                      {hit.propertyAlias ??
-                        `${hit.node.ownPropertyCount + hit.node.composedPropertyCount} properties`}
-                    </span>
-                    <Kbd
-                      className="shrink-0 opacity-0 group-data-[selected=true]:opacity-100"
-                      glyph
+                hits.map((hit) => {
+                  const detail =
+                    hit.propertyAlias ??
+                    plural(
+                      hit.node.ownPropertyCount +
+                        hit.node.composedPropertyCount,
+                      "property",
+                      "properties"
+                    );
+                  return (
+                    <CommandItem
+                      // One sentence for a screen reader, without the Enter glyph.
+                      aria-label={`${hit.node.name}, alias ${hit.node.alias}, ${hit.propertyAlias ? `property ${hit.propertyAlias}` : detail}`}
+                      className="group"
+                      key={hit.node.id}
+                      onSelect={() => pick(hit.node.id)}
+                      value={hit.node.id}
                     >
-                      ↵
-                    </Kbd>
-                  </CommandItem>
-                ))
+                      <span
+                        aria-hidden
+                        className={`size-2.5 shrink-0 ${swatchOf(hit.node)}`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs">
+                          {hit.node.name}
+                        </span>
+                        <span className="block truncate text-3xs text-label">
+                          {hit.node.alias}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-2xs text-label">
+                        {detail}
+                      </span>
+                      <Kbd
+                        aria-hidden
+                        className="shrink-0 opacity-0 group-data-[selected=true]:opacity-100"
+                        glyph
+                      >
+                        ↵
+                      </Kbd>
+                    </CommandItem>
+                  );
+                })
               )}
             </CommandList>
           </Command>

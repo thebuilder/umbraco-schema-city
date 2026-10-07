@@ -35,6 +35,7 @@ function CommandDialog({
   children,
   className,
   initialFocus,
+  finalFocus,
   showCloseButton = false,
   ...props
 }: Omit<React.ComponentProps<typeof Dialog>, "children"> & {
@@ -43,21 +44,25 @@ function CommandDialog({
   className?: string;
 
   initialFocus?: React.ComponentProps<typeof DialogContent>["initialFocus"];
+  finalFocus?: React.ComponentProps<typeof DialogContent>["finalFocus"];
   showCloseButton?: boolean;
 
   children: React.ReactNode;
 }) {
   return (
     <Dialog {...props}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </DialogHeader>
       <DialogContent
         className={cn("overflow-hidden p-0 sm:max-w-xl", className)}
+        finalFocus={finalFocus}
         initialFocus={initialFocus}
         showCloseButton={showCloseButton}
       >
+        {/* Patched: inside the popup, so the title names the dialog and leaves the
+            page with it. Outside, it stayed in the tree while the palette was shut. */}
+        <DialogHeader className="sr-only">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
         {children}
       </DialogContent>
     </Dialog>

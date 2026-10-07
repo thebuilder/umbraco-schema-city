@@ -17,6 +17,7 @@ import {
 import { type Finding, TAB_LIMIT } from "../model/findings";
 import type { Role } from "../model/inspector";
 import type { SchemaNode, SchemaProperty } from "../model/types";
+import { SEARCH_KEY } from "./a11y";
 import { FindingDot, READING, RoleBadges } from "./InspectorChips";
 import { InspectorChecks } from "./InspectorDiagnostics";
 
@@ -70,7 +71,7 @@ export function EditorLayout({
         </p>
         <Button className={READING} onClick={onPick} size="sm">
           Find a type
-          <Kbd>⌘K</Kbd>
+          <Kbd>{SEARCH_KEY}</Kbd>
         </Button>
       </div>
     );
