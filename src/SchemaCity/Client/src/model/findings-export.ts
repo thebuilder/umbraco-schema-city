@@ -13,7 +13,7 @@ const FORMULA = /^\s*[=+\-@]/;
 const QUOTED = /[",\n\r]/;
 const QUOTE = /"/g;
 
-const csv = (value: string | number) => {
+export const csv = (value: string | number) => {
   // Prefix formula-like cells so an exported alias or name cannot be evaluated
   // when a developer opens the report in a spreadsheet application.
   const text = String(value);
@@ -53,7 +53,7 @@ const HEADER = [
   "Data Type keys",
 ];
 
-const DOCUMENT_TYPE_PATH =
+export const DOCUMENT_TYPE_PATH =
   "/umbraco/section/settings/workspace/document-type/edit/";
 const DATA_TYPE_PATH = "/umbraco/section/settings/workspace/data-type/edit/";
 
