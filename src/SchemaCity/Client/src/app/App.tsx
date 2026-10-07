@@ -637,12 +637,7 @@ export function App({
               </p>
             </div>
           ) : (
-            <section
-              aria-label="City"
-              className="absolute inset-0 z-0 outline-none"
-              data-focus-home
-              tabIndex={-1}
-            >
+            <div className="absolute inset-0 z-0">
               <p className="sr-only">{citySummary(graph)}</p>
               <Suspense
                 fallback={
@@ -670,7 +665,7 @@ export function App({
                   usage={usage}
                 />
               </Suspense>
-            </section>
+            </div>
           )}
 
           {selectedNode && neighbourhood ? (

@@ -1995,7 +1995,7 @@ function Flight({
 }: {
   cameraFlight: RefObject<CameraFlight | null>;
   /** The element around the canvas, which takes focus when the city is clicked. */
-  host: RefObject<HTMLDivElement | null>;
+  host: RefObject<HTMLElement | null>;
   /** Moves at once and stops at once, with no ease in or coast after a release. */
   reducedMotion: boolean;
   /** The city's longer side, which is as high as the orbit point flies. */
@@ -2174,7 +2174,7 @@ function CanvasOverlay({
   onReset,
   raised,
 }: {
-  host: RefObject<HTMLDivElement | null>;
+  host: RefObject<HTMLElement | null>;
   onReset: () => void;
   /** Whether the comparison legend holds the corner, so this sits above it. */
   raised: boolean;
@@ -2345,7 +2345,7 @@ export default function Scene({
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
 }) {
-  const host = useRef<HTMLDivElement>(null);
+  const host = useRef<HTMLElement>(null);
   const cameraFlight = useRef<CameraFlight | null>(null);
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -2693,13 +2693,14 @@ export default function Scene({
 
   return (
     // Focusable, so the flight keys have somewhere to belong: they fly only while
-    // this or nothing has focus, and a click on the city focuses it. An application,
-    // because every key in it is the city's to handle.
-    <div
-      aria-label="City. Press ? for the controls."
+    // this or nothing has focus, and a click on the city focuses it. Closing the
+    // inspector hands focus back here for the same reason. A named region rather
+    // than an application, so a screen reader stays in its reading mode around it.
+    <section
+      aria-label="City. W A S D or the arrows move the camera, [ and ] orbit. Press ? for all controls."
       className="absolute inset-0 outline-none focus-visible:outline-2 focus-visible:outline-phosphor-bright focus-visible:outline-offset-[-2px]"
+      data-focus-home
       ref={host}
-      role="application"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the city takes keys, so a keyboard has to be able to reach it.
       tabIndex={0}
     >
@@ -2905,6 +2906,6 @@ export default function Scene({
           raised={Boolean(baseline && comparison)}
         />
       ) : null}
-    </div>
+    </section>
   );
 }
