@@ -3,6 +3,13 @@
 // there is no shadow root here.
 import { createRoot } from "react-dom/client";
 import { App } from "../src/app/App.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../src/app/components/ui/select.tsx";
 import appStyles from "../src/app/styles.css?inline";
 import type { Decision, DecisionStore } from "../src/model/review.ts";
 import type { SchemaGraph, UsageReport } from "../src/model/types.ts";
@@ -85,20 +92,41 @@ const samples = Object.keys(fixtures)
  * when it was the control that changed.
  */
 function SamplePicker({ path, refocus }: { path: string; refocus: boolean }) {
+  const items = samples.map((sample) => ({
+    value: sample,
+    label: fixtureLabel(sample),
+  }));
   return (
-    <label className="demo-picker">
+    // The same Select the footer's Group and Lens use, so the demo's own control
+    // looks like the rest of the bar. `.demo-picker` keeps it out of the shots.
+    // biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads.
+    <label className="demo-picker flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
       Sample schema
-      <select
-        autoFocus={refocus}
-        onChange={(event) => void show(event.target.value, true)}
+      <Select
+        items={items}
+        onValueChange={(value) => void show(value as string, true)}
         value={path}
       >
-        {samples.map((sample) => (
-          <option key={sample} value={sample}>
-            {fixtureLabel(sample)}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger
+          aria-label="Sample schema"
+          autoFocus={refocus}
+          className="text-2xs uppercase tracking-terminal"
+          size="sm"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {items.map(({ value, label }) => (
+            <SelectItem
+              className="text-2xs uppercase tracking-terminal"
+              key={value}
+              value={value}
+            >
+              {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </label>
   );
 }
