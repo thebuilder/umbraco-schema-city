@@ -50,14 +50,17 @@ export function filterFindings(findings: Finding[], kinds: FindingKind[]) {
   return { countOf, present, active, matched };
 }
 
+const pad = (value: number) => String(value).padStart(2, "0");
+
 /**
- * "2026-10-07 08:41" from an ISO timestamp, or null for a missing one or for the
- * epoch a snapshot carries when nothing set its date.
+ * "2026-10-07 08:41" in the reader's own time zone, so the minute reads as the clock
+ * on their wall, or null for a missing timestamp or the epoch a snapshot carries when
+ * nothing set its date. The footer and the Findings drawer both say it this way.
  */
 export function snapshotDate(iso: string | undefined): string | null {
-  if (!iso || Number.isNaN(Date.parse(iso))) return null;
-  if (new Date(iso).getUTCFullYear() < 2000) return null;
-  return iso.slice(0, 16).replace("T", " ");
+  const at = new Date(iso ?? "");
+  if (!(at.getUTCFullYear() >= 2000)) return null;
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
 /**

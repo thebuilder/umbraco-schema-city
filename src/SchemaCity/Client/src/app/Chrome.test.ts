@@ -6,12 +6,15 @@ const graph = (generatedAt: string) =>
   ({ generatedAt, nodes: [{}, {}] }) as unknown as SchemaGraph;
 const usage = (generatedAt: string) =>
   ({ generatedAt, byType: {}, references: [] }) as UsageReport;
+// Timestamps built from local parts, so the tests hold in any time zone.
+const at = (day: number, hour: number, minute: number) =>
+  new Date(2026, 9, day, hour, minute).toISOString();
 
-it("says the time for a snapshot read today and the date for an older one", () => {
+it("says the local time for a snapshot read today and the date for an older one", () => {
   expect(
     snapshotParts(
-      graph("2026-10-07T09:12:00Z"),
-      usage("2026-10-06T23:59:00Z"),
+      graph(at(7, 9, 12)),
+      usage(at(6, 23, 59)),
       false,
       "2026-10-07"
     )
@@ -30,7 +33,7 @@ it("leaves out the epoch a snapshot carries when nothing dated it", () => {
 });
 
 it("says usage is loading until it settles, and unavailable when it never came", () => {
-  const read = graph("2026-10-07T09:12:00Z");
+  const read = graph(at(7, 9, 12));
   expect(snapshotParts(read, undefined, true, "2026-10-07")).toContain(
     "usage loading"
   );
