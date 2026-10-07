@@ -155,7 +155,7 @@ export function Findings({
   };
 
   const exportCsv = () => {
-    const blob = new Blob([findingsCsv(matched, graph, usage)], {
+    const blob = new Blob([findingsCsv(matched, graph, usage, kinds)], {
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);

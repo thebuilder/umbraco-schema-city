@@ -118,12 +118,15 @@ again to clear the selection.
 
 Findings lists unused types, duplicate aliases, missing block targets, empty types, and other
 configuration checks. Results are grouped by kind in a fixed order, definite breakages such as
-broken blocks and duplicate aliases first: each group explains the kind once, and each row shows the
+broken blocks and duplicate aliases first: each group explains the kind once and says what to do next, and each row shows the
 type and what is particular to it, such as where an unused type is allowed. Problems are open and
 notes collapsed. Within a group, the strongest cases come first, for example an unused
 type whose allowed parents have no content either. Filter by category, select a result, and inspect
-it with its related types. Export CSV saves the filtered results with schema and usage timestamps
-and the kind's explanation for a ticket or review.
+it with its related types. Export CSV saves the filtered results as one header row and one row per finding, ready for an
+Excel or Jira import: the kind, the type with its key, folder, content counts and backoffice path,
+the detail, explanation and next step, related types by name, the filter used, and the schema and
+usage snapshot dates. For an unused type, the Unused branch root column names its topmost unused
+ancestor, so a branch of unused types can go in one ticket.
 
 Only a type an editor can create, at root or under another type, is reported as unused. A type
 nothing can create is a dead end, or a pure mixin when something composes it. The no template note
