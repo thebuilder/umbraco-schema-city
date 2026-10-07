@@ -287,8 +287,9 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     }
 
     /// <summary>
-    /// Five Data Types with real configuration objects, so <c>BlockEditorInspector</c> has
-    /// something to decode in M1.
+    /// Nine Data Types with real configuration objects, so <c>BlockEditorInspector</c> has
+    /// something to decode: four the structure types rotate through, three that one planted type
+    /// each uses, and the two near-duplicate title types.
     /// </summary>
     private async Task CreateBlockDataTypesAsync()
     {

@@ -14,7 +14,7 @@
     <Product>SchemaCity</Product>
     <Title>Schema City</Title>
     <Authors>Daniel Schmidt</Authors>
-    <Description>Renders the Umbraco content model as an isometric city in the backoffice.</Description>
+    <Description>Renders the Umbraco content model as a 3D city in the backoffice.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>umbraco umbraco-marketplace backoffice document-types visualisation three.js</PackageTags>

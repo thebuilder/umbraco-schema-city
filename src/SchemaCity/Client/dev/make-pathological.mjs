@@ -16,7 +16,7 @@
 //   8 rank-skipping allowedChild edges
 //   one hub with 60 children, one child with 12 parents
 //   10 compositions used by 100 types, 2 used by nothing
-//   5 types with no properties, 20 with 30 properties across 6 groups
+//   6 types with no properties, block39 among them, 20 with 30 properties in 6 groups
 //   one empty Element Type a block editor lists (block39)
 //   one tab over 20 properties only once its composition is counted (editorial40)
 //   culture variance with no effect: a variant Element Type in an invariant

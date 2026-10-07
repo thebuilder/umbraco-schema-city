@@ -22,7 +22,7 @@ const usageOf = (path: string) =>
 
 // Two hand-drawn stand-ins for the backoffice icon registry, which is where the
 // wrappers read the real ones. Two is enough to see roof icons work: the seeded
-// schema's brick and globe cover 22 of its 78 types, and every other type has no
+// schema's brick and globe cover 24 of its 86 types, and every other type has no
 // entry here, which is the missing-icon case.
 const icons = {
   "icon-brick":

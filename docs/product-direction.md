@@ -38,7 +38,7 @@ layers, while unrelated paths stay quiet. Keep names on the canvas and counts in
 Focus should make relationships easier to read, not add more permanent markers to the overview.
 
 The city has one perspective camera in a 3D world, after fsn: drag orbits, right-drag pans along the
-ground, the wheel dollies toward the cursor, and the keys fly, rise and turn. The camera never goes
+ground, the wheel dollies toward the cursor, and the keys fly, rise and descend. The camera never goes
 under the ground, and the sky, fog and ground meet at one horizon so no angle shows an edge. The
 default framing is a raised three-quarter view that reads like the old isometric overview. A
 framing flight must stay correct when the developer is already moving with the keyboard.
