@@ -188,6 +188,19 @@ it("filters by name, editor or key and sorts by any column", () => {
     "text",
   ]);
   expect(matchDataTypes(rows, " ").length).toBe(3);
+  // Built-ins wait behind the switch, except the one whose page is open.
+  const withBuiltIn = rows.map((row) =>
+    row.id === "spare" ? { ...row, isBuiltIn: true } : row
+  );
+  const ids = (options: { builtIn?: boolean; keep?: string | null }) =>
+    matchDataTypes(withBuiltIn, "", options).map((row) => row.id);
+  expect(ids({ builtIn: false })).toEqual(["blocks", "text"]);
+  expect(ids({ builtIn: false, keep: "spare" })).toEqual([
+    "blocks",
+    "spare",
+    "text",
+  ]);
+  expect(ids({ builtIn: true })).toHaveLength(3);
   expect(sortRows(rows, "types", false).map((row) => row.id)).toEqual([
     "text",
     "blocks",

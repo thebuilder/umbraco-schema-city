@@ -221,16 +221,25 @@ export function allowedBlocks(
   };
 }
 
-/** Rows whose name, editor or key contains the query, ignoring case. */
+/**
+ * Rows whose name, editor or key contains the query, ignoring case. Umbraco's own
+ * Data Types are left out unless `builtIn` asks for them, except the `keep` row,
+ * which a link chose and whose page is open.
+ */
 export function matchDataTypes(
   rows: DataTypeRow[],
-  query: string
+  query: string,
+  {
+    builtIn = true,
+    keep = null,
+  }: { builtIn?: boolean; keep?: string | null } = {}
 ): DataTypeRow[] {
   const needle = query.trim().toLowerCase();
-  if (needle === "") return rows;
-  return rows.filter((row) =>
-    [row.name, row.editorAlias, row.editorUiAlias ?? "", row.id].some((text) =>
-      text.toLowerCase().includes(needle)
-    )
+  return rows.filter(
+    (row) =>
+      (builtIn || !row.isBuiltIn || row.id === keep) &&
+      [row.name, row.editorAlias, row.editorUiAlias ?? "", row.id].some(
+        (text) => text.toLowerCase().includes(needle)
+      )
   );
 }

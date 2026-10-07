@@ -81,10 +81,18 @@ export function DataTypes(props: DataTypesProps) {
   const { graph, usage, findings, selected, onChoose } = props;
   const [query, setQuery] = useState("");
   const [sort, toggle] = useSort<SortKey>();
+  // Umbraco's own Data Types are a dozen rows every site has, so they wait behind
+  // the checkbox. One a link chose stays in the list, so the page has its row.
+  const [builtIn, setBuiltIn] = useState(false);
   const rows = useMemo(() => dataTypeIndex(graph, usage), [graph, usage]);
   const shown = useMemo(
-    () => sortRows(matchDataTypes(rows, query), sort.key, sort.ascending),
-    [rows, query, sort]
+    () =>
+      sortRows(
+        matchDataTypes(rows, query, { builtIn, keep: selected }),
+        sort.key,
+        sort.ascending
+      ),
+    [rows, query, sort, builtIn, selected]
   );
   const flagged = useMemo(() => {
     const out = new Map<string, Finding[]>();
@@ -112,22 +120,16 @@ export function DataTypes(props: DataTypesProps) {
 
   return (
     <div className="@container flex h-full flex-col bg-background font-sans text-[13px] text-prose leading-normal">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-line border-b px-4 py-2">
-        <FilterField
-          onQuery={setQuery}
-          placeholder="Filter Data Types"
-          query={query}
-        />
-        <p className="text-label text-xs">
-          <span className="font-mono">{shown.length}</span> of{" "}
-          <span className="font-mono">{rows.length}</span> Data Types
-        </p>
-        {graph.dataTypes ? null : (
-          <p className="text-label text-xs">
-            This schema lists only the Data Types its properties use.
-          </p>
-        )}
-      </div>
+      <ListToolbar
+        builtIn={builtIn}
+        hasBuiltIn={rows.some((row) => row.isBuiltIn)}
+        listsAll={Boolean(graph.dataTypes)}
+        onBuiltIn={setBuiltIn}
+        onQuery={setQuery}
+        query={query}
+        shown={shown.length}
+        total={rows.length}
+      />
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] @min-[760px]:grid-cols-2 @min-[760px]:grid-rows-1">
         <Scroller label="Data Type list">
           <table className="w-full border-collapse" ref={list}>
@@ -179,6 +181,57 @@ export function DataTypes(props: DataTypesProps) {
   );
 }
 
+/** The filter, the count, the built-in switch, and a note for a graph with no list. */
+function ListToolbar({
+  query,
+  onQuery,
+  shown,
+  total,
+  builtIn,
+  onBuiltIn,
+  hasBuiltIn,
+  listsAll,
+}: {
+  query: string;
+  onQuery: (query: string) => void;
+  shown: number;
+  total: number;
+  builtIn: boolean;
+  onBuiltIn: (on: boolean) => void;
+  hasBuiltIn: boolean;
+  listsAll: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-line border-b px-4 py-2">
+      <FilterField
+        onQuery={onQuery}
+        placeholder="Filter Data Types"
+        query={query}
+      />
+      <p className="text-label text-xs">
+        <span className="font-mono">{shown}</span> of{" "}
+        <span className="font-mono">{total}</span> Data Types
+      </p>
+      {hasBuiltIn ? (
+        <label className="flex items-center gap-1.5 text-label text-xs">
+          <input
+            checked={builtIn}
+            className="accent-phosphor"
+            onChange={(event) => onBuiltIn(event.target.checked)}
+            type="checkbox"
+          />
+          Show built-in
+        </label>
+      ) : null}
+      {listsAll ? null : (
+        <p className="text-label text-xs">
+          This schema lists only the Data Types its properties use.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * One Data Type in the list, with a dot for its findings: pink when one is a
  * problem, grey for notes only, and the kinds on hover.
@@ -220,6 +273,11 @@ function ListRow({
           >
             {row.name}
           </button>
+          {row.isBuiltIn ? (
+            <span className={`text-2xs ${on ? "text-label" : "text-faint"}`}>
+              built-in
+            </span>
+          ) : null}
           {findings.length > 0 ? (
             <FindingDot
               severity={problem ? "problem" : "note"}
@@ -327,6 +385,7 @@ function DetailHeader({
       <p className="mt-0.5 break-all font-mono text-2xs text-faint">
         {dataType.id}
         {dataType.folder ? ` · in ${dataType.folder}` : ""}
+        {dataType.isBuiltIn ? " · built-in" : ""}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button

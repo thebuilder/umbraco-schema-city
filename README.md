@@ -153,7 +153,8 @@ headless by design, and on a type already reported as unused.
   It takes the place of the unused Element Type row once usage has loaded, names the Data Types
   the blocks are stored in, and is a problem.
 - Unused Data Type: a Data Type no property on a Document, Media or Member Type uses, and no
-  collection view either. It is a note about the Data Type itself and opens its page.
+  collection view either. The Data Types Umbraco installs itself are left out, since every site has
+  a dozen it never uses. It is a note about the Data Type itself and opens its page.
 
 Once usage has loaded, an unused Element Type row says how many blocks of it content stores, and a
 broken block row says how many blocks of the missing Element Type content still holds. Rows that
@@ -238,11 +239,13 @@ group with such a row carries a dot. Choose Editor layout in the inspector to op
 
 Data Types lists every Data Type in the site, the unused ones included, with its editor, how many
 properties use it, on how many types, and the blocks content stores in it. A dot marks one a check
-flagged. Sort by any column and filter by name, editor or key. Choose one to read its page beside
-the list, or under it when the room is narrow; the URL keeps it as `dataType=<key>`. Every Data
-Type name elsewhere in the app opens this page: the Matrix's Data Types column headings, the
-Editor view's property rows, the inspector's Properties tab and block and picker sections, Data
-Type changes in Compare, and findings that name a Data Type.
+flagged. Sort by any column and filter by name, editor or key. The Data Types Umbraco installs
+itself are marked built-in and stay out of the list until you tick Show built-in, except one a link
+has opened. Choose one to read its page beside the list, or under it when the room is narrow; the
+URL keeps it as `dataType=<key>`. Every Data Type name elsewhere in the app opens this page: the
+Matrix's Data Types column headings, the Editor view's property rows, the inspector's Properties
+tab and block and picker sections, Data Type changes in Compare, and findings that name a Data
+Type.
 
 The page shows the editor's UI alias, its editor alias and its key, and Open in editor opens the
 Data Type in the backoffice. A block editor lists the Element Types it offers as content and as
