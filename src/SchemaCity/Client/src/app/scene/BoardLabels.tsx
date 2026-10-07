@@ -17,6 +17,7 @@ import {
   fittedFontPx,
   type Interaction,
   LINE_HEIGHT,
+  LINE_STEP,
   labelLight,
   labelsFlipped,
   packAtlas,
@@ -93,7 +94,7 @@ type Atlas = {
   sizes: Map<string, Sizes>;
 };
 
-/** Each print's width at `fontPx`, and where the rows put it. */
+/** Each print's width and height at `fontPx`, and where the rows put it. */
 function measureAll(
   context: CanvasRenderingContext2D,
   texts: readonly string[],
@@ -102,15 +103,26 @@ function measureAll(
   width: number
 ) {
   context.font = `${ATLAS_WEIGHT} ${fontPx}px ${font}`;
-  const rowHeight = Math.ceil(fontPx * LINE_HEIGHT);
   const widths = texts.map((text) =>
-    Math.min(width - ATLAS_PAD * 2, Math.ceil(context.measureText(text).width))
+    Math.min(
+      width - ATLAS_PAD * 2,
+      Math.ceil(
+        Math.max(
+          ...text.split("\n").map((line) => context.measureText(line).width)
+        )
+      )
+    )
+  );
+  const heights = texts.map((text) =>
+    Math.ceil(
+      fontPx * (LINE_HEIGHT + (text.split("\n").length - 1) * LINE_STEP)
+    )
   );
   return {
     fontPx,
-    rowHeight,
     widths,
-    packed: packAtlas(widths, rowHeight, width, ATLAS_PAD),
+    heights,
+    packed: packAtlas(widths, heights, width, ATLAS_PAD),
   };
 }
 
@@ -143,8 +155,11 @@ function buildAtlas(
       prints.map((fitted, print) => ({ id, level, print, fitted, em }))
     )
   );
-  // A name printed whole at two sizes is one raster, drawn at two sizes.
-  const texts = [...new Set(planned.map((one) => one.fitted.text))];
+  // A name printed whole at two sizes is one raster, drawn at two sizes. Names on
+  // one line pack first, so the rows of two-line names share their height.
+  const texts = [...new Set(planned.map((one) => one.fitted.text))].sort(
+    (a, b) => a.split("\n").length - b.split("\n").length
+  );
   const slot = new Map(texts.map((text, i) => [text, i]));
 
   const scale = Math.min(ratio, 2);
@@ -183,10 +198,18 @@ function buildAtlas(
   context.font = `${ATLAS_WEIGHT} ${fit.fontPx}px ${font}`;
   context.fillStyle = "#ffffff";
   context.textBaseline = "middle";
+  // Each line centred on the print, so a two-line name sits square under its part.
+  context.textAlign = "center";
   texts.forEach((text, i) => {
     const spot = fit.packed.spots[i] as { x: number; y: number };
-    if (spot.y + fit.rowHeight <= canvas.height)
-      context.fillText(text, spot.x, spot.y + fit.rowHeight / 2);
+    if (spot.y + (fit.heights[i] as number) > canvas.height) return;
+    text.split("\n").forEach((line, k) => {
+      context.fillText(
+        line,
+        spot.x + (fit.widths[i] as number) / 2,
+        spot.y + (fit.fontPx * LINE_HEIGHT) / 2 + k * fit.fontPx * LINE_STEP
+      );
+    });
   });
   const levels = new Map(
     [...decided].map(([id, sized]) => [id, sized.map((): number[] => [])])
@@ -195,7 +218,8 @@ function buildAtlas(
     const at = slot.get(one.fitted.text) as number;
     const spot = fit.packed.spots[at] as { x: number; y: number };
     const w = fit.widths[at] as number;
-    const clipped = spot.y + fit.rowHeight > canvas.height;
+    const h = fit.heights[at] as number;
+    const clipped = spot.y + h > canvas.height;
     levels.get(one.id)?.[one.level]?.push(i);
     return {
       id: one.id,
@@ -205,11 +229,11 @@ function buildAtlas(
         spot.x / width,
         1 - spot.y / canvas.height,
         (spot.x + w) / width,
-        1 - (spot.y + fit.rowHeight) / canvas.height,
+        1 - (spot.y + h) / canvas.height,
       ],
       // A print the atlas had no room for takes no room on the board either.
       width: clipped ? 0 : (one.em * w) / fit.fontPx,
-      height: clipped ? 0 : (one.em * fit.rowHeight) / fit.fontPx,
+      height: clipped ? 0 : (one.em * h) / fit.fontPx,
     };
   });
 

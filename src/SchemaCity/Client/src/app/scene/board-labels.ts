@@ -25,6 +25,12 @@ export const MAX_EM = 2.2;
 /** Height of a printed line over its font size: the ascenders and descenders. */
 export const LINE_HEIGHT = 1.25;
 /**
+ * How far a name's second line sits below its first, over the font size. Tighter
+ * than a line of its own, so a name on two lines reads as one block and takes less
+ * of the strip in front of its building.
+ */
+export const LINE_STEP = 1.1;
+/**
  * Width of one character over the font size. Every mono face the theme falls back
  * to is within a few percent of 0.6. Only the tests use it now: the atlas measures
  * the real face, so a wide glyph never runs past its room.
@@ -42,12 +48,14 @@ const NAME_SPACING = 0.6;
 export const LABEL_INSET = 0.1;
 /**
  * Extra ground the layout leaves between two rows of one block, on top of the
- * 1.5-unit gap a row already keeps, so the largest print (0.1 + 2.75 units) has
- * 0.65 of board between it and the next row's north wall. Without that the default
- * camera, which looks over that row from the south-east, lost the name behind any
- * building more than a floor or two high.
+ * 1.5-unit gap a row already keeps, so a name on two lines at the smallest print
+ * (0.1 + 1.6 x 2.35 units) has 0.64 of board between it and the next row's north
+ * wall, and the largest print on one line (0.1 + 2.75) has 1.65. Larger print on
+ * two lines takes the strip behind its building, or one line. Without that margin
+ * the default camera, which looks over that row from the south-east, lost the name
+ * behind any building more than a floor or two high.
  */
-export const LABEL_STRIP = 2;
+export const LABEL_STRIP = 3;
 
 /**
  * Projected text height, in CSS pixels, below which a name is gone and above which
@@ -100,92 +108,181 @@ export function printLevel(pxPerEm: number, ems: readonly number[]): number {
 }
 
 /**
- * A string's user-perceived characters, so a cut never splits an emoji, a flag or
- * a letter from its accent. Falls back to code points where Intl.Segmenter is
- * missing.
+ * Where a name may break onto a second line or be cut short: after a space, after a
+ * hyphen, and between a lower-case letter and a capital, so "GalleryPage" breaks as
+ * readily as "Gallery Page". Never inside a word, so never inside a grapheme.
  */
-export function graphemes(text: string): string[] {
-  if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
-    const segmenter = new Intl.Segmenter(undefined, {
-      granularity: "grapheme",
-    });
-    return Array.from(segmenter.segment(text), (part) => part.segment);
-  }
-  return [...text];
-}
+const BREAK = /(?<=\s)(?=\S)|(?<=-)(?=[^\s-])|(?<=\p{Ll})(?=\p{Lu})/gu;
+
+/** Spaces and hyphens a cut leaves at its end, which the ellipsis replaces. */
+const TRAILING = /[\s-]+$/u;
+
+const breaksIn = (text: string) =>
+  [...text.matchAll(BREAK)]
+    .map((match) => match.index as number)
+    .filter((at) => at > 0 && at < text.length);
 
 /**
- * The leading words two thirds or more of a board's names share, such as "Element "
- * on a board of Element Types, or "" when they share none. The board already says
- * what its types are, so the print can drop it and spend its room on the words that
- * tell the types apart. Fewer than three names share nothing worth dropping.
+ * `text` laid out in `room` ems: on one line when it fits, else, when `lines`
+ * allows two, split at the word break that leaves the longer line shortest, so the
+ * two lines balance. Null when neither fits.
  */
-export function sharedPrefix(names: readonly string[]): string {
-  if (names.length < 3) return "";
-  const counts = new Map<string, number>();
-  for (const name of names) {
-    // Every prefix ending in a space, short of the whole name.
-    for (let at = name.indexOf(" "); at > 0; at = name.indexOf(" ", at + 1)) {
-      const prefix = name.slice(0, at + 1);
-      counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+function wrap(
+  text: string,
+  room: number,
+  measure: (text: string) => number,
+  lines: number
+): string | null {
+  if (measure(text) <= room) return text;
+  if (lines < 2) return null;
+  let best: string | null = null;
+  let widest = Number.POSITIVE_INFINITY;
+  for (const at of breaksIn(text)) {
+    const top = text.slice(0, at).trimEnd();
+    const bottom = text.slice(at).trimStart();
+    const width = Math.max(measure(top), measure(bottom));
+    if (width <= room && width < widest) {
+      best = `${top}\n${bottom}`;
+      widest = width;
     }
   }
-  let best = "";
-  for (const [prefix, count] of counts)
-    if (count * 3 >= names.length * 2 && prefix.length > best.length)
-      best = prefix;
   return best;
 }
 
 /**
- * Characters of the name a cut print keeps before it says too little to tell one
- * type from another. Below this the print is left off rather than drawn.
+ * Share of a board's names that have to start or end with the same words before the
+ * print treats them as context the board already gives. Two in five, because the
+ * seeded schema's Site board ends 24 of its 50 names in " Page", and a board that
+ * holds pages says Page as plainly as one that holds only pages.
  */
-const MIN_KEPT = 5;
+const SHARED_SHARE = 0.4;
+
+/** A board's shared context: leading words such as "Element ", trailing ones such as " Page". */
+export type Context = { prefix: string; suffix: string };
+
+/**
+ * The longest leading words and the longest trailing words at least `SHARED_SHARE`
+ * of a board's names share, each "" when they share none. Fewer than three names
+ * share nothing worth dropping.
+ */
+export function sharedContext(names: readonly string[]): Context {
+  if (names.length < 3) return { prefix: "", suffix: "" };
+  const starts = new Map<string, number>();
+  const ends = new Map<string, number>();
+  const count = (map: Map<string, number>, key: string) =>
+    map.set(key, (map.get(key) ?? 0) + 1);
+  for (const name of names) {
+    // Every prefix ending in a space and every suffix starting with one, short of
+    // the whole name.
+    for (let at = name.indexOf(" "); at > 0; at = name.indexOf(" ", at + 1)) {
+      count(starts, name.slice(0, at + 1));
+      count(ends, name.slice(at));
+    }
+  }
+  const longest = (map: Map<string, number>) => {
+    let best = "";
+    for (const [words, n] of map)
+      if (n >= names.length * SHARED_SHARE && words.length > best.length)
+        best = words;
+    return best;
+  };
+  return { prefix: longest(starts), suffix: longest(ends) };
+}
+
+/**
+ * A name as the board can say it: whole, then without the board's leading words,
+ * without its trailing words, and without both, each once and never empty.
+ */
+export function readings(name: string, context: Context): string[] {
+  const start =
+    context.prefix && name.startsWith(context.prefix)
+      ? context.prefix.length
+      : 0;
+  const end =
+    context.suffix && name.endsWith(context.suffix)
+      ? name.length - context.suffix.length
+      : name.length;
+  const out = [name];
+  for (const one of [
+    name.slice(start),
+    name.slice(0, end),
+    name.slice(start, end),
+  ])
+    if (one.trim() !== "" && !out.includes(one)) out.push(one);
+  return out;
+}
+
+/** A name's board: its shared context and every reading of every other name on it. */
+export type Board = Context & { others: readonly string[] };
+
+const ALONE: Board = { prefix: "", suffix: "", others: [] };
 
 export type Fitted = {
-  /** What is printed. */
+  /** What is printed, a line break between two lines. */
   text: string;
   /** True when `text` is the whole name, so a floating label would repeat it. */
   full: boolean;
 };
 
 /**
- * `name` as it fits in `room` ems, measured by `measure` in ems. A name that fits
- * prints whole. A longer one loses `prefix` first when it starts with it, then its
- * middle, so two names that differ only at the end still print differently. A
- * name with no room at all prints an ellipsis.
+ * `name` as it fits in `room` ems on at most `lines` lines, measured by `measure` in
+ * ems, or null when it cannot be printed at this size. In order: the whole name; the
+ * name without the context its board gives, as long as that reads differently from
+ * every other name on the board; then the most leading words that fit, with an
+ * ellipsis, as long as no other name on the board starts the same way. A name is
+ * never cut inside a word.
  */
 export function fitName(
   name: string,
   room: number,
   measure: (text: string) => number,
-  prefix = ""
-): Fitted {
-  if (measure(name) <= room) return { text: name, full: true };
-  // The prefix goes only when what is left still reads as a name of its own.
-  const rest = name.startsWith(prefix) ? name.slice(prefix.length) : name;
-  const trimmed = graphemes(rest).length >= MIN_KEPT ? rest : name;
-  if (measure(trimmed) <= room) return { text: trimmed, full: false };
-  const characters = graphemes(trimmed);
-  // The most characters kept, split three to two in favour of the start, that
-  // still fit around the ellipsis.
-  for (let keep = characters.length - 1; keep > 0; keep--) {
-    const head = Math.ceil((keep * 3) / 5);
-    const text = `${characters.slice(0, head).join("").trimEnd()}…${characters
-      .slice(characters.length - (keep - head))
-      .join("")
-      .trimStart()}`;
-    if (measure(text) <= room) return { text, full: false };
+  board: Board = ALONE,
+  lines = 2
+): Fitted | null {
+  const bases = readings(name, board).filter(
+    (one, i) => i === 0 || !board.others.includes(one)
+  );
+  for (const base of bases) {
+    const text = wrap(base, room, measure, lines);
+    if (text) return { text, full: base === name };
   }
-  return { text: "…", full: false };
+  // The shortest reading first, so the words a cut keeps are the ones that tell
+  // this type from the others.
+  for (const base of bases.reverse()) {
+    for (const at of breaksIn(base).reverse()) {
+      const head = base.slice(0, at).replace(TRAILING, "");
+      // Fewer words would only start more names the same way.
+      if (board.others.some((other) => other.startsWith(head))) break;
+      const text = wrap(`${head}…`, room, measure, lines);
+      if (text) return { text, full: false };
+    }
+  }
+  return null;
 }
 
-/** True for a whole name, and for a cut one that keeps enough of it to read. */
-export const worthPrinting = (fitted: Fitted) =>
-  fitted.full ||
-  graphemes(fitted.text).filter((character) => character !== "…").length >=
-    MIN_KEPT;
+/** 0 for a whole name, 1 for one without its board's context, 2 for a cut one. */
+const kindOf = (fitted: Fitted) =>
+  fitted.full ? 0 : fitted.text.endsWith("…") ? 2 : 1;
+const linesOf = (fitted: Fitted) => fitted.text.split("\n").length;
+
+/**
+ * The prints worth offering, each text once, best first: a whole name before a
+ * shortened one before a cut one, one line before two, and more of the name before
+ * less.
+ */
+export function rankPrints(fitted: readonly (Fitted | null)[]): Fitted[] {
+  const kept = fitted.filter(
+    (one, i): one is Fitted =>
+      one !== null &&
+      fitted.findIndex((other) => other?.text === one.text) === i
+  );
+  return kept.sort(
+    (a, b) =>
+      kindOf(a) - kindOf(b) ||
+      linesOf(a) - linesOf(b) ||
+      b.text.length - a.text.length
+  );
+}
 
 /**
  * How wide each building's name may be in its own column, in world units: its
@@ -368,7 +465,7 @@ export type Want = {
   id: string;
   centre: { x: number; z: number };
   footprint: number;
-  /** Width and height of each print, in world units: the whole name, then a cut one. */
+  /** Width and height of each print, in world units, best first. */
   prints: readonly { width: number; height: number }[];
 };
 
@@ -398,14 +495,16 @@ const overlapping = (a: Rect, b: Rect, gap: number) =>
 
 /**
  * Places as many names as fit, none over another or over any building but its own,
- * in two passes in the order given. The first gives every name its shortest print
- * that still reads, in front of its building or else behind it, so as many names
- * as possible get a place. The second widens each placed name, in the same order,
- * to its longest print that fits the board the first pass left. A name no print of
- * which fits is left off.
+ * in two passes in the order given. The first gives every name the least of its
+ * prints that fits, trying the rest only when that one does not, in front of its
+ * building or else behind it, so as many names as possible get a place. The second
+ * moves each placed name, in the same order, to its best print that fits the board
+ * the first pass left. A name no print of which fits is left off.
  *
- * One pass that took each name's longest print first let the first long names take
- * the strips later short ones needed.
+ * One pass that took each name's best print first let the first long names take
+ * the strips later short ones needed. The first pass tries more than the least
+ * print because prints differ in height as well as width: a cut on one line can
+ * fit a strip a whole name on two lines does not.
  *
  * The prints lie flat on one plane, so two that overlap on the board overlap on
  * screen and two that do not, do not, whatever the camera. That is what lets the
@@ -487,9 +586,11 @@ export function placeLabels(
     return false;
   };
 
-  for (const want of wants) {
-    if (want.prints.length > 0) place(want, [want.prints.length - 1]);
-  }
+  for (const want of wants)
+    place(
+      want,
+      want.prints.map((_, i) => want.prints.length - 1 - i)
+    );
   for (const want of wants) {
     const held = placed.get(want.id);
     if (!held || held.print === 0) continue;
@@ -632,29 +733,33 @@ export function labelsFlipped(
 }
 
 /**
- * Shelf packing for the atlas: entries left to right in rows of one height, a new
- * row when the next one would run past `width`. Returns each entry's top-left corner
- * in pixels and the height the rows take. `pad` pixels surround every entry, so a
- * mipmap level a few steps down does not bleed one name into the next.
+ * Shelf packing for the atlas: entries left to right in rows as tall as their
+ * tallest entry, a new row when the next one would run past `width`. Returns each
+ * entry's top-left corner in pixels and the height the rows take. `pad` pixels
+ * surround every entry, so a mipmap level a few steps down does not bleed one name
+ * into the next.
  */
 export function packAtlas(
   widths: readonly number[],
-  rowHeight: number,
+  heights: readonly number[],
   width: number,
   pad: number
 ): { spots: { x: number; y: number }[]; height: number } {
   const spots: { x: number; y: number }[] = [];
   let x = pad;
   let y = pad;
-  for (const entry of widths) {
+  let row = 0;
+  widths.forEach((entry, i) => {
     if (x > pad && x + entry + pad > width) {
       x = pad;
-      y += rowHeight + pad;
+      y += row + pad;
+      row = 0;
     }
     spots.push({ x, y });
     x += entry + pad;
-  }
-  return { spots, height: widths.length > 0 ? y + rowHeight + pad : 0 };
+    row = Math.max(row, heights[i] as number);
+  });
+  return { spots, height: widths.length > 0 ? y + row + pad : 0 };
 }
 
 /**
@@ -687,15 +792,18 @@ export type Standing = {
   flatten?: number;
 };
 
-/** A name at one size: the size, and its prints at that size, widest first. */
+/** A name at one size: the size, and its prints at that size, best first. */
 export type Sized = { em: number; prints: Fitted[] };
 
 /**
  * What each building prints at each of its sizes, smallest size first: as much of
  * its name as fits clear of its neighbours, half way to its own column, and in its
- * own column, less any cut too short to read or the same as a wider one. Names on
- * one board share their leading words more often than not, Element on the elements
- * board, so a cut drops those first.
+ * own column, on two lines or on one, best first (`rankPrints`). Each name is
+ * fitted against the other names on its board, which decide the context a print
+ * may drop and the cuts that would read as some other type.
+ *
+ * ponytail: every name on a board against every other, about 20,000 readings on the
+ * pathological fixture's largest board, once per layout.
  */
 export function printsFor(
   standing: readonly Standing[],
@@ -703,33 +811,48 @@ export function printsFor(
   measure: (text: string) => number
 ): Map<string, Sized[]> {
   const room = labelRoom(standing);
-  const names = new Map<string, string[]>();
+  const boards = new Map<string, { id: string; name: string }[]>();
   for (const one of standing) {
-    const list = names.get(one.district) ?? [];
-    list.push(nameOf(one.id) ?? "");
-    names.set(one.district, list);
+    const name = nameOf(one.id);
+    if (name === undefined) continue;
+    const list = boards.get(one.district) ?? [];
+    list.push({ id: one.id, name });
+    boards.set(one.district, list);
   }
-  const prefixes = new Map(
-    [...names].map(([district, list]) => [district, sharedPrefix(list)])
+  const contexts = new Map(
+    [...boards].map(([district, list]) => [
+      district,
+      sharedContext(list.map((one) => one.name)),
+    ])
   );
   const prints = new Map<string, Sized[]>();
   for (const one of standing) {
     const name = nameOf(one.id);
-    if (name === undefined) continue;
+    const context = contexts.get(one.district);
+    if (name === undefined || !context) continue;
+    const board: Board = {
+      ...context,
+      others: (boards.get(one.district) ?? [])
+        .filter((other) => other.id !== one.id)
+        .flatMap((other) => readings(other.name, context)),
+    };
     const rooms = [
       longRoom(one.footprint),
       (longRoom(one.footprint) + one.footprint) / 2,
       room.get(one.id) ?? one.footprint,
     ];
-    const prefix = prefixes.get(one.district) ?? "";
     prints.set(
       one.id,
       PRINT_LEVELS.map((share) => {
         const em = labelEm(one.footprint) * share;
         return {
           em,
-          prints: distinctReadable(
-            rooms.map((width) => fitName(name, width / em, measure, prefix))
+          prints: rankPrints(
+            rooms.flatMap((width) =>
+              [2, 1].map((lines) =>
+                fitName(name, width / em, measure, board, lines)
+              )
+            )
           ),
         };
       })
@@ -737,14 +860,6 @@ export function printsFor(
   }
   return prints;
 }
-
-/** The prints worth printing, each text once, in the order given. */
-const distinctReadable = (fitted: readonly Fitted[]) =>
-  fitted.filter(
-    (one, i) =>
-      worthPrinting(one) &&
-      fitted.findIndex((other) => other.text === one.text) === i
-  );
 
 /**
  * Where a name stands in the queue for board space: 0 for the hovered or selected

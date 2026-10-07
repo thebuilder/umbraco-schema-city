@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
+import mediumFixture from "../../../dev/fixtures/medium.json";
+import pathologicalFixture from "../../../dev/fixtures/pathological.json";
+import smallFixture from "../../../dev/fixtures/small.json";
+import type { SchemaGraph } from "../../model/types";
+import { layoutCity } from "../layout/city";
 import {
   arrangeNames,
   BASE_OPACITY,
+  type Board,
   boardTextPx,
   byPriority,
   courtyard,
   DIMMED,
+  type Fitted,
   fitName,
   fittedFontPx,
   footprintRect,
-  graphemes,
   LABEL_INSET,
   LOD_HIDE_PX,
   LOD_SHOW_PX,
@@ -31,13 +37,27 @@ import {
   printRect,
   printsFor,
   type Ranked,
+  rankPrints,
+  readings,
   type Standing,
-  sharedPrefix,
+  sharedContext,
   type Want,
-  worthPrinting,
 } from "./board-labels";
 
 const WIDE = /[\u3000-\u9fff]|\p{Extended_Pictographic}/u;
+/** What a print may hold besides the name's own characters. */
+const PRINT_MARK = /[…\n]/u;
+const SEPARATOR = /[\s-]/u;
+const LOWER = /\p{Ll}/u;
+const UPPER = /\p{Lu}/u;
+const ALONE: Board = { prefix: "", suffix: "", others: [] };
+
+/** A string's user-perceived characters. */
+const graphemes = (text: string) =>
+  Array.from(
+    new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text),
+    (part) => part.segment
+  );
 
 /** A mono face: every character 0.6 em, and a CJK character or an emoji a whole em. */
 const mono = (text: string) =>
@@ -55,6 +75,12 @@ describe("labelEm", () => {
 });
 
 describe("fitName", () => {
+  const elements: Board = {
+    prefix: "Element ",
+    suffix: "",
+    others: ["Element Card", "Card", "Element Grid Row", "Grid Row"],
+  };
+
   it("prints a name that fits whole", () => {
     expect(fitName("Home", 4 * MONO_ADVANCE, mono)).toEqual({
       text: "Home",
@@ -62,70 +88,148 @@ describe("fitName", () => {
     });
   });
 
-  it("drops the board's shared prefix before it cuts anything", () => {
-    expect(
-      fitName("Element Card Grid", 10 * MONO_ADVANCE, mono, "Element ")
-    ).toEqual({
-      text: "Card Grid",
+  it("wraps a name onto two balanced lines before it drops anything", () => {
+    expect(fitName("No Template Page", 11 * MONO_ADVANCE, mono)).toEqual({
+      text: "No Template\nPage",
+      full: true,
+    });
+    expect(fitName("Element Accordion Item", 15 * MONO_ADVANCE, mono)).toEqual({
+      text: "Element\nAccordion Item",
+      full: true,
+    });
+  });
+
+  it("breaks between a lower-case letter and a capital", () => {
+    expect(fitName("GalleryPage", 8 * MONO_ADVANCE, mono)?.text).toBe(
+      "Gallery\nPage"
+    );
+  });
+
+  it("keeps to one line when asked", () => {
+    expect(fitName("Gallery Page", 8 * MONO_ADVANCE, mono, ALONE, 1)).toEqual({
+      text: "Gallery…",
       full: false,
     });
   });
 
-  it("cuts the middle, so names that differ at the end still differ", () => {
-    const room = 9 * MONO_ADVANCE;
-    const column = fitName("Element Grid Column", room, mono);
-    const row = fitName("Element Grid Row Settings", room, mono);
-    expect(column.text).not.toBe(row.text);
-    expect(column.text).toContain("…");
-    expect(column.text.startsWith("Eleme")).toBe(true);
-    expect(column.text.endsWith("mn")).toBe(true);
-    expect(mono(column.text)).toBeLessThanOrEqual(room + 1e-9);
+  it("drops the board's shared prefix or suffix only when the name does not fit", () => {
+    expect(fitName("Element Hero", 5 * MONO_ADVANCE, mono, elements)).toEqual({
+      text: "Hero",
+      full: false,
+    });
+    expect(fitName("Element Hero", 7 * MONO_ADVANCE, mono, elements)).toEqual({
+      text: "Element\nHero",
+      full: true,
+    });
+    const pages: Board = { prefix: "", suffix: " Page", others: [] };
+    expect(
+      fitName("Overloaded Tab Page", 14 * MONO_ADVANCE, mono, pages, 1)
+    ).toEqual({ text: "Overloaded Tab", full: false });
+  });
+
+  it("never drops context to leave a name another one on the board reads as", () => {
+    const board: Board = { prefix: "", suffix: " Page", others: ["Home"] };
+    expect(fitName("Home Page", 4 * MONO_ADVANCE, mono, board, 1)).toBe(null);
+  });
+
+  it("cuts whole trailing words, and only when no other name starts the same way", () => {
+    expect(
+      fitName("Element Grid Settings Panel", 9 * MONO_ADVANCE, mono, {
+        ...elements,
+        others: ["Card"],
+      })
+    ).toEqual({ text: "Grid\nSettings…", full: false });
+    // Grid Row starts with Grid as well, so "Grid…" would name either.
+    expect(
+      fitName("Element Grid Settings Panel", 5 * MONO_ADVANCE, mono, elements)
+    ).toBe(null);
+  });
+
+  it("prints nothing rather than cut inside a word", () => {
+    expect(fitName("Editorial00", 6 * MONO_ADVANCE, mono)).toBe(null);
+    expect(fitName("Anything", 0.1, mono)).toBe(null);
   });
 
   it("measures wide characters at their own width, so they never overrun", () => {
-    const name = "製品カタログページ一覧";
-    const fitted = fitName(name, 6 * MONO_ADVANCE, mono);
-    expect(mono(fitted.text)).toBeLessThanOrEqual(6 * MONO_ADVANCE + 1e-9);
-    expect(fitted.full).toBe(false);
+    const fitted = fitName("製品 カタログ ページ", 6, mono);
+    expect(fitted).not.toBe(null);
+    for (const line of fitted?.text.split("\n") ?? [])
+      expect(mono(line)).toBeLessThanOrEqual(6 + 1e-9);
   });
 
   it("never splits an emoji or a letter from its accent", () => {
     const name = "Café 👩🏽‍💻 Landing Page Template";
     const fitted = fitName(name, 12 * MONO_ADVANCE, mono);
-    for (const character of graphemes(fitted.text))
-      expect(graphemes(name).includes(character) || character === "…").toBe(
-        true
-      );
-  });
-
-  it("prints only an ellipsis with no room at all", () => {
-    expect(fitName("Anything", 0.1, mono).text).toBe("…");
+    for (const character of graphemes(fitted?.text ?? ""))
+      expect(
+        graphemes(name).includes(character) || PRINT_MARK.test(character)
+      ).toBe(true);
   });
 });
 
-describe("worthPrinting", () => {
-  it("keeps a whole name and a cut that still reads, and drops a stub", () => {
-    expect(worthPrinting({ text: "Faq", full: true })).toBe(true);
-    expect(worthPrinting({ text: "Prod…age", full: false })).toBe(true);
-    expect(worthPrinting({ text: "Pr…y", full: false })).toBe(false);
+describe("rankPrints", () => {
+  it("puts whole names first, then shortened, then cut, one line before two", () => {
+    const ranked = rankPrints([
+      { text: "Grid…", full: false },
+      null,
+      { text: "Grid Row", full: false },
+      { text: "Element\nGrid Row", full: true },
+      { text: "Element Grid Row", full: true },
+      { text: "Grid…", full: false },
+    ]);
+    expect(ranked.map((one) => one.text)).toEqual([
+      "Element Grid Row",
+      "Element\nGrid Row",
+      "Grid Row",
+      "Grid…",
+    ]);
   });
 });
 
-describe("sharedPrefix", () => {
-  it("finds the leading word most names on a board share", () => {
+describe("sharedContext", () => {
+  it("finds the leading and trailing words a board's names share", () => {
     expect(
-      sharedPrefix([
+      sharedContext([
         "Element Card",
         "Element Card Grid",
         "Element Quote",
         "Unused Element",
       ])
-    ).toBe("Element ");
+    ).toEqual({ prefix: "Element ", suffix: "" });
+    expect(
+      sharedContext([
+        "Home",
+        "Gallery Page",
+        "Form Thank You Page",
+        "Article",
+        "Faq Page",
+      ])
+    ).toEqual({ prefix: "", suffix: " Page" });
   });
 
   it("finds nothing on a board of unrelated names or of too few", () => {
-    expect(sharedPrefix(["Home", "Article", "News Landing"])).toBe("");
-    expect(sharedPrefix(["Element A", "Element B"])).toBe("");
+    expect(sharedContext(["Home", "Article", "News Landing"])).toEqual({
+      prefix: "",
+      suffix: "",
+    });
+    expect(sharedContext(["Element A", "Element B"]).prefix).toBe("");
+  });
+});
+
+describe("readings", () => {
+  it("reads a name whole, without either end of its context, and without both", () => {
+    const context = { prefix: "Element ", suffix: " Page" };
+    expect(readings("Element Hero Page", context)).toEqual([
+      "Element Hero Page",
+      "Hero Page",
+      "Element Hero",
+      "Hero",
+    ]);
+    expect(readings("Element Page", context)).toEqual([
+      "Element Page",
+      "Page",
+      "Element",
+    ]);
   });
 });
 
@@ -479,7 +583,7 @@ describe("fittedFontPx", () => {
 
 describe("packAtlas", () => {
   it("fills a row and starts the next one when the width runs out", () => {
-    const { spots, height } = packAtlas([40, 40, 40], 10, 100, 2);
+    const { spots, height } = packAtlas([40, 40, 40], [10, 10, 10], 100, 2);
     expect(spots).toEqual([
       { x: 2, y: 2 },
       { x: 44, y: 2 },
@@ -490,7 +594,12 @@ describe("packAtlas", () => {
 
   it("never overlaps two entries", () => {
     const widths = Array.from({ length: 50 }, (_, i) => 20 + ((i * 37) % 90));
-    const { spots } = packAtlas(widths, 12, 256, 3);
+    const { spots } = packAtlas(
+      widths,
+      widths.map(() => 12),
+      256,
+      3
+    );
     for (let a = 0; a < spots.length; a++) {
       for (let b = a + 1; b < spots.length; b++) {
         const one = spots[a] as { x: number; y: number };
@@ -508,7 +617,7 @@ describe("packAtlas", () => {
   });
 
   it("takes no room for no names", () => {
-    expect(packAtlas([], 10, 100, 2)).toEqual({ spots: [], height: 0 });
+    expect(packAtlas([], [], 100, 2)).toEqual({ spots: [], height: 0 });
   });
 });
 
@@ -529,17 +638,21 @@ describe("printsFor", () => {
     expect((sizes[0]?.em ?? 0) < (sizes[2]?.em ?? 0)).toBe(true);
   });
 
-  it("cuts a long name further for a building hemmed in by neighbours", () => {
+  it("offers a print that fits the column of a building hemmed in by neighbours", () => {
     const name = "Product Comparison Landing Page";
-    const alone = printsFor([at("a", 0)], () => name, mono).get("a");
     const crowded = printsFor(
       [at("a", 0), at("b", 5), at("c", -5)],
-      () => name,
+      (id) => (id === "a" ? name : "Home"),
       mono
     ).get("a");
-    const narrowest = (sizes: typeof alone) =>
-      Math.min(...(sizes?.[0]?.prints ?? []).map((one) => mono(one.text)));
-    expect(narrowest(crowded)).toBeLessThan(narrowest(alone));
+    const smallest = crowded?.[0];
+    const widest = (text: string) =>
+      Math.max(...text.split("\n").map((line) => mono(line)));
+    const narrowest = Math.min(
+      ...(smallest?.prints ?? []).map((one) => widest(one.text))
+    );
+    // Its own column: the footprint and 0.2 a side, half the 1-unit gap less 0.3.
+    expect(narrowest * (smallest?.em ?? 0)).toBeLessThanOrEqual(4.4 + 1e-9);
   });
 
   it("drops the leading word a board's names share before it cuts", () => {
@@ -561,6 +674,71 @@ describe("printsFor", () => {
 
   it("prints nothing for a type it has no name for", () => {
     expect(printsFor([at("a", 0)], () => undefined, mono).has("a")).toBe(false);
+  });
+});
+
+describe("printsFor on the fixtures", () => {
+  /** True when `at` in `text` is a space, a hyphen, or a capital after a lower-case letter. */
+  const breaksAt = (text: string, at: number) =>
+    SEPARATOR.test(text[at] ?? "") ||
+    SEPARATOR.test(text[at - 1] ?? "") ||
+    (LOWER.test(text[at - 1] ?? "") && UPPER.test(text[at] ?? ""));
+
+  /** True when `head` is whole leading words of `base`, short of all of it. */
+  const leadingWords = (head: string, base: string) =>
+    head.length > 0 &&
+    head.length < base.length &&
+    base.startsWith(head) &&
+    breaksAt(base, head.length);
+
+  /**
+   * True when a print is the whole name, one of its readings without the board's
+   * context, or whole leading words of one with an ellipsis. A line break stands
+   * where a space did, or inside a word at a capital.
+   */
+  const honest = (
+    { text, full }: Fitted,
+    name: string,
+    bases: readonly string[]
+  ) => {
+    const flat = [text.replace("\n", " "), text.replace("\n", "")];
+    if (full) return flat.includes(name);
+    if (!text.endsWith("…")) return flat.some((one) => bases.includes(one));
+    return flat.some((one) =>
+      bases.some((base) => leadingWords(one.slice(0, -1), base))
+    );
+  };
+
+  it.each([
+    ["small", smallFixture],
+    ["medium", mediumFixture],
+    ["pathological", pathologicalFixture],
+  ])("never cuts a name of the %s fixture inside a word", (_, fixture) => {
+    const graph = fixture as unknown as SchemaGraph;
+    const placements = layoutCity(graph);
+    const names = new Map(graph.nodes.map((node) => [node.id, node.name]));
+    const boards = new Map<string, string[]>();
+    for (const one of placements)
+      boards.set(one.district, [
+        ...(boards.get(one.district) ?? []),
+        names.get(one.id) as string,
+      ]);
+    const prints = printsFor(placements, (id) => names.get(id), mono);
+    const checked = placements.flatMap((one) => {
+      const name = names.get(one.id) as string;
+      const bases = readings(
+        name,
+        sharedContext(boards.get(one.district) ?? [])
+      );
+      return (prints.get(one.id) ?? []).flatMap((size) =>
+        size.prints.map((fitted) => ({
+          text: fitted.text,
+          honest: honest(fitted, name, bases),
+        }))
+      );
+    });
+    expect(checked.length).toBeGreaterThan(placements.length);
+    for (const one of checked) expect(one).toEqual({ ...one, honest: true });
   });
 });
 

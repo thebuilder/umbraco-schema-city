@@ -919,11 +919,12 @@ describe("layoutCity", () => {
 
     // The Pages folder holds the twelve-deep chain of single types. Before those
     // ranks shared a band it came out 61 by 229, framed at eight percent fill. The
-    // strip each folded row keeps for its printed names took it from 2.0 to 2.13.
+    // strip each folded row keeps for its printed names took it from 2.0 to 2.13,
+    // and to 2.3 once the strip held a name on two lines.
     const pages = districts.find((d) => d.name === "Pages") as District;
     const width = pages.maxX - pages.minX;
     const depth = pages.maxZ - pages.minZ;
-    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(2.2);
+    expect(Math.max(width, depth) / Math.min(width, depth)).toBeLessThan(2.4);
     console.log(
       `pathological: 300 nodes laid out in ${elapsed.toFixed(1)} ms, Pages ${width.toFixed(0)} by ${depth.toFixed(0)}`
     );
