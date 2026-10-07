@@ -1138,6 +1138,20 @@ const union = (a: Rect, b: Rect): Rect => ({
   maxZ: Math.max(a.maxZ, b.maxZ),
 });
 
+/** `rect` grown by `by` on every side. */
+const grow = (rect: Rect, by: number): Rect => ({
+  minX: rect.minX - by,
+  maxX: rect.maxX + by,
+  minZ: rect.minZ - by,
+  maxZ: rect.maxZ + by,
+});
+
+/**
+ * Board kept between a print and one on another board, on top of the clearance a
+ * building keeps: as much as two prints on one board keep in all.
+ */
+const BOARD_GAP = PRINT_GAP - CLEAR;
+
 /** The open ground between two rectangles along the axis they are furthest apart on. */
 const gapBetween = (a: Rect, b: Rect) =>
   Math.max(b.minX - a.maxX, a.minX - b.maxX, b.minZ - a.maxZ, a.minZ - b.maxZ);
@@ -1185,11 +1199,12 @@ function boardsOf(upright: readonly Standing[]) {
  * Every name's place at every print size and either way up, board by board. The
  * prints lie flat on the board, so whether two overlap does not depend on the
  * camera, and solving once per layout is what keeps a name still while the camera
- * pans and orbits. Each board is solved alone, against every building and against
- * the near half of the open ground to every other board, so a board that switches
- * size never moves or meets a name on another. Within a board names claim space by
- * `byPriority`, through `placeLabels`. A building focus mode has pressed flat takes
- * no space and prints nothing.
+ * pans and orbits. Each board picks its own size as the camera comes closer, so
+ * each is solved apart, against every building and every print a board solved
+ * before it may show, and a board that switches size never moves or meets a name on
+ * another. Within a board names claim space by `byPriority`, through
+ * `placeLabels`. A building focus mode has pressed flat takes no space and prints
+ * nothing.
  *
  * ponytail: six placements per board per layout. Solving a size lazily, on a
  * board's first switch to it, is the upgrade if a much larger schema makes the
@@ -1218,25 +1233,19 @@ export function solveNames(
       usage: usageOf(one.id),
     }))
     .sort(byPriority);
-  const placed = [false, true].map((flipped) =>
-    PRINT_LEVELS.map((_, level) => {
-      const out = new Map<string, Placed>();
-      for (const [board, { rect }] of boards) {
-        // The near half of the ground to each other board is this one's to print on.
-        const others = [...boards]
-          .filter(([id]) => id !== board)
-          .map(([id, other]) => {
-            const half = gapBetween(rect, other.rect) / 2;
-            return {
-              id: `board|${id}`,
-              rect: {
-                minX: other.rect.minX - half,
-                maxX: other.rect.maxX + half,
-                minZ: other.rect.minZ - half,
-                maxZ: other.rect.maxZ + half,
-              },
-            };
-          });
+  // Larger boards first: each later board keeps clear of every print an earlier one
+  // may show, at any of its sizes, since the two pick their sizes apart.
+  const order = [...boards.keys()].sort(
+    (a, b) =>
+      (boards.get(b)?.ids.length ?? 0) - (boards.get(a)?.ids.length ?? 0) ||
+      (a < b ? -1 : 1)
+  );
+  const placed = [false, true].map((flipped) => {
+    const levels = PRINT_LEVELS.map(() => new Map<string, Placed>());
+    const taken = [...buildings];
+    for (const board of order) {
+      const mine: { id: string; rect: Rect }[] = [];
+      levels.forEach((out, level) => {
         const wants = ranked.flatMap(({ one }): Want[] => {
           const prints = sizes.get(one.id)?.levels[level];
           return prints && boardOf.get(one.id) === board
@@ -1252,15 +1261,18 @@ export function solveNames(
         });
         for (const [id, spot] of placeLabels(
           wants,
-          [...buildings, ...others],
+          taken,
           flipped,
           crossesTrace
-        ))
+        )) {
           out.set(id, spot);
-      }
-      return out;
-    })
-  );
+          mine.push({ id: `print|${board}`, rect: grow(spot.rect, BOARD_GAP) });
+        }
+      });
+      taken.push(...mine);
+    }
+    return levels;
+  });
   return {
     placed,
     boards: new Map([...boards].map(([id, { rect, y }]) => [id, { rect, y }])),
