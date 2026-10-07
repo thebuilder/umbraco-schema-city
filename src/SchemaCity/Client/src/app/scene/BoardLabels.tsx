@@ -690,6 +690,45 @@ function useKnockouts(
   return { knockouts, knockoutMaterial };
 }
 
+/**
+ * Repaints the names on every frame the camera, the inputs, the intro, the floated
+ * set or the way up has moved since the last one, and tells the label layer which
+ * whole names the board now prints.
+ */
+function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
+  const camera = useThree((state) => state.camera);
+  const height = useThree((state) => state.size.height);
+  // What the last repaint was made from, so a still frame can tell it has nothing
+  // to write.
+  const written = useRef({ key: [] as unknown[], camera: new THREE.Matrix4() });
+  const flipped = useRef(false);
+  const forward = useMemo(() => new THREE.Vector3(), []);
+
+  useFrame((state) => {
+    camera.getWorldDirection(forward);
+    flipped.current = labelsFlipped(forward.x, forward.z, flipped.current);
+    const reveal = revealAt(state.clock.elapsedTime, reducedMotion).links;
+    const key = [inputs, reveal, floated.version, flipped.current, height];
+    const last = written.current;
+    if (
+      key.every((value, i) => value === last.key[i]) &&
+      camera.matrixWorld.equals(last.camera)
+    )
+      return;
+    const printed = repaint(
+      inputs,
+      { camera, viewportHeight: height, flipped: flipped.current, reveal },
+      floated.ids
+    );
+    if (!sameIds(printed, floated.printed)) {
+      floated.printed = printed;
+      floated.printedVersion += 1;
+    }
+    last.key = key;
+    last.camera.copy(camera.matrixWorld);
+  });
+}
+
 export function BoardLabels({
   cityPlacements,
   nodesById,
@@ -719,8 +758,6 @@ export function BoardLabels({
   /** Each board's colour by district id, for the bare board under a print. */
   boardColours: Map<string, THREE.Color>;
 }) {
-  const camera = useThree((state) => state.camera);
-  const height = useThree((state) => state.size.height);
   const { atlas, geometry, material, courtyards, lineMaterial } = useNameMesh(
     cityPlacements,
     nodesById,
@@ -759,35 +796,7 @@ export function BoardLabels({
       usage,
     ]
   );
-  // What the last repaint was made from, so a still frame can tell it has nothing
-  // to write.
-  const written = useRef({ key: [] as unknown[], camera: new THREE.Matrix4() });
-  const flipped = useRef(false);
-  const forward = useMemo(() => new THREE.Vector3(), []);
-
-  useFrame((state) => {
-    camera.getWorldDirection(forward);
-    flipped.current = labelsFlipped(forward.x, forward.z, flipped.current);
-    const reveal = revealAt(state.clock.elapsedTime, reducedMotion).links;
-    const key = [inputs, reveal, floated.version, flipped.current, height];
-    const last = written.current;
-    if (
-      key.every((value, i) => value === last.key[i]) &&
-      camera.matrixWorld.equals(last.camera)
-    )
-      return;
-    const printed = repaint(
-      inputs,
-      { camera, viewportHeight: height, flipped: flipped.current, reveal },
-      floated.ids
-    );
-    if (!sameIds(printed, floated.printed)) {
-      floated.printed = printed;
-      floated.printedVersion += 1;
-    }
-    last.key = key;
-    last.camera.copy(camera.matrixWorld);
-  });
+  useRepaint(inputs, floated, reducedMotion);
 
   return (
     <>
