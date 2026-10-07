@@ -98,14 +98,20 @@ export function createSnapshot(
 
 /**
  * "schema-city-snapshot-example-com-2026-10-07.json": the site and the day, so
- * exports from two environments stay apart in a downloads folder.
+ * exports from two environments stay apart in a downloads folder. `what` names
+ * other exports the same way, as "changes.csv".
  */
-export function snapshotFileName(host: string, capturedAt: string): string {
+export function snapshotFileName(
+  host: string,
+  capturedAt: string,
+  what = "snapshot.json"
+): string {
   const site = host
     .toLowerCase()
     .replace(NOT_SLUG, "-")
     .replace(EDGE_DASHES, "");
-  return `schema-city-snapshot-${site ? `${site}-` : ""}${capturedAt.slice(0, 10)}.json`;
+  const [name, extension] = what.split(".");
+  return `schema-city-${name}-${site ? `${site}-` : ""}${capturedAt.slice(0, 10)}.${extension}`;
 }
 
 const NOT_SLUG = /[^a-z0-9]+/g;

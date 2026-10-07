@@ -315,6 +315,8 @@ describe("change causes", () => {
     expect(rows[1]).toBe(
       `C1,cause,changed,'=Seo,seo,name: Seo -> =Seo,no,"live.example.com, 2026-10-01","staging.example.com, 2026-10-07"`
     );
-    expect(rows[rows.length - 1]).toContain("C1,side effect,side effect,Page,page,");
+    expect(rows[rows.length - 1]).toContain(
+      "C1,side effect,side effect,Page,page,"
+    );
   });
 });

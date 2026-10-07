@@ -181,6 +181,7 @@ type FlatViewProps = {
   scope?: FocusScope | null;
   /** Leaves focus, which is how the lists go back to every type. */
   onShowAll?: () => void;
+  compare?: ListProps["compare"];
 };
 
 type PageProps = FlatViewProps & { roleFor: (node: SchemaNode) => Role };
@@ -246,6 +247,7 @@ function Lists({
   findings,
   scope = null,
   onShowAll = () => undefined,
+  compare = null,
 }: FlatViewProps) {
   const List = LISTS[view] ?? TypeTable;
   // One shape in and out of focus, so entering focus keeps the list mounted with
@@ -257,6 +259,7 @@ function Lists({
       ) : null}
       <div className="min-h-0 flex-1">
         <List
+          compare={compare}
           findings={findings}
           graph={graph}
           onQuery={onQuery}

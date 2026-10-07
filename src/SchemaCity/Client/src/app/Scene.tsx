@@ -20,6 +20,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { Button } from "@/components/ui/button";
+import type { ChangeGroups, ChangeKind } from "../model/changes";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaComparison } from "../model/snapshots";
@@ -2234,50 +2235,63 @@ function CanvasOverlay({
   );
 }
 
+/** A unit box's edges, scaled per removed type, so every outline shares one geometry. */
+const GHOST_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+
+/**
+ * The change layer's marks: a ring round each type with an edit of its own, azure
+ * when added and amber when changed, and an outline where each removed type stood.
+ * A side effect gets no ring, so the causes stand out from their echoes.
+ */
 function ComparisonMarks({
-  comparison,
+  kinds,
+  removed,
   placements,
   palette,
 }: {
-  comparison?: SchemaComparison | null;
+  kinds?: ReadonlyMap<string, ChangeKind>;
+  removed: Placement[];
   placements: Placement[];
   palette: Palette;
 }) {
-  const marks = useMemo(
-    () =>
-      new Map(
-        (comparison ? [...comparison.added, ...comparison.changed] : []).map(
-          (change) => [change.currentId, change.status]
-        )
-      ),
-    [comparison]
-  );
+  const ringed = (at: Placement) => {
+    const kind = kinds?.get(at.id);
+    return (kind === "added" || kind === "changed") && (at.flatten ?? 0) < 0.5;
+  };
   return (
     <group>
-      {placements
-        .filter((at) => marks.has(at.id) && (at.flatten ?? 0) < 0.5)
-        .map((at) => (
-          <mesh
-            key={at.id}
-            position={[at.position.x, (at.y ?? 0) + 0.08, at.position.z]}
-            rotation={[-Math.PI / 2, 0, Math.PI / 4]}
-          >
-            <ringGeometry
-              args={[
-                at.footprint / Math.SQRT2 + 0.45,
-                at.footprint / Math.SQRT2 + 0.7,
-                4,
-              ]}
-            />
-            <meshBasicMaterial
-              color={
-                marks.get(at.id) === "added" ? palette.azure : palette.amber
-              }
-              depthWrite={false}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-        ))}
+      {placements.filter(ringed).map((at) => (
+        <mesh
+          key={at.id}
+          position={[at.position.x, (at.y ?? 0) + 0.08, at.position.z]}
+          rotation={[-Math.PI / 2, 0, Math.PI / 4]}
+        >
+          <ringGeometry
+            args={[
+              at.footprint / Math.SQRT2 + 0.45,
+              at.footprint / Math.SQRT2 + 0.7,
+              4,
+            ]}
+          />
+          <meshBasicMaterial
+            color={
+              kinds?.get(at.id) === "added" ? palette.azure : palette.amber
+            }
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ))}
+      {removed.map((at) => (
+        <lineSegments
+          geometry={GHOST_EDGES}
+          key={at.id}
+          position={[at.position.x, at.height / 2, at.position.z]}
+          scale={[at.footprint, at.height, at.footprint]}
+        >
+          <lineBasicMaterial color={palette.signal} opacity={0.7} transparent />
+        </lineSegments>
+      ))}
     </group>
   );
 }
@@ -2302,6 +2316,7 @@ export default function Scene({
   usage,
   baseline,
   comparison,
+  changes,
   focusDepth = 1,
   scale,
   selected,
@@ -2321,6 +2336,8 @@ export default function Scene({
   usage?: UsageReport;
   baseline?: SchemaGraph | null;
   comparison?: SchemaComparison | null;
+  /** The comparison read as causes and side effects, for the change layer. */
+  changes?: ChangeGroups | null;
   focusDepth?: number;
   /** Umbraco icon name to SVG, for the roofs. The harness usually passes none. */
   icons?: Record<string, string>;
@@ -2364,7 +2381,7 @@ export default function Scene({
     () =>
       baseline && comparison
         ? comparisonCity(baseline, graph, comparison.matches, grouping)
-        : cityDistricts(graph, grouping),
+        : { ...cityDistricts(graph, grouping), removed: [] },
     [baseline, comparison, graph, grouping]
   );
   // The ground a nested folder's members cover, which tints that patch of its island.
@@ -2847,9 +2864,10 @@ export default function Scene({
             </Html>
           ) : null}
           <ComparisonMarks
-            comparison={comparison}
+            kinds={changes?.kinds}
             palette={palette}
             placements={placements}
+            removed={city.removed}
           />
           {/* The floating labels first, so the board reads this frame's floated set
               rather than the last one's. */}
@@ -2903,7 +2921,7 @@ export default function Scene({
         <CanvasOverlay
           host={host}
           onReset={onReset}
-          raised={Boolean(baseline && comparison)}
+          raised={scale?.ramp === "change"}
         />
       ) : null}
     </section>

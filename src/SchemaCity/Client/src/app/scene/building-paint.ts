@@ -68,6 +68,19 @@ export function buildingColours(palette: BuildingPalette) {
 }
 
 /**
+ * The change layer's four steps. Added is azure and a type's own edit amber, the
+ * colours the compare rings always had. A side effect is the same amber pushed half
+ * way into the background, so it reads as the quieter echo of a cause, and an
+ * unchanged type is phosphor-dim pushed further still, out of the way.
+ */
+function changeColour(t: number, colours: BuildingColours): THREE.Color {
+  if (t >= 1) return colours.azure.clone();
+  if (t >= 0.75) return colours.amber.clone();
+  if (t >= 0.5) return colours.amber.clone().lerp(colours.background, 0.55);
+  return colours.dim.clone().lerp(colours.background, 0.7);
+}
+
+/**
  * Where one building lands on the lens's ramp. Amber to azure both ways, with
  * phosphor-dim as the diverging middle and the unused lens's quiet end, because
  * phosphor against signal is the pair colour-vision deficiency ruins.
@@ -79,6 +92,7 @@ function rampColour(
 ): THREE.Color {
   if (ramp === "binary")
     return (t >= 0.5 ? colours.signal : colours.dim).clone();
+  if (ramp === "change") return changeColour(t, colours);
   if (ramp === "sequential")
     return colours.amber.clone().lerp(colours.azure, t);
   return t < 0.5

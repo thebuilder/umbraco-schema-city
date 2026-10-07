@@ -28,6 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { groupChanges } from "../model/changes";
 import { dataTypeNames, dataTypeUsers } from "../model/data-types";
 import { findFindings } from "../model/findings";
 import { impactOf } from "../model/impact";
@@ -52,6 +53,7 @@ import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
+  changeScale,
   highlightScale,
   LENS_LABEL,
   LENSES,
@@ -104,6 +106,7 @@ const RAMP_BAR: Record<Ramp, string> = {
   sequential: "bg-linear-to-r from-amber to-azure",
   diverging: "bg-linear-to-r from-amber via-phosphor-dim to-azure",
   binary: "bg-linear-to-r from-phosphor-dim to-signal",
+  change: "bg-linear-to-r from-phosphor-dim via-amber to-azure",
 };
 
 // three.js, fiber and drei are a third of the bundle, so they load with the scene
@@ -355,17 +358,27 @@ export function App({
   }, [graph.edges]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
   const dataTypeName = useMemo(() => dataTypeNames(graph), [graph]);
-  // Show in city takes the lens's place on the buildings while it is on.
+  const comparison = useMemo(
+    () => (baseline ? compareSchemas(baseline, graph) : null),
+    [baseline, graph]
+  );
+  const changes = useMemo(
+    () => (comparison ? groupChanges(comparison) : null),
+    [comparison]
+  );
+  const compare = useMemo(
+    () => (baseline && changes ? { baseline, changes } : null),
+    [baseline, changes]
+  );
+  // Show in city takes the lens's place on the buildings while it is on, and a
+  // lens takes the change layer's, so loading a baseline turns the lens off.
   const scale = useMemo(
     () =>
       highlight
         ? highlightScale(graph, highlight.ids)
-        : lensScale(graph, usage, lens, findings),
-    [graph, usage, lens, findings, highlight]
-  );
-  const comparison = useMemo(
-    () => (baseline ? compareSchemas(baseline, graph) : null),
-    [baseline, graph]
+        : (lensScale(graph, usage, lens, findings) ??
+          (changes ? changeScale(graph, changes.kinds) : null)),
+    [graph, usage, lens, findings, highlight, changes]
   );
   // The focused neighbourhood, which the 2D views narrow to as the city does.
   const scope = useMemo(
@@ -630,7 +643,7 @@ export function App({
 
               <ComparisonTools
                 baseline={baseline}
-                comparison={comparison}
+                changes={changes}
                 graph={graph}
                 onBaselineChange={(next) => {
                   setBaseline(next);
@@ -682,7 +695,7 @@ export function App({
                   Clear
                 </TextButton>
               </div>
-            ) : scale && !flat ? (
+            ) : scale && !flat && scale.ramp !== "change" ? (
               <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
                 <span className="font-bold uppercase tracking-terminal">
                   {LENS_LABEL[lens]}
@@ -697,7 +710,9 @@ export function App({
             ) : null}
             {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
-            {flat ? null : <ComparisonLegend comparison={comparison} />}
+            {flat || scale?.ramp !== "change" ? null : (
+              <ComparisonLegend changes={changes} />
+            )}
             {flat ? (
               // The inspector is an overlay, so the view is inset by its width while
               // it is open rather than sliding under it.
@@ -707,6 +722,7 @@ export function App({
                 tabIndex={-1}
               >
                 <FlatView
+                  compare={compare}
                   dataTypes={{
                     selected: dataType,
                     onChoose: setDataType,
@@ -765,6 +781,7 @@ export function App({
                 >
                   <Scene
                     baseline={baseline}
+                    changes={changes}
                     comparison={comparison}
                     focus={focus}
                     focusDepth={focusDepth}

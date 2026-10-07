@@ -3,6 +3,7 @@
 // it, and the same search that feeds the palette filters it.
 import { type ReactNode, useId, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
+import type { ChangeGroups, ChangeKind } from "../model/changes";
 import { type Finding, problemLabels } from "../model/findings";
 import { contentCountOf, type Role, roleOf } from "../model/inspector";
 import { neighbourhoods } from "../model/neighbourhood";
@@ -26,12 +27,21 @@ export type TypeRow = {
    * a 0 there would read as unused.
    */
   usage: number | null;
+  /** How the type changed against the baseline, while one is loaded. */
+  change?: ChangeKind | "none";
 };
 
 export type SortKey = Exclude<keyof TypeRow, "id">;
 
-/** One row per type, with the allowed-child count counted once for the whole graph. */
-export function typeRows(graph: SchemaGraph, usage?: UsageReport): TypeRow[] {
+/**
+ * One row per type, with the allowed-child count counted once for the whole graph.
+ * With a comparison's kinds, each row also says how its type changed.
+ */
+export function typeRows(
+  graph: SchemaGraph,
+  usage?: UsageReport,
+  kinds?: ReadonlyMap<string, ChangeKind>
+): TypeRow[] {
   const children = new Map<string, number>();
   for (const edge of graph.edges ?? []) {
     if (edge.kind !== "allowedChild") continue;
@@ -56,8 +66,55 @@ export function typeRows(graph: SchemaGraph, usage?: UsageReport): TypeRow[] {
     composed: node.composedPropertyCount,
     children: children.get(node.id) ?? 0,
     usage: countOf(node.id) ?? null,
+    ...(kinds ? { change: kinds.get(node.id) ?? "none" } : {}),
   }));
 }
+
+/**
+ * The rows the list shows while a baseline is loaded: every current type, and
+ * after them each removed type as the baseline had it, so a removed type still has
+ * a row to find.
+ */
+export function compareRows(
+  graph: SchemaGraph,
+  usage: UsageReport | undefined,
+  compare: { baseline: SchemaGraph; changes: ChangeGroups } | null
+): TypeRow[] {
+  if (!compare) return typeRows(graph, usage);
+  const { kinds } = compare.changes;
+  return [
+    ...typeRows(graph, usage, kinds),
+    ...typeRows(compare.baseline, undefined, kinds).filter(
+      (row) => row.change === "removed"
+    ),
+  ];
+}
+
+/** The Change filter's choices: one kind, any change, or none at all. */
+const CHANGE_FILTERS = [
+  ["all", "All types"],
+  ["any", "Any change"],
+  ["added", "Added"],
+  ["removed", "Removed"],
+  ["changed", "Changed"],
+  ["side effect", "Side effect"],
+  ["none", "Unchanged"],
+] as const;
+
+type ChangeFilter = (typeof CHANGE_FILTERS)[number][0];
+
+const passes = (filter: ChangeFilter, row: TypeRow) =>
+  filter === "all" ||
+  (filter === "any" ? row.change !== "none" : row.change === filter);
+
+/** The Change column's word, in the colour the city's change layer uses for it. */
+const CHANGE_TONE: Record<ChangeKind | "none", string> = {
+  added: "text-azure",
+  removed: "text-signal",
+  changed: "text-amber",
+  "side effect": "text-label",
+  none: "text-faint",
+};
 
 /**
  * Sorted by one column. Text sorts as text, everything else by number, with a type
@@ -93,6 +150,7 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "composed", label: "Composed", numeric: true },
   { key: "children", label: "Allowed children", numeric: true },
   { key: "usage", label: "Content", numeric: true },
+  { key: "change", label: "Change" },
 ];
 
 const CELL = "border-line/60 border-b px-2 py-1.5 text-left align-baseline";
@@ -189,6 +247,8 @@ export type ListProps = {
   onSelect: (id: string) => void;
   /** In focus mode, the types around the focused one; null shows every type. */
   scope: ReadonlySet<string> | null;
+  /** The loaded baseline and the comparison against it, which the List shows. */
+  compare?: { baseline: SchemaGraph; changes: ChangeGroups } | null;
 };
 
 /**
@@ -290,34 +350,69 @@ export function TypeTable({
   selected,
   onSelect,
   scope,
+  compare = null,
 }: ListProps) {
   const [sort, toggle] = useSort<SortKey>();
+  const [changeFilter, setChangeFilter] = useState<ChangeFilter>("all");
+  const changeId = useId();
 
-  const rows = useMemo(() => typeRows(graph, usage), [graph, usage]);
+  const rows = useMemo(
+    () => compareRows(graph, usage, compare),
+    [graph, usage, compare]
+  );
   const problems = useMemo(() => problemLabels(findings), [findings]);
   // The same ranking the palette uses, kept only as a set: the table's own sort
   // decides the order, and searchNodes decides what is in it.
   const matched = useMatches(graph, query, scope);
-  const shown = useMemo(
-    () =>
-      sortRows(
-        matched ? rows.filter((row) => matched.has(row.id)) : rows,
-        sort.key,
-        sort.ascending
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    // A removed type is not in the graph the search reads, so it matches by name
+    // or alias, and focus, which is about the current graph, leaves it out.
+    const kept = (row: TypeRow) =>
+      row.change === "removed"
+        ? scope === null &&
+          (needle === "" ||
+            `${row.name} ${row.alias}`.toLowerCase().includes(needle))
+        : !matched || matched.has(row.id);
+    return sortRows(
+      rows.filter(
+        (row) => kept(row) && (!compare || passes(changeFilter, row))
       ),
-    [rows, matched, sort]
-  );
+      sort.key,
+      sort.ascending
+    );
+  }, [rows, matched, sort, query, scope, compare, changeFilter]);
 
   useAnnounceChange(`${shown.length} of ${rows.length} types`);
 
-  const columns = usage
-    ? COLUMNS
-    : COLUMNS.filter((column) => column.key !== "usage");
+  const columns = COLUMNS.filter(
+    (column) =>
+      (column.key !== "usage" || usage) && (column.key !== "change" || compare)
+  );
 
   return (
     <div className="flex h-full flex-col bg-background font-sans text-[13px] text-prose leading-normal">
       <div className="flex items-center gap-3 border-line border-b px-4 py-2">
         <FilterField onQuery={onQuery} query={query} />
+        {compare ? (
+          <div className="flex items-center gap-2 font-sans text-label text-xs">
+            <label htmlFor={changeId}>Change</label>
+            <select
+              className="h-8 border border-input bg-secondary px-2 text-prose text-xs focus-visible:border-phosphor"
+              id={changeId}
+              onChange={(event) =>
+                setChangeFilter(event.target.value as ChangeFilter)
+              }
+              value={changeFilter}
+            >
+              {CHANGE_FILTERS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <p className="text-label text-xs">
           <span className="font-mono">{shown.length}</span> of{" "}
           <span className="font-mono">{rows.length}</span> types
@@ -335,21 +430,27 @@ export function TypeTable({
             {shown.map((row) => {
               const on = row.id === selected;
               const flagged = problems.get(row.id);
+              // A removed type has nothing left to inspect.
+              const gone = row.change === "removed";
               return (
                 <tr
                   className={on ? "bg-accent" : "hover:bg-accent/50"}
                   key={row.id}
-                  onClick={() => onSelect(row.id)}
+                  onClick={gone ? undefined : () => onSelect(row.id)}
                 >
                   <th className={`${CELL} font-normal`} scope="row">
                     <span className="flex items-center gap-1.5">
-                      <button
-                        className={`text-left hover:text-phosphor hover:underline ${on ? "text-phosphor-bright" : "text-prose"}`}
-                        onClick={() => onSelect(row.id)}
-                        type="button"
-                      >
-                        {row.name}
-                      </button>
+                      {gone ? (
+                        <span className="text-label">{row.name}</span>
+                      ) : (
+                        <button
+                          className={`text-left hover:text-phosphor hover:underline ${on ? "text-phosphor-bright" : "text-prose"}`}
+                          onClick={() => onSelect(row.id)}
+                          type="button"
+                        >
+                          {row.name}
+                        </button>
+                      )}
                       {flagged ? <FindingDot title={flagged} /> : null}
                     </span>
                   </th>
@@ -368,6 +469,13 @@ export function TypeTable({
                   <Count on={on} value={row.composed} />
                   <Count on={on} value={row.children} />
                   {usage ? <Count on={on} value={row.usage} /> : null}
+                  {row.change ? (
+                    <td
+                      className={`${CELL} text-xs ${CHANGE_TONE[row.change]}`}
+                    >
+                      {row.change}
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -375,7 +483,9 @@ export function TypeTable({
         </table>
         {shown.length === 0 ? (
           <p className="px-4 py-6 text-faint text-xs">
-            No type or property matches “{query}”.
+            {query.trim() === ""
+              ? "No type has this kind of change."
+              : `No type or property matches “${query}”.`}
           </p>
         ) : null}
       </Scroller>

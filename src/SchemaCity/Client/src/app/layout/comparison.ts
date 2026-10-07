@@ -1,14 +1,24 @@
 import type { SchemaGraph } from "../../model/types";
-import { cityDistricts, DISTRICT_GAP, type Grouping } from "./city";
+import {
+  cityDistricts,
+  DISTRICT_GAP,
+  type Grouping,
+  type Placement,
+} from "./city";
 
-/** Keep matched types at baseline coordinates; append new districts beside them. */
+/**
+ * Keep matched types at baseline coordinates; append new districts beside them.
+ * `removed` holds where the baseline's removed types stood, for their outlines.
+ */
 export function comparisonCity(
   baseline: SchemaGraph,
   current: SchemaGraph,
   matches: ReadonlyMap<string, string>,
   grouping: Grouping = "structure"
-): ReturnType<typeof cityDistricts> {
+): ReturnType<typeof cityDistricts> & { removed: Placement[] } {
   const before = cityDistricts(baseline, grouping);
+  const kept = new Set(matches.values());
+  const removed = before.placements.filter((at) => !kept.has(at.id));
   const currentCity = cityDistricts(current, grouping);
   const byId = new Map(
     before.placements.map((placement) => [placement.id, placement])
@@ -30,7 +40,7 @@ export function comparisonCity(
     current.nodes.filter((node) => !matches.has(node.id)).map((node) => node.id)
   );
   if (addedIds.size === 0)
-    return { placements: retained, districts: before.districts };
+    return { placements: retained, districts: before.districts, removed };
   const added = cityDistricts(
     {
       ...current,
@@ -45,6 +55,7 @@ export function comparisonCity(
     Math.max(0, ...before.districts.map((district) => district.maxX)) +
     DISTRICT_GAP;
   return {
+    removed,
     placements: [
       ...retained,
       ...added.placements.map((placement) => ({

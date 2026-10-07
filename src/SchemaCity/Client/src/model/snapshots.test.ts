@@ -326,6 +326,9 @@ describe("schema snapshots", () => {
     expect(
       snapshotFileName("Www.Example.com", "2026-10-07T08:30:00.000Z")
     ).toBe("schema-city-snapshot-www-example-com-2026-10-07.json");
+    expect(
+      snapshotFileName("staging.example.com", "2026-10-07", "changes.csv")
+    ).toBe("schema-city-changes-staging-example-com-2026-10-07.csv");
     expect(snapshotFileName("", "2026-10-07T08:30:00.000Z")).toBe(
       "schema-city-snapshot-2026-10-07.json"
     );
