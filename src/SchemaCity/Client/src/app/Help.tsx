@@ -216,10 +216,14 @@ export function Help({
               <p>
                 Mark as intentional records why a finding is deliberate, with
                 your name and the date, and Hide reviewed takes it out of the
-                drawer. The decision belongs to the type as it is now: change
-                the type and the finding opens again, marked as reopened.
-                Decisions are kept in Umbraco's key-value table, apart from the
-                schema, and Undo removes one.
+                drawer. Everywhere else a reviewed finding goes quiet: a hollow
+                grey dot in the List, the Tree and the Data Types list, counts
+                and the problem mark for open findings only, and its check
+                greyed out after the open ones. The Unused lens and the Editor
+                layout's flags ignore it. The decision belongs to the type as it
+                is now: change the type and the finding opens again, marked as
+                reopened. Decisions are kept in Umbraco's key-value table, apart
+                from the schema, and Undo removes one.
               </p>
               <p>
                 The schema is read when the page loads. Content usage is a

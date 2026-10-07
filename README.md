@@ -180,6 +180,14 @@ reviewed, on by default, takes decided rows out of the drawer, so the list shrin
 needs attention, and the header counts both, for example "67 findings, 12 reviewed, 55 open". A
 row you decide stays in view until the drawer closes.
 
+A reviewed finding goes quiet everywhere else too, not only in the drawer. In the List, the Tree
+and the Data Types list its dot becomes a hollow grey ring whose label starts "Reviewed:". The
+inspector's Overview tab and a Data Type's Findings heading count open findings only, with the
+reviewed ones said apart, for example "1 reviewed", and the "!" marks open problems only. Reviewed
+checks stay listed, greyed out, after the open ones, so you can still read the reason or Undo it.
+The Unused lens and the Editor layout's flagged property rows weigh open findings only. A reopened
+finding counts as open again in all of these.
+
 ![A broken block marked as intentional with its reason and Undo, and the reason form open on a duplicate alias.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/review.png)
 
 A decision is tied to the schema as it was when it was made. The graph carries a fingerprint for
