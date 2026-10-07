@@ -216,13 +216,24 @@ function useCaptionSpace(card: RefObject<HTMLElement | null>) {
  * rests, and stays while the pointer or keyboard focus is in it. Hidden is opacity
  * only, so Tab still reaches it and showing it is what focus does.
  */
+/**
+ * Where the bar sits while Details is open: left of the panel, whose width is the
+ * inspector's own, 340 px or 520 px from 1024 px of room, times the presentation
+ * zoom. The zoomed layer reaches 1024 px when this container is 1024 * 1.4 wide.
+ */
+const DETAILS_CLEAR =
+  "right-[calc(min(340px,100%)*1.4+0.5rem)] @min-[1434px]:right-[calc(520px*1.4+0.5rem)]";
+
 export function PresentBar({
   view,
+  details,
   onView,
   onSearch,
   onLeave,
 }: {
   view: View;
+  /** Details is open, so the bar moves left of the panel instead of over its title. */
+  details: boolean;
   onView: (view: View) => void;
   onSearch: () => void;
   onLeave: () => void;
@@ -245,7 +256,7 @@ export function PresentBar({
   return (
     <nav
       aria-label="Presentation"
-      className={`absolute top-2 right-2 z-30 flex flex-wrap items-center justify-end gap-2 border border-line-strong bg-background/90 p-1.5 shadow-panel transition-opacity duration-300 focus-within:pointer-events-auto focus-within:opacity-100 hover:opacity-100 motion-reduce:transition-none ${shown ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      className={`absolute top-2 ${details ? DETAILS_CLEAR : "right-2"} z-30 flex flex-wrap items-center justify-end gap-2 border border-line-strong bg-background/90 p-1.5 shadow-panel transition-opacity duration-300 focus-within:pointer-events-auto focus-within:opacity-100 hover:opacity-100 motion-reduce:transition-none ${shown ? "opacity-100" : "pointer-events-none opacity-0"}`}
       data-present-bar=""
     >
       <ViewSwitcher onView={onView} view={view} />

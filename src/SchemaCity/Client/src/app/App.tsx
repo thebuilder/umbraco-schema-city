@@ -623,6 +623,7 @@ export function App({
               from the city comes back to it. */}
             {presenting ? (
               <PresentBar
+                details={details}
                 onLeave={() => present(false)}
                 onSearch={() => openPalette(true)}
                 onView={setView}
