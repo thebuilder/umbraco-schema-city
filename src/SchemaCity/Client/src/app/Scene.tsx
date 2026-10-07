@@ -79,9 +79,9 @@ import {
   approach,
   BOOST,
   desiredVelocity,
-  FLIGHT_CODES,
   flySpeed,
   groundAxes,
+  keydownAction,
   translateFlightEndpoints,
 } from "./scene/flight";
 import { framingDistance } from "./scene/framing";
@@ -1914,28 +1914,6 @@ function Controls({ span }: { span: number }) {
   );
 }
 
-/**
- * Whether this keystroke is one the city flies by. The app's own handler reads the
- * target the same way: an event that crossed a shadow boundary reports the host as
- * its target, so the path says where it really started, and a field being typed into
- * or anything inside a dialog keeps its letters. A modifier other than Shift means
- * the key belongs to the browser or to the backoffice around us.
- */
-/** The tag names whose own keyboard handling wins over the shortcut keys. */
-const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
-
-function flownBy(event: KeyboardEvent): boolean {
-  if (!FLIGHT_CODES.has(event.code)) return false;
-  if (event.metaKey || event.ctrlKey || event.altKey) return false;
-  const [from] = event.composedPath();
-  return !(
-    from instanceof HTMLElement &&
-    (from.isContentEditable ||
-      FIELD.test(from.tagName) ||
-      from.closest('[role="dialog"]'))
-  );
-}
-
 /** Scratch, so flying allocates nothing per frame. */
 const FLIGHT_STEP = new THREE.Vector3();
 /** How low the camera may fly, in world units above the ground. */
@@ -1944,16 +1922,18 @@ const MIN_EYE = 1;
 /**
  * Keyboard flight, after fsn. Held keys become a velocity that eases in and out,
  * which moves the camera and its orbit target together, so the controls pick the
- * pose back up unchanged the moment a hand goes back to the mouse. The arrows turn
- * and tilt by walking the target around a camera that stays put.
+ * pose back up unchanged the moment a hand goes back to the mouse.
  *
  * The speed grows with the distance to the target, so a key crosses about the same
  * share of the screen from the overview as from close in.
  */
 function Flight({
   cameraFlight,
+  host,
 }: {
   cameraFlight: RefObject<CameraFlight | null>;
+  /** The element around the canvas, which takes focus when the city is clicked. */
+  host: RefObject<HTMLDivElement | null>;
 }) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as Rig | null;
@@ -1968,10 +1948,7 @@ function Flight({
     };
     const down = (event: KeyboardEvent) => {
       boosting.current = event.shiftKey;
-      if (!flownBy(event)) {
-        // While a command key is down macOS withholds the keyup of everything else,
-        // so a key let go inside a shortcut would fly on forever. The same goes for
-        // a field or a dialog taking the keyboard mid-flight: stop rather than coast.
+      if (keydownAction(event, host.current) === "release") {
         release();
         return;
       }
@@ -1995,7 +1972,7 @@ function Flight({
       window.removeEventListener("blur", release);
       release();
     };
-  }, [held]);
+  }, [held, host]);
 
   useFrame((_, delta) => {
     if (!controls) return;
@@ -2471,7 +2448,17 @@ export default function Scene({
   }, []);
 
   return (
-    <div className="absolute inset-0" ref={host}>
+    // Focusable, so the flight keys have somewhere to belong: they fly only while
+    // this or nothing has focus, and a click on the city focuses it. An application,
+    // because every key in it is the city's to handle.
+    <div
+      aria-label="City. Press ? for the controls."
+      className="absolute inset-0 outline-none focus-visible:outline-2 focus-visible:outline-phosphor-bright focus-visible:outline-offset-[-2px]"
+      ref={host}
+      role="application"
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: the city takes keys, so a keyboard has to be able to reach it.
+      tabIndex={0}
+    >
       {palette ? (
         <Canvas
           // The far plane is the world's to set, from where the fog ends.
@@ -2645,7 +2632,7 @@ export default function Scene({
             traces={boardMarks.traces}
             usage={usage}
           />
-          <Flight cameraFlight={cameraFlight} />
+          <Flight cameraFlight={cameraFlight} host={host} />
           <CameraRig
             bounds={bounds}
             buildingHeight={Math.max(1, ...heights.values())}

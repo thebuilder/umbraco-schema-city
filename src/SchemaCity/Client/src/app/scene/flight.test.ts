@@ -5,6 +5,7 @@ import {
   FLY_SPEED,
   flySpeed,
   groundAxes,
+  keydownAction,
   translateFlightEndpoints,
 } from "./flight";
 
@@ -146,4 +147,45 @@ test("panning rebases an in-flight transition without changing its orientation",
       prior.position.z - prior.target.z
     );
   }
+});
+
+const HOST = { tagName: "DIV" };
+/** A keydown that started on `from`, the first entry of its composed path. */
+const press = (code: string, from: unknown, extra: object = {}) => ({
+  code,
+  key: code,
+  metaKey: false,
+  ctrlKey: false,
+  altKey: false,
+  defaultPrevented: false,
+  composedPath: () => [from, HOST, { tagName: "BODY" }],
+  ...extra,
+});
+
+test("the keys fly from the city or from a page with nothing focused", () => {
+  expect(keydownAction(press("ArrowDown", HOST), HOST)).toBe("fly");
+  expect(keydownAction(press("KeyW", { tagName: "BODY" }), HOST)).toBe("fly");
+});
+
+test("an arrow anywhere else belongs to the element it was pressed in", () => {
+  // The inspector's scrolling tab, a button, a tab, a list option, a field.
+  for (const from of [
+    { tagName: "DIV" },
+    { tagName: "BUTTON" },
+    { tagName: "A" },
+    { tagName: "SUMMARY" },
+    { tagName: "INPUT" },
+    { tagName: "SELECT" },
+  ])
+    expect(keydownAction(press("ArrowDown", from), HOST)).toBe("release");
+});
+
+test("a key another handler took, a chord or a non-flight key stops the flight", () => {
+  expect(
+    keydownAction(press("KeyW", HOST, { defaultPrevented: true }), HOST)
+  ).toBe("release");
+  expect(keydownAction(press("KeyW", HOST, { metaKey: true }), HOST)).toBe(
+    "release"
+  );
+  expect(keydownAction(press("KeyL", HOST), HOST)).toBe("release");
 });

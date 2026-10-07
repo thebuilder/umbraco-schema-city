@@ -47,6 +47,50 @@ export const FLIGHT_CODES: ReadonlySet<string> = new Set([
   "ArrowRight",
 ]);
 
+/** The parts of a keydown the flight reads, so the decision can be tested without a DOM. */
+type KeyPress = {
+  code: string;
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  defaultPrevented: boolean;
+  composedPath: () => readonly unknown[];
+};
+
+/**
+ * What a keydown does to the flight: "fly" holds the key and "release" lets go of
+ * every held key.
+ *
+ * The city flies only when the key was pressed on the scene's own `host` or on the
+ * page with nothing focused. The listener is on the window, and a whitelist is the
+ * only safe answer there: an arrow in the inspector's scrolling tab, on a button, in
+ * a list or anywhere else in the backoffice belongs to that element. The path's
+ * first entry is where the key really started, even across a shadow boundary.
+ *
+ * Anything else stops the flight rather than leaving keys held. While a command key
+ * is down macOS withholds the keyup of everything else, so a key let go inside a
+ * shortcut would fly on forever, and a field taking the keyboard mid-flight should
+ * stop the camera rather than let it coast.
+ */
+export function keydownAction(
+  event: KeyPress,
+  host: unknown
+): "fly" | "release" {
+  if (
+    !FLIGHT_CODES.has(event.code) ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    event.defaultPrevented
+  )
+    return "release";
+  const [from] = event.composedPath();
+  if (from === host) return "fly";
+  const tag = (from as { tagName?: unknown } | undefined)?.tagName;
+  return tag === "BODY" || tag === "HTML" ? "fly" : "release";
+}
+
 /**
  * The slowest the keys fly, world units per second. A street is 9 units wide.
  */
