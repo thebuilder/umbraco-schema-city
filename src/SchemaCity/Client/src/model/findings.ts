@@ -388,8 +388,8 @@ export function findFindings(
         "unusedElementType",
         node,
         blockHosts.size > 0
-          ? `Could be listed by the block editors on ${plural(blockHosts.size, "type")}`
-          : "No type in this schema has a block editor"
+          ? `No block editor lists it. ${plural(blockHosts.size, "type has", "types have")} a block editor that could`
+          : "No block editor lists it, and no type in this schema has a block editor"
       );
     }
 
@@ -400,12 +400,7 @@ export function findFindings(
       add(
         "deadEnd",
         node,
-        content(node.id) ||
-          plural(
-            node.ownPropertyCount + node.composedPropertyCount,
-            "property",
-            "properties"
-          )
+        `Not allowed at root or under any type, and nothing composes it. ${detail}`
       );
     }
 
@@ -431,6 +426,13 @@ export function findFindings(
             return editors.size > 1
               ? `${alias}: ${origins.map((origin) => `${origin.editor} from ${source(origin.id)}`).join(", ")}`
               : `${alias} from ${list(origins.map((origin) => source(origin.id)))}`;
+      const detail =
+        content(node.id) ||
+        plural(
+          node.ownPropertyCount + node.composedPropertyCount,
+          "property",
+          "properties"
+        );
           })
           .join("; "),
         [

@@ -188,6 +188,9 @@ describe("findFindings, one rule at a time", () => {
     );
     expect(aliasesFor(graph, "unusedElementType")).toEqual(["spare"]);
   });
+    expect(summaryOf(graph, "unusedElementType", "spare")?.summary).toBe(
+      "No block editor lists it. 1 type has a block editor that could"
+    );
 
   it("reports a type no editor can create and nothing composes", () => {
     const graph = graphOf(
@@ -196,6 +199,9 @@ describe("findFindings, one rule at a time", () => {
     );
     expect(aliasesFor(graph, "deadEnd")).toEqual(["orphan"]);
   });
+    expect(summaryOf(graph, "deadEnd", "orphan")?.summary).toBe(
+      "Not allowed at root or under any type, and nothing composes it. 1 property"
+    );
 
   it("leaves a composed type off the dead ends, whatever usage says", () => {
     const graph = graphOf(
