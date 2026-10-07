@@ -827,11 +827,11 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
   const flipped = useRef(false);
   const forward = useMemo(() => new THREE.Vector3(), []);
 
-  useAnimationFrame((state, delta) => {
-    const playing = introPlaying(state.clock.elapsedTime, reducedMotion);
+  /** One frame's repaint, if anything moved; true while it needs another frame. */
+  const paint = (elapsed: number, step: number): boolean => {
     camera.getWorldDirection(forward);
     flipped.current = labelsFlipped(forward.x, forward.z, flipped.current);
-    const reveal = revealAt(state.clock.elapsedTime, reducedMotion).links;
+    const reveal = revealAt(elapsed, reducedMotion).links;
     const key = [
       inputs,
       fades,
@@ -841,13 +841,13 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
       height,
     ];
     const last = written.current;
-    if (unchanged(last, key, camera)) return playing;
+    if (unchanged(last, key, camera)) return false;
     const frame: Frame = {
       camera,
       viewportHeight: height,
       flipped: flipped.current,
       reveal,
-      step: reducedMotion ? 1 : delta / FADE_SECONDS,
+      step,
       fades,
     };
     // A new printed set changes what the floating labels leave out, and they read
@@ -857,8 +857,16 @@ function useRepaint(inputs: Inputs, floated: Floated, reducedMotion: boolean) {
     last.key = key;
     last.camera.copy(camera.matrixWorld);
     last.moving = fades.moving;
-    return playing || fades.moving || published;
-  });
+    return fades.moving || published;
+  };
+
+  useAnimationFrame(
+    (state, delta) =>
+      paint(
+        state.clock.elapsedTime,
+        reducedMotion ? 1 : delta / FADE_SECONDS
+      ) || introPlaying(state.clock.elapsedTime, reducedMotion)
+  );
 }
 
 export function BoardLabels({
