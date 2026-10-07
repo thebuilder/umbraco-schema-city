@@ -301,9 +301,12 @@ describe("schema snapshots", () => {
       [page(blocks("dt-2", "Textstring", ["quote-key"])), card, quote],
       [{ kind: "block", from: "page", to: "quote-key", propertyAlias: "body" }]
     );
-    const details =
-      compareSchemas(before, after).changed.find((c) => c.alias === "page")
-        ?.details ?? [];
+    const change = compareSchemas(before, after).changed.find(
+      (c) => c.alias === "page"
+    );
+    const details = change?.details ?? [];
+    // The Data Type the property moved onto, as a link to its page.
+    expect(change?.dataTypeIds).toEqual(["dt-2"]);
     expect(details).toEqual([
       "property content.body Data Type: Textarea to Textstring",
       "target added: content.body -> Quote (content)",

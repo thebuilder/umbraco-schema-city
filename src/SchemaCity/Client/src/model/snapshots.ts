@@ -50,6 +50,8 @@ export type SchemaChange = {
   currentId?: string;
   baselineId?: string;
   details: string[];
+  /** The current Data Types of properties that changed Data Type, as links. */
+  dataTypeIds?: string[];
 };
 
 export type SchemaComparison = {
@@ -735,6 +737,32 @@ function detailDiff(
   return details;
 }
 
+/**
+ * The Data Types properties moved onto, matched by group and alias as the details
+ * are. Only the current side, since the page a link opens shows the current schema.
+ */
+function changedDataTypes(previous: SchemaNode, node: SchemaNode): string[] {
+  const keyOf = (group: PropertyGroup, property: SchemaProperty) =>
+    `${group.alias}.${property.alias}`;
+  const before = new Map(
+    previous.groups.flatMap((group) =>
+      group.properties.map((p) => [keyOf(group, p), p.dataTypeId] as const)
+    )
+  );
+  return [
+    ...new Set(
+      node.groups.flatMap((group) =>
+        group.properties
+          .filter((p) => {
+            const was = before.get(keyOf(group, p));
+            return was !== undefined && was !== p.dataTypeId;
+          })
+          .map((p) => p.dataTypeId)
+      )
+    ),
+  ];
+}
+
 export function compareSchemas(
   baseline: SchemaGraph,
   current: SchemaGraph
@@ -760,6 +788,7 @@ export function compareSchemas(
     const previous = baselineById.get(baselineId);
     if (!previous) continue;
     const details = detailDiff(previous, node, baseline, current, matches);
+    const dataTypeIds = changedDataTypes(previous, node);
     if (details.length > 0)
       changed.push({
         status: "changed",
@@ -768,6 +797,7 @@ export function compareSchemas(
         currentId: node.id,
         baselineId,
         details,
+        ...(dataTypeIds.length > 0 ? { dataTypeIds } : {}),
       });
   }
   for (const node of byKey(baseline.nodes, (candidate) => candidate.alias)) {
