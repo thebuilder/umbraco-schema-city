@@ -375,6 +375,11 @@ const groundOf = (placement: { y?: number }) => placement.y ?? 0;
 type Frame = {
   camera: THREE.Camera;
   viewportHeight: number;
+  /**
+   * The viewport height a board's print size is chosen for, shorter than the real
+   * one while presenting so a board keeps larger print longer.
+   */
+  tierHeight: number;
   flipped: boolean;
   reveal: number;
   /** How far a fade moves this repaint, 1 for at once. */
@@ -678,7 +683,7 @@ function repaint(inputs: Inputs, frame: Frame, floated: Set<string>): boolean {
     frame.fades,
     inputs.solution.boards,
     frame.camera.position,
-    frame.viewportHeight
+    frame.tierHeight
   );
   frame.fades.moving = false;
   let printedChanged = false;
@@ -818,10 +823,7 @@ function useRepaint(
   textScale: number
 ) {
   const camera = useThree((state) => state.camera);
-  // Presenting asks every name for `textScale` times the pixels before it reads or
-  // takes a smaller size, which is the same sum as a viewport that much shorter: a
-  // board keeps larger print longer and a name too small for a projector goes.
-  const height = useThree((state) => state.size.height) / textScale;
+  const height = useThree((state) => state.size.height);
   // A new solution starts its fades afresh; the hover and the selection do not.
   const fades = useMemo(
     () => newFades(inputs.standing.length),
@@ -847,12 +849,17 @@ function useRepaint(
       floated.version,
       flipped.current,
       height,
+      textScale,
     ];
     const last = written.current;
     if (unchanged(last, key, camera)) return false;
     const frame: Frame = {
       camera,
       viewportHeight: height,
+      // Presenting asks a board for `textScale` times the pixels before it takes a
+      // smaller size, the same sum as a viewport that much shorter. The legibility
+      // cut stays at the real height: raising it too left the overview 5 names.
+      tierHeight: height / textScale,
       flipped: flipped.current,
       reveal,
       step,
@@ -909,7 +916,7 @@ export function BoardLabels({
   traces: readonly Trace[];
   /** Each board's colour by district id, for the bare board under a print. */
   boardColours: Map<string, THREE.Color>;
-  /** How many times the usual pixels a name needs to read, 1.4 when presenting. */
+  /** How many times the usual pixels a board targets for its print size, 1.4 when presenting. */
   textScale: number;
 }) {
   const { atlas, geometry, material, courtyards, lineMaterial } = useNameMesh(
