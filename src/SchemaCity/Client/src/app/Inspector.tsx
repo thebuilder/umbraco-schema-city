@@ -22,8 +22,8 @@ import {
   READING,
   ROLE,
   RoleBadges,
+  SpokenCount,
   TabButton,
-  TabCount,
 } from "./InspectorChips";
 import {
   FocusExpansionRow,
@@ -307,7 +307,7 @@ export function Inspector({
             selected={tab === id}
           >
             {TAB_LABEL[id]}
-            <TabCount
+            <SpokenCount
               count={counts[id].count}
               problem={counts[id].problem}
               spoken={counts[id].spoken}

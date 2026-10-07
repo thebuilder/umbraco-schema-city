@@ -180,25 +180,34 @@ export function TabButton({
 }
 
 /**
- * A tab's count, read as part of its name: "Properties, 26 properties". A tab that
- * holds a problem adds a "!" so it differs from a note without its colour.
+ * A count read as part of its control's name: "Properties, 26 properties". One that
+ * stands for a problem adds a "!" so it differs from a note without its colour.
+ * `tone` replaces the faint grey and the pink on a pressed or selected background,
+ * where neither reaches 4.5:1.
  */
-export function TabCount({
+export function SpokenCount({
   count,
   spoken,
   problem = false,
+  tone,
 }: {
   count: number;
   spoken: string;
   problem?: boolean;
+  tone?: string;
 }) {
   if (count === 0) return null;
   return (
     <>
       <span className="sr-only">, {spoken}</span>
-      <span aria-hidden className="font-mono text-2xs text-faint">
+      <span
+        aria-hidden
+        className={`font-mono text-2xs ${tone ?? "text-faint"}`}
+      >
         {count.toLocaleString()}
-        {problem ? <span className="font-bold text-signal">!</span> : null}
+        {problem ? (
+          <span className={`font-bold ${tone ?? "text-signal"}`}>!</span>
+        ) : null}
       </span>
     </>
   );

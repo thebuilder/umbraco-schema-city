@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,7 +20,36 @@ import {
 } from "../model/findings";
 import { findingsCsv } from "../model/findings-export";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
-import { READING } from "./InspectorChips";
+import { inspectorHeading, plural, useAnnounceChange } from "./a11y";
+import { READING, SpokenCount } from "./InspectorChips";
+
+/**
+ * The chips to offer and the rows they leave. A picked kind that has no rows any
+ * more, such as No template once usage arrives and the unused rule takes those
+ * types, counts as not picked, so its chip can never vanish while pressed and
+ * hide every row.
+ */
+export function filterFindings(findings: Finding[], kinds: FindingKind[]) {
+  const countOf = (kind: FindingKind) =>
+    findings.filter((finding) => finding.kind === kind).length;
+  const present = FINDING_KINDS.filter((kind) => countOf(kind) > 0);
+  const active = kinds.filter((kind) => present.includes(kind));
+  const matched =
+    active.length === 0
+      ? findings
+      : findings.filter((finding) => active.includes(finding.kind));
+  return { countOf, present, active, matched };
+}
+
+/**
+ * "2026-10-07 08:41" from an ISO timestamp, or null for a missing one or for the
+ * epoch a snapshot carries when nothing set its date.
+ */
+export function snapshotDate(iso: string | undefined): string | null {
+  if (!iso || Number.isNaN(Date.parse(iso))) return null;
+  if (new Date(iso).getUTCFullYear() < 2000) return null;
+  return iso.slice(0, 16).replace("T", " ");
+}
 
 /**
  * One finding. The group above it carries the kind and what it means, so the row
@@ -128,14 +157,7 @@ export function Findings({
   usage?: UsageReport;
 }) {
   const [kinds, setKinds] = useState<FindingKind[]>([]);
-
-  const countOf = (kind: FindingKind) =>
-    findings.filter((finding) => finding.kind === kind).length;
-  const present = FINDING_KINDS.filter((kind) => countOf(kind) > 0);
-  const matched =
-    kinds.length === 0
-      ? findings
-      : findings.filter((finding) => kinds.includes(finding.kind));
+  const { countOf, present, active, matched } = filterFindings(findings, kinds);
   // findFindings already sorts rows inside a kind strongest first, so grouping
   // keeps that.
   const groups = findingGroups(matched);
@@ -144,15 +166,27 @@ export function Findings({
   ).length;
   const toggle = (kind: FindingKind) =>
     setKinds(
-      kinds.includes(kind)
-        ? kinds.filter((picked) => picked !== kind)
-        : [...kinds, kind]
+      active.includes(kind)
+        ? active.filter((other) => other !== kind)
+        : [...active, kind]
     );
+  useAnnounceChange(
+    active.length > 0
+      ? `${matched.length} of ${plural(findings.length, "finding")} shown`
+      : "All findings shown"
+  );
 
+  const trigger = useRef<HTMLButtonElement>(null);
+  const picked = useRef(false);
   const pick = (id: string) => {
+    picked.current = true;
     onSelect(id);
     onOpenChange(false);
   };
+  const dates = [
+    ["Schema read", snapshotDate(graph.generatedAt)],
+    ["usage counted", snapshotDate(usage?.generatedAt)],
+  ].filter(([, date]) => date !== null);
 
   const exportCsv = () => {
     const blob = new Blob([findingsCsv(matched, graph, usage, kinds)], {
@@ -172,32 +206,39 @@ export function Findings({
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
       <SheetTrigger
+        ref={trigger}
         render={<Button data-trigger size="sm" variant="outline" />}
       >
         Findings
         <Badge variant={problems > 0 ? "signal" : "outline"}>
-          {findings.length}
+          <span aria-hidden>{findings.length}</span>
+          <span className="sr-only">
+            {plural(findings.length, "finding")}, {plural(problems, "problem")}
+          </span>
         </Badge>
       </SheetTrigger>
-      <SheetContent className="w-full gap-0 p-0 font-sans text-[13px] text-prose leading-normal sm:max-w-md">
+      <SheetContent
+        className="w-full gap-0 p-0 font-sans text-[13px] text-prose leading-normal sm:max-w-md"
+        // A chosen row opens the inspector, so focus goes to its heading.
+        finalFocus={() => {
+          const chose = picked.current;
+          picked.current = false;
+          return chose ? inspectorHeading(trigger.current) : true;
+        }}
+      >
         <div className="border-line border-b px-4 pt-4 pb-3">
           <SheetTitle className="font-sans font-semibold text-[17px] text-foreground">
             Findings
           </SheetTitle>
           <div className="mt-1.5 flex items-center justify-between gap-2">
             <p className="text-label">
-              <span className="font-mono">{findings.length}</span> findings,{" "}
-              <span
-                className={`font-mono ${problems > 0 ? "text-signal" : ""}`}
-              >
-                {problems}
-              </span>{" "}
-              {problems === 1 ? "problem" : "problems"}
-              {matched.length === findings.length ? null : (
-                <>
-                  , <span className="font-mono">{matched.length}</span> shown
-                </>
-              )}
+              {plural(findings.length, "finding")},{" "}
+              <span className={problems > 0 ? "text-signal" : ""}>
+                {plural(problems, "problem")}
+              </span>
+              {matched.length === findings.length
+                ? null
+                : `, ${matched.length} shown`}
             </p>
             <Button
               className={READING}
@@ -208,6 +249,11 @@ export function Findings({
               Export CSV
             </Button>
           </div>
+          {dates.length > 0 ? (
+            <p className="mt-1 text-faint text-xs">
+              {dates.map(([what, date]) => `${what} ${date}`).join(", ")}
+            </p>
+          ) : null}
           {usage ? null : (
             <p className="mt-1 text-faint text-xs">
               Usage snapshot unavailable; usage-dependent checks are omitted.
@@ -222,7 +268,7 @@ export function Findings({
             className="flex flex-wrap gap-1 px-4 py-3"
           >
             {present.map((kind) => {
-              const on = kinds.includes(kind);
+              const on = active.includes(kind);
               const problem = findings.some(
                 (finding) =>
                   finding.kind === kind && finding.severity === "problem"
@@ -230,7 +276,7 @@ export function Findings({
               return (
                 <button
                   aria-pressed={on}
-                  className={`inline-flex items-baseline gap-1 border px-1.5 py-0.5 text-xs ${
+                  className={`group inline-flex items-baseline gap-1 border px-1.5 py-0.5 text-xs ${
                     on
                       ? "border-phosphor bg-accent text-phosphor-bright"
                       : "border-line bg-muted text-prose hover:border-phosphor hover:text-phosphor"
@@ -240,11 +286,12 @@ export function Findings({
                   type="button"
                 >
                   {FINDING_LABEL[kind]}
-                  <span
-                    className={`font-mono text-2xs ${problem ? "text-signal" : "text-faint"}`}
-                  >
-                    {countOf(kind)}
-                  </span>
+                  <SpokenCount
+                    count={countOf(kind)}
+                    problem={problem}
+                    spoken={plural(countOf(kind), problem ? "problem" : "note")}
+                    tone={on ? "text-prose" : undefined}
+                  />
                 </button>
               );
             })}
@@ -269,7 +316,7 @@ export function Findings({
                 kind={kind}
                 nodesById={nodesById}
                 onSelect={pick}
-                open={rows[0]?.severity === "problem" || kinds.includes(kind)}
+                open={rows[0]?.severity === "problem" || active.includes(kind)}
                 rows={rows}
               />
             ))}
