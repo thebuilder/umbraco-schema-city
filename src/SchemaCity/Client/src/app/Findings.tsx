@@ -16,6 +16,7 @@ import {
   type FindingSeverity,
   findingGroups,
   KIND_EXPLANATION,
+  KIND_NEXT_STEP,
 } from "../model/findings";
 import { findingsCsv } from "../model/findings-export";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
@@ -87,6 +88,9 @@ function Group({
         <span className={`ml-auto text-xs ${tone.text}`}>{tone.word}</span>
       </summary>
       <p className="px-3 pb-2 text-label text-xs">{KIND_EXPLANATION[kind]}</p>
+      <p className="px-3 pb-2 text-label text-xs">
+        What to do: {KIND_NEXT_STEP[kind]}
+      </p>
       <div className="border-line/40 border-t bg-panel">
         {rows.map((finding) => (
           <Row
@@ -151,7 +155,7 @@ export function Findings({
   };
 
   const exportCsv = () => {
-    const blob = new Blob([findingsCsv(matched, graph, usage)], {
+    const blob = new Blob([findingsCsv(matched, graph, usage, kinds)], {
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);

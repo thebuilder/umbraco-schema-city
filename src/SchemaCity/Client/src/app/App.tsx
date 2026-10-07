@@ -506,8 +506,8 @@ export function App({
   }, [graph.edges]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
   const scale = useMemo(
-    () => lensScale(graph, usage, lens),
-    [graph, usage, lens]
+    () => lensScale(graph, usage, lens, findings),
+    [graph, usage, lens, findings]
   );
   const comparison = useMemo(
     () => (baseline ? compareSchemas(baseline, graph) : null),

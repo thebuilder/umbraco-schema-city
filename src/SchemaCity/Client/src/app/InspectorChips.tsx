@@ -176,6 +176,11 @@ export function TypeChips({
             type="button"
           >
             <span className="truncate">{chip.name}</span>
+            {chip.through ? (
+              <span className="text-2xs text-faint">
+                through {chip.through}
+              </span>
+            ) : null}
             {chip.count === undefined ? null : (
               <span className="font-mono text-2xs text-faint">
                 {chip.count.toLocaleString()}

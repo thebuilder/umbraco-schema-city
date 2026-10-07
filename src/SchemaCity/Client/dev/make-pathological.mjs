@@ -5,7 +5,7 @@
 // the plan below changed.
 //
 // Deterministic the same two ways the seeder's medium.json export is: ids are
-// name-based guids over the alias, and both timestamps are pinned to the epoch. The
+// name-based guids over the alias, and every timestamp is pinned to 2026-09-01. The
 // only pseudo-randomness is one LCG, seeded, used for usage counts where a flat
 // number would make the usage lens useless.
 //
@@ -16,20 +16,21 @@
 //   8 rank-skipping allowedChild edges
 //   one hub with 60 children, one child with 12 parents
 //   10 compositions used by 100 types, 2 used by nothing
-//   5 types with no properties, 20 with 30 properties across 6 groups
+//   6 types with no properties, block39 among them, 20 with 30 properties in 6 groups
 //   one empty Element Type a block editor lists (block39)
 //   one tab over 20 properties only once its composition is counted (editorial40)
 //   culture variance with no effect: a variant Element Type in an invariant
 //   host's block editor (block05), and a variant property on an invariant root (root2)
 //   block editors covering every Element Type from 30 hosts, plus 3 broken ones
 //   4 types with a property alias arriving from two compositions
-//   7 Data Types, two named nearly like another (Text String, SEO Toggle)
+//   7 Data Types, two named nearly like another (Text String, Seo_Toggle)
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const EPOCH = "1970-01-01T00:00:00+00:00";
+// A fixed, realistic date for every timestamp, so the demo never says 1970.
+const FIXTURE_DATE = "2026-09-01T12:00:00+00:00";
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 
 /**
@@ -97,7 +98,7 @@ const EDITORS = [
   [
     "Umbraco.TrueFalse",
     "Umb.PropertyEditorUi.Toggle",
-    "SEO Toggle",
+    "Seo_Toggle",
     "SEO Toggle",
   ],
 ];
@@ -538,7 +539,7 @@ function fill(alias, total) {
       : node.variesByCulture
         ? ["en-US", "da-DK"]
         : ["en-US"],
-    lastEdited: EPOCH,
+    lastEdited: FIXTURE_DATE,
   };
 }
 for (const alias of busy) fill(alias, between(120, 940));
@@ -573,8 +574,17 @@ edges.sort(
 const write = (name, value) =>
   writeFileSync(join(FIXTURES, name), `${JSON.stringify(value, null, 2)}\n`);
 
-write("pathological.json", { generatedAt: EPOCH, folders, nodes, edges });
-write("pathological-usage.json", { generatedAt: EPOCH, byType, references });
+write("pathological.json", {
+  generatedAt: FIXTURE_DATE,
+  folders,
+  nodes,
+  edges,
+});
+write("pathological-usage.json", {
+  generatedAt: FIXTURE_DATE,
+  byType,
+  references,
+});
 
 // ------------------------------------------------------------------ what was planted
 

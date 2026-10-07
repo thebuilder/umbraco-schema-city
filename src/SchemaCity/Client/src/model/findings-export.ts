@@ -1,5 +1,12 @@
-import { type Finding, KIND_EXPLANATION } from "./findings";
-import type { SchemaGraph, UsageReport } from "./types";
+import { dayOf } from "./dates";
+import {
+  FINDING_LABEL,
+  type Finding,
+  type FindingKind,
+  KIND_EXPLANATION,
+  KIND_NEXT_STEP,
+} from "./findings";
+import type { SchemaGraph, TypeUsage, UsageReport } from "./types";
 
 const FORMULA = /^\s*[=+\-@]/;
 const QUOTED = /[",\n\r]/;
@@ -14,56 +21,165 @@ const csv = (value: string | number) => {
 };
 
 /**
- * A portable snapshot of the findings currently visible to the developer. The
- * usage line is deliberately explicit because graph-only findings can be exported
- * while the slower usage request is still unavailable.
+ * One header row and one row per finding, so Excel and Jira imports read it as is.
+ * The snapshot dates and the filter repeat on every row rather than sitting in a
+ * preamble an import would take for data. New columns go on the end, so a sheet
+ * built on this order still lines up.
+ */
+const HEADER = [
+  "Kind",
+  "Kind code",
+  "Severity",
+  "Type",
+  "Alias",
+  "Type key",
+  "Folder",
+  "Total",
+  "Published",
+  "Drafts",
+  "Trashed",
+  "Last edited",
+  "Backoffice path",
+  "Detail",
+  "Explanation",
+  "What to do",
+  "Related",
+  "Unused branch root",
+  "Filter",
+  "Schema snapshot",
+  "Usage snapshot",
+];
+
+/**
+ * The findings currently visible to the developer, as CSV. `kinds` is the drawer's
+ * filter, empty for every kind. Usage columns stay empty while the usage report is
+ * unavailable, and the usage snapshot column says so.
  */
 export function findingsCsv(
   findings: Finding[],
   graph: SchemaGraph,
-  usage?: UsageReport
+  usage?: UsageReport,
+  kinds: FindingKind[] = []
 ): string {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const folders = new Map(graph.folders.map((folder) => [folder.id, folder]));
+  const folderPath = (id: string | null): string => {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (
+      let folder = id ? folders.get(id) : undefined;
+      folder && !seen.has(folder.id);
+      folder = folder.parentId ? folders.get(folder.parentId) : undefined
+    ) {
+      seen.add(folder.id);
+      names.unshift(folder.name);
+    }
+    return names.join("/");
+  };
   const related = (finding: Finding) =>
     [...new Set(finding.related ?? [])]
-      .map((id) => nodes.get(id)?.alias ?? `missing:${id}`)
+      .map(
+        (id) =>
+          nodes.get(id)?.name ??
+          `${finding.kind === "brokenBlock" ? "Missing Element Type" : "Missing type"} ${id}`
+      )
       .join(" | ");
-  const lines = [
-    ["Schema City findings", "snapshot"].map(csv).join(","),
-    ["Schema generated at", graph.generatedAt].map(csv).join(","),
-    [
-      "Usage snapshot",
-      usage?.generatedAt ?? "unavailable; usage-dependent findings omitted",
-    ]
-      .map(csv)
-      .join(","),
-    "",
-    // New columns go on the end, so a sheet built on the old order still lines up.
-    [
-      "Type",
-      "Alias",
-      "Severity",
-      "Finding",
-      "Summary",
-      "Related",
-      "Explanation",
-    ]
-      .map(csv)
-      .join(","),
-    ...findings.map((finding) => {
-      const node = nodes.get(finding.nodeId);
-      return [
-        node?.name ?? "deleted type",
-        node?.alias ?? finding.nodeId,
-        finding.severity,
-        finding.kind,
-        finding.summary,
-        related(finding),
-        KIND_EXPLANATION[finding.kind],
+  const branchRoot = unusedBranchRoots(findings, graph);
+  const filter =
+    kinds.length === 0
+      ? "All kinds"
+      : kinds.map((kind) => FINDING_LABEL[kind]).join(" | ");
+  const schemaDate = dayOf(graph.generatedAt) ?? "";
+  const usageDate = usage ? (dayOf(usage.generatedAt) ?? "") : "unavailable";
+
+  const rows = findings.map((finding) => {
+    const node = nodes.get(finding.nodeId);
+    return [
+      FINDING_LABEL[finding.kind],
+      finding.kind,
+      finding.severity,
+      ...(node
+        ? [node.name, node.alias, finding.nodeId, folderPath(node.folderId)]
+        : ["deleted type", "", finding.nodeId, ""]),
+      ...usageCells(usage?.byType[finding.nodeId]),
+      `/umbraco/section/settings/workspace/document-type/edit/${finding.nodeId}`,
+      finding.summary,
+      KIND_EXPLANATION[finding.kind],
+      KIND_NEXT_STEP[finding.kind],
+      related(finding),
+      (finding.kind === "unusedType" && branchRoot.get(finding.nodeId)) || "",
+      filter,
+      schemaDate,
+      usageDate,
+    ];
+  });
+  return `${[HEADER, ...rows].map((row) => row.map(csv).join(",")).join("\n")}\n`;
+}
+
+/** Total, published, drafts, trashed and last edited, or blanks without usage. */
+const usageCells = (counts: TypeUsage | undefined) =>
+  counts
+    ? [
+        counts.total,
+        counts.published,
+        counts.drafts,
+        counts.trashed,
+        dayOf(counts.lastEdited) ?? "",
       ]
-        .map(csv)
-        .join(",");
-    }),
-  ];
-  return `${lines.join("\n")}\n`;
+    : ["", "", "", "", ""];
+
+/**
+ * The unused ancestors at the top of one unused type's branch, walking up the
+ * allowed-parent edges between unused types, cycle safe. A ring of unused types has
+ * no top, so every member of it stands for the branch.
+ */
+function branchTops(id: string, parents: Map<string, string[]>): string[] {
+  const seen = new Set([id]);
+  const tops: string[] = [];
+  for (let frontier = [id]; frontier.length > 0; ) {
+    const next: string[] = [];
+    for (const at of frontier) {
+      const up = parents.get(at) ?? [];
+      if (up.length === 0) tops.push(at);
+      next.push(...up.filter((parent) => !seen.has(parent)));
+      for (const parent of up) seen.add(parent);
+    }
+    frontier = next;
+  }
+  return tops.length > 0 ? tops : [...seen];
+}
+
+/**
+ * For each unused type, the name of its topmost ancestor that is unused too, so a
+ * team can file one ticket per unused branch. Walks up the allowed-parent edges,
+ * cycle safe. A type with no unused parent is its own root. Several tops, from
+ * several unused parents, give the first by name.
+ */
+function unusedBranchRoots(
+  findings: Finding[],
+  graph: SchemaGraph
+): Map<string, string> {
+  const unused = new Set(
+    findings
+      .filter((finding) => finding.kind === "unusedType")
+      .map((finding) => finding.nodeId)
+  );
+  const nameOf = new Map(graph.nodes.map((node) => [node.id, node.name]));
+  const parents = new Map<string, string[]>();
+  for (const edge of graph.edges ?? [])
+    if (
+      edge.kind === "allowedChild" &&
+      edge.from !== edge.to &&
+      unused.has(edge.from)
+    )
+      parents.set(edge.to, [...(parents.get(edge.to) ?? []), edge.from]);
+
+  return new Map(
+    [...unused].map((id) => [
+      id,
+      branchTops(id, parents)
+        .map((top) => nameOf.get(top) ?? top)
+        .sort((a, b) => a.localeCompare(b))[0] ?? "",
+    ])
+  );
 }

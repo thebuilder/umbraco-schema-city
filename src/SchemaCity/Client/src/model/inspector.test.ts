@@ -86,6 +86,9 @@ describe("usageLine", () => {
     expect(line(lone, plain, report({}), used(1))).toBe(
       "1 content item, 1 published"
     );
+    expect(
+      line(lone, plain, report({}), { ...used(162, 152), trashed: 5 })
+    ).toBe("162 content items, 152 published, including 5 trashed");
   });
 
   it("says a type with no content has none", () => {
@@ -112,6 +115,27 @@ describe("usageLine", () => {
   });
 });
 
+describe("usageLine through inheritance", () => {
+  it("counts a type that inherits a composition's user", () => {
+    const nodes = [node("seo"), node("article"), node("press")];
+    const edges: SchemaEdge[] = [
+      { kind: "composition", from: "article", to: "seo" },
+      { kind: "inherits", from: "press", to: "article" },
+      { kind: "composition", from: "press", to: "article" },
+    ];
+    expect(
+      line(
+        nodes[0] as SchemaNode,
+        around(nodes, edges, "seo"),
+        report({ article: used(10), press: used(5) }),
+        undefined
+      )
+    ).toBe(
+      "No content of its own. 15 items through 2 of the 2 types that use it"
+    );
+  });
+});
+
 describe("directUsageRows", () => {
   it("prints the date half of the last edit and none for no cultures", () => {
     expect(
@@ -123,6 +147,9 @@ describe("directUsageRows", () => {
     ).toContainEqual(["Last edited", "2026-09-03"]);
     expect(directUsageRows(used(3))).toContainEqual(["Cultures", "none"]);
     expect(directUsageRows(used(3))).toContainEqual(["Last edited", "never"]);
+    expect(
+      directUsageRows({ ...used(3), lastEdited: "1970-01-01T00:00:00" })
+    ).toContainEqual(["Last edited", "unknown"]);
   });
 });
 
@@ -251,6 +278,34 @@ describe("connectionGroups", () => {
     { kind: "reference", from: "press", to: "news", propertyAlias: "links" },
   ];
   const groups = connectionGroups(press, around(nodes, edges, "press"));
+
+  it("lists a composition's indirect users with the type they come through", () => {
+    const seoGroups = connectionGroups(
+      node("seo"),
+      around(
+        [...nodes, node("home")],
+        [
+          ...edges.filter((edge) => edge.to !== "seo"),
+          { kind: "composition", from: "article", to: "seo" },
+        ],
+        "seo"
+      )
+    );
+    const composedBy = seoGroups.find((group) => group.kind === "composedBy");
+    expect(composedBy).toMatchObject({ count: 2, ids: ["article", "press"] });
+    const byId = new Map([...nodes].map((n) => [n.id, n]));
+    expect(
+      chips(
+        ["article", "press"],
+        byId,
+        () => undefined,
+        composedBy && "via" in composedBy ? composedBy.via : undefined
+      )
+    ).toEqual([
+      { id: "article", name: "article", count: undefined },
+      { id: "press", name: "press", count: undefined, through: "article" },
+    ]);
+  });
 
   it("lists the parent under Inherits only", () => {
     const find = (kind: string) => groups.find((group) => group.kind === kind);

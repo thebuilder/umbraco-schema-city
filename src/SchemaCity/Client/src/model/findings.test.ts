@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import mediumFixture from "../../dev/fixtures/medium.json";
+import mediumPlantedFixture from "../../dev/fixtures/medium-planted.json";
 import mediumUsageFixture from "../../dev/fixtures/medium-usage.json";
 import pathologicalFixture from "../../dev/fixtures/pathological.json";
 import pathologicalUsageFixture from "../../dev/fixtures/pathological-usage.json";
@@ -9,6 +10,7 @@ import {
   type FindingKind,
   findFindings,
   findingGroups,
+  KIND_NEXT_STEP,
   problemLabels,
 } from "./findings";
 import type {
@@ -187,6 +189,9 @@ describe("findFindings, one rule at a time", () => {
       [edge("block", "host", "used", "blocks")]
     );
     expect(aliasesFor(graph, "unusedElementType")).toEqual(["spare"]);
+    expect(summaryOf(graph, "unusedElementType", "spare")?.summary).toBe(
+      "No block editor lists it. 1 type has a block editor that could"
+    );
   });
 
   it("reports a type no editor can create and nothing composes", () => {
@@ -195,6 +200,9 @@ describe("findFindings, one rule at a time", () => {
       [edge("allowedChild", "home", "child")]
     );
     expect(aliasesFor(graph, "deadEnd")).toEqual(["orphan"]);
+    expect(summaryOf(graph, "deadEnd", "orphan")?.summary).toBe(
+      "Not allowed at root or under any type, and nothing composes it. 1 property"
+    );
   });
 
   it("leaves a composed type off the dead ends, whatever usage says", () => {
@@ -251,6 +259,33 @@ describe("findFindings, one rule at a time", () => {
     expect(finding?.nodeId).toBe("host");
     expect(finding?.related).toEqual(["deleted-key"]);
     expect(finding?.summary).toContain("blocks");
+  });
+
+  it("reports a composed block property once, on the type that declares it", () => {
+    const blocks = property("heroBlocks", null);
+    const graph = graphOf(
+      [
+        node("hero", { groups: [group("hero", [blocks])] }),
+        node("home", {
+          allowedAsRoot: true,
+          name: "Home",
+          groups: [group("hero", [property("heroBlocks", "hero")])],
+        }),
+        node("spacer", { isElement: true, ownPropertyCount: 0 }),
+        node("localised", { isElement: true, variesByCulture: true }),
+      ],
+      [
+        edge("composition", "home", "hero"),
+        ...["hero", "home"].flatMap((host) => [
+          edge("block", host, "deleted-key", "heroBlocks"),
+          edge("block", host, "spacer", "heroBlocks"),
+          edge("block", host, "localised", "heroBlocks"),
+        ]),
+      ]
+    );
+    expect(aliasesFor(graph, "brokenBlock")).toEqual(["hero"]);
+    expect(aliasesFor(graph, "cultureMismatch")).toEqual(["hero"]);
+    expect(summaryOf(graph, "emptyBlock", "spacer")?.related).toEqual(["hero"]);
   });
 
   it("reports a type with no properties at all", () => {
@@ -323,6 +358,41 @@ describe("findFindings, one rule at a time", () => {
     const [finding] = findFindings(graph).filter((f) => f.kind === "pureMixin");
     expect(finding?.nodeId).toBe("seo");
     expect(finding?.related).toEqual(["page"]);
+  });
+
+  it("leaves an Element Type that other Element Types compose out of unusedElementType", () => {
+    const graph = graphOf(
+      [
+        node("page", { allowedAsRoot: true }),
+        node("card", { isElement: true }),
+        node("linkMixin", { isElement: true }),
+      ],
+      [
+        edge("block", "page", "card", "body"),
+        edge("composition", "card", "linkMixin"),
+      ]
+    );
+    expect(aliasesFor(graph, "unusedElementType")).toEqual([]);
+  });
+
+  it("counts a mixin's users through inheritance, as the Matrix does", () => {
+    const graph = graphOf(
+      [
+        node("article", { allowedAsRoot: true }),
+        node("press", { allowedAsRoot: true }),
+        node("seo"),
+      ],
+      [
+        edge("composition", "article", "seo"),
+        edge("inherits", "press", "article"),
+        edge("composition", "press", "article"),
+      ]
+    );
+    const [finding] = findFindings(graph).filter((f) => f.kind === "pureMixin");
+    expect(finding?.summary).toBe(
+      "Composed by 1 type, and 1 more through them"
+    );
+    expect(finding?.related).toEqual(["article", "press"]);
   });
 
   it("reports only the top complexity tier", () => {
@@ -413,7 +483,30 @@ describe("findFindings, one rule at a time", () => {
     const [finding] = findFindings(graph).filter(
       (f) => f.kind === "duplicateAlias"
     );
-    expect(finding?.summary).toBe("seoTitle from Seo A, page");
+    expect(finding?.summary).toBe("seoTitle from Seo A, this type");
+    // The type itself is where the row already is, so it is not a related link.
+    expect(finding?.related).toEqual(["seoA"]);
+  });
+
+  it("names the editors when a clashing alias uses different ones", () => {
+    const graph = graphOf([
+      node("seo", { name: "Seo Composition" }),
+      node("mirror", { name: "Dup Seo Mirror" }),
+      node("page", {
+        allowedAsRoot: true,
+        groups: [
+          group("seo", [
+            property("seoTitle", "seo", { dataTypeName: "Textstring" }),
+          ]),
+          group("mirror", [
+            property("seoTitle", "mirror", { dataTypeName: "Media Picker" }),
+          ]),
+        ],
+      }),
+    ]);
+    expect(summaryOf(graph, "duplicateAlias", "page")?.summary).toBe(
+      "seoTitle: Textstring from Seo Composition, Media Picker from Dup Seo Mirror"
+    );
   });
 
   it("reports a type whose only parents no root reaches", () => {
@@ -617,6 +710,43 @@ describe("findFindings, one rule at a time", () => {
     expect(aliasesFor(single, "nearDuplicateDataType")).toEqual([]);
   });
 
+  it("anchors a tie by id and reads a copy suffix as the same name", () => {
+    const text = (id: string, name: string) =>
+      property("title", null, { dataTypeId: id, dataTypeName: name });
+    const nodes = [
+      node("b", {
+        allowedAsRoot: true,
+        groups: [group("content", [text("dt-b", "Teaser")])],
+      }),
+      node("a", {
+        allowedAsRoot: true,
+        groups: [group("content", [text("dt-a", "Teaser (1)")])],
+      }),
+    ];
+    // One set despite the suffix. Equal counts, so the plain name anchors it,
+    // whichever node comes first.
+    expect(aliasesFor(graphOf(nodes), "nearDuplicateDataType")).toEqual(["b"]);
+    expect(
+      aliasesFor(graphOf([...nodes].reverse()), "nearDuplicateDataType")
+    ).toEqual(["b"]);
+    const twins = [
+      node("x", {
+        allowedAsRoot: true,
+        groups: [group("content", [text("dt-2", "Teaser")])],
+      }),
+      node("y", {
+        allowedAsRoot: true,
+        name: "x",
+        groups: [group("content", [text("dt-1", "Teaser")])],
+      }),
+    ];
+    // Same Data Type name, same counts, and types with one name: the id decides.
+    expect(aliasesFor(graphOf(twins), "nearDuplicateDataType")).toEqual(["y"]);
+    expect(
+      aliasesFor(graphOf([...twins].reverse()), "nearDuplicateDataType")
+    ).toEqual(["y"]);
+  });
+
   it("reports a tab with more than twenty properties, composed ones included", () => {
     const graph = graphOf([
       node("page", {
@@ -653,6 +783,15 @@ describe("findFindings, one rule at a time", () => {
     expect(aliasesFor(graph, "overloadedTab")).toEqual(["tabless"]);
     expect(summaryOf(graph, "overloadedTab", "tabless")?.summary).toBe(
       "listing group holds 21 properties"
+    );
+    const loose = graphOf([
+      node("loose", {
+        allowedAsRoot: true,
+        groups: [{ ...group("no-group", many("item", 21)), name: "No group" }],
+      }),
+    ]);
+    expect(summaryOf(loose, "overloadedTab", "loose")?.summary).toBe(
+      "Ungrouped holds 21 properties"
     );
   });
 
@@ -778,21 +917,10 @@ describe("findFindings on the seeded medium.json", () => {
     "unusedSeoComposition",
     "deadEndPromo",
   ]);
-  const planted: [string, FindingKind][] = [
-    ["unusedArticleLegacy", "unusedType"],
-    ["unusedElementBanner", "unusedElementType"],
-    ["unusedSeoComposition", "deadEnd"],
-    ["deadEndPromo", "deadEnd"],
-    ["dupAliasPage", "duplicateAlias"],
-    ["brokenBlockHost", "brokenBlock"],
-    ["emptyType", "noProperties"],
-    ["legacyHub", "deadEnd"],
-    ["legacyHubPage", "unreachableChain"],
-    ["localisedBlockHost", "cultureMismatch"],
-    ["nearDuplicatePage", "nearDuplicateDataType"],
-    ["overloadedTabPage", "overloadedTab"],
-    ["elementSpacer", "emptyBlock"],
-  ];
+  // SchemaSeeder.PlantedFindings, written out by the seeder's fixture export.
+  const planted = (
+    mediumPlantedFixture as { kind: FindingKind; alias: string }[]
+  ).map(({ kind, alias }) => [alias, kind] as const);
 
   it("treats the sample as headless and leaves the template note out", () => {
     // 54 of the 59 types an editor can reach have no template, noTemplatePage among them.
@@ -844,8 +972,8 @@ describe("findFindings on the seeded medium.json", () => {
  * without a report. There is no unusedElementType row on purpose: the 30 block hosts
  * between them reach all 40 Element Types.
  *
- * nearDuplicateDataType is one row per set: Text String with Textstring, and SEO Toggle
- * with Seo Toggle. Per type it was 279 of the 300, which is why it is per set.
+ * nearDuplicateDataType is one row per set: Text String with Textstring, and Seo Toggle
+ * with Seo_Toggle. Per type it was 279 of the 300, which is why it is per set.
  * emptyBlock is block39, overloadedTab is editorial40,
  * and cultureMismatch is editorial05 hosting the variant block05, and root2.
  */
@@ -910,6 +1038,13 @@ describe("findFindings on the pathological fixture", () => {
     expect(unusedType).toBeGreaterThan(0);
     expect(counts).toEqual({ ...rest, noTemplate: 6 });
   });
+});
+
+it("says what to do for every kind, and never that a type is safe to delete", () => {
+  for (const kind of FINDING_KINDS) {
+    expect(KIND_NEXT_STEP[kind].length).toBeGreaterThan(0);
+    expect(KIND_NEXT_STEP[kind].toLowerCase()).not.toContain("safe");
+  }
 });
 
 it("labels each type by its problems only, in finding order", () => {

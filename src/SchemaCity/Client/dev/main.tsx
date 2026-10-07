@@ -12,7 +12,8 @@ document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 
 // Both fixture kinds in one glob: `<name>.json` is the graph and the
 // `<name>-usage.json` next to it, when the site has exported one, is its usage
-// report. The endpoints arrive separately in the backoffice too.
+// report. The endpoints arrive separately in the backoffice too. `medium-planted.json`
+// is the seeder's planted findings list for the tests, not a graph.
 const fixtures = import.meta.glob<unknown>("./fixtures/*.json", {
   import: "default",
 });
@@ -22,7 +23,7 @@ const usageOf = (path: string) =>
 
 // Two hand-drawn stand-ins for the backoffice icon registry, which is where the
 // wrappers read the real ones. Two is enough to see roof icons work: the seeded
-// schema's brick and globe cover 22 of its 78 types, and every other type has no
+// schema's brick and globe cover 24 of its 86 types, and every other type has no
 // entry here, which is the missing-icon case.
 const icons = {
   "icon-brick":
@@ -48,7 +49,7 @@ const fixtureLabel = (path: string) => {
 };
 
 for (const path of Object.keys(fixtures).sort()) {
-  if (path.endsWith("-usage.json")) continue;
+  if (path.endsWith("-usage.json") || path.endsWith("-planted.json")) continue;
   picker.add(new Option(fixtureLabel(path), path));
 }
 

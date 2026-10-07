@@ -1,68 +1,122 @@
 import { describe, expect, it } from "vitest";
+import type { Finding } from "./findings";
 import { findingsCsv } from "./findings-export";
-import type { SchemaGraph } from "./types";
+import type { SchemaGraph, SchemaNode, UsageReport } from "./types";
+
+const node = (id: string, extra: Partial<SchemaNode> = {}): SchemaNode => ({
+  id,
+  alias: id,
+  name: id,
+  icon: "icon-document",
+  iconColor: null,
+  folderId: null,
+  isElement: false,
+  allowedAsRoot: false,
+  variesByCulture: false,
+  variesBySegment: false,
+  description: null,
+  groups: [],
+  ownPropertyCount: 0,
+  composedPropertyCount: 0,
+  templates: [],
+  ...extra,
+});
 
 const graph: SchemaGraph = {
   generatedAt: "2026-09-06T10:00:00Z",
-  folders: [],
-  nodes: [
-    {
-      id: "page",
-      alias: "page",
-      name: "Page, root",
-      icon: "icon-document",
-      iconColor: null,
-      folderId: null,
-      isElement: false,
-      allowedAsRoot: true,
-      variesByCulture: false,
-      variesBySegment: false,
-      description: null,
-      groups: [],
-      ownPropertyCount: 0,
-      composedPropertyCount: 0,
-      templates: [],
-    },
+  folders: [
+    { id: "f1", name: "Pages", parentId: null },
+    { id: "f2", name: "News", parentId: "f1" },
   ],
-  edges: [],
+  nodes: [
+    node("page", { name: "Page, root", folderId: "f2" }),
+    node("hub", { name: "Hub" }),
+    node("leaf", { name: "Leaf" }),
+  ],
+  edges: [
+    { kind: "allowedChild", from: "page", to: "hub" },
+    { kind: "allowedChild", from: "hub", to: "leaf" },
+    { kind: "allowedChild", from: "leaf", to: "leaf" },
+  ],
 };
 
-describe("findingsCsv", () => {
-  it("escapes cell punctuation and preserves missing related keys", () => {
-    const output = findingsCsv(
-      [
-        {
-          id: "brokenBlock:page",
-          kind: "brokenBlock",
-          severity: "problem",
-          nodeId: "page",
-          summary: "Blocks, settings\nneed review",
-          related: ["deleted-key"],
-        },
-      ],
-      graph
-    );
+const usage: UsageReport = {
+  generatedAt: "2026-09-06T10:02:00Z",
+  byType: {
+    page: {
+      total: 12,
+      published: 9,
+      drafts: 2,
+      trashed: 1,
+      rootInstances: 0,
+      cultures: [],
+      lastEdited: "2026-09-05T08:00:00",
+    },
+  },
+  references: [],
+};
 
-    expect(output).toContain(
-      '"Page, root",page,problem,brokenBlock,"Blocks, settings\nneed review",missing:deleted-key,A block editor lists an Element Type that no longer exists in the schema.'
-    );
-    expect(output).toContain(
-      "Type,Alias,Severity,Finding,Summary,Related,Explanation\n"
-    );
-    expect(output).toContain(
-      "Usage snapshot,unavailable; usage-dependent findings omitted"
+const broken: Finding = {
+  id: "brokenBlock:page",
+  kind: "brokenBlock",
+  severity: "problem",
+  nodeId: "page",
+  summary: "Blocks, settings\nneed review",
+  related: ["deleted-key", "hub"],
+};
+
+const lines = (text: string) => text.trimEnd().split("\n");
+
+describe("findingsCsv", () => {
+  it("puts the header row first, with no preamble", () => {
+    const [header] = lines(findingsCsv([broken], graph, usage));
+    expect(header).toBe(
+      "Kind,Kind code,Severity,Type,Alias,Type key,Folder,Total,Published,Drafts,Trashed,Last edited,Backoffice path,Detail,Explanation,What to do,Related,Unused branch root,Filter,Schema snapshot,Usage snapshot"
     );
   });
 
-  it("includes the usage snapshot when supplied", () => {
-    const usage = {
-      generatedAt: "2026-09-06T10:02:00Z",
-      byType: {},
-      references: [],
-    };
-    expect(findingsCsv([], graph, usage)).toContain(
-      "Usage snapshot,2026-09-06T10:02:00Z"
+  it("writes one row per finding with usage, folder, path and readable related names", () => {
+    const output = findingsCsv([broken], graph, usage, ["brokenBlock"]);
+    expect(output).toContain(
+      'Broken block,brokenBlock,problem,"Page, root",page,page,Pages/News,12,9,2,1,2026-09-05,/umbraco/section/settings/workspace/document-type/edit/page,"Blocks, settings\nneed review",'
     );
+    expect(output).toContain(
+      ",Missing Element Type deleted-key | Hub,,Broken block,2026-09-06,2026-09-06\n"
+    );
+  });
+
+  it("says when the usage snapshot is missing and the export is not filtered", () => {
+    const [, row] = lines(findingsCsv([{ ...broken, summary: "x" }], graph));
+    expect(row).toContain(",page,Pages/News,,,,,,/umbraco/");
+    expect(row?.endsWith(",All kinds,2026-09-06,unavailable")).toBe(true);
+  });
+
+  it("names the topmost unused ancestor of each unused type, cycle safe", () => {
+    const unused = (nodeId: string): Finding => ({
+      id: `unusedType:${nodeId}`,
+      kind: "unusedType",
+      severity: "problem",
+      nodeId,
+      summary: "",
+    });
+    const rows = lines(
+      findingsCsv(
+        [
+          unused("hub"),
+          unused("leaf"),
+          { ...broken, nodeId: "hub", summary: "x" },
+        ],
+        graph,
+        usage
+      )
+    ).slice(1);
+    // Hub's parent has content, so hub tops its own branch, and leaf is under it.
+    // The column is for unused type rows only, not another kind on the same type.
+    expect(rows.map((row) => row.split(",").slice(-4)[0])).toEqual([
+      "Hub",
+      "Hub",
+      "",
+    ]);
   });
 
   it.each(["", "\t", "  ", "\r\n"])(
@@ -70,15 +124,15 @@ describe("findingsCsv", () => {
     (prefix) => {
       const formulaGraph = {
         ...graph,
-        nodes: [{ ...graph.nodes[0], name: `${prefix}=HYPERLINK("x")` }],
+        nodes: [node("page", { name: `${prefix}=HYPERLINK("x")` })],
       };
       expect(
         findingsCsv(
           [
             {
-              id: "empty:page",
+              id: "noProperties:page",
               kind: "noProperties",
-              severity: "problem",
+              severity: "note",
               nodeId: "page",
               summary: "check",
             },

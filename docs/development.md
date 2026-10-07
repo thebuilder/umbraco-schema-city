@@ -110,8 +110,9 @@ Usage is cached for one minute. Append `?refresh=true` to bypass that cache. The
 routes directly through `Client/src/api.ts`; there is no generated API client.
 
 The standalone fixtures are under `Client/dev/fixtures/`. A Development boot of the demo site
-exports `medium.json` and `medium-usage.json` from the seeded installation. Their timestamps are
-fixed for reproducible diffs, so 1970 dates in demo screenshots are fixture data.
+exports `medium.json` and `medium-usage.json` from the seeded installation. Every timestamp in
+them is pinned to 2026-09-01 12:00 UTC for reproducible diffs, so that date in demo screenshots is
+fixture data.
 
 ## Build a local package
 
@@ -147,6 +148,9 @@ animation at a consistent viewport size. Omit the fixture selector from the imag
 the demo page, not the extension. Do not alter schema values for screenshots.
 
 Save images under `docs/screenshots/` and update the README captions to describe what they show.
-The current set covers the structure overview, Home in focus, filtered findings, Article with the
-content-count lens, the list sorted by own property count, and a low orbit toward the horizon. The README uses absolute
-image URLs so images also work when it is included in a NuGet package.
+The current set is `city.png` (the structure overview), `focus.png` (Home in focus),
+`findings.png` (findings grouped by kind), `lens.png` (Article with the content-count lens),
+`list.png` (the list sorted by own property count), `tree.png` (the creation tree), `matrix.png`
+(the compositions matrix), `editor.png` (Home in the editor view) and `free-camera.png` (a low orbit
+toward the horizon, which the README does not show). The README uses absolute image URLs so
+images also work when it is included in a NuGet package.

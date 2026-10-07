@@ -4,6 +4,7 @@
 // app/scene/graph-links.ts stays separate on purpose. It answers a different
 // question, the flat set of everything one hop away that the scene keeps lit,
 // and it includes directions this file has no section for.
+import { type CompositionUser, compositionUsers } from "./matrix";
 import type { SchemaGraph } from "./types";
 
 /**
@@ -25,6 +26,11 @@ export type PropertyTargets = { propertyAlias: string; ids: string[] };
 export type Neighbourhood = {
   compositions: string[];
   composedBy: string[];
+  /**
+   * Every type that gets this one's properties: composedBy, plus the types that
+   * inherit or compose one of them, each with the type it arrives through.
+   */
+  usedBy: CompositionUser[];
   inherits: string[];
   inheritedBy: string[];
   allowedParents: string[];
@@ -38,6 +44,7 @@ export type Neighbourhood = {
 const empty = (): Neighbourhood => ({
   compositions: [],
   composedBy: [],
+  usedBy: [],
   inherits: [],
   inheritedBy: [],
   allowedParents: [],
@@ -116,6 +123,9 @@ export function neighbourhoods(graph: SchemaGraph): Map<string, Neighbourhood> {
   // target, so the flat lists drop repeats. The grouped lists keep theirs, because
   // there the property alias is what tells the two rows apart.
   const tidy = (ids: string[]) => [...new Set(ids)].sort(byAlias);
+
+  for (const [id, users] of compositionUsers(graph))
+    at(id).usedBy = users.sort((a, b) => byAlias(a.id, b.id));
 
   for (const entry of map.values()) {
     entry.compositions = tidy(entry.compositions);

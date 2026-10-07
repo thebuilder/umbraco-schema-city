@@ -91,6 +91,29 @@ function GroupHeader({
   );
 }
 
+/**
+ * Top-level groups, each tab with the groups it holds. Anything whose parent alias
+ * resolves to nothing is drawn at the top level rather than hidden. When the type
+ * and a composition both declare a tab under one alias, its groups go under the
+ * first of them only.
+ */
+export function topGroups(
+  groups: PropertyGroup[]
+): (PropertyGroup & { children: PropertyGroup[] })[] {
+  const top = groups.filter(
+    (group) =>
+      group.parentAlias === null ||
+      !groups.some((candidate) => candidate.alias === group.parentAlias)
+  );
+  return top.map((group) => ({
+    ...group,
+    children:
+      top.find((first) => first.alias === group.alias) === group
+        ? groups.filter((child) => child.parentAlias === group.alias)
+        : [],
+  }));
+}
+
 export function InspectorProperties({
   node,
   nodesById,
@@ -101,15 +124,7 @@ export function InspectorProperties({
   const { groups } = node;
   if (groups.length === 0)
     return <p className="py-3.5 text-faint text-xs">No properties.</p>;
-  // A tab holds its groups. Anything whose parent alias resolves to nothing is
-  // drawn at the top level rather than hidden.
-  const nested = (parent: PropertyGroup) =>
-    groups.filter((group) => group.parentAlias === parent.alias);
-  const top = groups.filter(
-    (group) =>
-      group.parentAlias === null ||
-      !groups.some((candidate) => candidate.alias === group.parentAlias)
-  );
+  const top = topGroups(groups);
   const total = node.ownPropertyCount + node.composedPropertyCount;
 
   return (
@@ -124,7 +139,7 @@ export function InspectorProperties({
             <GroupHeader group={group} nodesById={nodesById} />
           </h3>
           <Rows group={group} nodesById={nodesById} />
-          {nested(group).map((child) => (
+          {group.children.map((child) => (
             <div className="border-line border-t" key={child.id}>
               <h4 className="flex items-baseline gap-2 px-2.5 pt-2 font-medium text-label text-xs">
                 <GroupHeader group={child} nodesById={nodesById} />

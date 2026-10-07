@@ -2,26 +2,62 @@ import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { dayOf } from "../model/dates";
 import {
   compareSchemas,
   createSnapshot,
   readSnapshotFile,
+  snapshotFileName,
 } from "../model/snapshots";
 import type { SchemaGraph } from "../model/types";
 import { ComparisonResults } from "./ComparisonResults";
 
-function downloadSnapshot(graph: SchemaGraph) {
-  const blob = new Blob([JSON.stringify(createSnapshot(graph), null, 2)], {
+/** Saves the snapshot and returns the file name it was saved under. */
+function downloadSnapshot(graph: SchemaGraph): string {
+  const snapshot = createSnapshot(graph);
+  const name = snapshotFileName(window.location.hostname, snapshot.capturedAt);
+  const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "schema-city-snapshot.json";
+  link.download = name;
   document.body.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  return name;
+}
+
+/** The file the last export saved, and the last import's error. */
+function Status({
+  error,
+  saved,
+}: {
+  error: string | null;
+  saved: string | null;
+}) {
+  return (
+    <>
+      {saved ? (
+        <p className="mt-2 text-phosphor text-xs" role="status">
+          Exported {saved}.
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-signal text-xs" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** The two snapshot dates. An epoch date is a placeholder, so it is left out. */
+function datesLine(generatedAt: string, baselineCapturedAt: string | null) {
+  const current = dayOf(generatedAt);
+  return `Current graph${current ? `: ${current}` : ""} · baseline ${dayOf(baselineCapturedAt) ?? "loaded"}`;
 }
 
 export function Comparison({
@@ -40,6 +76,7 @@ export function Comparison({
   open: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
   const [baselineCapturedAt, setBaselineCapturedAt] = useState<string | null>(
     null
   );
@@ -83,7 +120,7 @@ export function Comparison({
               Import snapshot
             </Button>
             <Button
-              onClick={() => downloadSnapshot(graph)}
+              onClick={() => setSaved(downloadSnapshot(graph))}
               size="sm"
               variant="outline"
             >
@@ -115,18 +152,13 @@ export function Comparison({
               type="file"
             />
           </div>
-          {error ? (
-            <p className="mt-2 text-signal text-xs" role="alert">
-              {error}
-            </p>
-          ) : null}
+          <Status error={error} saved={saved} />
         </div>
         <ScrollArea className="min-h-0 flex-1">
           {comparison ? (
             <div className="space-y-3 px-3 py-4">
               <p className="text-3xs text-phosphor-dim">
-                Current graph: {graph.generatedAt.slice(0, 10)} · baseline{" "}
-                {snapshotDate(baselineCapturedAt)}
+                {datesLine(graph.generatedAt, baselineCapturedAt)}
               </p>
               <ComparisonResults comparison={comparison} onSelect={onSelect} />
             </div>
@@ -140,8 +172,4 @@ export function Comparison({
       </SheetContent>
     </Sheet>
   );
-}
-
-function snapshotDate(timestamp: string | null) {
-  return timestamp?.slice(0, 10) ?? "loaded";
 }

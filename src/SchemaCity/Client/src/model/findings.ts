@@ -5,6 +5,7 @@
 // the whole set is cheap enough to recompute whenever either input changes.
 import { creationTree } from "./creation-tree";
 import { editorLayout } from "./editor-layout";
+import { compositionUsers } from "./matrix";
 import type {
   SchemaEdge,
   SchemaGraph,
@@ -100,7 +101,7 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
   brokenBlock:
     "A block editor lists an Element Type that no longer exists in the schema.",
   duplicateAlias:
-    "A property alias arrives from more than one composition. The editor that results cannot save both values.",
+    "A property alias arrives from more than one place, the type's own properties or its compositions. The editor that results cannot save both values, and where the editors differ the stored value may not suit one of them.",
   emptyBlock:
     "A block editor offers these Element Types as content blocks, but they have no own and no composed properties, so an editor who adds one has nothing to fill in. A deliberate divider or spacer block looks the same.",
   cultureMismatch:
@@ -115,13 +116,47 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
     "An editor can create these Document Types, but the usage snapshot counts no content of them. Custom code, migrations and external consumers can still depend on a type.",
   overloadedTab: `One tab, or one group on a type without tabs, holds more than ${TAB_LIMIT} properties. Composed properties count, merged the way the Editor view shows them.`,
   nearDuplicateDataType:
-    "Data Types whose names match once case, spaces, hyphens and underscores are ignored. They can differ in configuration. Each set is one row, on a type that uses the least-used of them, and the related types are every other type that uses any of them. Only own properties count, so a composed property counts on its composition.",
+    "Data Types whose names match once case, spaces, hyphens, underscores and a copy number such as (1) are ignored. They can differ in configuration. Each set is one row, on a type that uses the least-used of them, and the related types are every other type that uses any of them. Only own properties count, so a composed property counts on its composition.",
   noProperties: "These types have no own and no composed properties.",
   complexity: `In the highest of ${COMPLEXITY_TIERS} complexity tiers in this schema. The score is own and composed properties, plus twice the compositions, plus distinct block targets.`,
   pureMixin:
     "Used only as compositions and never created on their own. Usually intended; listed so the mixins are easy to find.",
   noTemplate:
     "An editor can create these types, but no template is allowed. Check whether they are meant to render on their own.",
+};
+
+/**
+ * What a developer can do about each kind, shown beside the explanation. A finding
+ * is evidence to check, so none of these calls a type safe to delete.
+ */
+export const KIND_NEXT_STEP: Record<FindingKind, string> = {
+  brokenBlock:
+    "Remove the missing Element Type from the block editor, or restore it if content still holds those blocks.",
+  duplicateAlias:
+    "Rename the property on one source or drop one of the compositions, then check which value editors expect.",
+  emptyBlock:
+    "Add the properties the block needs, or keep it if it is a deliberate divider or spacer.",
+  cultureMismatch:
+    "Let the type vary by culture, or make the property or Element Type invariant, whichever editors expect.",
+  unreachableChain:
+    "Allow the top of the chain under a type a root reaches, or remove the chain if it is left over.",
+  deadEnd: "Allow it under a page, or remove it if it is left over.",
+  unusedElementType:
+    "Check stored block values and custom code, then add it to a block editor or remove it.",
+  unusedType:
+    "Check custom code and imports, then remove it or allow it where editors need it.",
+  overloadedTab:
+    "Split the tab into groups or more tabs, so editors find the fields they need.",
+  nearDuplicateDataType:
+    "Compare the configurations, then move the properties onto one Data Type if they should match.",
+  noProperties:
+    "Add properties, or check whether code relies on it as a folder or marker type.",
+  complexity:
+    "Check whether some properties belong in a composition or a block, so the type stays readable.",
+  pureMixin:
+    "Nothing, if it is meant as a mixin. With one or two users, consider moving its properties onto them.",
+  noTemplate:
+    "Allow a template if it should render on its own, or leave it for headless or block-only content.",
 };
 
 const SEVERITY: Record<FindingKind, FindingSeverity> = {
@@ -212,8 +247,8 @@ export function findFindings(
   const inBlock = counter();
   const outComposition = counter();
   const blockTargets = new Map<string, Set<string>>();
-  const composedBy = new Map<string, string[]>();
-  // Block edges to types the graph has, by host and by Element Type.
+  // Block edges to types the graph has, by host and by Element Type, from the type
+  // that declares the block property.
   const blocksFrom = new Map<string, SchemaEdge[]>();
   const blocksTo = new Map<string, SchemaEdge[]>();
   // Host id to the Element Type keys its block editors name and the graph does not
@@ -223,6 +258,22 @@ export function findFindings(
     { propertyAlias: string; to: string }[]
   >();
 
+  // A composed block property arrives with an edge from every type that uses the
+  // composition. Rules about the block editor itself read it once, on the type that
+  // declares the property.
+  const composedAliases = new Map(
+    nodes.map((node) => [
+      node.id,
+      new Set(
+        propertiesOf(node)
+          .filter((p) => p.fromCompositionId)
+          .map((p) => p.alias)
+      ),
+    ])
+  );
+  const declares = (edge: SchemaEdge) =>
+    !composedAliases.get(edge.from)?.has(edge.propertyAlias ?? "");
+
   for (const edge of edges) {
     switch (edge.kind) {
       case "allowedChild":
@@ -231,11 +282,11 @@ export function findFindings(
       case "composition":
         bump(inComposition, edge.to);
         bump(outComposition, edge.from);
-        append(composedBy, edge.to, edge.from);
         break;
       case "block": {
         blockHosts.add(edge.from);
         if (!byId.has(edge.to)) {
+          if (!declares(edge)) break;
           append(missingBlocks, edge.from, {
             propertyAlias: edge.propertyAlias ?? "",
             to: edge.to,
@@ -243,8 +294,10 @@ export function findFindings(
           break;
         }
         bump(inBlock, edge.to);
-        append(blocksFrom, edge.from, edge);
-        append(blocksTo, edge.to, edge);
+        if (declares(edge)) {
+          append(blocksFrom, edge.from, edge);
+          append(blocksTo, edge.to, edge);
+        }
         // Two properties pointing at the same Element Type are one target, the same
         // way the scene draws them as one line.
         const targets = blockTargets.get(edge.from) ?? new Set<string>();
@@ -259,6 +312,7 @@ export function findFindings(
 
   // The creation tree already walks down from every root, so the chains it cannot
   // reach come from there. Types with no parent at all are the dead end rule's.
+  const users = compositionUsers(graph);
   const unreachable = new Map(
     creationTree(graph)
       .unreachable.filter((row) => row.parents.length > 0)
@@ -295,7 +349,8 @@ export function findFindings(
     pages.length;
   const nameOf = new Map(nodes.map((node) => [node.id, node.name]));
   const byName = (a: string, b: string) =>
-    (nameOf.get(a) ?? a).localeCompare(nameOf.get(b) ?? b);
+    (nameOf.get(a) ?? a).localeCompare(nameOf.get(b) ?? b) ||
+    a.localeCompare(b);
   const twins = dataTypeTwins(nodes, byName);
   const names = (ids: string[]) => list(ids.map((id) => nameOf.get(id) ?? id));
   // Without a report the row has nothing usage-based to add, so it says nothing.
@@ -360,13 +415,15 @@ export function findFindings(
       );
     }
 
-    if (node.isElement && at(inBlock, node.id) === 0) {
+    // An Element Type other Element Types compose is a mixin: its properties reach
+    // blocks through them, and an unused composer gets a row of its own.
+    if (node.isElement && at(inBlock, node.id) === 0 && composers === 0) {
       add(
         "unusedElementType",
         node,
         blockHosts.size > 0
-          ? `Could be listed by the block editors on ${plural(blockHosts.size, "type")}`
-          : "No type in this schema has a block editor"
+          ? `No block editor lists it. ${plural(blockHosts.size, "type has", "types have")} a block editor that could`
+          : "No block editor lists it, and no type in this schema has a block editor"
       );
     }
 
@@ -374,15 +431,17 @@ export function findFindings(
     // this one row says so. A type something composes is a mixin doing its job, so
     // it is never a dead end; the pure mixin note below covers it instead.
     if (!(node.isElement || canCreate) && composers === 0) {
+      const detail =
+        content(node.id) ||
+        plural(
+          node.ownPropertyCount + node.composedPropertyCount,
+          "property",
+          "properties"
+        );
       add(
         "deadEnd",
         node,
-        content(node.id) ||
-          plural(
-            node.ownPropertyCount + node.composedPropertyCount,
-            "property",
-            "properties"
-          )
+        `Not allowed at root or under any type, and nothing composes it. ${detail}`
       );
     }
 
@@ -398,13 +457,27 @@ export function findFindings(
 
     const duplicates = duplicateAliases(node);
     if (duplicates.length > 0) {
+      const source = (id: string) =>
+        id === node.id ? "this type" : (nameOf.get(id) ?? id);
       add(
         "duplicateAlias",
         node,
         duplicates
-          .map(({ alias, origins }) => `${alias} from ${names(origins)}`)
+          .map(({ alias, origins }) => {
+            const editors = new Set(origins.map((origin) => origin.editor));
+            // Different editors under one alias is the real data risk, so name them.
+            return editors.size > 1
+              ? `${alias}: ${origins.map((origin) => `${origin.editor} from ${source(origin.id)}`).join(", ")}`
+              : `${alias} from ${list(origins.map((origin) => source(origin.id)))}`;
+          })
           .join("; "),
-        duplicates.flatMap((duplicate) => duplicate.origins),
+        [
+          ...new Set(
+            duplicates.flatMap((duplicate) =>
+              duplicate.origins.map((origin) => origin.id)
+            )
+          ),
+        ].filter((id) => id !== node.id),
         duplicates.length
       );
     }
@@ -541,13 +614,18 @@ export function findFindings(
     }
 
     if (composers > 0 && !canCreate && at(inBlock, node.id) === 0) {
-      // A mixin only one or two types compose is the one worth folding back in.
+      // Users through inheritance and nested compositions count, the same set the
+      // inspector and the Matrix show. A mixin only one or two types use is the one
+      // worth folding back in.
+      const all = users.get(node.id) ?? [];
+      const using = all.map((user) => user.id);
+      const indirect = all.filter((user) => user.via).length;
       add(
         "pureMixin",
         node,
-        `Composed by ${plural(composers, "type")}`,
-        composedBy.get(node.id),
-        -composers
+        `Composed by ${plural(all.length - indirect, "type")}${indirect > 0 ? `, and ${indirect} more through them` : ""}`,
+        using.sort(byName),
+        -using.length
       );
     }
 
@@ -595,23 +673,34 @@ function list(items: string[]): string {
  * editor that results cannot save both values.
  */
 function duplicateAliases(node: SchemaNode) {
-  const origins = new Map<string, Set<string>>();
+  // Alias to origin id to the Data Type, or editor, the property uses there.
+  const origins = new Map<string, Map<string, string>>();
   for (const property of propertiesOf(node)) {
-    const seen = origins.get(property.alias) ?? new Set<string>();
+    const seen = origins.get(property.alias) ?? new Map<string, string>();
     // Own properties have no composition to name, so they are their own origin.
-    seen.add(property.fromCompositionId ?? node.id);
+    seen.set(
+      property.fromCompositionId ?? node.id,
+      property.dataTypeName ?? property.editorAlias
+    );
     origins.set(property.alias, seen);
   }
   return [...origins]
     .filter(([, from]) => from.size > 1)
-    .map(([alias, from]) => ({ alias, origins: [...from] }))
+    .map(([alias, from]) => ({
+      alias,
+      origins: [...from].map(([id, editor]) => ({ id, editor })),
+    }))
     .sort((a, b) => a.alias.localeCompare(b.alias));
 }
 
 const SEPARATORS = /[\s_-]+/g;
 
-/** "SEO Toggle", "seo-toggle" and "Seo_Toggle" all become "seotoggle". */
-const normalName = (name: string) => name.toLowerCase().replace(SEPARATORS, "");
+/** Umbraco saves a second Data Type of the same name as "Name (1)". */
+const COPY_SUFFIX = /\s*\(\d+\)$/;
+
+/** "SEO Toggle", "seo-toggle", "Seo_Toggle" and "SEO Toggle (1)" all become "seotoggle". */
+const normalName = (name: string) =>
+  name.toLowerCase().replace(COPY_SUFFIX, "").replace(SEPARATORS, "");
 
 /**
  * Data Types are only in the graph through the properties that use them, so the
@@ -659,11 +748,14 @@ function dataTypeTwins(
     { summary: string; related: string[]; properties: number }
   >();
   for (const set of dataTypeSets(nodes)) {
+    // Two Data Types with one name and the same counts tie, so the id decides,
+    // never the order the nodes arrived in.
     const uses = [...set].sort(
-      ([, a], [, b]) =>
+      ([idA, a], [idB, b]) =>
         a.properties - b.properties ||
         a.types.size - b.types.size ||
-        a.name.localeCompare(b.name)
+        a.name.localeCompare(b.name) ||
+        idA.localeCompare(idB)
     );
     const names = uses.map(([, use]) => use.name);
     const label = ([id, use]: [string, DataTypeUse]) =>
@@ -706,7 +798,11 @@ function overloadedTabs(node: SchemaNode) {
   const boxes =
     tabs.length === 1 && only?.key === ""
       ? only.panels.map((panel) => ({
-          label: panel.name === null ? "Ungrouped" : `${panel.name} group`,
+          // The backend's synthetic "No group" would read "No group group".
+          label:
+            panel.name === null || panel.key.endsWith("/no-group")
+              ? "Ungrouped"
+              : `${panel.name} group`,
           count: panel.properties.length,
         }))
       : tabs.map((tab) => ({ label: `${tab.name} tab`, count: tab.count }));

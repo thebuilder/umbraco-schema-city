@@ -1,5 +1,6 @@
 // What the inspector says about one type, worked out from the graph and the usage
 // report. Pure: no DOM, no React, no three.js.
+import { dayOf } from "./dates";
 import type { Neighbourhood } from "./neighbourhood";
 import type { SchemaEdge, SchemaNode, TypeUsage, UsageReport } from "./types";
 
@@ -16,8 +17,12 @@ export function roleOf(
   around: Neighbourhood | undefined
 ): Role {
   if (node.isElement) return "element";
-  return (around?.composedBy.length ?? 0) > 0 &&
-    (around?.allowedParents.length ?? 0) === 0 &&
+  // A type allowed under itself still needs a way in, so that edge is no parent,
+  // as in the city.
+  const other = (ids: string[] | undefined) =>
+    (ids ?? []).some((id) => id !== node.id);
+  return other(around?.composedBy) &&
+    !other(around?.allowedParents) &&
     !node.allowedAsRoot
     ? "composition"
     : "page";
@@ -28,19 +33,16 @@ export type ThroughUsage = {
   published: number;
   drafts: number;
   trashed: number;
-  /** Types that compose this one and have content of their own. */
+  /** Types that use this one and have content of their own. */
   withContent: number;
-  /** Types that compose this one. */
+  /** Types that use this one, directly or through another type. */
   of: number;
 };
 
 /**
- * Content that carries a composition's properties, summed over the types that
- * compose it.
- *
- * ponytail: one level only. A composition composed into another composition counts
- * that one's own content, which is none; walk composedBy transitively if nested
- * mixins turn up in real schemas.
+ * Content that carries a composition's properties, summed over every type that
+ * gets them, through inheritance and nested compositions included. Each user is a
+ * different type, so no item is counted twice.
  */
 function throughUsage(
   around: Neighbourhood,
@@ -52,9 +54,9 @@ function throughUsage(
     drafts: 0,
     trashed: 0,
     withContent: 0,
-    of: around.composedBy.length,
+    of: around.usedBy.length,
   };
-  for (const id of around.composedBy) {
+  for (const { id } of around.usedBy) {
     const usage = report.byType[id];
     if (!usage || usage.total === 0) continue;
     sum.total += usage.total;
@@ -68,6 +70,10 @@ function throughUsage(
 
 const items = (count: number) =>
   `${count.toLocaleString()} ${count === 1 ? "item" : "items"}`;
+
+/** Totals count the recycle bin too, so the line says so rather than hiding it. */
+const trashedNote = (trashed: number) =>
+  trashed > 0 ? `, including ${trashed.toLocaleString()} trashed` : "";
 
 /** Which of the usage stories applies to a type, with what it needs to tell it. */
 export type UsageState =
@@ -86,7 +92,7 @@ export function usageState(
   // Block values are stored inside the content that hosts them, so an Element
   // Type is never counted as a content item of its own.
   if (node.isElement) return { kind: "element" };
-  if (around.composedBy.length === 0) return { kind: "none" };
+  if (around.usedBy.length === 0) return { kind: "none" };
   return { kind: "through", through: throughUsage(around, report) };
 }
 
@@ -100,13 +106,13 @@ export function usageLine(state: UsageState): string {
     case "none":
       return "No content items yet";
     case "direct":
-      return `${state.usage.total.toLocaleString()} content ${state.usage.total === 1 ? "item" : "items"}, ${state.usage.published.toLocaleString()} published`;
+      return `${state.usage.total.toLocaleString()} content ${state.usage.total === 1 ? "item" : "items"}, ${state.usage.published.toLocaleString()} published${trashedNote(state.usage.trashed)}`;
     default: {
       const { through } = state;
       const users = `${through.of} ${through.of === 1 ? "type" : "types"} that use it`;
       return through.total === 0
         ? `No content of its own, and none through the ${users}`
-        : `No content of its own. ${items(through.total)} through ${through.withContent} of the ${users}`;
+        : `No content of its own. ${items(through.total)} through ${through.withContent} of the ${users}${trashedNote(through.trashed)}`;
     }
   }
 }
@@ -122,9 +128,11 @@ export function directUsageRows(usage: TypeUsage): [string, string][] {
       "Cultures",
       usage.cultures.length > 0 ? usage.cultures.join(", ") : "none",
     ],
-    // The date half of the timestamp, not a formatted local date, so the panel
-    // reads the same on every machine the backoffice runs on.
-    ["Last edited", usage.lastEdited ? usage.lastEdited.slice(0, 10) : "never"],
+    // An epoch date is a placeholder, not an edit, so it reads as unknown.
+    [
+      "Last edited",
+      usage.lastEdited ? (dayOf(usage.lastEdited) ?? "unknown") : "never",
+    ],
   ];
 }
 
@@ -157,7 +165,13 @@ export function contentCountOf(
       : undefined;
 }
 
-export type Chip = { id: string; name: string | null; count?: number };
+export type Chip = {
+  id: string;
+  name: string | null;
+  count?: number;
+  /** The type's name it arrives through, for an indirect composition user. */
+  through?: string;
+};
 
 /**
  * Most content first, then by name, so the types that matter most lead a long
@@ -167,14 +181,21 @@ export type Chip = { id: string; name: string | null; count?: number };
 export function chips(
   ids: string[],
   nodesById: Map<string, SchemaNode>,
-  countOf: (id: string) => number | undefined
+  countOf: (id: string) => number | undefined,
+  via?: Map<string, string>
 ): Chip[] {
   return ids
-    .map((id) => ({
-      id,
-      name: nodesById.get(id)?.name ?? null,
-      count: countOf(id),
-    }))
+    .map((id) => {
+      const through = via?.get(id);
+      return {
+        id,
+        name: nodesById.get(id)?.name ?? null,
+        count: countOf(id),
+        ...(through
+          ? { through: nodesById.get(through)?.name ?? through }
+          : {}),
+      };
+    })
     .sort(
       (a, b) =>
         Number(a.name === null) - Number(b.name === null) ||
@@ -210,7 +231,14 @@ export type ConnectionGroup = {
   trace: Trace;
   /** Distinct types in the group. */
   count: number;
-} & ({ ids: string[] } | { fields: Field[] });
+} & (
+  | {
+      ids: string[];
+      /** Id to the type it arrives through, for a user that does not compose it itself. */
+      via?: Map<string, string>;
+    }
+  | { fields: Field[] }
+);
 
 const LABEL: Record<FlatKind | FieldKind, string> = {
   allowedParents: "Allowed under",
@@ -269,7 +297,10 @@ export function connectionGroups(
     inherits: around.inherits,
     compositions: without(around.compositions, around.inherits),
     inheritedBy: around.inheritedBy,
-    composedBy: without(around.composedBy, around.inheritedBy),
+    composedBy: without(
+      around.usedBy.map((user) => user.id),
+      around.inheritedBy
+    ),
     blockHosts: around.blockHosts,
     referencesIn: around.referencesIn,
   };
@@ -303,6 +334,13 @@ export function connectionGroups(
       const list = byField[kind];
       const count = new Set(list.flatMap((field) => field.ids)).size;
       if (count > 0) groups.push({ ...base, count, fields: list });
+    } else if (kind === "composedBy" && flat[kind].length > 0) {
+      const via = new Map(
+        around.usedBy.flatMap((user) =>
+          user.via ? [[user.id, user.via] as const] : []
+        )
+      );
+      groups.push({ ...base, count: flat[kind].length, ids: flat[kind], via });
     } else if (flat[kind].length > 0)
       groups.push({ ...base, count: flat[kind].length, ids: flat[kind] });
   }

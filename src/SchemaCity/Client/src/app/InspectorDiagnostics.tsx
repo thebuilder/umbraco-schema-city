@@ -2,6 +2,7 @@ import {
   FINDING_LABEL,
   type Finding,
   KIND_EXPLANATION,
+  KIND_NEXT_STEP,
 } from "../model/findings";
 import type { SchemaEdge, SchemaNode } from "../model/types";
 import { FindingRelations } from "./FindingRelations";
@@ -42,6 +43,9 @@ export function InspectorChecks({
             <p className="mt-0.5 text-prose">{finding.summary}</p>
             <p className="mt-1.5 text-faint text-xs">
               {KIND_EXPLANATION[finding.kind]}
+            </p>
+            <p className="mt-1 text-faint text-xs">
+              What to do: {KIND_NEXT_STEP[finding.kind]}
             </p>
             <FindingRelations
               finding={finding}

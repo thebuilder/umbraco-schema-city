@@ -43,10 +43,9 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 {
     /// <summary>
     /// The findings the seed data is built to produce, as (kind, Document Type alias), with the
-    /// client's kind ids. The findings test asserts that its own output contains all of these.
-    /// It cannot assert equality:
-    /// the no-template rule matches every creatable type the seeder leaves without one, and giving
-    /// 60 Document Types a template would write 60 .cshtml files into the site.
+    /// client's kind ids. The export writes them to medium-planted.json, and the client's findings
+    /// test asserts that its output on medium.json contains every one. Containment, not equality:
+    /// the rules find more than what is planted, such as the unused types the content leaves.
     /// </summary>
     public static readonly (string Kind, string Alias)[] PlantedFindings =
     [
@@ -59,17 +58,31 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         ("emptyBlock", "elementSpacer"),
         ("nearDuplicateDataType", "nearDuplicatePage"),
         ("noProperties", "emptyType"),
-        ("noTemplate", "noTemplatePage"),
         ("overloadedTab", "overloadedTabPage"),
         ("unreachableChain", "legacyHubPage"),
         ("unusedElementType", "unusedElementBanner"),
         ("unusedType", "unusedArticleLegacy"),
     ];
 
+    /// <summary>
+    /// Bump this whenever the seed changes shape. The site type carries it in its description, and
+    /// the export leaves the fixtures alone when the database was seeded by another version, so an
+    /// old database never rewrites them with a stale schema.
+    /// </summary>
+    private const string SeedVersion = "2026-10-07";
+
+    private const string SiteDescription = $"Seeded Site, seed version {SeedVersion}.";
+
     /// <summary>The unattended install creates en-US. The seeder adds da-DK next to it.</summary>
     private const string DefaultCulture = "en-US";
 
     private const string SecondCulture = "da-DK";
+
+    /// <summary>
+    /// Every timestamp in the exported fixtures. Fixed so a boot alone does not change the files, and
+    /// a realistic date rather than the epoch so the demo never says "Last edited 1970-01-01".
+    /// </summary>
+    private static readonly DateTimeOffset FixtureDate = new(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
 
     private static readonly JsonSerializerOptions FixtureJson = new()
     {
@@ -274,8 +287,9 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     }
 
     /// <summary>
-    /// Five Data Types with real configuration objects, so <c>BlockEditorInspector</c> has
-    /// something to decode in M1.
+    /// Nine Data Types with real configuration objects, so <c>BlockEditorInspector</c> has
+    /// something to decode: four the structure types rotate through, three that one planted type
+    /// each uses, and the two near-duplicate title types.
     /// </summary>
     private async Task CreateBlockDataTypesAsync()
     {
@@ -408,13 +422,15 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// <summary>
     /// Seven compositions. Five are used by many types, <c>unusedSeoComposition</c> is used by
     /// none, and <c>dupSeoMirror</c> exists to collide with <c>seoComposition</c> on one type.
+    /// <c>openGraphComposition</c> has the usual Umbraco 14+ shape: a tab, "Social", that holds
+    /// only a group, "Open Graph", and no properties of its own.
     /// </summary>
     private void CreateCompositions(int folderId)
     {
         (string Alias, string Group, string[] Properties)[] specs =
         [
             ("seoComposition", "seo", ["seoTitle", "seoDescription", "seoKeywords", "seoCanonical", "seoNoIndex"]),
-            ("openGraphComposition", "openGraph", ["ogTitle", "ogDescription", "ogImage"]),
+            ("openGraphComposition", "social/openGraph", ["ogTitle", "ogDescription", "ogImage"]),
             ("navigationComposition", "navigation", ["navHide", "navTitle", "navIcon"]),
             ("heroComposition", "hero", ["heroTitle", "heroImage", "heroBlocks"]),
             ("settingsComposition", "config", ["settingsGroup", "settingsValue"]),
@@ -425,9 +441,17 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         for (int i = 0; i < specs.Length; i++)
         {
             IContentType type = NewType(specs[i].Alias, folderId, "icon-plugin");
+            string[] path = specs[i].Group.Split('/');
+            if (path.Length > 1)
+            {
+                type.AddPropertyGroup(path[0], Title(path[0]));
+                type.PropertyGroups[path[0]].Type = PropertyGroupType.Tab;
+                type.PropertyGroups[path[0]].Key = KeyFor($"{specs[i].Alias}/{path[0]}");
+            }
+
             for (int p = 0; p < specs[i].Properties.Length; p++)
             {
-                type.AddPropertyType(NewProperty(specs[i].Properties[p], _editors[(i + p) % _editors.Count]), specs[i].Group, Title(specs[i].Group));
+                type.AddPropertyType(NewProperty(specs[i].Properties[p], _editors[(i + p) % _editors.Count]), specs[i].Group, Title(path[^1]));
             }
 
             type.PropertyGroups[specs[i].Group].Key = KeyFor($"{specs[i].Alias}/{specs[i].Group}");
@@ -538,7 +562,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
 
             type.AllowedAsRoot = spec.Root;
             type.Variations = spec.Varies ? ContentVariation.Culture : ContentVariation.Nothing;
-            type.Description = $"Seeded {Title(spec.Alias)}.";
+            type.Description = spec.Alias == "site" ? SiteDescription : $"Seeded {Title(spec.Alias)}.";
 
             foreach (string composition in spec.Compositions)
             {
@@ -739,8 +763,8 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// <summary>
     /// Writes what the two endpoints return to Client/dev/fixtures/medium.json and
     /// medium-usage.json, so the dev harness renders a real schema and its real counts. The two
-    /// timestamps are pinned, otherwise every boot would rewrite the files and dirty the working
-    /// tree. LastEdited is pinned per row rather than in the seeder, because fixing the real dates
+    /// timestamps are pinned to <see cref="FixtureDate"/>, otherwise every boot would rewrite the
+    /// files and dirty the working tree. LastEdited is pinned per row rather than in the seeder, because fixing the real dates
     /// would mean writing umbracoContentVersion.versionDate behind the content service's back.
     /// </summary>
     private async Task ExportFixtureAsync()
@@ -748,6 +772,17 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         string clientRoot = Path.GetFullPath(Path.Combine(_hostEnvironment.ContentRootPath, "..", "SchemaCity", "Client"));
         if (Directory.Exists(clientRoot) is false)
         {
+            return;
+        }
+
+        string? stamp = _contentTypeService.Get("site")?.Description;
+        if (stamp != SiteDescription)
+        {
+            _logger.LogWarning(
+                "Schema City seeder: this database was not seeded by seed version {Version} (site type says "
+                + "\"{Stamp}\"), so the fixtures are left as they are. Delete umbraco/Data to seed again.",
+                SeedVersion,
+                stamp ?? "nothing");
             return;
         }
 
@@ -763,17 +798,22 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             await _dataTypeService.GetAllAsync());
 
         string path = Path.Combine(directory, "medium.json");
-        System.IO.File.WriteAllText(path, JsonSerializer.Serialize(graph with { GeneratedAt = DateTimeOffset.UnixEpoch }, FixtureJson));
+        System.IO.File.WriteAllText(path, JsonSerializer.Serialize(graph with { GeneratedAt = FixtureDate }, FixtureJson));
         _logger.LogInformation("Schema City seeder: wrote {Nodes} nodes to {Path}.", graph.Nodes.Count, path);
 
         UsageReport usage = _usageCollector.Query();
         UsageReport pinned = usage with
         {
-            GeneratedAt = DateTimeOffset.UnixEpoch,
+            GeneratedAt = FixtureDate,
             ByType = usage.ByType.ToDictionary(
                 row => row.Key,
-                row => row.Value.LastEdited is null ? row.Value : row.Value with { LastEdited = DateTime.UnixEpoch }),
+                row => row.Value.LastEdited is null ? row.Value : row.Value with { LastEdited = FixtureDate.UtcDateTime }),
         };
+
+        string plantedPath = Path.Combine(directory, "medium-planted.json");
+        System.IO.File.WriteAllText(
+            plantedPath,
+            JsonSerializer.Serialize(PlantedFindings.Select(p => new { p.Kind, p.Alias }), FixtureJson));
 
         string usagePath = Path.Combine(directory, "medium-usage.json");
         System.IO.File.WriteAllText(usagePath, JsonSerializer.Serialize(pinned, FixtureJson));

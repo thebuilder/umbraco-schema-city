@@ -68,6 +68,21 @@ export function createSnapshot(graph: SchemaGraph): SchemaSnapshot {
   };
 }
 
+/**
+ * "schema-city-snapshot-example-com-2026-10-07.json": the site and the day, so
+ * exports from two environments stay apart in a downloads folder.
+ */
+export function snapshotFileName(host: string, capturedAt: string): string {
+  const site = host
+    .toLowerCase()
+    .replace(NOT_SLUG, "-")
+    .replace(EDGE_DASHES, "");
+  return `schema-city-snapshot-${site ? `${site}-` : ""}${capturedAt.slice(0, 10)}.json`;
+}
+
+const NOT_SLUG = /[^a-z0-9]+/g;
+const EDGE_DASHES = /^-|-$/g;
+
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -151,6 +166,9 @@ function validateNode(value: unknown, index: number): SchemaNode {
         for (const key of ["alias", "name", "dataTypeId", "editorAlias"])
           requiredString(property[key], `${propertyPath}.${key}`);
         nullableString(property.editorUiAlias, `${propertyPath}.editorUiAlias`);
+        // Snapshots exported before the Data Type name was sent have none.
+        if (property.dataTypeName !== undefined)
+          nullableString(property.dataTypeName, `${propertyPath}.dataTypeName`);
         nullableString(
           property.fromCompositionId,
           `${propertyPath}.fromCompositionId`
@@ -450,25 +468,70 @@ function edgeShape(graph: SchemaGraph, currentToBaseline: Map<string, string>) {
   );
 }
 
+/** A type's name from either graph, or its key when neither has it. */
+type NameOf = (id: string) => string;
+
+const nameLookup = (baseline: SchemaGraph, current: SchemaGraph): NameOf => {
+  const names = new Map(
+    [...current.nodes, ...baseline.nodes].map((node) => [node.id, node.name])
+  );
+  return (id) => names.get(id) ?? id;
+};
+
+/** The Data Type by name, with the key's start when the name alone is ambiguous. */
+function dataTypeChange(before: SchemaProperty, after: SchemaProperty) {
+  const same = before.dataTypeName === after.dataTypeName;
+  const label = (property: SchemaProperty) =>
+    property.dataTypeName
+      ? `${property.dataTypeName}${same ? ` (${property.dataTypeId.slice(0, 8)})` : ""}`
+      : property.dataTypeId;
+  return `${label(before)} to ${label(after)}`;
+}
+
 function propertyDiff(
   groupAlias: string,
   oldProperty: SchemaProperty,
   property: SchemaProperty,
-  matches: Map<string, string>
+  matches: Map<string, string>,
+  nameOf: NameOf
 ): string[] {
   const details: string[] = [];
-  for (const key of [
-    "name",
-    "dataTypeId",
-    "editorAlias",
-    "editorUiAlias",
-    "mandatory",
-    "variesByCulture",
-  ] as const)
+  const at = `${groupAlias}.${property.alias}`;
+  const dataTypeChanged = oldProperty.dataTypeId !== property.dataTypeId;
+  if (dataTypeChanged)
+    details.push(
+      `property ${at} Data Type: ${dataTypeChange(oldProperty, property)}`
+    );
+  // A new Data Type brings its editor with it, so the editor lines would repeat it.
+  const keys = dataTypeChanged
+    ? (["name", "mandatory", "variesByCulture"] as const)
+    : ([
+        "name",
+        "editorAlias",
+        "editorUiAlias",
+        "mandatory",
+        "variesByCulture",
+      ] as const);
+  for (const key of keys)
     if (oldProperty[key] !== property[key])
       details.push(
-        `property ${groupAlias}.${property.alias} ${key}: ${JSON.stringify(oldProperty[key])} -> ${JSON.stringify(property[key])}`
+        `property ${at} ${key}: ${JSON.stringify(oldProperty[key])} -> ${JSON.stringify(property[key])}`
       );
+  return [
+    ...details,
+    ...targetDiff(at, oldProperty, property, matches, nameOf),
+  ];
+}
+
+/** Block and picker targets one property gained or lost, by name. */
+function targetDiff(
+  at: string,
+  oldProperty: SchemaProperty,
+  property: SchemaProperty,
+  matches: Map<string, string>,
+  nameOf: NameOf
+): string[] {
+  const details: string[] = [];
   const oldTargets = new Set(
     oldProperty.targets.map((target) => `${target.nodeId}:${target.role}`)
   );
@@ -482,13 +545,13 @@ function propertyDiff(
     const key = `${matches.get(target.nodeId) ?? target.nodeId}:${target.role}`;
     if (!oldTargets.has(key))
       details.push(
-        `target added: ${groupAlias}.${property.alias} -> ${target.nodeId} (${target.role})`
+        `target added: ${at} -> ${nameOf(target.nodeId)} (${target.role})`
       );
   }
   for (const target of oldProperty.targets)
     if (!newTargets.has(`${target.nodeId}:${target.role}`))
       details.push(
-        `target removed: ${groupAlias}.${property.alias} -> ${target.nodeId} (${target.role})`
+        `target removed: ${at} -> ${nameOf(target.nodeId)} (${target.role})`
       );
   return details;
 }
@@ -496,7 +559,8 @@ function propertyDiff(
 function groupDiff(
   oldGroup: PropertyGroup,
   group: PropertyGroup,
-  matches: Map<string, string>
+  matches: Map<string, string>,
+  nameOf: NameOf
 ): string[] {
   const details: string[] = [];
   for (const key of ["name", "type", "parentAlias"] as const)
@@ -513,7 +577,7 @@ function groupDiff(
   const detailsForProperty = (property: SchemaProperty) => {
     const oldProperty = oldProperties.get(property.alias);
     return oldProperty
-      ? propertyDiff(group.alias, oldProperty, property, matches)
+      ? propertyDiff(group.alias, oldProperty, property, matches, nameOf)
       : [`property added: ${group.alias}.${property.alias}`];
   };
   for (const property of group.properties)
@@ -527,7 +591,8 @@ function groupDiff(
 function detailedGroups(
   before: SchemaNode,
   after: SchemaNode,
-  matches: Map<string, string>
+  matches: Map<string, string>,
+  nameOf: NameOf
 ): string[] {
   const details: string[] = [];
   const oldGroups = new Map(before.groups.map((group) => [group.alias, group]));
@@ -538,7 +603,7 @@ function detailedGroups(
       details.push(`group added: ${group.alias}`);
       continue;
     }
-    details.push(...groupDiff(oldGroup, group, matches));
+    details.push(...groupDiff(oldGroup, group, matches, nameOf));
   }
   for (const group of before.groups)
     if (!newGroups.has(group.alias))
@@ -546,39 +611,50 @@ function detailedGroups(
   return details;
 }
 
+/**
+ * Relationship changes around one type, by name. A block or picker edge out of a
+ * property both versions have is left out: the property's target lines say it.
+ *
+ * Later: one removed composition or Data Type causes lines on several types.
+ * Grouping those side effects under their cause would read better.
+ */
 function detailedEdges(
   baseline: SchemaGraph,
   current: SchemaGraph,
   node: SchemaNode,
-  matches: Map<string, string>
+  matches: Map<string, string>,
+  nameOf: NameOf,
+  sharedProperties: Set<string>
 ): string[] {
-  const aliases = new Map(
-    baseline.nodes.map((candidate) => [candidate.id, candidate.alias])
-  );
-  const currentAliases = new Map(
-    current.nodes.map((candidate) => [candidate.id, candidate.alias])
-  );
-  const oldEdges = edgeShape(baseline, new Map()).filter(
-    (edge) => edge.from === node.id || edge.to === node.id
-  );
-  const newEdges = edgeShape(current, matches).filter(
-    (edge) => edge.from === node.id || edge.to === node.id
-  );
+  const told = (edge: SchemaEdge) =>
+    edge.from === node.id &&
+    (edge.kind === "block" || edge.kind === "reference") &&
+    sharedProperties.has(edge.propertyAlias ?? "");
+  const around = (edge: SchemaEdge) =>
+    (edge.from === node.id || edge.to === node.id) && !told(edge);
+  const oldEdges = edgeShape(baseline, new Map()).filter(around);
+  const newEdges = edgeShape(current, matches).filter(around);
   const key = (edge: SchemaEdge) =>
     stable([edge.kind, edge.from, edge.to, edge.propertyAlias, edge.role]);
   const oldKeys = new Set(oldEdges.map(key));
   const newKeys = new Set(newEdges.map(key));
-  const label = (edge: SchemaEdge, names: Map<string, string>) =>
-    `${edge.kind}: ${names.get(edge.from) ?? edge.from} -> ${names.get(edge.to) ?? edge.to}${edge.propertyAlias ? ` (${edge.propertyAlias})` : ""}`;
   return [
     ...newEdges
       .filter((edge) => !oldKeys.has(key(edge)))
-      .map((edge) => `relationship added: ${label(edge, currentAliases)}`),
+      .map((edge) => `relationship added: ${edgeLabel(edge, nameOf)}`),
     ...oldEdges
       .filter((edge) => !newKeys.has(key(edge)))
-      .map((edge) => `relationship removed: ${label(edge, aliases)}`),
+      .map((edge) => `relationship removed: ${edgeLabel(edge, nameOf)}`),
   ];
 }
+
+const edgeLabel = (edge: SchemaEdge, nameOf: NameOf) =>
+  `${edge.kind}: ${nameOf(edge.from)} -> ${nameOf(edge.to)}${edge.propertyAlias ? ` (${edge.propertyAlias})` : ""}`;
+
+const propertyAliases = (node: SchemaNode) =>
+  node.groups.flatMap((group) =>
+    group.properties.map((property) => property.alias)
+  );
 
 function detailDiff(
   baseline: SchemaNode,
@@ -592,6 +668,7 @@ function detailDiff(
     typeof value === "string" ? value || "empty" : JSON.stringify(value);
   const before = nodeShape(baselineGraph, baseline, new Map());
   const after = nodeShape(currentGraph, current, matches);
+  const nameOf = nameLookup(baselineGraph, currentGraph);
   for (const key of [
     "alias",
     "name",
@@ -610,7 +687,7 @@ function detailDiff(
       details.push(`${key}: ${show(before[key])} -> ${show(after[key])}`);
   }
   if (stable(before.groups) !== stable(after.groups))
-    details.push(...detailedGroups(baseline, current, matches));
+    details.push(...detailedGroups(baseline, current, matches, nameOf));
   if (stable(before.templates) !== stable(after.templates))
     details.push("templates changed");
   const beforeEdges = edgeShape(baselineGraph, new Map()).filter(
@@ -619,9 +696,17 @@ function detailDiff(
   const afterEdges = edgeShape(currentGraph, matches).filter(
     (edge) => edge.from === baseline.id || edge.to === baseline.id
   );
+  const kept = new Set(propertyAliases(current));
   if (stable(beforeEdges) !== stable(afterEdges))
     details.push(
-      ...detailedEdges(baselineGraph, currentGraph, baseline, matches)
+      ...detailedEdges(
+        baselineGraph,
+        currentGraph,
+        baseline,
+        matches,
+        nameOf,
+        new Set(propertyAliases(baseline).filter((alias) => kept.has(alias)))
+      )
     );
   return details;
 }
@@ -631,6 +716,7 @@ export function compareSchemas(
   current: SchemaGraph
 ): SchemaComparison {
   const matches = nodeMatches(baseline, current);
+  const nameOf = nameLookup(baseline, current);
   const baselineById = new Map(baseline.nodes.map((node) => [node.id, node]));
   const added: SchemaChange[] = [];
   const removed: SchemaChange[] = [];
@@ -677,15 +763,9 @@ export function compareSchemas(
           ),
           ...baseline.edges
             .filter((edge) => edge.from === node.id || edge.to === node.id)
-            .map((edge) => {
-              const aliases = new Map(
-                baseline.nodes.map((candidate) => [
-                  candidate.id,
-                  candidate.alias,
-                ])
-              );
-              return `relationship in baseline: ${edge.kind} ${aliases.get(edge.from) ?? edge.from} -> ${aliases.get(edge.to) ?? edge.to}${edge.propertyAlias ? ` (${edge.propertyAlias})` : ""}`;
-            }),
+            .map(
+              (edge) => `relationship in baseline: ${edgeLabel(edge, nameOf)}`
+            ),
         ],
       });
   }

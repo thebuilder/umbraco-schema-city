@@ -47,7 +47,7 @@ export type SchemaProperty = {
   name: string;
   dataTypeId: string;
   /** Null when the Data Type could not be found. Snapshots exported before it existed lack it. */
-  dataTypeName: string | null;
+  dataTypeName?: string | null;
   editorAlias: string;
   editorUiAlias: string | null;
   mandatory: boolean;

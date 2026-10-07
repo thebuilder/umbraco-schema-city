@@ -124,13 +124,22 @@ public sealed class SchemaGraphBuilder :
         {
             string compositionId = composition.Key.ToString();
 
-            foreach (Umbraco.Cms.Core.Models.PropertyGroup group in composition.PropertyGroups.OrderBy(g => g.SortOrder))
+            (Umbraco.Cms.Core.Models.PropertyGroup Group, IPropertyType[] Contributed)[] composed = composition.PropertyGroups
+                .OrderBy(g => g.SortOrder)
+                .Select(g => (g, g.PropertyTypes!.OrderBy(p => p.SortOrder).Where(p => claimedIds.Add(p.Id)).ToArray()))
+                .ToArray();
+
+            // A tab that only holds groups, the usual shape since Umbraco 14 (tab "SEO" with
+            // group "Meta"), has no properties of its own but its groups still need it to land in.
+            HashSet<string> filledTabs = composed
+                .Where(c => c.Contributed.Length > 0)
+                .Select(c => c.Group.GetParentAlias() ?? string.Empty)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach ((Umbraco.Cms.Core.Models.PropertyGroup group, IPropertyType[] contributed) in composed)
             {
-                IPropertyType[] contributed = group.PropertyTypes!
-                    .OrderBy(p => p.SortOrder)
-                    .Where(p => claimedIds.Add(p.Id))
-                    .ToArray();
-                if (contributed.Length > 0)
+                if (contributed.Length > 0
+                    || (group.Type == PropertyGroupType.Tab && filledTabs.Contains(group.Alias ?? string.Empty)))
                 {
                     groups.Add(ToGroup(group, compositionId, contributed, dataTypesByKey, targetsByDataTypeKey, hostId, edges));
                 }
