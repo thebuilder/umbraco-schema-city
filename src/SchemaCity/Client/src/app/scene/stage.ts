@@ -32,12 +32,17 @@ export const CAMERA_FOV = 40;
  * the orbit point leaves all of it crisp wherever the camera orbits over it. Three
  * times that is where the ground has become the horizon, which is also as far as
  * the camera needs to see.
+ *
+ * `lift` is how far the orbit point is above the ground. R raises it, and the city
+ * is then that much further from the camera than the orbit point is, so the fog
+ * starts that much further out too.
  */
 export function atmosphere(
   span: number,
-  distance: number
+  distance: number,
+  lift = 0
 ): { near: number; far: number } {
-  const near = distance + span * 1.5;
+  const near = distance + Math.max(0, lift) + span * 1.5;
   return { near, far: near * 3 };
 }
 
@@ -75,6 +80,35 @@ export function framingAction<B, C>(
   // The orbit controls arrive one render after the first framing, and the target
   // they were created with is the origin, so that framing has to be applied again.
   return last.controls === next.controls ? "none" : "snap";
+}
+
+/**
+ * What the camera rig does with a framing action, given the rest of its state:
+ * nothing, put back the pose it was left in after a 2D view, place the camera on
+ * the framing, play the establishing shot into it, or fly to it.
+ *
+ * Coming back from a 2D view to the framing it left is a restore, with no shot and
+ * no flight. The controls arriving while a flight runs need nothing, since the
+ * flight writes their target and hands them the camera when it lands. Reduced
+ * motion places rather than flies. The first framing in a browser plays the
+ * establishing shot, once: `introSeen` marks it seen, so it is only asked when the
+ * shot would otherwise play.
+ */
+export function framingStep(state: {
+  action: "none" | "snap" | "fly";
+  first: boolean;
+  flying: boolean;
+  reducedMotion: boolean;
+  restorable: boolean;
+  introSeen: () => boolean;
+}): "none" | "restore" | "place" | "intro" | "fly" {
+  const { action, first } = state;
+  if (action === "none") return "none";
+  if (first && state.restorable) return "restore";
+  if (action === "snap" && !first && state.flying) return "none";
+  if (!state.reducedMotion && action === "fly") return "fly";
+  if (state.reducedMotion || !first) return "place";
+  return state.introSeen() ? "place" : "intro";
 }
 
 /**

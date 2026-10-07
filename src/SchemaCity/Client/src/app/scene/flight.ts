@@ -33,8 +33,12 @@ export function translateFlightEndpoints(
   }
 }
 
-/** The keys the city flies by. Every other key belongs to the app's own handler. */
-export const FLIGHT_CODES: ReadonlySet<string> = new Set([
+/**
+ * The keys the city flies by. Every other key belongs to the app's own handler. The
+ * brackets and PageUp and PageDown orbit rather than fly: without them a keyboard
+ * could pan and rise but never change the angle.
+ */
+const FLIGHT_CODES: ReadonlySet<string> = new Set([
   "KeyW",
   "KeyA",
   "KeyS",
@@ -45,7 +49,88 @@ export const FLIGHT_CODES: ReadonlySet<string> = new Set([
   "ArrowDown",
   "ArrowLeft",
   "ArrowRight",
+  "BracketLeft",
+  "BracketRight",
+  "PageUp",
+  "PageDown",
 ]);
+
+/** The parts of a keydown the flight reads, so the decision can be tested without a DOM. */
+type KeyPress = {
+  code: string;
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  defaultPrevented: boolean;
+  composedPath: () => readonly unknown[];
+};
+
+const MODIFIERS: ReadonlySet<string> = new Set([
+  "Shift",
+  "Meta",
+  "Control",
+  "Alt",
+]);
+
+/**
+ * What a keydown does to the flight: "fly" holds the key, "release" lets go of
+ * every held key and "modifier" changes nothing held.
+ *
+ * The city flies only when the key was pressed on the scene's own `host` or on the
+ * page with nothing focused. The listener is on the window, and a whitelist is the
+ * only safe answer there: an arrow in the inspector's scrolling tab, on a button, in
+ * a list or anywhere else in the backoffice belongs to that element. The path's
+ * first entry is where the key really started, even across a shadow boundary.
+ *
+ * Anything else stops the flight rather than leaving keys held. While a command key
+ * is down macOS withholds the keyup of everything else, so a key let go inside a
+ * shortcut would fly on forever, and a field taking the keyboard mid-flight should
+ * stop the camera rather than let it coast.
+ */
+export function keydownAction(
+  event: KeyPress,
+  host: unknown
+): "fly" | "release" | "modifier" {
+  // A modifier on its own lets go of nothing. Shift is the boost, held down mid-flight
+  // to go faster, and a Cmd or Ctrl chord releases everything when the modifier
+  // itself comes back up.
+  if (MODIFIERS.has(event.key)) return "modifier";
+  if (
+    !FLIGHT_CODES.has(event.code) ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    event.defaultPrevented
+  )
+    return "release";
+  const [from] = event.composedPath();
+  if (from === host) return "fly";
+  const tag = (from as { tagName?: unknown } | undefined)?.tagName;
+  return tag === "BODY" || tag === "HTML" ? "fly" : "release";
+}
+
+/** How low the camera may fly, in world units above the ground. */
+const MIN_EYE = 1;
+
+/**
+ * The vertical part of one frame's flight, `rise`, cut short so neither the camera
+ * at height `eye` nor the point it orbits at height `target` goes under the ground,
+ * and the orbit point goes no higher than `ceiling`.
+ *
+ * R moves the camera and its orbit point together. Without a ceiling, holding it
+ * carried both up until the city was gone in the fog, and orbiting from there
+ * swung the camera around a point in the empty sky.
+ */
+export function verticalStep(
+  rise: number,
+  eye: number,
+  target: number,
+  ceiling: number
+): number {
+  const floor = Math.max(Math.min(0, MIN_EYE - eye), Math.min(0, -target));
+  return Math.min(Math.max(rise, floor), Math.max(0, ceiling - target));
+}
 
 /**
  * The slowest the keys fly, world units per second. A street is 9 units wide.
@@ -134,5 +219,61 @@ export function desiredVelocity(
     x: (axes.forward.x * forward + axes.right.x * right) * scale,
     y: up * scale,
     z: (axes.forward.z * forward + axes.right.z * right) * scale,
+  };
+}
+
+/**
+ * Radians a second the brackets turn the camera round the point it looks at, and
+ * PageUp and PageDown tilt it. A quarter turn a second takes four seconds round the
+ * city, slow enough to stop where you mean to; the tilt range is a quarter of that.
+ */
+const TURN_SPEED = Math.PI / 2;
+const TILT_SPEED = Math.PI / 4;
+
+/**
+ * The turn and tilt the held keys ask for, in radians a second. "[" swings the
+ * camera left round its orbit point and "]" right, and PageUp tilts it up toward
+ * overhead and PageDown down toward the ground. Unlike flight these do not ease:
+ * an orbit that coasts past where the key was let go overshoots the angle you
+ * wanted.
+ */
+export function desiredTurn(held: ReadonlySet<string>): {
+  yaw: number;
+  pitch: number;
+} {
+  const on = (code: string) => Number(held.has(code));
+  return {
+    yaw: (on("BracketRight") - on("BracketLeft")) * TURN_SPEED,
+    pitch: (on("PageUp") - on("PageDown")) * TILT_SPEED,
+  };
+}
+
+/** The highest the camera tilts: just short of looking straight down. */
+const MIN_POLAR = 0.01;
+
+/**
+ * The camera's offset from its orbit point after turning by `yaw` round the vertical
+ * and tilting by `pitch` toward overhead, both in radians. The distance is kept, and
+ * the tilt stops between overhead and `maxPolar`, the angle from straight up the
+ * orbit controls stop at, so the keys never take the camera under the ground.
+ */
+export function orbitOffset(
+  offset: Vec3,
+  yaw: number,
+  pitch: number,
+  maxPolar: number
+): Vec3 {
+  const radius = Math.hypot(offset.x, offset.y, offset.z);
+  if (radius === 0) return offset;
+  const polar = Math.min(
+    maxPolar,
+    Math.max(MIN_POLAR, Math.acos(offset.y / radius) - pitch)
+  );
+  const azimuth = Math.atan2(offset.x, offset.z) + yaw;
+  const across = Math.sin(polar) * radius;
+  return {
+    x: Math.sin(azimuth) * across,
+    y: Math.cos(polar) * radius,
+    z: Math.cos(azimuth) * across,
   };
 }

@@ -12,9 +12,9 @@ function ChangeRow({
     <details className="border-line border-b bg-panel-sunken px-2 py-1.5 last:border-b">
       <summary className="cursor-pointer text-phosphor text-xs">
         <span className="ml-1">{change.name}</span>
-        <span className="ml-2 text-3xs text-phosphor-dim">{change.alias}</span>
+        <span className="ml-2 text-3xs text-label">{change.alias}</span>
       </summary>
-      <div className="mt-1 pl-4 text-3xs text-phosphor-dim">
+      <div className="mt-1 pl-4 text-3xs text-label">
         {change.details.map((detail) => (
           <p key={detail}>{detail}</p>
         ))}
@@ -61,7 +61,7 @@ export function ComparisonResults({
         const changes = comparison[status];
         return (
           <section key={status}>
-            <h3 className="mb-1 flex items-center gap-2 font-bold text-3xs text-phosphor-dim uppercase tracking-terminal-xl">
+            <h3 className="mb-1 flex items-center gap-2 font-bold text-3xs text-label uppercase tracking-terminal-xl">
               <span>{status}</span>
               <Badge
                 variant={
@@ -76,7 +76,7 @@ export function ComparisonResults({
               </Badge>
             </h3>
             {changes.length === 0 ? (
-              <p className="px-2 text-3xs text-phosphor-dim">None</p>
+              <p className="px-2 text-3xs text-label">None</p>
             ) : (
               changes.map((change) => (
                 <ChangeRow

@@ -1,19 +1,12 @@
 import { expect, test } from "vitest";
-import medium from "../../dev/fixtures/medium.json";
-import pathological from "../../dev/fixtures/pathological.json";
-import small from "../../dev/fixtures/small.json";
 import type { SchemaGraph } from "../model/types";
-import { districtCount } from "./a11y";
-import { cityDistricts } from "./layout/city";
+import { citySummary } from "./a11y";
 
-const fixtures = [small, medium, pathological] as unknown as SchemaGraph[];
+const graph = { nodes: [{ id: "a" }, { id: "b" }] } as unknown as SchemaGraph;
 
-test("counts the districts the layout draws, with folders and without", () => {
-  for (const graph of fixtures) {
-    const unfiled = { ...graph, folders: [] };
-    expect(districtCount(graph)).toBe(cityDistricts(graph).districts.length);
-    expect(districtCount(unfiled)).toBe(
-      cityDistricts(unfiled).districts.length
-    );
-  }
+test("names the type count and the grouping the city is drawn with", () => {
+  expect(citySummary(graph, "structure")).toBe(
+    "3D city of 2 Document Types, grouped by what editors can create where. The List view has the same types as a table."
+  );
+  expect(citySummary(graph, "folders")).toContain("grouped by folder");
 });

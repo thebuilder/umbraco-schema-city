@@ -161,7 +161,10 @@ await send("Page.enable");
 // shots. Injected on every navigation, before the app mounts, so the scene measures
 // the viewport it is actually photographed at.
 await send("Page.addScriptToEvaluateOnNewDocument", {
-  source: `document.addEventListener("DOMContentLoaded", () => {
+  // The first-visit hint is for people, not for the README, so every shot is a
+  // return visit.
+  source: `try { localStorage.setItem("schema-city:hint-seen", "1"); } catch {}
+  document.addEventListener("DOMContentLoaded", () => {
     const style = document.createElement("style");
     style.textContent = ".demo-footer { display: none }";
     document.head.append(style);

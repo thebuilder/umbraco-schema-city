@@ -9,14 +9,17 @@ import {
   type ReactNode,
   type RefObject,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import * as THREE from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { Button } from "@/components/ui/button";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaComparison } from "../model/snapshots";
@@ -78,13 +81,23 @@ import {
 import {
   approach,
   BOOST,
+  desiredTurn,
   desiredVelocity,
-  FLIGHT_CODES,
   flySpeed,
   groundAxes,
+  keydownAction,
+  orbitOffset,
   translateFlightEndpoints,
+  type Vec3,
+  verticalStep,
 } from "./scene/flight";
-import { framingDistance } from "./scene/framing";
+import {
+  type Framed,
+  MIN_DISTANCE,
+  maxDistanceFor,
+  revealShift,
+  viewOf,
+} from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
 import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
@@ -119,6 +132,7 @@ import {
   atmosphere,
   CAMERA_FOV,
   framingAction,
+  framingStep,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
   pixelsPerUnit,
@@ -1401,7 +1415,7 @@ function World({ palette, span }: { palette: Palette; span: number }) {
   useFrame(() => {
     const target = controls?.target ?? ORIGIN;
     const distance = camera.position.distanceTo(target);
-    const { near, far } = atmosphere(span, distance);
+    const { near, far } = atmosphere(span, distance, target.y);
     if (fog.current) {
       fog.current.near = near;
       fog.current.far = far;
@@ -1610,17 +1624,6 @@ type View = {
   target: THREE.Vector3;
 };
 
-/** What a framing shows: the ground it has to fit, and the point it centres on. */
-type Framed = {
-  centre: { x: number; z: number };
-  grounds: readonly {
-    minX: number;
-    maxX: number;
-    minZ: number;
-    maxZ: number;
-  }[];
-};
-
 /** The orbit controls, as far as the camera code touches them. */
 type Rig = {
   target: THREE.Vector3;
@@ -1662,60 +1665,7 @@ const INTRO_SWING = 0.42;
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
-/**
- * The default view looks down the isometric diagonal, from the south-east at about
- * 35 degrees, so the city opens on the overview it always has, now with depth.
- */
-const FRAMING_DIRECTION = new THREE.Vector3(1, 1, 1).normalize();
-/** Screen-right on the ground from that direction. */
-const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 const UP = new THREE.Vector3(0, 1, 0);
-
-/**
- * Where the camera stands to frame `bounds` from the default direction: every corner
- * of every piece of ground, at the ground and at the height of the tallest building.
- *
- * `shift` is how many CSS pixels the framed centre moves left on screen, which is
- * half the inspector's width when it is open. The target moves that many pixels'
- * worth of ground along screen-right, measured at the target's own distance, and the
- * framed centre lands in the middle of the canvas the panel does not cover.
- */
-function viewOf(
-  bounds: Framed,
-  size: { width: number; height: number },
-  shift: number,
-  fill: number,
-  buildingHeight: number
-): View {
-  const corners = bounds.grounds.flatMap((ground) =>
-    [ground.minX, ground.maxX].flatMap((x) =>
-      [ground.minZ, ground.maxZ].flatMap((z) =>
-        [0, buildingHeight].map((y) => ({
-          x: x - bounds.centre.x,
-          y: y - buildingHeight / 2,
-          z: z - bounds.centre.z,
-        }))
-      )
-    )
-  );
-  const distance = framingDistance(
-    corners,
-    FRAMING_DIRECTION,
-    size,
-    shift * 2,
-    fill,
-    CAMERA_FOV
-  );
-  const target = new THREE.Vector3(
-    bounds.centre.x,
-    buildingHeight / 2,
-    bounds.centre.z
-  ).addScaledVector(SCREEN_RIGHT, shift / pixelsPerUnit(size.height, distance));
-  return {
-    position: target.clone().addScaledVector(FRAMING_DIRECTION, distance),
-    target,
-  };
-}
 
 /**
  * fsn's opening pose: wider, swung round and looking at the same point, so the
@@ -1750,6 +1700,76 @@ type CameraFlight = {
 /** Stands in for the orbit target in the frame before the controls exist. */
 const LOOSE_TARGET = new THREE.Vector3();
 
+/** The camera's pose now, copied, with `fallback` as the target before the controls exist. */
+function poseOf(
+  camera: THREE.Camera,
+  controls: Rig | null,
+  fallback: THREE.Vector3
+): View {
+  return {
+    position: camera.position.clone(),
+    target: (controls?.target ?? fallback).clone(),
+  };
+}
+
+function flightTo(
+  from: View,
+  to: View,
+  ms: number,
+  ease: (t: number) => number
+): CameraFlight {
+  return { from, to, started: performance.now(), ms, ease };
+}
+
+/**
+ * Slides the camera when a new type is selected, so its building stands beside the
+ * inspector rather than under it. Only a new selection does: the panel resizing or
+ * the reader moving away from the building afterwards is theirs to keep, a framing
+ * flight already places the city beside the panel, and what is already selected
+ * when the scene mounts is not new.
+ */
+function useRevealSelection(
+  selectedAt: { id: string; point: Vec3 } | null,
+  flight: RefObject<CameraFlight | null>,
+  covered: number,
+  reducedMotion: boolean
+) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as Rig | null;
+  const size = useThree((state) => state.size);
+  const revealed = useRef<string | null>(selectedAt?.id ?? null);
+
+  useEffect(() => {
+    const id = selectedAt?.id ?? null;
+    const fresh = id !== revealed.current;
+    revealed.current = id;
+    if (!(fresh && selectedAt && controls) || flight.current) return;
+    const slide = revealShift(
+      selectedAt.point,
+      { position: camera.position, target: controls.target },
+      size,
+      covered,
+      CAMERA_FOV
+    );
+    if (slide.x === 0 && slide.z === 0) return;
+    const from = poseOf(camera, controls, LOOSE_TARGET);
+    const to = {
+      position: from.position.clone().add(slide),
+      target: from.target.clone().add(slide),
+    };
+    if (reducedMotion) placeCamera(camera, controls, to);
+    else flight.current = flightTo(from, to, REFRAME_MS, smootherstep);
+  }, [selectedAt, camera, controls, covered, flight, reducedMotion, size]);
+}
+
+/**
+ * Where the camera was when the scene last unmounted, per graph, with the framing
+ * it was on. A 2D view replaces the canvas, and coming back to the city framed it
+ * from scratch, losing wherever the reader had flown. A changed framing, such as
+ * focus entered from the list, is framed fresh instead.
+ */
+const kept = new WeakMap<object, { pose: View; framing: string }>();
+
 /**
  * Frames the city, and flies to a new framing when focus changes it. The first
  * framing is fsn's establishing shot. A keyboard move translates a flight as it
@@ -1770,10 +1790,19 @@ function CameraRig({
   reducedMotion,
   overview,
   flightRef,
+  graph,
+  selectedAt,
+  span,
 }: {
   bounds: Framed;
+  /** Which city this is, for the pose it is shown from again after a 2D view. */
+  graph: object;
   buildingHeight: number;
   inspectorOpen: boolean;
+  /** The selected building, which a new selection slides out from under the panel. */
+  selectedAt: { id: string; point: Vec3 } | null;
+  /** The city's longer side, which sets the dolly range a framing stays inside. */
+  span: number;
   /** Bumped by Home to ask for the same city to be framed again. */
   reframe: number;
   reducedMotion: boolean;
@@ -1790,21 +1819,25 @@ function CameraRig({
     controls: unknown;
     reframe: number;
   } | null>(null);
+  const restored = useRef<View | null>(null);
+  const framing = useMemo(() => JSON.stringify(bounds), [bounds]);
+  // The canvas is as wide as the area the panel sizes itself to.
+  const covered = inspectorOpen ? inspectorWidthFor(size.width) : 0;
 
-  // Half the panel, because the middle of the uncovered canvas is that far left of
-  // the middle of the whole of it.
-  const view = useMemo(
-    () =>
-      viewOf(
-        bounds,
-        size,
-        // The canvas is as wide as the area the panel sizes itself to.
-        inspectorOpen ? inspectorWidthFor(size.width) / 2 : 0,
-        overview ? 0.94 : 0.9,
-        buildingHeight
-      ),
-    [bounds, buildingHeight, inspectorOpen, overview, size]
-  );
+  const view = useMemo((): View => {
+    const fit = viewOf(
+      bounds,
+      size,
+      covered,
+      overview ? 0.94 : 0.9,
+      buildingHeight,
+      span
+    );
+    return {
+      position: new THREE.Vector3().copy(fit.position),
+      target: new THREE.Vector3().copy(fit.target),
+    };
+  }, [bounds, buildingHeight, covered, overview, size, span]);
 
   useEffect(() => {
     // Captured, so it runs before the controls' own listener on the same canvas:
@@ -1832,39 +1865,59 @@ function CameraRig({
     const asked = !first && framed.current?.reframe !== reframe;
     const action = framingAction(framed.current, { bounds, controls, reframe });
     framed.current = { bounds, controls, reframe };
-    if (action === "none") return;
-    // The controls arriving mid-establishing-shot need nothing: the flight writes
-    // their target every frame and hands them the camera when it lands.
-    if (action === "snap" && !first && flight.current) return;
-    if (reducedMotion || action === "snap") {
-      if (reducedMotion || !first || introSeen()) {
-        flight.current = null;
-        placeCamera(camera, controls, view);
-        return;
-      }
-      const opening = introOf(view);
-      placeCamera(camera, controls, opening);
-      flight.current = {
-        from: opening,
-        to: view,
-        started: performance.now(),
-        ms: INTRO_MS,
-        ease: smootherstep,
-      };
+    const back = kept.get(graph);
+    const step = framingStep({
+      action,
+      first,
+      flying: flight.current !== null,
+      reducedMotion,
+      restorable: back?.framing === framing,
+      introSeen,
+    });
+    if (step === "none") return;
+    if (step === "restore" && back) {
+      // Back from a 2D view: no establishing shot and no flight, just the pose.
+      restored.current = back.pose;
+      flight.current = null;
+      placeCamera(camera, controls, back.pose);
       return;
     }
-    flight.current = {
-      from: {
-        position: camera.position.clone(),
-        target: (controls?.target ?? view.target).clone(),
-      },
-      to: view,
-      started: performance.now(),
-      ms: asked ? REFRAME_MS : FLIGHT_MS,
-      ease: asked ? smootherstep : easeInOutCubic,
-    };
+    if (step === "place") {
+      flight.current = null;
+      // The controls arriving after a restore take the restored pose, not a frame.
+      const pose = action === "snap" ? restored.current : null;
+      placeCamera(camera, controls, pose ?? view);
+      restored.current = null;
+      return;
+    }
+    if (step === "intro") {
+      const opening = introOf(view);
+      placeCamera(camera, controls, opening);
+      flight.current = flightTo(opening, view, INTRO_MS, smootherstep);
+      return;
+    }
+    flight.current = flightTo(
+      poseOf(camera, controls, view.target),
+      view,
+      asked ? REFRAME_MS : FLIGHT_MS,
+      asked ? smootherstep : easeInOutCubic
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, bounds, controls, reframe, reducedMotion]);
+
+  useEffect(
+    () => () => {
+      // Where a flight was going rather than where it had got to.
+      const pose = flight.current?.to ?? poseOf(camera, controls, LOOSE_TARGET);
+      kept.set(graph, {
+        pose: { position: pose.position.clone(), target: pose.target.clone() },
+        framing,
+      });
+    },
+    [camera, controls, flight, framing, graph]
+  );
+
+  useRevealSelection(selectedAt, flight, covered, reducedMotion);
 
   useFrame(() => {
     const moving = flight.current;
@@ -1895,14 +1948,22 @@ const MAX_POLAR = Math.PI * 0.49;
  * The dolly range scales with the city, and the horizon moves out with the camera,
  * so no distance in it shows an edge.
  */
-function Controls({ span }: { span: number }) {
+function Controls({
+  reducedMotion,
+  span,
+}: {
+  reducedMotion: boolean;
+  span: number;
+}) {
   return (
     <OrbitControls
       dampingFactor={0.065}
+      // Damping is a glide after the hand lets go, which is motion nobody asked for.
+      enableDamping={!reducedMotion}
       makeDefault
-      maxDistance={span * 6}
+      maxDistance={maxDistanceFor(span)}
       maxPolarAngle={MAX_POLAR}
-      minDistance={3}
+      minDistance={MIN_DISTANCE}
       mouseButtons={{
         LEFT: THREE.MOUSE.ROTATE,
         MIDDLE: THREE.MOUSE.DOLLY,
@@ -1914,46 +1975,31 @@ function Controls({ span }: { span: number }) {
   );
 }
 
-/**
- * Whether this keystroke is one the city flies by. The app's own handler reads the
- * target the same way: an event that crossed a shadow boundary reports the host as
- * its target, so the path says where it really started, and a field being typed into
- * or anything inside a dialog keeps its letters. A modifier other than Shift means
- * the key belongs to the browser or to the backoffice around us.
- */
-/** The tag names whose own keyboard handling wins over the shortcut keys. */
-const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
-
-function flownBy(event: KeyboardEvent): boolean {
-  if (!FLIGHT_CODES.has(event.code)) return false;
-  if (event.metaKey || event.ctrlKey || event.altKey) return false;
-  const [from] = event.composedPath();
-  return !(
-    from instanceof HTMLElement &&
-    (from.isContentEditable ||
-      FIELD.test(from.tagName) ||
-      from.closest('[role="dialog"]'))
-  );
-}
-
 /** Scratch, so flying allocates nothing per frame. */
 const FLIGHT_STEP = new THREE.Vector3();
-/** How low the camera may fly, in world units above the ground. */
-const MIN_EYE = 1;
 
 /**
  * Keyboard flight, after fsn. Held keys become a velocity that eases in and out,
  * which moves the camera and its orbit target together, so the controls pick the
- * pose back up unchanged the moment a hand goes back to the mouse. The arrows turn
- * and tilt by walking the target around a camera that stays put.
+ * pose back up unchanged the moment a hand goes back to the mouse. The brackets and
+ * PageUp and PageDown orbit the camera round its target instead, at a steady rate.
  *
  * The speed grows with the distance to the target, so a key crosses about the same
  * share of the screen from the overview as from close in.
  */
 function Flight({
   cameraFlight,
+  host,
+  reducedMotion,
+  span,
 }: {
   cameraFlight: RefObject<CameraFlight | null>;
+  /** The element around the canvas, which takes focus when the city is clicked. */
+  host: RefObject<HTMLElement | null>;
+  /** Moves at once and stops at once, with no ease in or coast after a release. */
+  reducedMotion: boolean;
+  /** The city's longer side, which is as high as the orbit point flies. */
+  span: number;
 }) {
   const camera = useThree((state) => state.camera);
   const controls = useThree((state) => state.controls) as Rig | null;
@@ -1968,10 +2014,9 @@ function Flight({
     };
     const down = (event: KeyboardEvent) => {
       boosting.current = event.shiftKey;
-      if (!flownBy(event)) {
-        // While a command key is down macOS withholds the keyup of everything else,
-        // so a key let go inside a shortcut would fly on forever. The same goes for
-        // a field or a dialog taking the keyboard mid-flight: stop rather than coast.
+      const action = keydownAction(event, host.current);
+      if (action === "modifier") return;
+      if (action === "release") {
         release();
         return;
       }
@@ -1995,7 +2040,7 @@ function Flight({
       window.removeEventListener("blur", release);
       release();
     };
-  }, [held]);
+  }, [held, host]);
 
   useFrame((_, delta) => {
     if (!controls) return;
@@ -2006,16 +2051,32 @@ function Flight({
     const step = Math.min(delta, 0.05);
     const boost = boosting.current ? BOOST : 1;
 
+    const turn = desiredTurn(held);
+    if (turn.yaw !== 0 || turn.pitch !== 0) {
+      // A framing flight would write the pose straight back, so turning ends it.
+      cameraFlight.current = null;
+      const turned = orbitOffset(
+        FLIGHT_STEP.subVectors(camera.position, controls.target),
+        turn.yaw * boost * step,
+        turn.pitch * boost * step,
+        MAX_POLAR
+      );
+      camera.position.copy(controls.target).add(turned);
+      camera.lookAt(controls.target);
+    }
+
     const wanted = desiredVelocity(
       held,
       groundAxes(camera.position, controls.target),
       flySpeed(camera.position.distanceTo(controls.target)) * boost
     );
-    moving.set(
-      approach(moving.x, wanted.x, step),
-      approach(moving.y, wanted.y, step),
-      approach(moving.z, wanted.z, step)
-    );
+    if (reducedMotion) moving.set(wanted.x, wanted.y, wanted.z);
+    else
+      moving.set(
+        approach(moving.x, wanted.x, step),
+        approach(moving.y, wanted.y, step),
+        approach(moving.z, wanted.z, step)
+      );
     // A hundredth of a world unit a second is a stop, and rounding it to one keeps
     // the frame from doing this work on every idle frame for ever.
     if (moving.lengthSq() < 1e-4) {
@@ -2023,11 +2084,13 @@ function Flight({
       return;
     }
     FLIGHT_STEP.copy(moving).multiplyScalar(step);
-    // Neither the camera nor the point it orbits goes under the ground.
-    FLIGHT_STEP.y = Math.max(
+    // The orbit point rises no higher than the city is wide, which from the far
+    // end of the dolly range still has the city on screen.
+    FLIGHT_STEP.y = verticalStep(
       FLIGHT_STEP.y,
-      Math.min(0, MIN_EYE - camera.position.y),
-      Math.min(0, -controls.target.y)
+      camera.position.y,
+      controls.target.y,
+      span
     );
     // Keep a framing flight's endpoints in the same translated frame as the camera,
     // so a held key moves the view during the flight without the interpolation
@@ -2040,6 +2103,135 @@ function Flight({
   });
 
   return null;
+}
+
+/**
+ * Lets go of every geometry, material and texture the city drew with when this
+ * canvas goes. Some outlive it: three keeps one lookup texture for its standard
+ * material's lighting for the life of the page, and the buildings' box, the
+ * district names and the roof icons are shared at module level. Each renderer that
+ * uploads one adds a dispose listener to it that holds the renderer's WebGL
+ * context, the context holds the canvas, and the canvas holds the whole old app
+ * around it, so every switch of sample or view leaked one app's DOM and
+ * listeners. Disposing runs those listeners, which drop the resource from every
+ * renderer and remove themselves; a live renderer uploads it again when it next
+ * draws with it.
+ *
+ * A layout effect, and the first child of the canvas, so the cleanup runs while the
+ * meshes and their compiled materials are still in the scene.
+ */
+function ReleaseResources() {
+  const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
+  useLayoutEffect(
+    () => () => {
+      const held = new Set<{ dispose: () => void }>();
+      const collect = (value: unknown) => {
+        if ((value as THREE.Texture | null)?.isTexture)
+          held.add(value as THREE.Texture);
+      };
+      scene.traverse((object) => {
+        const { geometry, material } = object as THREE.Mesh;
+        if (geometry) held.add(geometry);
+        for (const each of [material ?? []].flat()) {
+          held.add(each);
+          for (const value of Object.values(each)) collect(value);
+          // Uniforms three filled in itself, such as the lighting lookup.
+          const compiled = gl.properties.get(each) as {
+            uniforms?: Record<string, { value?: unknown } | undefined>;
+          };
+          for (const uniform of Object.values(compiled.uniforms ?? {}))
+            collect(uniform?.value);
+        }
+      });
+      for (const resource of held) resource.dispose();
+    },
+    [gl, scene]
+  );
+  return null;
+}
+
+/** Set once the reader has dismissed the first-visit hint or touched the city. */
+const HINT_SEEN_KEY = "schema-city:hint-seen";
+
+function hintSeen(): boolean {
+  try {
+    return localStorage.getItem(HINT_SEEN_KEY) !== null;
+  } catch {
+    // Blocked storage shows the hint again, which is harmless.
+    return false;
+  }
+}
+
+/**
+ * The way back for a reader who is lost, over the bottom-left of the canvas: a
+ * Reset view button that does what Home does, for the laptops that have no Home
+ * key, and on the first visit a hint that says it is there. The hint goes with its
+ * close button or the first press, scroll or key on the city.
+ */
+function CanvasOverlay({
+  host,
+  onReset,
+  raised,
+}: {
+  host: RefObject<HTMLElement | null>;
+  onReset: () => void;
+  /** Whether the comparison legend holds the corner, so this sits above it. */
+  raised: boolean;
+}) {
+  const [hint, setHint] = useState(() => !hintSeen());
+  const dismiss = () => {
+    setHint(false);
+    try {
+      localStorage.setItem(HINT_SEEN_KEY, "1");
+    } catch {
+      // Blocked storage only means the hint comes back next time.
+    }
+  };
+
+  useEffect(() => {
+    const element = host.current;
+    if (!(hint && element)) return;
+    const events = ["pointerdown", "wheel", "keydown"] as const;
+    for (const type of events)
+      element.addEventListener(type, dismiss, { capture: true, passive: true });
+    return () => {
+      for (const type of events)
+        element.removeEventListener(type, dismiss, { capture: true });
+    };
+  }, [hint, host]);
+
+  return (
+    <div
+      className={`absolute left-3 z-10 flex flex-col items-start gap-2 ${raised ? "bottom-14" : "bottom-3"}`}
+    >
+      {hint ? (
+        <div className="flex max-w-72 items-start gap-2 border border-line bg-panel py-2 pr-1 pl-3 text-2xs text-phosphor leading-relaxed shadow-panel">
+          <p>
+            Drag to orbit, scroll to zoom, click a building. Lost? Reset view.
+          </p>
+          <button
+            aria-label="Dismiss the hint"
+            className="shrink-0 px-1.5 text-phosphor-bright"
+            onClick={dismiss}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+      <Button
+        aria-keyshortcuts="Home"
+        aria-label="Reset view, framing the whole city again"
+        className="bg-panel"
+        onClick={onReset}
+        size="sm"
+        variant="outline"
+      >
+        Reset view
+      </Button>
+    </div>
+  );
 }
 
 function ComparisonMarks({
@@ -2095,6 +2287,15 @@ const TWEEN_MS = 400;
 
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+const prefersReducedMotion = () => window.matchMedia(REDUCED_MOTION).matches;
+/** Read live, so turning the preference on mid-session stops the glide at once. */
+function subscribeReducedMotion(change: () => void) {
+  const query = window.matchMedia(REDUCED_MOTION);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+}
+
 export default function Scene({
   graph,
   grouping = "structure",
@@ -2109,6 +2310,7 @@ export default function Scene({
   icons,
   inspectorOpen = false,
   reframe = 0,
+  onReset,
   onSelect,
   onFocus,
 }: {
@@ -2138,17 +2340,19 @@ export default function Scene({
    * the camera has to answer Home a second time from wherever the reader took it.
    */
   reframe?: number;
+  /** What Home does, for the Reset view button over the canvas. */
+  onReset?: () => void;
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
 }) {
-  const host = useRef<HTMLDivElement>(null);
+  const host = useRef<HTMLElement>(null);
   const cameraFlight = useRef<CameraFlight | null>(null);
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  const reducedMotion = useMemo(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    []
+  const reducedMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    prefersReducedMotion
   );
   const [bootPhase, setBootPhase] = useState<BootPhase>(
     reducedMotion ? "done" : "trace"
@@ -2329,6 +2533,23 @@ export default function Scene({
           ];
     return { centre: ground.centre, grounds };
   }, [city, focusIsland, ground]);
+  // Where the selected building stands once any focus tween lands, for the camera
+  // to keep it out from under the panel.
+  const selectedAt = useMemo(() => {
+    const at = selected
+      ? target.find((placement) => placement.id === selected)
+      : undefined;
+    return at
+      ? {
+          id: at.id,
+          point: {
+            x: at.position.x,
+            y: (at.y ?? 0) + at.height / 2,
+            z: at.position.z,
+          },
+        }
+      : null;
+  }, [selected, target]);
   const nodesById = useMemo(
     () => new Map(graph.nodes.map((node) => [node.id, node])),
     [graph]
@@ -2471,7 +2692,18 @@ export default function Scene({
   }, []);
 
   return (
-    <div className="absolute inset-0" ref={host}>
+    // Focusable, so the flight keys have somewhere to belong: they fly only while
+    // this or nothing has focus, and a click on the city focuses it. Closing the
+    // inspector hands focus back here for the same reason. A named region rather
+    // than an application, so a screen reader stays in its reading mode around it.
+    <section
+      aria-label="City. W A S D or the arrows move the camera, [ and ] orbit. Press ? for all controls."
+      className="absolute inset-0 outline-none focus-visible:outline-2 focus-visible:outline-phosphor-bright focus-visible:outline-offset-[-2px]"
+      data-focus-home
+      ref={host}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: the city takes keys, so a keyboard has to be able to reach it.
+      tabIndex={0}
+    >
       {palette ? (
         <Canvas
           // The far plane is the world's to set, from where the fog ends.
@@ -2484,6 +2716,7 @@ export default function Scene({
           }}
           shadows="percentage"
         >
+          <ReleaseResources />
           <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
           <Stage
             districts={city.districts}
@@ -2645,19 +2878,34 @@ export default function Scene({
             traces={boardMarks.traces}
             usage={usage}
           />
-          <Flight cameraFlight={cameraFlight} />
+          <Flight
+            cameraFlight={cameraFlight}
+            host={host}
+            reducedMotion={reducedMotion}
+            span={span}
+          />
           <CameraRig
             bounds={bounds}
             buildingHeight={Math.max(1, ...heights.values())}
             flightRef={cameraFlight}
+            graph={graph}
             inspectorOpen={inspectorOpen}
             overview={focus === null}
             reducedMotion={reducedMotion}
             reframe={reframe}
+            selectedAt={selectedAt}
+            span={span}
           />
-          <Controls span={span} />
+          <Controls reducedMotion={reducedMotion} span={span} />
         </Canvas>
       ) : null}
-    </div>
+      {onReset ? (
+        <CanvasOverlay
+          host={host}
+          onReset={onReset}
+          raised={Boolean(baseline && comparison)}
+        />
+      ) : null}
+    </section>
   );
 }

@@ -45,8 +45,8 @@ import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_INSET, Inspector } from "./Inspector";
-import type { Grouping } from "./layout/city";
 import { Legend } from "./Legend";
+import type { Grouping } from "./layout/city";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   LENS_LABEL,
@@ -55,6 +55,7 @@ import {
   lensScale,
   type Ramp,
 } from "./scene/lens";
+import { enterFocuses } from "./shortcuts";
 import {
   FLAT_VIEWS,
   parseUrl,
@@ -177,6 +178,13 @@ export function App({
   const [query, setQuery] = useState("");
   const portal = useRef<HTMLDivElement>(null);
 
+  // Home, and the Reset view button over the city. Leaving focus already flies back
+  // to the whole city, so it only asks for a fresh framing with no focus to leave.
+  const resetView = () => {
+    if (focus) setFocus(null);
+    else setReframe((count) => count + 1);
+  };
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
@@ -202,7 +210,7 @@ export function App({
       ) {
         return;
       }
-      if (event.key === "Enter" && selected) {
+      if (selected && enterFocuses(event)) {
         setFocusDepth(1);
         setFocus(selected);
       }
@@ -229,12 +237,7 @@ export function App({
       const key = event.key.toLowerCase();
       const tab = VIEW_TABS.find((candidate) => candidate.key === key);
       if (tab) setView((at) => (at === tab.value ? "city" : tab.value));
-      // Leaving focus already flies back to the whole city, so Home only asks for a
-      // fresh framing when there is no focus to leave.
-      if (key === "home") {
-        if (focus) setFocus(null);
-        else setReframe((count) => count + 1);
-      }
+      if (key === "home") resetView();
       if (key === "?") setHelpOpen(true);
     };
     // Keyboard events cross the shadow boundary, so one document listener covers
@@ -634,13 +637,8 @@ export function App({
               </p>
             </div>
           ) : (
-            <section
-              aria-label="City"
-              className="absolute inset-0 z-0 outline-none"
-              data-focus-home
-              tabIndex={-1}
-            >
-              <p className="sr-only">{citySummary(graph)}</p>
+            <div className="absolute inset-0 z-0">
+              <p className="sr-only">{citySummary(graph, group)}</p>
               <Suspense
                 fallback={
                   <p className="p-4 text-phosphor-dim text-sm">
@@ -659,6 +657,7 @@ export function App({
                   inspectorOpen={Boolean(selectedNode && neighbourhood)}
                   layers={layers}
                   onFocus={enterFocus}
+                  onReset={resetView}
                   onSelect={(id) => (id === null ? done() : setSelected(id))}
                   reframe={reframe}
                   scale={scale}
@@ -666,7 +665,7 @@ export function App({
                   usage={usage}
                 />
               </Suspense>
-            </section>
+            </div>
           )}
 
           {selectedNode && neighbourhood ? (

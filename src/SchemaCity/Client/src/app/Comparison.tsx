@@ -154,10 +154,13 @@ export function Comparison({
           </div>
           <Status error={error} saved={saved} />
         </div>
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea
+          className="min-h-0 flex-1"
+          viewport={{ "aria-label": "Schema changes" }}
+        >
           {comparison ? (
             <div className="space-y-3 px-3 py-4">
-              <p className="text-3xs text-phosphor-dim">
+              <p className="text-3xs text-label">
                 {datesLine(graph.generatedAt, baselineCapturedAt)}
               </p>
               <ComparisonResults comparison={comparison} onSelect={onSelect} />

@@ -38,20 +38,31 @@ import { iconMask } from "./scene/icons";
  * which inside the backoffice is a narrow window or an open sidebar. The breakpoint
  * is the width of the area the panel sits in, a container query rather than a media
  * query, because the backoffice's own chrome takes part of the viewport.
+ *
+ * Below `OVERLAY_BELOW` the panel is a sheet over the view instead. Insetting the
+ * view by 340 px there left the list, tree and matrix a strip too narrow to read,
+ * with the list's columns gone and the city's labels under the panel. The sheet
+ * closes with its close button or Escape.
  */
+const OVERLAY_BELOW = 760;
 const WIDE_FROM = 1024;
 const WIDE = 520;
 const NARROW = 340;
 
 /**
- * CSS pixels of canvas the open panel covers, for the camera, which frames the city
- * in the part the panel leaves. It has to agree with the classes below.
+ * CSS pixels of canvas the open panel takes from the view, for the camera, which
+ * frames the city in the part the panel leaves. A sheet takes none: the city is
+ * framed on the whole canvas and the sheet closed to see it. It has to agree with
+ * the classes below.
  */
-export const inspectorWidthFor = (areaWidth: number) =>
-  Math.min(areaWidth >= WIDE_FROM ? WIDE : NARROW, areaWidth);
+export const inspectorWidthFor = (areaWidth: number) => {
+  if (areaWidth < OVERLAY_BELOW) return 0;
+  return areaWidth >= WIDE_FROM ? WIDE : NARROW;
+};
 
 /** The inset a view under the open panel takes, so nothing slides beneath it. */
-export const INSPECTOR_INSET = "pr-[min(340px,100%)] @min-[1024px]:pr-[520px]";
+export const INSPECTOR_INSET =
+  "@min-[760px]:pr-[340px] @min-[1024px]:pr-[520px]";
 const PANEL_WIDTH = "w-[min(340px,100%)] @min-[1024px]:w-[520px]";
 
 const WORDS = /\s+/;

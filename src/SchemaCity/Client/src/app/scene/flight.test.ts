@@ -1,11 +1,15 @@
 import { expect, test } from "vitest";
 import {
   approach,
+  desiredTurn,
   desiredVelocity,
   FLY_SPEED,
   flySpeed,
   groundAxes,
+  keydownAction,
+  orbitOffset,
   translateFlightEndpoints,
+  verticalStep,
 } from "./flight";
 
 /** The default framing's pose: standing south-east of the city, looking at it. */
@@ -146,4 +150,95 @@ test("panning rebases an in-flight transition without changing its orientation",
       prior.position.z - prior.target.z
     );
   }
+});
+
+const HOST = { tagName: "DIV" };
+/** A keydown that started on `from`, the first entry of its composed path. */
+const press = (code: string, from: unknown, extra: object = {}) => ({
+  code,
+  key: code,
+  metaKey: false,
+  ctrlKey: false,
+  altKey: false,
+  defaultPrevented: false,
+  composedPath: () => [from, HOST, { tagName: "BODY" }],
+  ...extra,
+});
+
+test("the keys fly from the city or from a page with nothing focused", () => {
+  expect(keydownAction(press("ArrowDown", HOST), HOST)).toBe("fly");
+  expect(keydownAction(press("KeyW", { tagName: "BODY" }), HOST)).toBe("fly");
+});
+
+test("an arrow anywhere else belongs to the element it was pressed in", () => {
+  // The inspector's scrolling tab, a button, a tab, a list option, a field.
+  for (const from of [
+    { tagName: "DIV" },
+    { tagName: "BUTTON" },
+    { tagName: "A" },
+    { tagName: "SUMMARY" },
+    { tagName: "INPUT" },
+    { tagName: "SELECT" },
+  ])
+    expect(keydownAction(press("ArrowDown", from), HOST)).toBe("release");
+});
+
+test("a key another handler took, a chord or a non-flight key stops the flight", () => {
+  expect(
+    keydownAction(press("KeyW", HOST, { defaultPrevented: true }), HOST)
+  ).toBe("release");
+  expect(keydownAction(press("KeyW", HOST, { metaKey: true }), HOST)).toBe(
+    "release"
+  );
+  expect(keydownAction(press("KeyL", HOST), HOST)).toBe("release");
+});
+
+test("the brackets orbit and PageUp and PageDown tilt, keeping the distance", () => {
+  const south = { x: 0, y: 10, z: 10 };
+  const maxPolar = Math.PI * 0.49;
+  // "[" swings the camera to its own left, which from the south is west.
+  const left = desiredTurn(held("BracketLeft"));
+  const swung = orbitOffset(south, left.yaw * 0.1, 0, maxPolar);
+  expect(swung.x).toBeLessThan(0);
+  expect(swung.y).toBeCloseTo(10);
+  expect(Math.hypot(swung.x, swung.y, swung.z)).toBeCloseTo(Math.hypot(10, 10));
+  expect(desiredTurn(held("BracketRight")).yaw).toBeCloseTo(-left.yaw);
+  // PageUp looks down from higher up, PageDown from lower.
+  const up = desiredTurn(held("PageUp"));
+  expect(orbitOffset(south, 0, up.pitch * 0.1, maxPolar).y).toBeGreaterThan(10);
+  const down = desiredTurn(held("PageDown"));
+  expect(orbitOffset(south, 0, down.pitch * 0.1, maxPolar).y).toBeLessThan(10);
+  // Nothing held, nothing turns.
+  expect(desiredTurn(held("KeyW"))).toEqual({ yaw: 0, pitch: 0 });
+});
+
+test("a tilt stops short of overhead and at the orbit controls' polar limit", () => {
+  const south = { x: 0, y: 10, z: 10 };
+  const maxPolar = Math.PI * 0.49;
+  const low = orbitOffset(south, 0, -10, maxPolar);
+  expect(Math.acos(low.y / Math.hypot(low.x, low.y, low.z))).toBeCloseTo(
+    maxPolar
+  );
+  const high = orbitOffset(south, 0, 10, maxPolar);
+  expect(high.y).toBeGreaterThan(0);
+  expect(Math.hypot(high.x, high.z)).toBeGreaterThan(0);
+});
+
+test("R stops at the ceiling and F at the ground", () => {
+  // Free to rise below the ceiling, and only as far as it.
+  expect(verticalStep(2, 40, 10, 100)).toBe(2);
+  expect(verticalStep(5, 120, 98, 100)).toBeCloseTo(2);
+  expect(verticalStep(5, 130, 100, 100)).toBe(0);
+  // Descending stops with the orbit point on the ground or the eye a unit above it.
+  expect(verticalStep(-5, 40, 3, 100)).toBe(-3);
+  expect(verticalStep(-5, 2, 30, 100)).toBe(-1);
+  // Already under the ground is not pulled further down, and not pushed up.
+  expect(verticalStep(-1, 0.5, 0, 100)).toBe(0);
+});
+
+test("pressing Shift mid-flight boosts rather than stopping", () => {
+  for (const key of ["Shift", "Meta", "Control", "Alt"])
+    expect(
+      keydownAction(press("ShiftLeft", HOST, { key, shiftKey: true }), HOST)
+    ).toBe("modifier");
 });
