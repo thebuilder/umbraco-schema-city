@@ -1235,6 +1235,7 @@ function Labels({
         labelHeight: LABEL_HEIGHT_PX * textScale,
         width: size.width,
         height: size.height,
+        shown: floated.ids,
       }
     );
     // The board leaves out what floats, so a cut print never sits under the whole name.
