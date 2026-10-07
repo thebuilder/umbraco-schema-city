@@ -16,8 +16,12 @@ export function roleOf(
   around: Neighbourhood | undefined
 ): Role {
   if (node.isElement) return "element";
-  return (around?.composedBy.length ?? 0) > 0 &&
-    (around?.allowedParents.length ?? 0) === 0 &&
+  // A type allowed under itself still needs a way in, so that edge is no parent,
+  // as in the city.
+  const other = (ids: string[] | undefined) =>
+    (ids ?? []).some((id) => id !== node.id);
+  return other(around?.composedBy) &&
+    !other(around?.allowedParents) &&
     !node.allowedAsRoot
     ? "composition"
     : "page";
