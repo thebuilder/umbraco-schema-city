@@ -408,13 +408,15 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// <summary>
     /// Seven compositions. Five are used by many types, <c>unusedSeoComposition</c> is used by
     /// none, and <c>dupSeoMirror</c> exists to collide with <c>seoComposition</c> on one type.
+    /// <c>openGraphComposition</c> has the usual Umbraco 14+ shape: a tab, "Social", that holds
+    /// only a group, "Open Graph", and no properties of its own.
     /// </summary>
     private void CreateCompositions(int folderId)
     {
         (string Alias, string Group, string[] Properties)[] specs =
         [
             ("seoComposition", "seo", ["seoTitle", "seoDescription", "seoKeywords", "seoCanonical", "seoNoIndex"]),
-            ("openGraphComposition", "openGraph", ["ogTitle", "ogDescription", "ogImage"]),
+            ("openGraphComposition", "social/openGraph", ["ogTitle", "ogDescription", "ogImage"]),
             ("navigationComposition", "navigation", ["navHide", "navTitle", "navIcon"]),
             ("heroComposition", "hero", ["heroTitle", "heroImage", "heroBlocks"]),
             ("settingsComposition", "config", ["settingsGroup", "settingsValue"]),
@@ -425,9 +427,17 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         for (int i = 0; i < specs.Length; i++)
         {
             IContentType type = NewType(specs[i].Alias, folderId, "icon-plugin");
+            string[] path = specs[i].Group.Split('/');
+            if (path.Length > 1)
+            {
+                type.AddPropertyGroup(path[0], Title(path[0]));
+                type.PropertyGroups[path[0]].Type = PropertyGroupType.Tab;
+                type.PropertyGroups[path[0]].Key = KeyFor($"{specs[i].Alias}/{path[0]}");
+            }
+
             for (int p = 0; p < specs[i].Properties.Length; p++)
             {
-                type.AddPropertyType(NewProperty(specs[i].Properties[p], _editors[(i + p) % _editors.Count]), specs[i].Group, Title(specs[i].Group));
+                type.AddPropertyType(NewProperty(specs[i].Properties[p], _editors[(i + p) % _editors.Count]), specs[i].Group, Title(path[^1]));
             }
 
             type.PropertyGroups[specs[i].Group].Key = KeyFor($"{specs[i].Alias}/{specs[i].Group}");

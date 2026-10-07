@@ -85,13 +85,19 @@ describe("editorLayout", () => {
     const tabs = layout([
       group("content", "Tab", null, ["title"]),
       group("no-group", "Group", null, ["loose"]),
-      group("orphan", "Group", "deletedTab", ["stray"]),
     ]);
     expect(tabs.map((tab) => tab.name)).toEqual([GENERIC_TAB, "CONTENT"]);
-    expect(tabs[0].panels).toEqual([
-      ["NO-GROUP", "loose"],
-      ["ORPHAN", "stray"],
+    expect(tabs[0].panels).toEqual([["NO-GROUP", "loose"]]);
+  });
+
+  it("gives a group whose tab the graph lacks a tab named by its alias", () => {
+    // An older snapshot never sent a composition tab that only holds groups.
+    const tabs = layout([
+      group("content", "Tab", null, ["title"]),
+      group("meta", "Group", "seo", ["metaTitle"], "seoComposition"),
     ]);
+    expect(tabs.map((tab) => tab.name)).toEqual(["CONTENT", "seo"]);
+    expect(tabs[1]?.panels).toEqual([["META", "metaTitle"]]);
   });
 
   it("names a tab after its declaration even when a group reaches it first", () => {

@@ -116,6 +116,48 @@ public class SchemaGraphBuilderTests
     }
 
     /// <summary>
+    /// A composition tab that holds only groups, tab "seo" with group "seo/meta", still reaches
+    /// the user, so its groups have a tab to sit in.
+    /// </summary>
+    [Fact]
+    public void BuildGraph_emits_a_composition_tab_that_only_holds_groups()
+    {
+        Guid seoKey = Guid.Parse("45454545-4545-4545-4545-454545454545");
+        ContentType seo = NewContentType(1210, seoKey, "seoTabComposition", "Seo Tab", parentId: -1);
+        seo.AddPropertyGroup("seo", "SEO");
+        seo.PropertyGroups["seo"].Type = PropertyGroupType.Tab;
+        seo.AddPropertyType(NewProperty("metaTitle", id: 40), "seo/meta", "Meta");
+        seo.AddPropertyGroup("empty", "Empty");
+        seo.PropertyGroups["empty"].Type = PropertyGroupType.Tab;
+
+        ContentType page = NewContentType(1211, Guid.Parse("56565656-5656-5656-5656-565656565656"), "page", "Page", parentId: -1);
+        page.AddContentType(seo);
+
+        SchemaGraph graph = SchemaGraphBuilder.BuildGraph([page, seo], [], []);
+        SchemaNode pageNode = Assert.Single(graph.Nodes, n => n.Alias == "page");
+
+        Assert.Equal(["seo", "meta"], pageNode.Groups.Select(g => g.Alias));
+        Assert.Equal("Tab", pageNode.Groups[0].Type);
+        Assert.Empty(pageNode.Groups[0].Properties);
+        Assert.Equal(seoKey.ToString(), pageNode.Groups[0].FromCompositionId);
+        Assert.Equal("seo", pageNode.Groups[1].ParentAlias);
+    }
+
+    /// <summary>A property whose Data Type is not in the list says so with a null name.</summary>
+    [Fact]
+    public void BuildGraph_leaves_the_data_type_name_null_when_the_data_type_is_missing()
+    {
+        ContentType home = NewContentType(1220, HomeKey, "home", "Home", parentId: -1);
+        home.AddPropertyType(NewProperty("title", id: 41), "content", "Content");
+
+        SchemaGraph graph = SchemaGraphBuilder.BuildGraph([home], [], []);
+
+        SchemaProperty title = graph.Nodes.Single().Groups.SelectMany(g => g.Properties).Single();
+        Assert.Null(title.DataTypeName);
+        Assert.Null(title.EditorUiAlias);
+    }
+
+    /// <summary>
     /// A type that inherits from another one still finds the properties its parent in turn
     /// composes in, and gets both a composition edge and an inherits edge to that parent.
     /// </summary>

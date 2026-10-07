@@ -47,19 +47,20 @@ export function editorLayout(node: SchemaNode): EditorTab[] {
   for (const group of groups)
     if (group.type === "Tab" && !tabNames.has(group.alias))
       tabNames.set(group.alias, group.name);
-  const tabOf = (group: PropertyGroup) => tabKey(group, tabNames);
 
   // Root groups come first, as Umbraco puts the generic tab first.
   const tabs = new Map<string, EditorTab>();
-  for (const key of ["", ...groups.map(tabOf)])
+  for (const key of ["", ...groups.map(tabKey)])
     if (!tabs.has(key))
       tabs.set(key, {
         key,
-        name: tabNames.get(key) ?? GENERIC_TAB,
+        // A group's tab the graph never sent, from a snapshot taken before the
+        // backend sent composition tabs that only hold groups, is named by its alias.
+        name: key === "" ? GENERIC_TAB : (tabNames.get(key) ?? key),
         panels: [],
         count: 0,
       });
-  for (const group of groups) addGroup(tabs.get(tabOf(group)), group);
+  for (const group of groups) addGroup(tabs.get(tabKey(group)), group);
 
   return [...tabs.values()]
     .map((tab) => ({
@@ -69,12 +70,9 @@ export function editorLayout(node: SchemaNode): EditorTab[] {
     .filter((tab) => tab.panels.length > 0);
 }
 
-/** The tab a group is drawn in; one whose tab resolves to nothing goes to the top. */
-function tabKey(group: PropertyGroup, tabNames: ReadonlyMap<string, string>) {
-  if (group.type === "Tab") return group.alias;
-  const parent = group.parentAlias ?? "";
-  return tabNames.has(parent) ? parent : "";
-}
+/** The tab a group is drawn in, or "" for a group that sits in no tab. */
+const tabKey = (group: PropertyGroup) =>
+  group.type === "Tab" ? group.alias : (group.parentAlias ?? "");
 
 function addGroup(tab: EditorTab | undefined, group: PropertyGroup) {
   if (!tab) return;
