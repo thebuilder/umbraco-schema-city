@@ -15,7 +15,14 @@ import { LENSES, type Lens } from "./scene/lens";
  * replace the canvas. One value rather than a flag each, because those views have no
  * camera and the camera has no table.
  */
-export type View = "city" | "list" | "tree" | "matrix" | "editor" | "datatypes";
+export type View =
+  | "city"
+  | "list"
+  | "tree"
+  | "matrix"
+  | "editor"
+  | "datatypes"
+  | "impact";
 
 /** The views drawn without the 3D canvas. */
 export const FLAT_VIEWS: readonly View[] = [
@@ -24,6 +31,7 @@ export const FLAT_VIEWS: readonly View[] = [
   "matrix",
   "editor",
   "datatypes",
+  "impact",
 ];
 
 const VIEWS: readonly View[] = ["city", ...FLAT_VIEWS];

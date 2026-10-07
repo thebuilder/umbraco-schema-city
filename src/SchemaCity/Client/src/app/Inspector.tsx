@@ -3,6 +3,7 @@ import { type CSSProperties, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Finding } from "../model/findings";
+import type { Impact } from "../model/impact";
 import {
   connectionGroups,
   contentCountOf,
@@ -18,6 +19,7 @@ import type {
   UsageReport,
 } from "../model/types";
 import { plural, roving, usePanelFocus } from "./a11y";
+import { ImpactSummary } from "./Impact";
 import {
   READING,
   ROLE,
@@ -106,12 +108,13 @@ function Glyph({ node, svg }: { node: SchemaNode; svg?: string }) {
   );
 }
 
-type Tab = "overview" | "properties" | "connections";
+type Tab = "overview" | "properties" | "connections" | "impact";
 
 const TAB_LABEL: Record<Tab, string> = {
   overview: "Overview",
   properties: "Properties",
   connections: "Connections",
+  impact: "Impact",
 };
 
 export function Inspector({
@@ -134,7 +137,13 @@ export function Inspector({
   focusCount,
   onExpandFocus,
   canExpandFocus = false,
+  impact,
+  onOpenImpact,
 }: {
+  /** What a change to the type reaches, along every relationship. */
+  impact: Impact;
+  /** Shows the full impact page for this type. */
+  onOpenImpact: () => void;
   focused: boolean;
   /** Umbraco icon name to SVG, the same map the scene puts on the roofs. */
   icons?: Record<string, string>;
@@ -205,6 +214,11 @@ export function Inspector({
     connections: {
       count: related,
       spoken: plural(related, "type"),
+      problem: false,
+    },
+    impact: {
+      count: impact.types,
+      spoken: `reaches ${plural(impact.types, "type")}`,
       problem: false,
     },
   };
@@ -351,6 +365,14 @@ export function Inspector({
           ) : null}
           {tab === "connections" ? (
             <Connections {...tabProps} edges={edges} />
+          ) : null}
+          {tab === "impact" ? (
+            <ImpactSummary
+              impact={impact}
+              nodesById={nodesById}
+              onOpen={onOpenImpact}
+              onSelect={onSelect}
+            />
           ) : null}
         </div>
       </ScrollArea>

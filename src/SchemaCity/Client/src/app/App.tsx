@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 import { dataTypeNames, dataTypeUsers } from "../model/data-types";
 import { findFindings } from "../model/findings";
+import { impactOf } from "../model/impact";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import { searchNodes } from "../model/search";
@@ -178,8 +179,17 @@ export function App({
   const [view, setView] = useState<View>(start.view);
   const [group, setGroup] = useState<Grouping>(start.group);
   const [dataType, setDataType] = useState<string | null>(start.dataType);
-  // The Data Type whose users Show in city lights up, until Clear or a lens.
-  const [highlight, setHighlight] = useState<string | null>(null);
+  // What Show in city lights up, from a Data Type page or an impact trace, until
+  // Clear or a lens. The label finishes "Lit: ", as "types using Textstring".
+  const [highlight, setHighlight] = useState<{
+    label: string;
+    ids: ReadonlySet<string>;
+  } | null>(null);
+  // The type the Impact view traces when it was opened for one, and the property
+  // alias it checks. Clicking a row there selects that type without moving the
+  // trace; anywhere else the view traces the selection.
+  const [impactStart, setImpactStart] = useState<string | null>(null);
+  const [impactAlias, setImpactAlias] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [findingsOpen, setFindingsOpen] = useState(false);
@@ -346,10 +356,7 @@ export function App({
   const scale = useMemo(
     () =>
       highlight
-        ? highlightScale(
-            graph,
-            new Set(dataTypeUsers(graph, highlight).map((user) => user.node.id))
-          )
+        ? highlightScale(graph, highlight.ids)
         : lensScale(graph, usage, lens, findings),
     [graph, usage, lens, findings, highlight]
   );
@@ -418,6 +425,28 @@ export function App({
     [dataTypeName]
   );
 
+  const showInCity = (label: string, ids: ReadonlySet<string>) => {
+    setHighlight({ label, ids });
+    setView("city");
+  };
+
+  // The Impact view on one type, and on one of its property aliases when given.
+  const openImpact = (id: string | null, alias = "") => {
+    setImpactStart(id);
+    setImpactAlias(alias);
+    setView("impact");
+  };
+  // Leaving the view lets go of the type it was opened for, so coming back with I
+  // or the switcher traces whatever is selected then.
+  useEffect(() => {
+    if (view !== "impact") setImpactStart(null);
+  }, [view]);
+  // The inspector's Impact tab: every relationship, any depth, for the selection.
+  const selectedImpact = useMemo(
+    () => (selected ? impactOf(graph, selected, {}, usage) : null),
+    [graph, selected, usage]
+  );
+
   // A chosen row opens the inspector, so focus goes to its heading, not back to
   // the Search button.
   const handOff = useHandOff(portal);
@@ -438,9 +467,7 @@ export function App({
           <Announcements
             focus={scope}
             layers={layers.map((layer) => LAYER_LABEL[layer])}
-            lit={
-              highlight ? (dataTypeName.get(highlight) ?? "a Data Type") : null
-            }
+            lit={highlight?.label ?? null}
             nodesById={nodesById}
             selected={selected}
             view={view}
@@ -636,10 +663,7 @@ export function App({
                   className={`h-2 w-6 shrink-0 ${RAMP_BAR.binary}`}
                 />
                 <span className="font-sans text-label text-xs">
-                  Lit: types using{" "}
-                  <span className="text-prose">
-                    {dataTypeName.get(highlight) ?? "the Data Type"}
-                  </span>
+                  Lit: <span className="text-prose">{highlight.label}</span>
                 </span>
                 <TextButton onClick={() => setHighlight(null)}>
                   Clear
@@ -674,15 +698,25 @@ export function App({
                     selected: dataType,
                     onChoose: setDataType,
                     onOpenDataType,
-                    onShowInCity: (id) => {
-                      setHighlight(id);
-                      setView("city");
-                    },
+                    onShowInCity: (id) =>
+                      showInCity(
+                        `types using ${dataTypeName.get(id) ?? "the Data Type"}`,
+                        new Set(
+                          dataTypeUsers(graph, id).map((user) => user.node.id)
+                        )
+                      ),
                   }}
                   findings={findings}
                   graph={graph}
+                  impact={{
+                    start: impactStart ?? selected,
+                    alias: impactAlias,
+                    onAlias: setImpactAlias,
+                    onShowInCity: showInCity,
+                  }}
                   neighbourhoodById={neighbourhoodById}
                   nodesById={nodesById}
+                  onImpact={(alias) => openImpact(selected, alias)}
                   onPick={() => setPaletteOpen(true)}
                   onQuery={setQuery}
                   onSelect={setSelected}
@@ -736,7 +770,7 @@ export function App({
               </div>
             )}
 
-            {selectedNode && neighbourhood ? (
+            {selectedNode && neighbourhood && selectedImpact ? (
               <Inspector
                 canExpandFocus={canExpandFocus}
                 edges={graph.edges}
@@ -748,12 +782,14 @@ export function App({
                 focusDepth={focusDepth}
                 focused={focus === selectedNode.id}
                 icons={icons}
+                impact={selectedImpact}
                 neighbourhood={neighbourhood}
                 node={selectedNode}
                 nodesById={nodesById}
                 onClose={done}
                 onEditorLayout={() => setView("editor")}
                 onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
+                onOpenImpact={() => openImpact(selectedNode.id)}
                 onOpenType={onOpenType}
                 onSelect={followLink}
                 onToggleFocus={() =>

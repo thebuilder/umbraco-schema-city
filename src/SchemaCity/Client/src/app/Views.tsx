@@ -11,6 +11,7 @@ import { plural, roving, useAnnounceChange } from "./a11y";
 import { CreationTree } from "./CreationTree";
 import { DataTypes, type DataTypesProps } from "./DataTypes";
 import { EditorLayout } from "./EditorLayout";
+import { ImpactView, type ImpactViewProps } from "./Impact";
 import { TextButton } from "./InspectorChips";
 import { Matrix } from "./Matrix";
 import { type ListProps, TypeTable } from "./TypeTable";
@@ -27,6 +28,7 @@ export const VIEW_TABS: { value: View; label: string; key?: string }[] = [
   { value: "matrix", label: "Matrix", key: "m" },
   { value: "editor", label: "Editor", key: "e" },
   { value: "datatypes", label: "Data Types" },
+  { value: "impact", label: "Impact", key: "i" },
 ];
 
 const ITEM = `${toggleVariants({ size: "sm", variant: "outline" })} min-w-0 border-0 bg-secondary px-3 focus-visible:z-10 focus-visible:outline-offset-[-2px]`;
@@ -104,7 +106,7 @@ export function Announcements({
   layers: string[];
   focus: FocusScope | null;
   nodesById: Map<string, SchemaNode>;
-  /** The Data Type whose users Show in city lit, by name. */
+  /** What Show in city lit, as "types using Textstring". */
   lit?: string | null;
 }) {
   const name = (id: string | null | undefined) =>
@@ -117,7 +119,9 @@ export function Announcements({
   );
   useAnnounceChange(`Layers on: ${layers.join(", ") || "none"}`);
   useAnnounceChange(
-    lit ? `Types using ${lit} lit in the city` : "City lighting cleared"
+    lit
+      ? `${lit.charAt(0).toUpperCase()}${lit.slice(1)} lit in the city`
+      : "City lighting cleared"
   );
   useAnnounceChange(
     focus
@@ -168,7 +172,13 @@ export function FlatView({
   scope = null,
   onShowAll = () => undefined,
   dataTypes,
+  impact,
+  onImpact,
 }: {
+  /** What the Impact view needs beyond the lists' props. */
+  impact: Pick<ImpactViewProps, "start" | "alias" | "onAlias" | "onShowInCity">;
+  /** Opens the Impact view on a property of the type the editor view shows. */
+  onImpact?: (alias: string) => void;
   /** What the Data Types view needs beyond the lists' props. */
   dataTypes: Pick<
     DataTypesProps,
@@ -209,10 +219,22 @@ export function FlatView({
       <EditorLayout
         findings={findings}
         nodesById={nodesById}
+        onImpact={onImpact}
         onPick={onPick}
         onSelect={onSelect}
         roleOf={roleFor}
         selected={selected}
+      />
+    );
+  if (view === "impact")
+    return (
+      <ImpactView
+        {...impact}
+        graph={graph}
+        nodesById={nodesById}
+        onPick={onPick}
+        onSelect={onSelect}
+        usage={usage}
       />
     );
   const List = LISTS[view] ?? TypeTable;

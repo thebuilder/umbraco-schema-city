@@ -143,7 +143,10 @@ export function EditorLayout({
   onSelect,
   findings,
   roleOf,
+  onImpact,
 }: {
+  /** Opens the impact trace for one of the type's properties, by alias. */
+  onImpact?: (alias: string) => void;
   selected: string | null;
   nodesById: Lookup;
   /** Opens the search palette, the one type picker the app already has. */
@@ -177,6 +180,7 @@ export function EditorLayout({
       key={node.id}
       node={node}
       nodesById={nodesById}
+      onImpact={onImpact}
       onSelect={onSelect}
       role={roleOf(node)}
     />
@@ -198,7 +202,9 @@ function PropertyItem({
   quiet,
   mixed,
   flag,
+  onImpact,
 }: {
+  onImpact?: (alias: string) => void;
   property: SchemaProperty;
   nodesById: Lookup;
   quiet: boolean;
@@ -209,7 +215,7 @@ function PropertyItem({
 }) {
   return (
     <li
-      className="grid grid-cols-[minmax(0,1fr)_minmax(0,14rem)] items-baseline gap-x-4 border-line/40 border-t border-l-2 border-l-transparent px-3 py-1.5 first:border-t-0 data-[flagged=true]:border-l-signal"
+      className="grid grid-cols-[minmax(0,1fr)_minmax(0,14rem)_auto] items-baseline gap-x-4 border-line/40 border-t border-l-2 border-l-transparent px-3 py-1.5 first:border-t-0 data-[flagged=true]:border-l-signal"
       data-flagged={flag !== undefined}
     >
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
@@ -233,7 +239,19 @@ function PropertyItem({
           <span className="text-faint"> · varies by culture</span>
         ) : null}
       </DataTypeName>
-      <p className="col-span-2 text-signal text-xs empty:hidden">{flag}</p>
+      {onImpact ? (
+        <button
+          aria-label={`Impact of ${property.alias}`}
+          className="text-phosphor text-xs hover:text-phosphor-bright hover:underline"
+          onClick={() => onImpact(property.alias)}
+          type="button"
+        >
+          Impact
+        </button>
+      ) : (
+        <span />
+      )}
+      <p className="col-span-3 text-signal text-xs empty:hidden">{flag}</p>
     </li>
   );
 }
@@ -303,7 +321,9 @@ function Panel({
   onToggle,
   overloaded,
   flags,
+  onImpact,
 }: {
+  onImpact?: (alias: string) => void;
   panel: EditorPanel;
   nodesById: Lookup;
   open: boolean;
@@ -319,6 +339,7 @@ function Panel({
           key={rowKey(property)}
           mixed={panelSource(panel) === MIXED}
           nodesById={nodesById}
+          onImpact={onImpact}
           property={property}
           quiet={borrowed(panel)}
         />
@@ -400,7 +421,9 @@ function Layout({
   onSelect,
   findings,
   role,
+  onImpact,
 }: {
+  onImpact?: (alias: string) => void;
   node: SchemaNode;
   nodesById: Lookup;
   onSelect: (id: string) => void;
@@ -496,6 +519,7 @@ function Layout({
               flags={flags}
               key={panel.key}
               nodesById={nodesById}
+              onImpact={onImpact}
               onToggle={() => flip(panel.key)}
               open={isOpen(panel)}
               overloaded={!tabRow && panel.properties.length > TAB_LIMIT}
