@@ -456,7 +456,7 @@ export function App({
   }, [view]);
   // The inspector's Impact tab: every relationship, any depth, for the selection.
   const selectedImpact = useMemo(
-    () => (selected ? impactOf(graph, selected, {}, usage) : null),
+    () => impactOf(graph, selected ?? "", {}, usage),
     [graph, selected, usage]
   );
 
@@ -785,7 +785,7 @@ export function App({
               </div>
             )}
 
-            {selectedNode && neighbourhood && selectedImpact ? (
+            {selectedNode && neighbourhood ? (
               <Inspector
                 canExpandFocus={canExpandFocus}
                 edges={graph.edges}

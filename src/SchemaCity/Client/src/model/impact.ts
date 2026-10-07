@@ -6,7 +6,7 @@ import { storedByElementType } from "./data-types";
 import { dayOf } from "./dates";
 import { csv, DOCUMENT_TYPE_PATH } from "./findings-export";
 import { contentCountOf } from "./inspector";
-import type { SchemaGraph, SchemaNode, UsageReport } from "./types";
+import type { SchemaEdge, SchemaGraph, SchemaNode, UsageReport } from "./types";
 
 /** The relationship kinds a developer can switch on and off. */
 export type Relation = "compositions" | "blocks" | "children" | "pickers";
@@ -155,29 +155,32 @@ function linksFor(graph: SchemaGraph, direction: Direction) {
     links.set(at, [...(links.get(at) ?? []), link]);
   };
   for (const edge of graph.edges) {
-    if (edge.from === edge.to || !(nodes.has(edge.from) && nodes.has(edge.to)))
-      continue;
     const kind = stepKind(edge.kind, parents.has(`${edge.from}>${edge.to}`));
-    if (!kind) continue;
-    const property = edge.propertyAlias
-      ? nodes
-          .get(edge.from)
-          ?.groups.flatMap((group) => group.properties)
-          .find((candidate) => candidate.alias === edge.propertyAlias)
-      : undefined;
-    const via = edge.propertyAlias
-      ? {
-          property: edge.propertyAlias,
-          ...(property
-            ? { dataType: property.dataTypeName ?? property.editorAlias }
-            : {}),
-        }
-      : {};
-    if (direction === "dependents")
-      add(edge.to, { id: edge.from, kind, ...via });
-    else add(edge.from, { id: edge.to, kind, ...via });
+    const known = nodes.has(edge.from) && nodes.has(edge.to);
+    if (!kind || edge.from === edge.to || !known) continue;
+    const step = { kind, ...viaOf(edge, nodes) };
+    if (direction === "dependents") add(edge.to, { id: edge.from, ...step });
+    else add(edge.from, { id: edge.to, ...step });
   }
   return links;
+}
+
+/** The property a block or picker edge goes through, with its Data Type's name. */
+function viaOf(
+  edge: SchemaEdge,
+  nodes: ReadonlyMap<string, SchemaNode>
+): Pick<Step, "property" | "dataType"> {
+  if (!edge.propertyAlias) return {};
+  const property = nodes
+    .get(edge.from)
+    ?.groups.flatMap((group) => group.properties)
+    .find((candidate) => candidate.alias === edge.propertyAlias);
+  return {
+    property: edge.propertyAlias,
+    ...(property
+      ? { dataType: property.dataTypeName ?? property.editorAlias }
+      : {}),
+  };
 }
 
 function stepKind(kind: string, isParent: boolean): StepKind | null {
@@ -250,20 +253,21 @@ function walk(
 ): Map<string, Step[][]> {
   const found = new Map<string, Step[][]>();
   const queue: Step[][] = [[]];
+  const extend = (path: Step[], link: Link) => {
+    const paths = found.get(link.id) ?? [];
+    const revisits =
+      link.id === start || path.some((step) => step.id === link.id);
+    if (revisits || paths.length >= MAX_PATHS) return;
+    const longer = [...path, link];
+    paths.push(longer);
+    found.set(link.id, paths);
+    queue.push(longer);
+  };
   for (let path = queue.shift(); path; path = queue.shift()) {
-    if (path.length >= depth) continue;
     const last = path[path.length - 1];
     const kinds = last ? next(last.kind) : first;
-    for (const link of linksOf(last?.id ?? start, kinds)) {
-      if (link.id === start || path.some((step) => step.id === link.id))
-        continue;
-      const paths = found.get(link.id) ?? [];
-      if (paths.length >= MAX_PATHS) continue;
-      const longer = [...path, link];
-      paths.push(longer);
-      found.set(link.id, paths);
-      queue.push(longer);
-    }
+    if (path.length < depth)
+      for (const link of linksOf(last?.id ?? start, kinds)) extend(path, link);
   }
   return found;
 }
@@ -566,6 +570,71 @@ const amount = (row: ImpactRow) =>
   row.content ??
   (row.blocks === undefined ? "" : `${row.blocks.toLocaleString()} blocks`);
 
+/** The schema and usage snapshot dates a trace was read from. */
+const datesLine = (graph: SchemaGraph, usage: UsageReport | undefined) =>
+  `Schema snapshot ${dayOf(graph.generatedAt) ?? "undated"}, usage snapshot ${usage ? (dayOf(usage.generatedAt) ?? "undated") : "unavailable"}.`;
+
+/** The start type's own content and its stored blocks, each as a paragraph. */
+function startLines(impact: Impact, name: string): string[] {
+  const { own } = impact;
+  const stored = storedLine(impact);
+  return [
+    ...(own === undefined
+      ? []
+      : [
+          "",
+          `${name} has ${own.toLocaleString()} content ${own === 1 ? "item" : "items"} of its own.`,
+        ]),
+    ...(stored ? ["", stored] : []),
+  ];
+}
+
+/** What was traced and when, the totals, and the start type's own counts. */
+function markdownHeader(
+  impact: Impact,
+  graph: SchemaGraph,
+  usage: UsageReport | undefined
+): string[] {
+  const start = graph.nodes.find((node) => node.id === impact.start);
+  const name = start?.name ?? impact.start;
+  const title =
+    impact.direction === "dependents"
+      ? "Impact of changing"
+      : "Dependencies of";
+  const relations = impact.relations
+    .map((relation) => RELATION_LABEL[relation].toLowerCase())
+    .join(", ");
+  return [
+    `## ${title} ${name} (${start?.alias ?? ""})`,
+    "",
+    `Relationships: ${relations || "none"}. Depth: ${DEPTH_WORD(impact.depth)}.`,
+    datesLine(graph, usage),
+    "",
+    `**${totalsLine(impact.types, impact.content)}.** These are configured relationships to review, not proof that a change breaks them.`,
+    ...startLines(impact, name),
+  ];
+}
+
+/** Where a property alias lands and the types that already have it. */
+function aliasMarkdown(
+  alias: AliasImpact,
+  nameOf: (id: string) => string
+): string[] {
+  return [
+    "",
+    `### Property ${alias.alias}`,
+    "",
+    `Lands on ${totalsLine(alias.carriers.length, alias.content)}, declared on ${nameOf(alias.source)}.`,
+    "",
+    alias.collisions.length === 0
+      ? "No alias collisions found."
+      : table(
+          ["Type", "Already has it from"],
+          alias.collisions.map((collision) => [collision.name, collision.from])
+        ),
+  ];
+}
+
 /**
  * A ticket-ready summary: what was traced, the totals, a table per group and the
  * alias collisions. Paths beyond the first are listed after it, so a reviewer sees
@@ -579,59 +648,27 @@ export function impactMarkdown(
 ): string {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node.name]));
   const nameOf = (id: string) => nodes.get(id) ?? id;
-  const start = graph.nodes.find((node) => node.id === impact.start);
   const words = (path: Step[]) =>
     pathWords(impact.start, path, impact.direction, nameOf);
+  const groups = impact.groups.flatMap((group) => [
+    "",
+    `### ${group.label} (${group.rows.length})`,
+    "",
+    table(
+      ["Type", "Alias", "Content", "Path"],
+      group.rows.map((row) => [
+        row.name,
+        row.alias,
+        amount(row),
+        row.paths.map(words).join("; or "),
+      ])
+    ),
+  ]);
   const lines = [
-    `## ${impact.direction === "dependents" ? "Impact of changing" : "Dependencies of"} ${start?.name ?? impact.start} (${start?.alias ?? ""})`,
-    "",
-    `Relationships: ${impact.relations.map((relation) => RELATION_LABEL[relation].toLowerCase()).join(", ") || "none"}. Depth: ${DEPTH_WORD(impact.depth)}.`,
-    `Schema snapshot ${dayOf(graph.generatedAt) ?? "undated"}, usage snapshot ${usage ? (dayOf(usage.generatedAt) ?? "undated") : "unavailable"}.`,
-    "",
-    `**${totalsLine(impact.types, impact.content)}.** These are configured relationships to review, not proof that a change breaks them.`,
+    ...markdownHeader(impact, graph, usage),
+    ...groups,
+    ...(alias ? aliasMarkdown(alias, nameOf) : []),
   ];
-  if (impact.own !== undefined)
-    lines.push(
-      "",
-      `${start?.name ?? impact.start} has ${impact.own.toLocaleString()} content ${impact.own === 1 ? "item" : "items"} of its own.`
-    );
-  const stored = storedLine(impact);
-  if (stored) lines.push("", stored);
-  for (const group of impact.groups)
-    lines.push(
-      "",
-      `### ${group.label} (${group.rows.length})`,
-      "",
-      table(
-        ["Type", "Alias", "Content", "Path"],
-        group.rows.map((row) => [
-          row.name,
-          row.alias,
-          amount(row),
-          row.paths.map(words).join("; or "),
-        ])
-      )
-    );
-  if (alias) {
-    lines.push(
-      "",
-      `### Property ${alias.alias}`,
-      "",
-      `Lands on ${totalsLine(alias.carriers.length, alias.content)}, declared on ${nameOf(alias.source)}.`
-    );
-    lines.push(
-      "",
-      alias.collisions.length === 0
-        ? "No alias collisions found."
-        : table(
-            ["Type", "Already has it from"],
-            alias.collisions.map((collision) => [
-              collision.name,
-              collision.from,
-            ])
-          )
-    );
-  }
   return `${lines.join("\n")}\n`;
 }
 

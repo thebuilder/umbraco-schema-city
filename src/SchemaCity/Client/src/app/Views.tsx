@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { toggleVariants } from "@/components/ui/toggle";
 import type { Finding } from "../model/findings";
-import { roleOf } from "../model/inspector";
+import { type Role, roleOf } from "../model/inspector";
 import type { Neighbourhood } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
@@ -157,24 +157,7 @@ const LISTS: Partial<Record<View, (props: ListProps) => ReactNode>> = {
   matrix: Matrix,
 };
 
-export function FlatView({
-  view,
-  graph,
-  usage,
-  query,
-  onQuery,
-  selected,
-  onSelect,
-  nodesById,
-  onPick,
-  findings,
-  neighbourhoodById,
-  scope = null,
-  onShowAll = () => undefined,
-  dataTypes,
-  impact,
-  onImpact,
-}: {
+type FlatViewProps = {
   /** What the Impact view needs beyond the lists' props. */
   impact: Pick<ImpactViewProps, "start" | "alias" | "onAlias" | "onShowInCity">;
   /** Opens the Impact view on a property of the type the editor view shows. */
@@ -198,45 +181,72 @@ export function FlatView({
   scope?: FocusScope | null;
   /** Leaves focus, which is how the lists go back to every type. */
   onShowAll?: () => void;
-}) {
-  const roleFor = (node: SchemaNode) =>
-    roleOf(node, neighbourhoodById.get(node.id));
-  // Data Types are not types, so focus does not narrow them.
-  if (view === "datatypes")
-    return (
-      <DataTypes
-        {...dataTypes}
-        findings={findings}
-        graph={graph}
-        nodesById={nodesById}
-        onSelect={onSelect}
-        roleOf={roleFor}
-        usage={usage}
-      />
-    );
-  if (view === "editor")
-    return (
-      <EditorLayout
-        findings={findings}
-        nodesById={nodesById}
-        onImpact={onImpact}
-        onPick={onPick}
-        onSelect={onSelect}
-        roleOf={roleFor}
-        selected={selected}
-      />
-    );
-  if (view === "impact")
-    return (
-      <ImpactView
-        {...impact}
-        graph={graph}
-        nodesById={nodesById}
-        onPick={onPick}
-        onSelect={onSelect}
-        usage={usage}
-      />
-    );
+};
+
+type PageProps = FlatViewProps & { roleFor: (node: SchemaNode) => Role };
+
+/**
+ * The views that are pages of their own rather than lists. Focus does not narrow
+ * them: Data Types are not types, and the editor and impact pages are about one.
+ */
+const PAGES: Partial<Record<View, (props: PageProps) => ReactNode>> = {
+  datatypes: (props) => (
+    <DataTypes
+      {...props.dataTypes}
+      findings={props.findings}
+      graph={props.graph}
+      nodesById={props.nodesById}
+      onSelect={props.onSelect}
+      roleOf={props.roleFor}
+      usage={props.usage}
+    />
+  ),
+  editor: (props) => (
+    <EditorLayout
+      findings={props.findings}
+      nodesById={props.nodesById}
+      onImpact={props.onImpact}
+      onPick={props.onPick}
+      onSelect={props.onSelect}
+      roleOf={props.roleFor}
+      selected={props.selected}
+    />
+  ),
+  impact: (props) => (
+    <ImpactView
+      {...props.impact}
+      graph={props.graph}
+      nodesById={props.nodesById}
+      onPick={props.onPick}
+      onSelect={props.onSelect}
+      usage={props.usage}
+    />
+  ),
+};
+
+export function FlatView(props: FlatViewProps) {
+  const page = PAGES[props.view];
+  if (page)
+    return page({
+      ...props,
+      roleFor: (node) => roleOf(node, props.neighbourhoodById.get(node.id)),
+    });
+  return <Lists {...props} />;
+}
+
+function Lists({
+  view,
+  graph,
+  usage,
+  query,
+  onQuery,
+  selected,
+  onSelect,
+  nodesById,
+  findings,
+  scope = null,
+  onShowAll = () => undefined,
+}: FlatViewProps) {
   const List = LISTS[view] ?? TypeTable;
   // One shape in and out of focus, so entering focus keeps the list mounted with
   // its sort, its open branches and the row that has keyboard focus.

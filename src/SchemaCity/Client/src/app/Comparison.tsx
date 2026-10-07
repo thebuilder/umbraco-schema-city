@@ -11,22 +11,13 @@ import {
 } from "../model/snapshots";
 import type { SchemaGraph } from "../model/types";
 import { ComparisonResults } from "./ComparisonResults";
+import { saveFile } from "./save-file";
 
 /** Saves the snapshot and returns the file name it was saved under. */
 function downloadSnapshot(graph: SchemaGraph): string {
   const snapshot = createSnapshot(graph);
   const name = snapshotFileName(window.location.hostname, snapshot.capturedAt);
-  const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  saveFile(JSON.stringify(snapshot, null, 2), name, "application/json");
   return name;
 }
 

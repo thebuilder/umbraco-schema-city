@@ -34,6 +34,7 @@ import {
 } from "./a11y";
 import { Heading, READING, TypeChips } from "./InspectorChips";
 import { Muted, Section } from "./InspectorTabs";
+import { saveFile } from "./save-file";
 import { Scroller } from "./TypeTable";
 
 /** The colour each group takes, the one the city draws its kind of link in. */
@@ -396,21 +397,6 @@ function AliasCheck({
   );
 }
 
-/** Saves text as a file, the way the findings export does. */
-function download(text: string, name: string) {
-  const url = URL.createObjectURL(
-    new Blob([text], { type: "text/csv;charset=utf-8" })
-  );
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  // Downloads consume the URL asynchronously, after the click task has ended.
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
-}
-
 /**
  * Copies the Markdown, or, where the clipboard is refused (an insecure origin, a
  * denied permission), shows it selected in a box so the keyboard copy still works.
@@ -498,16 +484,119 @@ export function ImpactView(props: ImpactViewProps) {
 
 const COLUMN = "mx-auto w-full max-w-240 px-4";
 
-function TracePage({
+type TraceProps = ImpactViewProps & { node: SchemaNode };
+
+/** The header's one line: what the trace reaches, the start's own content, stored blocks. */
+function summaryLine(impact: Impact, node: SchemaNode) {
+  const totals = totalsLine(impact.types, impact.content);
+  const own =
+    impact.own === undefined
+      ? ""
+      : ` ${node.name} has ${plural(impact.own, "content item")} of its own.`;
+  const reach =
+    impact.direction === "dependents"
+      ? `A change reaches ${totals}.`
+      : `It depends on ${totals}.`;
+  return { reach, rest: `${own} ${storedLine(impact) ?? ""}`.trimEnd() };
+}
+
+/** Show in city, Export CSV and Copy as Markdown, all over the trace as it stands. */
+function Actions({
+  impact,
+  aliasResult,
   graph,
   usage,
   node,
-  alias,
-  onAlias,
-  nodesById,
-  onSelect,
   onShowInCity,
-}: ImpactViewProps & { node: SchemaNode }) {
+}: Pick<TraceProps, "graph" | "usage" | "node" | "onShowInCity"> & {
+  impact: Impact;
+  aliasResult: AliasImpact | null;
+}) {
+  const reached = impact.groups.flatMap((group) =>
+    group.rows.map((row) => row.id)
+  );
+  const verb =
+    impact.direction === "dependents" ? "a change reaches" : "it depends on";
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <Button
+        className={READING}
+        onClick={() =>
+          onShowInCity(
+            `${node.name} and the ${plural(impact.types, "type")} ${verb}`,
+            new Set([node.id, ...reached])
+          )
+        }
+        size="sm"
+        variant="outline"
+      >
+        Show in city
+      </Button>
+      <Button
+        className={READING}
+        onClick={() =>
+          saveFile(
+            impactCsv(impact, graph, usage, aliasResult),
+            `schema-city-impact-${node.alias}.csv`,
+            "text/csv;charset=utf-8"
+          )
+        }
+        size="sm"
+        variant="outline"
+      >
+        Export CSV
+      </Button>
+      <CopyMarkdown
+        text={() => impactMarkdown(impact, graph, usage, aliasResult)}
+      />
+    </div>
+  );
+}
+
+/** The groups, or why there are none, and the note on what a trace can say. */
+function Results({
+  impact,
+  graph,
+  usage,
+  nameOf,
+  onSelect,
+}: Pick<TraceProps, "graph" | "usage" | "onSelect"> & {
+  impact: Impact;
+  nameOf: (id: string) => string;
+}) {
+  const empty =
+    impact.relations.length === 0
+      ? "Switch on a relationship to trace it."
+      : "Nothing is reached along the chosen relationships.";
+  const counted = usage
+    ? `usage counted ${dayOf(usage.generatedAt) ?? "undated"}.`
+    : "usage not loaded, so content counts are missing.";
+  return (
+    <>
+      {impact.groups.length === 0 ? (
+        <Section>
+          <Muted>{empty}</Muted>
+        </Section>
+      ) : null}
+      {impact.groups.map((group) => (
+        <GroupTable
+          group={group}
+          impact={impact}
+          key={group.key}
+          nameOf={nameOf}
+          onSelect={onSelect}
+        />
+      ))}
+      <p className="pt-3 text-faint text-xs">
+        {EVIDENCE} Schema read {dayOf(graph.generatedAt) ?? "undated"},{" "}
+        {counted}
+      </p>
+    </>
+  );
+}
+
+function TracePage(props: TraceProps) {
+  const { graph, usage, node, alias, onAlias, nodesById, onSelect } = props;
   const [relations, setRelations] = useState<Relation[]>(RELATIONS);
   const [depth, setDepth] = useState(Number.POSITIVE_INFINITY);
   const [direction, setDirection] = useState<Direction>("dependents");
@@ -523,16 +612,12 @@ function TracePage({
   const panel = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   usePanelFocus(panel, heading, node.id);
-  const totals = totalsLine(impact.types, impact.content);
+  const summary = summaryLine(impact, node);
+  useAnnounceChange(summary.reach);
   useAnnounceChange(
-    `${direction === "dependents" ? "Reaches" : "Depends on"} ${totals}`
+    aliasResult &&
+      `${plural(aliasResult.collisions.length, "alias collision")} for ${aliasResult.alias}`
   );
-  useAnnounceChange(
-    aliasResult
-      ? `${plural(aliasResult.collisions.length, "alias collision")} for ${aliasResult.alias}`
-      : null
-  );
-  const stamp = dayOf(graph.generatedAt) ?? "undated";
 
   return (
     <div
@@ -551,15 +636,8 @@ function TracePage({
           </h2>
           <p className="mt-1 font-mono text-faint text-xs">{node.alias}</p>
           <p className="mt-2 text-label">
-            <span className="text-prose">
-              {direction === "dependents"
-                ? `A change reaches ${totals}.`
-                : `It depends on ${totals}.`}
-            </span>
-            {impact.own === undefined
-              ? ""
-              : ` ${node.name} has ${plural(impact.own, "content item")} of its own.`}
-            {impact.stored.length > 0 ? ` ${storedLine(impact)}` : ""}
+            <span className="text-prose">{summary.reach}</span>
+            {summary.rest}
           </p>
           <div className="mt-3">
             <Controls
@@ -571,42 +649,7 @@ function TracePage({
               relations={relations}
             />
           </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button
-              className={READING}
-              onClick={() =>
-                onShowInCity(
-                  `${node.name} and the ${plural(impact.types, "type")} ${direction === "dependents" ? "a change reaches" : "it depends on"}`,
-                  new Set([
-                    node.id,
-                    ...impact.groups.flatMap((group) =>
-                      group.rows.map((row) => row.id)
-                    ),
-                  ])
-                )
-              }
-              size="sm"
-              variant="outline"
-            >
-              Show in city
-            </Button>
-            <Button
-              className={READING}
-              onClick={() =>
-                download(
-                  impactCsv(impact, graph, usage, aliasResult),
-                  `schema-city-impact-${node.alias}.csv`
-                )
-              }
-              size="sm"
-              variant="outline"
-            >
-              Export CSV
-            </Button>
-            <CopyMarkdown
-              text={() => impactMarkdown(impact, graph, usage, aliasResult)}
-            />
-          </div>
+          <Actions {...props} aliasResult={aliasResult} impact={impact} />
         </div>
       </header>
 
@@ -619,30 +662,13 @@ function TracePage({
             onSelect={onSelect}
             result={aliasResult}
           />
-          {impact.groups.length === 0 ? (
-            <Section>
-              <Muted>
-                {relations.length === 0
-                  ? "Switch on a relationship to trace it."
-                  : "Nothing is reached along the chosen relationships."}
-              </Muted>
-            </Section>
-          ) : null}
-          {impact.groups.map((group) => (
-            <GroupTable
-              group={group}
-              impact={impact}
-              key={group.key}
-              nameOf={nameOf}
-              onSelect={onSelect}
-            />
-          ))}
-          <p className="pt-3 text-faint text-xs">
-            {EVIDENCE} Schema read {stamp}
-            {usage
-              ? `, usage counted ${dayOf(usage.generatedAt) ?? "undated"}.`
-              : ", usage not loaded, so content counts are missing."}
-          </p>
+          <Results
+            graph={graph}
+            impact={impact}
+            nameOf={nameOf}
+            onSelect={onSelect}
+            usage={usage}
+          />
         </div>
       </Scroller>
     </div>

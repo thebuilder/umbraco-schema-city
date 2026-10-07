@@ -27,6 +27,7 @@ import {
   useHandOff,
 } from "./a11y";
 import { DataTypeLinks, READING, SpokenCount } from "./InspectorChips";
+import { saveFile } from "./save-file";
 
 /**
  * The chips to offer and the rows they leave. A picked kind that has no rows any
@@ -291,18 +292,11 @@ function downloadCsv(
   usage: UsageReport | undefined,
   kinds: FindingKind[]
 ) {
-  const blob = new Blob([findingsCsv(rows, graph, usage, kinds)], {
-    type: "text/csv;charset=utf-8",
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "schema-city-findings.csv";
-  document.body.append(link);
-  link.click();
-  link.remove();
-  // Downloads consume the URL asynchronously, after the click task has ended.
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  saveFile(
+    findingsCsv(rows, graph, usage, kinds),
+    "schema-city-findings.csv",
+    "text/csv;charset=utf-8"
+  );
 }
 
 /**
