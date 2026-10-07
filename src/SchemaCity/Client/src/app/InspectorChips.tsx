@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { createContext, type ReactNode, use, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { editorLabel } from "../model/editor-layout";
 import type { FindingSeverity } from "../model/findings";
@@ -10,9 +10,48 @@ import { plural } from "./a11y";
 export const READING = "font-sans font-medium normal-case tracking-normal";
 
 /**
- * A property's Data Type, which is what an editor recognises. The property editor
- * behind it is on hover for a mouse and read after it for a screen reader; a
- * property whose Data Type is gone shows the editor alone.
+ * What turns a Data Type name into a link to its page. App provides it; without it,
+ * as in a test or a host that has no Data Types view, the names stay text.
+ */
+export const DataTypeLinks = createContext<{
+  open: (id: string) => void;
+  nameOf: (id: string) => string | undefined;
+} | null>(null);
+
+/**
+ * A Data Type's name as a link to its page. It stops the click there, because the
+ * rows it sits in select a type on click.
+ */
+export function DataTypeLink({
+  id,
+  children,
+  className = "",
+}: {
+  id: string;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const links = use(DataTypeLinks);
+  const name = children ?? links?.nameOf(id) ?? id;
+  if (!links) return <span className={className}>{name}</span>;
+  return (
+    <button
+      className={`max-w-full truncate text-left underline-offset-2 hover:text-phosphor hover:underline ${className}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        links.open(id);
+      }}
+      type="button"
+    >
+      {name}
+    </button>
+  );
+}
+
+/**
+ * A property's Data Type, which is what an editor recognises, as a link to its
+ * page. The property editor behind it is on hover for a mouse and read after it for
+ * a screen reader; a property whose Data Type is gone shows the editor alone.
  */
 export function DataTypeName({
   property,
@@ -26,10 +65,12 @@ export function DataTypeName({
   const editor = property.editorUiAlias ?? property.editorAlias;
   return (
     <span className={className} title={editorLabel(property)}>
-      {property.dataTypeName ?? property.editorAlias}
-      <span className="sr-only">
-        {property.dataTypeName ? `, editor ${editor}` : ""}
-      </span>
+      <DataTypeLink id={property.dataTypeId}>
+        {property.dataTypeName ?? property.editorAlias}
+        <span className="sr-only">
+          {property.dataTypeName ? `, editor ${editor}` : ""}
+        </span>
+      </DataTypeLink>
       {children}
     </span>
   );

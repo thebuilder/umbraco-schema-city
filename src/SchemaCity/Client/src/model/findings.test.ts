@@ -14,6 +14,7 @@ import {
   problemLabels,
 } from "./findings";
 import type {
+  SchemaDataType,
   SchemaEdge,
   SchemaGraph,
   SchemaNode,
@@ -668,6 +669,8 @@ describe("findFindings, one rule at a time", () => {
       "Seo_Toggle: 1 property on 1 type, SEO Toggle: 2 properties on 2 types"
     );
     expect(finding?.related).toEqual(["news"]);
+    // Both Data Types of the set, least used first, each a link to its page.
+    expect(finding?.dataTypeIds).toEqual(["dt-2", "dt-1"]);
   });
 
   it("leaves one Data Type used everywhere, and composed properties, alone", () => {
@@ -856,8 +859,9 @@ describe("findFindings, one rule at a time", () => {
       "complexity",
       "noTemplate",
     ]);
-    expect(FINDING_KINDS.slice(0, 8)).toEqual([
+    expect(FINDING_KINDS.slice(0, 9)).toEqual([
       "brokenBlock",
+      "orphanedBlocks",
       "duplicateAlias",
       "cultureMismatch",
       "unreachableChain",
@@ -870,6 +874,140 @@ describe("findFindings, one rule at a time", () => {
 
   it("says nothing about an empty graph", () => {
     expect(findFindings(graphOf([]))).toEqual([]);
+  });
+});
+
+describe("findFindings about Data Types and stored blocks", () => {
+  const dataType = (
+    id: string,
+    extra: Partial<SchemaDataType> = {}
+  ): SchemaDataType => ({
+    id,
+    name: id,
+    editorAlias: "Umbraco.BlockList",
+    editorUiAlias: null,
+    folder: null,
+    targets: [],
+    otherUses: 0,
+    ...extra,
+  });
+  /** A report whose block counts store `count` blocks of each Element Type in `dataTypeId`. */
+  const withBlocks = (
+    graph: SchemaGraph,
+    stored: Record<string, number>,
+    partial = false,
+    dataTypeId = "dt-body"
+  ): UsageReport => ({
+    ...usageOf(graph),
+    blocks: {
+      partial,
+      valuesRead: 4,
+      unreadable: 0,
+      byDataType: [
+        {
+          dataTypeId,
+          values: 4,
+          items: 2,
+          elements: Object.entries(stored).map(([elementTypeId, content]) => ({
+            elementTypeId,
+            content,
+            settings: 0,
+            items: 2,
+          })),
+        },
+      ],
+    },
+  });
+  const hosted = (dataTypes: SchemaDataType[] = []) =>
+    ({
+      ...graphOf(
+        [
+          node("host", {
+            allowedAsRoot: true,
+            groups: [
+              group("content", [
+                property("body", null, { dataTypeId: "dt-body" }),
+              ]),
+            ],
+          }),
+          node("used", { isElement: true }),
+          node("retired", { isElement: true }),
+        ],
+        [edge("block", "host", "used", "body")]
+      ),
+      dataTypes,
+    }) as SchemaGraph;
+
+  it("reports a Data Type nothing uses, as a note about the Data Type alone", () => {
+    const graph = hosted([
+      dataType("dt-body"),
+      dataType("dt-spare", { folder: "Old", editorAlias: "Umbraco.TextBox" }),
+      dataType("dt-upload", { otherUses: 1 }),
+    ]);
+    const unused = findFindings(graph).filter(
+      (finding) => finding.kind === "unusedDataType"
+    );
+    expect(unused).toEqual([
+      {
+        id: "unusedDataType:dt-spare",
+        kind: "unusedDataType",
+        severity: "note",
+        summary: "Editor Umbraco.TextBox, in Old",
+        dataTypeIds: ["dt-spare"],
+      },
+    ]);
+    // A graph that lists no Data Types cannot say one is unused.
+    expect(
+      findFindings(hosted()).some((f) => f.kind === "unusedDataType")
+    ).toBe(false);
+  });
+
+  it("says how many stored blocks an unlisted Element Type has, once they are counted", () => {
+    const graph = hosted();
+    const summary = (usage?: UsageReport) =>
+      findFindings(graph, usage).find(
+        (f) => f.kind === "unusedElementType" && f.nodeId === "retired"
+      )?.summary;
+    expect(summary()).toBe(
+      "No block editor lists it. 1 type has a block editor that could"
+    );
+    expect(summary(withBlocks(graph, { used: 3 }))).toBe(
+      "No block editor lists it. 1 type has a block editor that could. Content stores 0 blocks of it"
+    );
+    expect(summary(withBlocks(graph, {}, true))).toContain(
+      "No stored block of it was counted, but the count stopped early"
+    );
+  });
+
+  it("turns an unlisted Element Type that content still stores into orphaned blocks", () => {
+    const graph = hosted([dataType("dt-body", { name: "Body Blocks" })]);
+    const findings = findFindings(graph, withBlocks(graph, { retired: 5 }));
+    const orphaned = findings.find((f) => f.kind === "orphanedBlocks");
+    expect(orphaned).toMatchObject({
+      nodeId: "retired",
+      severity: "problem",
+      summary:
+        "No block editor lists it, but content stores 5 blocks of it in Body Blocks",
+      dataTypeIds: ["dt-body"],
+    });
+    expect(
+      findings.some(
+        (f) => f.kind === "unusedElementType" && f.nodeId === "retired"
+      )
+    ).toBe(false);
+  });
+
+  it("links a broken block to its Data Type and says what content still stores", () => {
+    const graph = hosted();
+    graph.edges.push(edge("block", "host", "deleted-key", "body"));
+    const broken = findFindings(
+      graph,
+      withBlocks(graph, { "deleted-key": 2 })
+    ).find((f) => f.kind === "brokenBlock");
+    expect(broken?.dataTypeIds).toEqual(["dt-body"]);
+    expect(broken?.summary).toBe(
+      "body points at 1 Element Type that no longer exists, and content still stores 2 blocks of it"
+    );
   });
 });
 
@@ -947,6 +1085,26 @@ describe("findFindings on the seeded medium.json", () => {
     expect(unused).toContain(legacy);
     // article has 162 items in that report, so it is never the unused one.
     expect(unused).not.toContain(article);
+  });
+
+  it("reads the seeded stored blocks and the unused Data Types", () => {
+    const findings = findFindings(medium, mediumUsage);
+    const banner = medium.nodes.find(
+      (candidate) => candidate.alias === "unusedElementBanner"
+    )?.id;
+    // The seed stores blocks only of Element Types its editors offer, so none is orphaned.
+    expect(findings.some((f) => f.kind === "orphanedBlocks")).toBe(false);
+    expect(findings.find((f) => f.kind === "unusedElementType")).toMatchObject({
+      nodeId: banner,
+      summary: expect.stringContaining("Content stores 0 blocks of it"),
+    });
+    // The built-in Data Types no Document, Media or Member Type uses.
+    expect(findings.filter((f) => f.kind === "unusedDataType")).toHaveLength(
+      20
+    );
+    expect(
+      findings.find((f) => f.kind === "brokenBlock")?.dataTypeIds
+    ).toHaveLength(1);
   });
 
   it("reports the graph-only rules with no usage report at all", () => {

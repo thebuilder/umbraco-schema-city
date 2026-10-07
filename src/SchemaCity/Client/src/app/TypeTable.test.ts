@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
-import { sortRows, typeRows } from "./TypeTable";
+import { type SortKey, sortRows, typeRows } from "./TypeTable";
 
 const node = (id: string, extra: Partial<SchemaNode> = {}): SchemaNode => ({
   id,
@@ -78,7 +78,7 @@ test("usage is a count when the report is in, and absent when it is not", () => 
 
 test("clicking a header sorts by it, and clicking it again turns it round", () => {
   const rows = typeRows(graph);
-  const names = (key: Parameters<typeof sortRows>[1], ascending: boolean) =>
+  const names = (key: SortKey, ascending: boolean) =>
     sortRows(rows, key, ascending).map((row) => row.name);
 
   expect(names("name", true)).toEqual(["Article", "Card", "Home"]);

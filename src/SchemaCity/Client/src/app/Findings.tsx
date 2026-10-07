@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { use, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,8 +20,13 @@ import {
 } from "../model/findings";
 import { findingsCsv } from "../model/findings-export";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
-import { plural, useAnnounceChange, useHandOff } from "./a11y";
-import { READING, SpokenCount } from "./InspectorChips";
+import {
+  DATA_TYPE_HEADING,
+  plural,
+  useAnnounceChange,
+  useHandOff,
+} from "./a11y";
+import { DataTypeLinks, READING, SpokenCount } from "./InspectorChips";
 
 /**
  * The chips to offer and the rows they leave. A picked kind that has no rows any
@@ -54,27 +59,64 @@ export function snapshotDate(iso: string | undefined): string | null {
 /**
  * One finding. The group above it carries the kind and what it means, so the row
  * is the type and what is particular to it. Clicking selects the type, which for a
- * broken block reference is the host: the missing Element Type has no building.
+ * broken block reference is the host: the missing Element Type has no building. A
+ * finding about a Data Type alone opens that Data Type's page instead, and the Data
+ * Types a type's finding names are links under it.
  */
 function Row({
   finding,
   name,
   onSelect,
+  onDataType,
 }: {
   finding: Finding;
   name: string;
   onSelect: (id: string) => void;
+  onDataType: (id: string) => void;
 }) {
+  const { nodeId, dataTypeIds = [] } = finding;
+  return (
+    <div className="border-line/40 border-t first:border-t-0">
+      <button
+        className="group block w-full px-3 py-1.5 text-left hover:bg-accent/50"
+        onClick={() =>
+          nodeId ? onSelect(nodeId) : onDataType(dataTypeIds[0] ?? "")
+        }
+        type="button"
+      >
+        <span className="block truncate text-prose group-hover:text-phosphor">
+          {name}
+        </span>
+        <span className="block text-label text-xs">{finding.summary}</span>
+      </button>
+      {nodeId && dataTypeIds.length > 0 ? (
+        <p className="flex flex-wrap gap-x-2 px-3 pb-1.5 text-faint text-xs">
+          Data Types:
+          {dataTypeIds.map((id) => (
+            <DataTypeLinkTo id={id} key={id} onOpen={onDataType} />
+          ))}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** A Data Type link that also closes the drawer, which the shared link cannot know about. */
+function DataTypeLinkTo({
+  id,
+  onOpen,
+}: {
+  id: string;
+  onOpen: (id: string) => void;
+}) {
+  const links = use(DataTypeLinks);
   return (
     <button
-      className="group block w-full border-line/40 border-t px-3 py-1.5 text-left first:border-t-0 hover:bg-accent/50"
-      onClick={() => onSelect(finding.nodeId)}
+      className="max-w-48 truncate text-phosphor hover:text-phosphor-bright hover:underline"
+      onClick={() => onOpen(id)}
       type="button"
     >
-      <span className="block truncate text-prose group-hover:text-phosphor">
-        {name}
-      </span>
-      <span className="block text-label text-xs">{finding.summary}</span>
+      {links?.nameOf(id) ?? id}
     </button>
   );
 }
@@ -99,14 +141,21 @@ function Group({
   rows,
   nodesById,
   onSelect,
+  onDataType,
 }: {
   kind: FindingKind;
   open: boolean;
   rows: Finding[];
   nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
+  onDataType: (id: string) => void;
 }) {
   const tone = TONE[rows[0]?.severity ?? "note"];
+  const links = use(DataTypeLinks);
+  const nameOf = (finding: Finding) =>
+    finding.nodeId
+      ? (nodesById.get(finding.nodeId)?.name ?? "a deleted type")
+      : (links?.nameOf(finding.dataTypeIds?.[0] ?? "") ?? "a Data Type");
   return (
     <details className={`border-l-2 bg-muted ${tone.border}`} open={open}>
       <summary className="flex cursor-pointer items-baseline gap-2 px-3 pt-2.5 pb-1">
@@ -125,7 +174,8 @@ function Group({
           <Row
             finding={finding}
             key={finding.id}
-            name={nodesById.get(finding.nodeId)?.name ?? "a deleted type"}
+            name={nameOf(finding)}
+            onDataType={onDataType}
             onSelect={onSelect}
           />
         ))}
@@ -303,6 +353,13 @@ export function Findings({
     onSelect(id);
     onOpenChange(false);
   };
+  // A Data Type opens its page, so focus goes to that page's heading.
+  const links = use(DataTypeLinks);
+  const pickDataType = (id: string) => {
+    handOff.chose(DATA_TYPE_HEADING);
+    links?.open(id);
+    onOpenChange(false);
+  };
 
   return (
     <Sheet onOpenChange={onOpenChange} open={open}>
@@ -344,6 +401,7 @@ export function Findings({
                 key={kind}
                 kind={kind}
                 nodesById={nodesById}
+                onDataType={pickDataType}
                 onSelect={pick}
                 open={rows[0]?.severity === "problem" || active.includes(kind)}
                 rows={rows}

@@ -71,7 +71,7 @@ describe("findingsCsv", () => {
   it("puts the header row first, with no preamble", () => {
     const [header] = lines(findingsCsv([broken], graph, usage));
     expect(header).toBe(
-      "Kind,Kind code,Severity,Type,Alias,Type key,Folder,Total,Published,Drafts,Trashed,Last edited,Backoffice path,Detail,Explanation,What to do,Related,Unused branch root,Filter,Schema snapshot,Usage snapshot"
+      "Kind,Kind code,Severity,Type,Alias,Type key,Folder,Total,Published,Drafts,Trashed,Last edited,Backoffice path,Detail,Explanation,What to do,Related,Unused branch root,Filter,Schema snapshot,Usage snapshot,Data Types,Data Type keys"
     );
   });
 
@@ -81,14 +81,14 @@ describe("findingsCsv", () => {
       'Broken block,brokenBlock,problem,"Page, root",page,page,Pages/News,12,9,2,1,2026-09-05,/umbraco/section/settings/workspace/document-type/edit/page,"Blocks, settings\nneed review",'
     );
     expect(output).toContain(
-      ",Missing Element Type deleted-key | Hub,,Broken block,2026-09-06,2026-09-06\n"
+      ",Missing Element Type deleted-key | Hub,,Broken block,2026-09-06,2026-09-06,,\n"
     );
   });
 
   it("says when the usage snapshot is missing and the export is not filtered", () => {
     const [, row] = lines(findingsCsv([{ ...broken, summary: "x" }], graph));
     expect(row).toContain(",page,Pages/News,,,,,,/umbraco/");
-    expect(row?.endsWith(",All kinds,2026-09-06,unavailable")).toBe(true);
+    expect(row?.endsWith(",All kinds,2026-09-06,unavailable,,")).toBe(true);
   });
 
   it("names the topmost unused ancestor of each unused type, cycle safe", () => {
@@ -112,11 +112,47 @@ describe("findingsCsv", () => {
     ).slice(1);
     // Hub's parent has content, so hub tops its own branch, and leaf is under it.
     // The column is for unused type rows only, not another kind on the same type.
-    expect(rows.map((row) => row.split(",").slice(-4)[0])).toEqual([
+    expect(rows.map((row) => row.split(",").slice(-6)[0])).toEqual([
       "Hub",
       "Hub",
       "",
     ]);
+  });
+
+  it("writes a Data Type finding with blank type columns and the Data Type's path", () => {
+    const withDataType: SchemaGraph = {
+      ...graph,
+      dataTypes: [
+        {
+          id: "dt-old",
+          name: "Old Picker",
+          editorAlias: "Umbraco.MultiNodeTreePicker",
+          editorUiAlias: null,
+          folder: "Legacy",
+          targets: [],
+          otherUses: 0,
+        },
+      ],
+    };
+    const [, row] = lines(
+      findingsCsv(
+        [
+          {
+            id: "unusedDataType:dt-old",
+            kind: "unusedDataType",
+            severity: "note",
+            summary: "Editor Umbraco.MultiNodeTreePicker",
+            dataTypeIds: ["dt-old"],
+          },
+        ],
+        withDataType,
+        usage
+      )
+    );
+    expect(row).toContain(
+      "Unused Data Type,unusedDataType,note,,,,Legacy,,,,,,/umbraco/section/settings/workspace/data-type/edit/dt-old,"
+    );
+    expect(row?.endsWith(",Old Picker,dt-old")).toBe(true);
   });
 
   it.each(["", "\t", "  ", "\r\n"])(

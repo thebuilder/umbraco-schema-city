@@ -62,20 +62,21 @@ export function typeRows(graph: SchemaGraph, usage?: UsageReport): TypeRow[] {
 /**
  * Sorted by one column. Text sorts as text, everything else by number, with a type
  * the usage report says nothing about at the bottom either way. Ties fall back to
- * the name, so the order is stable however often you click a header.
+ * the name, so the order is stable however often you click a header. The Data
+ * Types list sorts its rows the same way.
  */
-export function sortRows(
-  rows: TypeRow[],
-  key: SortKey,
+export function sortRows<Row extends { name: string }>(
+  rows: Row[],
+  key: keyof Row,
   ascending: boolean
-): TypeRow[] {
-  const number = (row: TypeRow) => {
-    const value = row[key];
+): Row[] {
+  const number = (row: Row) => {
+    const value: unknown = row[key];
     if (typeof value === "number") return value;
     if (typeof value === "boolean") return value ? 1 : 0;
     return Number.NEGATIVE_INFINITY;
   };
-  const compare = (a: TypeRow, b: TypeRow) =>
+  const compare = (a: Row, b: Row) =>
     (typeof a[key] === "string"
       ? String(a[key]).localeCompare(String(b[key]))
       : number(a) - number(b)) || a.name.localeCompare(b.name);

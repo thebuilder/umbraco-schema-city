@@ -4,6 +4,7 @@
 // Every rule is one pass over the nodes with a few edge counts prepared first, so
 // the whole set is cheap enough to recompute whenever either input changes.
 import { creationTree } from "./creation-tree";
+import { dataTypeNames, storedByElementType } from "./data-types";
 import { editorLayout } from "./editor-layout";
 import { compositionUsers } from "./matrix";
 import type {
@@ -16,6 +17,7 @@ import type {
 
 export type FindingKind =
   | "brokenBlock"
+  | "orphanedBlocks"
   | "duplicateAlias"
   | "emptyBlock"
   | "cultureMismatch"
@@ -25,6 +27,7 @@ export type FindingKind =
   | "unusedType"
   | "overloadedTab"
   | "nearDuplicateDataType"
+  | "unusedDataType"
   | "noProperties"
   | "complexity"
   | "pureMixin"
@@ -33,12 +36,23 @@ export type FindingKind =
 export type FindingSeverity = "problem" | "note";
 
 export type Finding = {
-  /** `kind:nodeId`, stable across runs so a row can be linked to. */
+  /**
+   * `kind:nodeId`, or `kind:dataTypeId` for a finding about a Data Type alone,
+   * stable across runs so a row can be linked to.
+   */
   id: string;
   kind: FindingKind;
   severity: FindingSeverity;
-  /** The type the finding is about, and the one a row selects. */
-  nodeId: string;
+  /**
+   * The type the finding is about, and the one a row selects. Absent when the
+   * subject is a Data Type no type uses, which has no building to select.
+   */
+  nodeId?: string;
+  /**
+   * The Data Types the finding names, each a link to its page. A finding without a
+   * nodeId is about the first of them.
+   */
+  dataTypeIds?: string[];
   /**
    * What is particular to this row: which types can create it, how many compose
    * it, which aliases clash. What the kind means is in KIND_EXPLANATION, said once.
@@ -58,6 +72,7 @@ export type Finding = {
  */
 export const FINDING_KINDS: readonly FindingKind[] = [
   "brokenBlock",
+  "orphanedBlocks",
   "duplicateAlias",
   "cultureMismatch",
   "unreachableChain",
@@ -67,6 +82,7 @@ export const FINDING_KINDS: readonly FindingKind[] = [
   "emptyBlock",
   "overloadedTab",
   "nearDuplicateDataType",
+  "unusedDataType",
   "noProperties",
   "complexity",
   "pureMixin",
@@ -75,6 +91,7 @@ export const FINDING_KINDS: readonly FindingKind[] = [
 
 export const FINDING_LABEL: Record<FindingKind, string> = {
   brokenBlock: "Broken block",
+  orphanedBlocks: "Orphaned blocks",
   duplicateAlias: "Duplicate alias",
   emptyBlock: "Empty block",
   cultureMismatch: "Culture mismatch",
@@ -84,6 +101,7 @@ export const FINDING_LABEL: Record<FindingKind, string> = {
   unusedType: "Unused type",
   overloadedTab: "Overloaded tab",
   nearDuplicateDataType: "Near-duplicate Data Type",
+  unusedDataType: "Unused Data Type",
   noProperties: "No properties",
   complexity: "Complexity",
   pureMixin: "Pure mixin",
@@ -100,6 +118,8 @@ export const TAB_LIMIT = 20;
 export const KIND_EXPLANATION: Record<FindingKind, string> = {
   brokenBlock:
     "A block editor lists an Element Type that no longer exists in the schema.",
+  orphanedBlocks:
+    "Content still stores blocks of these Element Types, but no block editor configuration lists them any more. Editors cannot add new ones, and the stored ones may not render or edit as expected.",
   duplicateAlias:
     "A property alias arrives from more than one place, the type's own properties or its compositions. The editor that results cannot save both values, and where the editors differ the stored value may not suit one of them.",
   emptyBlock:
@@ -111,12 +131,14 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
   deadEnd:
     "Not allowed at root, not allowed under any type, not an Element Type, and nothing composes them, so an editor cannot create content with these types.",
   unusedElementType:
-    "No block editor configuration lists these Element Types. Stored block values and custom code can still use them.",
+    "No block editor configuration lists these Element Types. Once usage has loaded, each row says whether stored block values use them; custom code can still use them either way.",
   unusedType:
     "An editor can create these Document Types, but the usage snapshot counts no content of them. Custom code, migrations and external consumers can still depend on a type.",
   overloadedTab: `One tab, or one group on a type without tabs, holds more than ${TAB_LIMIT} properties. Composed properties count, merged the way the Editor view shows them.`,
   nearDuplicateDataType:
     "Data Types whose names match once case, spaces, hyphens, underscores and a copy number such as (1) are ignored. They can differ in configuration. Each set is one row, on a type that uses the least-used of them, and the related types are every other type that uses any of them. Only own properties count, so a composed property counts on its composition.",
+  unusedDataType:
+    "No property on a Document, Media or Member Type uses these Data Types, and no collection view does. Custom code and packages can still refer to one by its key.",
   noProperties: "These types have no own and no composed properties.",
   complexity: `In the highest of ${COMPLEXITY_TIERS} complexity tiers in this schema. The score is own and composed properties, plus twice the compositions, plus distinct block targets.`,
   pureMixin:
@@ -132,6 +154,8 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
 export const KIND_NEXT_STEP: Record<FindingKind, string> = {
   brokenBlock:
     "Remove the missing Element Type from the block editor, or restore it if content still holds those blocks.",
+  orphanedBlocks:
+    "Add the Element Type back to the block editor that held it, or move or remove the stored blocks before you change the type.",
   duplicateAlias:
     "Rename the property on one source or drop one of the compositions, then check which value editors expect.",
   emptyBlock:
@@ -142,13 +166,15 @@ export const KIND_NEXT_STEP: Record<FindingKind, string> = {
     "Allow the top of the chain under a type a root reaches, or remove the chain if it is left over.",
   deadEnd: "Allow it under a page, or remove it if it is left over.",
   unusedElementType:
-    "Check stored block values and custom code, then add it to a block editor or remove it.",
+    "Check the stored block count and custom code, then add it to a block editor or remove it.",
   unusedType:
     "Check custom code and imports, then remove it or allow it where editors need it.",
   overloadedTab:
     "Split the tab into groups or more tabs, so editors find the fields they need.",
   nearDuplicateDataType:
     "Compare the configurations, then move the properties onto one Data Type if they should match.",
+  unusedDataType:
+    "Search custom code and packages for its key, then remove it or give a property the Data Type.",
   noProperties:
     "Add properties, or check whether code relies on it as a folder or marker type.",
   complexity:
@@ -161,6 +187,7 @@ export const KIND_NEXT_STEP: Record<FindingKind, string> = {
 
 const SEVERITY: Record<FindingKind, FindingSeverity> = {
   brokenBlock: "problem",
+  orphanedBlocks: "problem",
   duplicateAlias: "problem",
   emptyBlock: "note",
   cultureMismatch: "problem",
@@ -170,6 +197,7 @@ const SEVERITY: Record<FindingKind, FindingSeverity> = {
   unusedType: "problem",
   overloadedTab: "note",
   nearDuplicateDataType: "note",
+  unusedDataType: "note",
   noProperties: "note",
   complexity: "note",
   pureMixin: "note",
@@ -195,7 +223,7 @@ export const findingGroups = (findings: Finding[]) =>
 export function problemLabels(findings: Finding[]): Map<string, string> {
   const labels = new Map<string, string[]>();
   for (const finding of findings)
-    if (finding.severity === "problem")
+    if (finding.severity === "problem" && finding.nodeId)
       append(labels, finding.nodeId, FINDING_LABEL[finding.kind]);
   return new Map([...labels].map(([id, kinds]) => [id, kinds.join(", ")]));
 }
@@ -353,6 +381,13 @@ export function findFindings(
     a.localeCompare(b);
   const twins = dataTypeTwins(nodes, byName);
   const names = (ids: string[]) => list(ids.map((id) => nameOf.get(id) ?? id));
+  const dataTypeName = dataTypeNames(graph);
+  const dataTypeList = (ids: string[]) =>
+    list(ids.map((id) => dataTypeName.get(id) ?? id));
+  // Blocks content stores, per Element Type. Empty until a report with block
+  // counts arrives, and then the Element Type rules can say what content holds.
+  const blocks = usage?.blocks;
+  const stored = storedByElementType(usage);
   // Without a report the row has nothing usage-based to add, so it says nothing.
   const content = (id: string) => {
     if (!usage) return "";
@@ -371,7 +406,8 @@ export function findFindings(
     node: SchemaNode,
     summary: string,
     related?: string[],
-    weight = 0
+    weight = 0,
+    dataTypeIds?: string[]
   ) => {
     if (!usage && NEEDS_USAGE.has(kind)) return;
     strength.set(`${kind}:${node.id}`, weight);
@@ -382,6 +418,7 @@ export function findFindings(
       nodeId: node.id,
       summary,
       ...(related && related.length > 0 ? { related } : {}),
+      ...(dataTypeIds && dataTypeIds.length > 0 ? { dataTypeIds } : {}),
     });
   };
 
@@ -418,13 +455,30 @@ export function findFindings(
     // An Element Type other Element Types compose is a mixin: its properties reach
     // blocks through them, and an unused composer gets a row of its own.
     if (node.isElement && at(inBlock, node.id) === 0 && composers === 0) {
-      add(
-        "unusedElementType",
-        node,
-        blockHosts.size > 0
-          ? `No block editor lists it. ${plural(blockHosts.size, "type has", "types have")} a block editor that could`
-          : "No block editor lists it, and no type in this schema has a block editor"
-      );
+      const kept = stored.get(node.id);
+      if (kept) {
+        // Content still holds it, so this is no cleanup candidate but a
+        // configuration that dropped an Element Type its blocks still name.
+        add(
+          "orphanedBlocks",
+          node,
+          `No block editor lists it, but content stores ${plural(kept.blocks, "block")} of it in ${dataTypeList(kept.dataTypeIds)}${blocks?.partial ? ", or more: the count stopped early" : ""}`,
+          undefined,
+          kept.blocks,
+          kept.dataTypeIds
+        );
+      } else {
+        const hosts =
+          blockHosts.size > 0
+            ? `No block editor lists it. ${plural(blockHosts.size, "type has", "types have")} a block editor that could`
+            : "No block editor lists it, and no type in this schema has a block editor";
+        let evidence = "";
+        if (blocks)
+          evidence = blocks.partial
+            ? ". No stored block of it was counted, but the count stopped early"
+            : ". Content stores 0 blocks of it";
+        add("unusedElementType", node, hosts + evidence);
+      }
     }
 
     // A type nothing composes and nothing can create is a structural dead end, and
@@ -487,12 +541,28 @@ export function findFindings(
       const aliases = [
         ...new Set(broken.map((block) => block.propertyAlias)),
       ].join(", ");
+      const own = propertiesOf(node);
+      const editors = [
+        ...new Set(
+          broken.flatMap(
+            (block) =>
+              own.find((p) => p.alias === block.propertyAlias)?.dataTypeId ?? []
+          )
+        ),
+      ];
+      // A deleted Element Type can still be in stored values, which is what decides
+      // whether restoring it matters.
+      const kept = broken.reduce(
+        (sum, block) => sum + (stored.get(block.to)?.blocks ?? 0),
+        0
+      );
       add(
         "brokenBlock",
         node,
-        `${aliases || "A block editor"} points at ${broken.length} Element Type${broken.length === 1 ? "" : "s"} that no longer exist${broken.length === 1 ? "s" : ""}`,
+        `${aliases || "A block editor"} points at ${broken.length} Element Type${broken.length === 1 ? "" : "s"} that no longer exist${broken.length === 1 ? "s" : ""}${kept > 0 ? `, and content still stores ${plural(kept, "block")} of ${broken.length === 1 ? "it" : "them"}` : ""}`,
         broken.map((block) => block.to),
-        broken.length
+        broken.length,
+        editors
       );
     }
 
@@ -548,7 +618,8 @@ export function findFindings(
         node,
         twin.summary,
         twin.related,
-        twin.properties
+        twin.properties,
+        twin.dataTypeIds
       );
 
     const overloaded = overloadedTabs(node);
@@ -641,15 +712,49 @@ export function findFindings(
     }
   }
 
+  found.push(...unusedDataTypes(graph));
+
   const rank = (finding: Finding) => FINDING_KINDS.indexOf(finding.kind);
   const strengthOf = (finding: Finding) => strength.get(finding.id) ?? 0;
+  const subject = (finding: Finding) =>
+    finding.nodeId
+      ? (nameOf.get(finding.nodeId) ?? "")
+      : (dataTypeName.get(finding.dataTypeIds?.[0] ?? "") ?? "");
   return found.sort(
     (a, b) =>
       rank(a) - rank(b) ||
       strengthOf(b) - strengthOf(a) ||
-      (nameOf.get(a.nodeId) ?? "").localeCompare(nameOf.get(b.nodeId) ?? "") ||
-      a.nodeId.localeCompare(b.nodeId)
+      subject(a).localeCompare(subject(b)) ||
+      a.id.localeCompare(b.id)
   );
+}
+
+/**
+ * Data Types no property uses and nothing else the graph cannot show, such as a
+ * Media Type property or a collection view. Only a graph that lists its Data Types
+ * can say one is unused: an older one knows only the ones properties name.
+ */
+function unusedDataTypes(graph: SchemaGraph): Finding[] {
+  const used = new Set(
+    graph.nodes.flatMap((node) => propertiesOf(node).map((p) => p.dataTypeId))
+  );
+  return (graph.dataTypes ?? [])
+    .filter((dataType) => !used.has(dataType.id) && dataType.otherUses === 0)
+    .map((dataType) => ({
+      id: `unusedDataType:${dataType.id}`,
+      kind: "unusedDataType" as const,
+      severity: SEVERITY.unusedDataType,
+      summary: [
+        `Editor ${dataType.editorAlias}`,
+        dataType.targets.length > 0
+          ? `offering ${plural(new Set(dataType.targets.map((t) => t.nodeId)).size, "type")}`
+          : "",
+        dataType.folder ? `in ${dataType.folder}` : "",
+      ]
+        .filter(Boolean)
+        .join(", "),
+      dataTypeIds: [dataType.id],
+    }));
 }
 
 const EMPTY_BRANCH = (parents: number) =>
@@ -745,7 +850,12 @@ function dataTypeTwins(
 ) {
   const rows = new Map<
     string,
-    { summary: string; related: string[]; properties: number }
+    {
+      summary: string;
+      related: string[];
+      properties: number;
+      dataTypeIds: string[];
+    }
   >();
   for (const set of dataTypeSets(nodes)) {
     // Two Data Types with one name and the same counts tie, so the id decides,
@@ -783,6 +893,7 @@ function dataTypeTwins(
       properties:
         (before?.properties ?? 0) +
         uses.reduce((sum, [, use]) => sum + use.properties, 0),
+      dataTypeIds: [...(before?.dataTypeIds ?? []), ...uses.map(([id]) => id)],
     });
   }
   return rows;

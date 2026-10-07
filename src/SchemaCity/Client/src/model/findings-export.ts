@@ -1,3 +1,4 @@
+import { dataTypeIndex } from "./data-types";
 import { dayOf } from "./dates";
 import {
   FINDING_LABEL,
@@ -48,7 +49,13 @@ const HEADER = [
   "Filter",
   "Schema snapshot",
   "Usage snapshot",
+  "Data Types",
+  "Data Type keys",
 ];
+
+const DOCUMENT_TYPE_PATH =
+  "/umbraco/section/settings/workspace/document-type/edit/";
+const DATA_TYPE_PATH = "/umbraco/section/settings/workspace/data-type/edit/";
 
 /**
  * The findings currently visible to the developer, as CSV. `kinds` is the drawer's
@@ -92,27 +99,56 @@ export function findingsCsv(
   const schemaDate = dayOf(graph.generatedAt) ?? "";
   const usageDate = usage ? (dayOf(usage.generatedAt) ?? "") : "unavailable";
 
-  const rows = findings.map((finding) => {
-    const node = nodes.get(finding.nodeId);
+  const dataTypes = new Map(
+    dataTypeIndex(graph).map((dataType) => [dataType.id, dataType])
+  );
+  const dataTypeCells = (ids: string[] = []) => [
+    ids
+      .map((id) => dataTypes.get(id)?.name ?? `Missing Data Type ${id}`)
+      .join(" | "),
+    ids.join(" | "),
+  ];
+  // A finding about a Data Type alone has no type, so its type columns stay blank
+  // and the path opens the Data Type instead.
+  const subjectCells = (finding: Finding) => {
+    const id = finding.nodeId;
+    if (!id) {
+      const dataTypeId = finding.dataTypeIds?.[0] ?? "";
+      return [
+        "",
+        "",
+        "",
+        dataTypes.get(dataTypeId)?.folder ?? "",
+        ...usageCells(undefined),
+        `${DATA_TYPE_PATH}${dataTypeId}`,
+      ];
+    }
+    const node = nodes.get(id);
     return [
-      FINDING_LABEL[finding.kind],
-      finding.kind,
-      finding.severity,
       ...(node
-        ? [node.name, node.alias, finding.nodeId, folderPath(node.folderId)]
-        : ["deleted type", "", finding.nodeId, ""]),
-      ...usageCells(usage?.byType[finding.nodeId]),
-      `/umbraco/section/settings/workspace/document-type/edit/${finding.nodeId}`,
-      finding.summary,
-      KIND_EXPLANATION[finding.kind],
-      KIND_NEXT_STEP[finding.kind],
-      related(finding),
-      (finding.kind === "unusedType" && branchRoot.get(finding.nodeId)) || "",
-      filter,
-      schemaDate,
-      usageDate,
+        ? [node.name, node.alias, id, folderPath(node.folderId)]
+        : ["deleted type", "", id, ""]),
+      ...usageCells(usage?.byType[id]),
+      `${DOCUMENT_TYPE_PATH}${id}`,
     ];
-  });
+  };
+
+  const rows = findings.map((finding) => [
+    FINDING_LABEL[finding.kind],
+    finding.kind,
+    finding.severity,
+    ...subjectCells(finding),
+    finding.summary,
+    KIND_EXPLANATION[finding.kind],
+    KIND_NEXT_STEP[finding.kind],
+    related(finding),
+    (finding.kind === "unusedType" && branchRoot.get(finding.nodeId ?? "")) ||
+      "",
+    filter,
+    schemaDate,
+    usageDate,
+    ...dataTypeCells(finding.dataTypeIds),
+  ]);
   return `${[HEADER, ...rows].map((row) => row.map(csv).join(",")).join("\n")}\n`;
 }
 
@@ -160,9 +196,9 @@ function unusedBranchRoots(
   graph: SchemaGraph
 ): Map<string, string> {
   const unused = new Set(
-    findings
-      .filter((finding) => finding.kind === "unusedType")
-      .map((finding) => finding.nodeId)
+    findings.flatMap((finding) =>
+      finding.kind === "unusedType" && finding.nodeId ? [finding.nodeId] : []
+    )
   );
   const nameOf = new Map(graph.nodes.map((node) => [node.id, node.name]));
   const parents = new Map<string, string[]>();
