@@ -793,6 +793,7 @@ export function App({
                   reframe={reframe}
                   scale={scale}
                   selected={selected}
+                  usage={usage}
                 />
               </Suspense>
             </div>

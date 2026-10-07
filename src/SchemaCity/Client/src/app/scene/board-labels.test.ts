@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   BASE_OPACITY,
-  boardRepeats,
-  boardText,
   boardTextPx,
+  byPriority,
+  courtyard,
   DIMMED,
+  fitName,
+  fittedFontPx,
+  graphemes,
   LABEL_INSET,
   LOD_HIDE_PX,
   LOD_SHOW_PX,
-  labelCorners,
   labelEm,
   labelFade,
   labelLight,
@@ -17,57 +19,107 @@ import {
   labelsFlipped,
   MAX_EM,
   MIN_EM,
+  MONO_ADVANCE,
   packAtlas,
-  truncate,
+  placeLabels,
+  printCorners,
+  printLevel,
+  printRect,
+  type Ranked,
+  sharedPrefix,
+  type Want,
+  worthPrinting,
 } from "./board-labels";
 
-describe("truncate", () => {
-  it("keeps a name that fits", () => {
-    expect(truncate("Home", 4)).toBe("Home");
-  });
+const WIDE = /[\u3000-\u9fff]|\p{Extended_Pictographic}/u;
 
-  it("ends a cut name on an ellipsis inside the limit", () => {
-    expect(truncate("Article Page", 8)).toBe("Article…");
-    expect([...truncate("Article Page", 8)]).toHaveLength(8);
-  });
+/** A mono face: every character 0.6 em, and a CJK character or an emoji a whole em. */
+const mono = (text: string) =>
+  graphemes(text).reduce(
+    (sum, character) => sum + (WIDE.test(character) ? 1 : MONO_ADVANCE),
+    0
+  );
 
-  it("drops the space a cut lands after", () => {
-    expect(truncate("Site Settings", 6)).toBe("Site…");
-  });
-
-  it("prints only the ellipsis when there is room for one character", () => {
-    expect(truncate("Anything", 1)).toBe("…");
-  });
-});
-
-describe("boardText", () => {
+describe("labelEm", () => {
   it("sizes print by footprint between the floor and the cap", () => {
     expect(labelEm(0.5)).toBe(MIN_EM);
     expect(labelEm(100)).toBe(MAX_EM);
-    expect(labelEm(4)).toBeGreaterThan(labelEm(3));
+    expect(labelEm(5)).toBeGreaterThan(labelEm(4.2));
   });
+});
 
-  it("prints a short name whole on the smallest footprint", () => {
-    expect(boardText("Home", 2.4, 2.4)).toMatchObject({
+describe("fitName", () => {
+  it("prints a name that fits whole", () => {
+    expect(fitName("Home", 4 * MONO_ADVANCE, mono)).toEqual({
       text: "Home",
       full: true,
     });
   });
 
-  it("cuts a long name to its room and says so", () => {
-    const printed = boardText("Product Comparison Landing Page", 2.4, 3.3);
-    expect(printed.full).toBe(false);
-    expect(printed.text.endsWith("…")).toBe(true);
-    expect([...printed.text].length * printed.em * 0.6).toBeLessThanOrEqual(
-      3.3 + 1e-9
-    );
+  it("drops the board's shared prefix before it cuts anything", () => {
+    expect(
+      fitName("Element Card Grid", 10 * MONO_ADVANCE, mono, "Element ")
+    ).toEqual({
+      text: "Card Grid",
+      full: false,
+    });
   });
 
-  it("prints more of the same name with more room", () => {
-    const name = "Product Comparison Landing Page";
-    expect(boardText(name, 2.4, 6).text.length).toBeGreaterThan(
-      boardText(name, 2.4, 3).text.length
-    );
+  it("cuts the middle, so names that differ at the end still differ", () => {
+    const room = 9 * MONO_ADVANCE;
+    const column = fitName("Element Grid Column", room, mono);
+    const row = fitName("Element Grid Row Settings", room, mono);
+    expect(column.text).not.toBe(row.text);
+    expect(column.text).toContain("…");
+    expect(column.text.startsWith("Eleme")).toBe(true);
+    expect(column.text.endsWith("mn")).toBe(true);
+    expect(mono(column.text)).toBeLessThanOrEqual(room + 1e-9);
+  });
+
+  it("measures wide characters at their own width, so they never overrun", () => {
+    const name = "製品カタログページ一覧";
+    const fitted = fitName(name, 6 * MONO_ADVANCE, mono);
+    expect(mono(fitted.text)).toBeLessThanOrEqual(6 * MONO_ADVANCE + 1e-9);
+    expect(fitted.full).toBe(false);
+  });
+
+  it("never splits an emoji or a letter from its accent", () => {
+    const name = "Café 👩🏽‍💻 Landing Page Template";
+    const fitted = fitName(name, 12 * MONO_ADVANCE, mono);
+    for (const character of graphemes(fitted.text))
+      expect(graphemes(name).includes(character) || character === "…").toBe(
+        true
+      );
+  });
+
+  it("prints only an ellipsis with no room at all", () => {
+    expect(fitName("Anything", 0.1, mono).text).toBe("…");
+  });
+});
+
+describe("worthPrinting", () => {
+  it("keeps a whole name and a cut that still reads, and drops a stub", () => {
+    expect(worthPrinting({ text: "Faq", full: true })).toBe(true);
+    expect(worthPrinting({ text: "Prod…age", full: false })).toBe(true);
+    expect(worthPrinting({ text: "Pr…y", full: false })).toBe(false);
+  });
+});
+
+describe("sharedPrefix", () => {
+  it("finds the leading word most names on a board share", () => {
+    expect(
+      sharedPrefix([
+        "Element Card",
+        "Element Card Grid",
+        "Element Quote",
+        "Unused Element",
+      ])
+    ).toBe("Element ");
+  });
+
+  it("finds nothing on a board of unrelated names or of too few", () => {
+    expect(sharedPrefix(["Home", "Article", "News Landing"])).toBe("");
+    expect(sharedPrefix(["Element A", "Element B"])).toBe("");
   });
 });
 
@@ -88,7 +140,7 @@ describe("labelRoom", () => {
   it("gives a building alone in its row the full overhang", () => {
     // The other one stands in the next row, so it does not limit the name.
     const room = labelRoom([at("a", 0, 0), at("b", 0, 5)]);
-    expect(room.get("a")).toBeCloseTo(6);
+    expect(room.get("a")).toBeCloseTo(8);
   });
 
   it("takes the nearer neighbour on either side", () => {
@@ -115,6 +167,20 @@ describe("level of detail", () => {
     const low = boardTextPx(0.5, 1000, { x: 17, y: 1, z: 0 }, anchor);
     expect(near).toBeGreaterThan(far);
     expect(low).toBeLessThan(near / 4);
+  });
+
+  it("counts a name at the default diagonal view at the height it has on screen", () => {
+    // From (1, 1, 1) the print's height and its strokes both shorten to the sine of
+    // 54.7 degrees, 0.816, where the steepness alone said 0.577.
+    const anchor = { x: 0, y: 0, z: 0 };
+    const diagonal = boardTextPx(1, 1000, { x: 30, y: 30, z: 30 }, anchor);
+    const above = boardTextPx(
+      1,
+      1000,
+      { x: 0, y: Math.sqrt(2700), z: 0 },
+      anchor
+    );
+    expect(diagonal / above).toBeCloseTo(Math.sqrt(2 / 3), 3);
   });
 
   it("projects nothing from below the board", () => {
@@ -146,15 +212,15 @@ describe("labelLight", () => {
     expect(labelLight("c", now)).toBe(DIMMED);
   });
 
-  it("leaves the hovered and selected names to their floating labels", () => {
+  it("keeps the hovered and selected names lit, for when no floating label shows", () => {
     const now = {
       ...rest,
       hovered: "a",
       selected: "b",
-      neighbours: new Set(["b"]),
+      neighbours: new Set(["c"]),
     };
-    expect(labelLight("a", now)).toBe(0);
-    expect(labelLight("b", now)).toBe(0);
+    expect(labelLight("a", now)).toBe(1);
+    expect(labelLight("b", now)).toBe(1);
   });
 
   it("dims everything outside a focus with nothing selected", () => {
@@ -178,28 +244,6 @@ describe("labelOpacity", () => {
   });
 });
 
-describe("boardRepeats", () => {
-  const ground = { position: { x: 0, z: 0 } };
-  const near = { x: 3, y: 3, z: 3 };
-  const far = { x: 300, y: 300, z: 300 };
-
-  it("says a whole name legible on the board needs no floating label", () => {
-    expect(
-      boardRepeats({ text: "Home", em: 0.6, full: true }, ground, near, 1000)
-    ).toBe(true);
-  });
-
-  it("keeps the floating label for a cut name or one too small to read", () => {
-    expect(
-      boardRepeats({ text: "Hom…", em: 0.6, full: false }, ground, near, 1000)
-    ).toBe(false);
-    expect(
-      boardRepeats({ text: "Home", em: 0.6, full: true }, ground, far, 1000)
-    ).toBe(false);
-    expect(boardRepeats(undefined, ground, near, 1000)).toBe(false);
-  });
-});
-
 describe("labelsFlipped", () => {
   it("stays upright for the default view from the south-east", () => {
     expect(labelsFlipped(-1, -1, false)).toBe(false);
@@ -217,33 +261,213 @@ describe("labelsFlipped", () => {
     expect(labelsFlipped(x, z, false)).toBe(false);
     expect(labelsFlipped(x, -z, true)).toBe(true);
   });
+
+  it("leaves the band at 105 degrees from north one way and 75 the other", () => {
+    const facing = (degrees: number) => {
+      const radians = (degrees * Math.PI) / 180;
+      // 0 looks due north, along -z.
+      return [Math.sin(radians), -Math.cos(radians)] as const;
+    };
+    expect(labelsFlipped(...facing(104), false)).toBe(false);
+    expect(labelsFlipped(...facing(106), false)).toBe(true);
+    expect(labelsFlipped(...facing(76), true)).toBe(true);
+    expect(labelsFlipped(...facing(74), true)).toBe(false);
+  });
 });
 
-describe("labelCorners", () => {
-  it("lies under the south edge, centred, reading west to east", () => {
-    const [nwX, nwZ, neX, , , swZ] = labelCorners(
-      { x: 10, z: 20 },
-      4,
-      3,
-      0.5,
-      false
-    );
-    expect(nwX).toBeCloseTo(8.5);
-    expect(neX).toBeCloseTo(11.5);
-    expect(nwZ).toBeCloseTo(22 + LABEL_INSET);
-    expect(swZ).toBeCloseTo(22 + LABEL_INSET + 0.5);
+describe("printLevel", () => {
+  const ems = [0.8, 1.2, 2];
+
+  it("takes the smallest size that reads comfortably", () => {
+    expect(printLevel(12, ems)).toBe(0);
+    expect(printLevel(8, ems)).toBe(1);
   });
 
-  it("turns about the building onto its north edge when flipped", () => {
-    const corners = labelCorners({ x: 10, z: 20 }, 4, 3, 0.5, true);
-    const [nwX, nwZ, neX] = corners;
-    // The upright north-west corner is now the south-east one, past the north edge.
-    expect(nwX).toBeCloseTo(11.5);
-    expect(neX).toBeCloseTo(8.5);
-    expect(nwZ).toBeCloseTo(18 - LABEL_INSET);
-    expect(Math.min(...corners.filter((_, i) => i % 2 === 1))).toBeCloseTo(
-      18 - LABEL_INSET - 0.5
+  it("takes the largest while it is fading in, and nothing below that", () => {
+    expect(printLevel(LOD_SHOW_PX / 2, ems)).toBe(2);
+    expect(printLevel((LOD_HIDE_PX - 0.5) / 2, ems)).toBe(-1);
+  });
+});
+
+describe("byPriority", () => {
+  const ranked = (id: string, extra: Partial<Ranked> = {}): Ranked => ({
+    id,
+    tier: 2,
+    footprint: 4,
+    usage: 0,
+    ...extra,
+  });
+
+  it("puts the selection, then its neighbours, then larger types, then busier ones", () => {
+    const order = [
+      ranked("small"),
+      ranked("busy", { usage: 9 }),
+      ranked("large", { footprint: 6 }),
+      ranked("neighbour", { tier: 1, footprint: 3.2 }),
+      ranked("selected", { tier: 0, footprint: 3.2 }),
+    ]
+      .sort(byPriority)
+      .map((one) => one.id);
+    expect(order).toEqual(["selected", "neighbour", "large", "busy", "small"]);
+  });
+});
+
+describe("placeLabels", () => {
+  const want = (
+    id: string,
+    x: number,
+    z: number,
+    widths: number[],
+    footprint = 4
+  ): Want => ({
+    id,
+    centre: { x, z },
+    footprint,
+    prints: widths.map((width) => ({ width, height: 2 })),
+  });
+  const building = (id: string, x: number, z: number, footprint = 4) => ({
+    id,
+    rect: {
+      minX: x - footprint / 2,
+      maxX: x + footprint / 2,
+      minZ: z - footprint / 2,
+      maxZ: z + footprint / 2,
+    },
+  });
+  const apart = (
+    a: { minX: number; maxX: number; minZ: number; maxZ: number },
+    b: typeof a
+  ) =>
+    a.maxX <= b.minX ||
+    b.maxX <= a.minX ||
+    a.maxZ <= b.minZ ||
+    b.maxZ <= a.minZ;
+
+  it("prints in front of a building when the board there is clear", () => {
+    const placed = placeLabels(
+      [want("a", 0, 0, [6])],
+      [building("a", 0, 0)],
+      false
     );
+    expect(placed.get("a")?.rect).toEqual(
+      printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false)
+    );
+  });
+
+  it("prints two close neighbours whole on opposite sides", () => {
+    // Two buildings 5.5 apart: their whole names would meet in front.
+    const placed = placeLabels(
+      [want("a", 0, 0, [8, 4]), want("b", 5.5, 0, [8, 4])],
+      [building("a", 0, 0), building("b", 5.5, 0)],
+      false
+    );
+    expect(placed.get("a")?.print).toBe(0);
+    expect(placed.get("b")?.print).toBe(0);
+    const behind = (id: string) => (placed.get(id)?.rect.maxZ ?? 0) < 0;
+    expect(behind("a")).not.toBe(behind("b"));
+  });
+
+  it("gives every name a place before any name a longer print", () => {
+    // Three in a row 5 apart: whole names for all three cannot fit on two sides.
+    const row = ["a", "b", "c"];
+    const placed = placeLabels(
+      row.map((id, i) => want(id, i * 5, 0, [9, 4])),
+      row.map((id, i) => building(id, i * 5, 0)),
+      false
+    );
+    expect(placed.size).toBe(3);
+  });
+
+  it("never lays a print over another or over another building", () => {
+    const wants: Want[] = [];
+    const buildings: ReturnType<typeof building>[] = [];
+    for (let row = 0; row < 4; row++)
+      for (let column = 0; column < 8; column++) {
+        const id = `${row}|${column}`;
+        wants.push(want(id, column * 5.5, row * 8, [9, 6, 4]));
+        buildings.push(building(id, column * 5.5, row * 8));
+      }
+    const placed = [...placeLabels(wants, buildings, false)];
+    expect(placed.length).toBeGreaterThan(16);
+    for (const [id, { rect }] of placed) {
+      for (const [other, spot] of placed)
+        if (other !== id) expect(apart(rect, spot.rect)).toBe(true);
+      for (const one of buildings)
+        if (one.id !== id) expect(apart(rect, one.rect)).toBe(true);
+    }
+  });
+
+  it("leaves a name off when no print of it fits", () => {
+    const placed = placeLabels(
+      [want("a", 0, 0, [6]), want("b", 0.5, 0, [6])],
+      // A wall over the strip behind, so b has neither side.
+      [building("a", 0, 0), building("b", 0.5, 30), building("wall", 0, -4)],
+      false
+    );
+    expect(placed.has("a")).toBe(true);
+    expect(placed.has("b")).toBe(false);
+  });
+
+  it("swaps front and back when the names are flipped", () => {
+    const placed = placeLabels(
+      [want("a", 0, 0, [6])],
+      [building("a", 0, 0)],
+      true
+    );
+    expect(placed.get("a")?.rect.maxZ).toBeCloseTo(-2 - LABEL_INSET);
+  });
+});
+
+describe("printCorners", () => {
+  const rect = { minX: 8.5, maxX: 11.5, minZ: 22, maxZ: 22.5 };
+
+  it("reads west to east with its top to the north, upright", () => {
+    expect(printCorners(rect, false, [])).toEqual([
+      8.5, 22, 11.5, 22, 8.5, 22.5, 11.5, 22.5,
+    ]);
+  });
+
+  it("turns the text 180 degrees in its rectangle when flipped", () => {
+    expect(printCorners(rect, true, [])).toEqual([
+      11.5, 22.5, 8.5, 22.5, 11.5, 22, 8.5, 22,
+    ]);
+  });
+});
+
+describe("courtyard", () => {
+  const segments = (print: Parameters<typeof courtyard>[2]) => {
+    const out = new Float32Array(32);
+    const end = courtyard({ x: 0, z: 0 }, 4, print, out, 0);
+    return Array.from(out.slice(0, end));
+  };
+
+  it("outlines the footprint alone with four sides when there is no print", () => {
+    expect(segments(null)).toHaveLength(16);
+  });
+
+  it("takes in the print beside it, so the outline closes round both", () => {
+    const lines = segments({ minX: -4, maxX: 4, minZ: 2.1, maxZ: 4.1 });
+    expect(lines).toHaveLength(32);
+    const zs = lines.filter((_, i) => i % 2 === 1);
+    const xs = lines.filter((_, i) => i % 2 === 0);
+    expect(Math.max(...zs)).toBeGreaterThan(4.1);
+    expect(Math.max(...xs)).toBeGreaterThan(4);
+    expect(Math.min(...zs)).toBeLessThan(-2);
+  });
+});
+
+describe("fittedFontPx", () => {
+  it("keeps the font when the atlas fits", () => {
+    expect(fittedFontPx(48, 1000, 4096, 8)).toBe(48);
+  });
+
+  it("shrinks by the square root of the overflow, since the area goes with its square", () => {
+    // Four times too tall: half the font packs into about a quarter of the area.
+    expect(fittedFontPx(48, 16_384, 4096, 8)).toBe(23);
+  });
+
+  it("never goes below the floor, however large the schema", () => {
+    expect(fittedFontPx(48, 10_000_000, 4096, 8)).toBe(8);
   });
 });
 

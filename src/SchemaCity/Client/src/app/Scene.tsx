@@ -20,7 +20,12 @@ import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeome
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaComparison } from "../model/snapshots";
-import type { SchemaEdge, SchemaGraph, SchemaNode } from "../model/types";
+import type {
+  SchemaEdge,
+  SchemaGraph,
+  SchemaNode,
+  UsageReport,
+} from "../model/types";
 import { inspectorWidthFor } from "./Inspector";
 import {
   type CityBounds,
@@ -54,12 +59,6 @@ import {
 } from "./scene/Boards";
 import { BuildingFrames, Buildings } from "./scene/BuildingMeshes";
 import { edgeFingers, type Finger, traceVias } from "./scene/board";
-import {
-  type BoardText,
-  boardRepeats,
-  boardText,
-  labelRoom,
-} from "./scene/board-labels";
 import {
   buildFloorCells,
   buildPlazaCells,
@@ -1016,10 +1015,15 @@ const LABEL_CLASS =
  * `pickLabels` keeps the best ranked ones that do not land on each other, and drops
  * the rest. District names are not candidates: they are printed on the ground.
  *
- * Every type's name is printed on the board as well, legible once the camera is close
- * enough. A related type whose whole name is already legible there gets no floating
- * label, so the screen never says one name twice. Every other type that keeps a
- * floating label has its print left off the board, through `floated`.
+ * Every type's name is printed on the board as well, wherever it fits legibly. A
+ * related type whose whole name the board printed on screen at the last repaint
+ * gets no floating label, so the screen never says one name twice. Every other type
+ * that keeps a floating label has its print left off the board, through `floated`.
+ *
+ * ponytail: the board only knows its print is on screen and clear of other prints,
+ * not that no building stands in front of it. A related type whose print is hidden
+ * behind a tall building shows its name nowhere until the camera moves; a depth
+ * read of the print's anchor is the upgrade if that turns up.
  *
  * The layer is built and written to by hand rather than through React, because
  * this runs inside the frame loop and forty spans that only ever change their
@@ -1034,7 +1038,6 @@ function Labels({
   hoveredNeighbours,
   neighbours,
   focusNeighbours,
-  boardTexts,
   floated,
   reducedMotion,
 }: {
@@ -1046,8 +1049,10 @@ function Labels({
   hoveredNeighbours: Set<string> | null;
   neighbours: Set<string> | null;
   focusNeighbours: Set<string> | null;
-  boardTexts: Map<string, BoardText>;
-  /** Written here every repaint: the types that have a floating label now. */
+  /**
+   * Written here every repaint: the types that have a floating label now. Read here:
+   * the types whose whole name the board prints.
+   */
   floated: Floated;
   reducedMotion: boolean;
 }) {
@@ -1062,6 +1067,7 @@ function Labels({
   // skipped otherwise, so a still city costs one matrix comparison a frame.
   const dirty = useRef(true);
   const framedAt = useRef(new THREE.Matrix4());
+  const printedSeen = useRef(-1);
 
   const candidates = useMemo(() => {
     const ids = visibleLabelIds({
@@ -1135,19 +1141,19 @@ function Labels({
       labelLayer.current.style.opacity = String(
         revealAt(state.clock.elapsedTime, reducedMotion).links
       );
-    if (!dirty.current && camera.matrixWorld.equals(framedAt.current)) return;
+    if (
+      !dirty.current &&
+      printedSeen.current === floated.printedVersion &&
+      camera.matrixWorld.equals(framedAt.current)
+    )
+      return;
     dirty.current = false;
+    printedSeen.current = floated.printedVersion;
     framedAt.current.copy(camera.matrixWorld);
 
-    // A related type whose board already prints its whole name, legibly.
+    // A related type whose board prints its whole name, legibly and on screen.
     const printedWhole = (candidate: { id: string; rank: number }) =>
-      candidate.rank >= 2 &&
-      boardRepeats(
-        boardTexts.get(candidate.id),
-        placementsById.get(candidate.id),
-        camera.position,
-        size.height
-      );
+      candidate.rank >= 2 && floated.printed.has(candidate.id);
 
     const kept = pickLabels(
       candidates
@@ -2089,6 +2095,7 @@ const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 export default function Scene({
   graph,
   grouping = "structure",
+  usage,
   baseline,
   comparison,
   focusDepth = 1,
@@ -2105,6 +2112,8 @@ export default function Scene({
   graph: SchemaGraph;
   /** How the city is cut into districts. */
   grouping?: Grouping;
+  /** Content counts, which put a busier type's printed name ahead of a quieter one. */
+  usage?: UsageReport;
   baseline?: SchemaGraph | null;
   comparison?: SchemaComparison | null;
   focusDepth?: number;
@@ -2338,30 +2347,19 @@ export default function Scene({
   );
   // The floating labels on screen, which the board leaves out. Shared by reference and
   // written in the frame loop, so passing it on costs no render.
-  const floated = useMemo<Floated>(() => ({ ids: new Set(), version: 0 }), []);
+  const floated = useMemo<Floated>(
+    () => ({
+      ids: new Set(),
+      version: 0,
+      printed: new Set(),
+      printedVersion: 0,
+    }),
+    []
+  );
   const interaction = useMemo(
     () => ({ hovered, selected, neighbours, hoveredNeighbours }),
     [hovered, selected, neighbours, hoveredNeighbours]
   );
-  // What each type prints on the board, sized from the city's footprints, which a
-  // focus tween moves but never resizes.
-  const boardTexts = useMemo(() => {
-    const texts = new Map<string, BoardText>();
-    const room = labelRoom(city.placements);
-    for (const placement of city.placements) {
-      const node = nodesById.get(placement.id);
-      if (node)
-        texts.set(
-          node.id,
-          boardText(
-            node.name,
-            placement.footprint,
-            room.get(node.id) ?? placement.footprint
-          )
-        );
-    }
-    return texts;
-  }, [city, nodesById]);
   // Pins and roles come from the edges alone, so a focus tween does not recount them.
   const connections = useMemo(() => connectionsOf(graph.edges ?? []), [graph]);
   const { cells, windows, heights } = useMemo(
@@ -2602,17 +2600,9 @@ export default function Scene({
             palette={palette}
             placements={placements}
           />
-          <BoardLabels
-            floated={floated}
-            interaction={interaction}
-            nodesById={nodesById}
-            palette={palette}
-            placementsById={placementsById}
-            reducedMotion={reducedMotion}
-            texts={boardTexts}
-          />
+          {/* The floating labels first, so the board reads this frame's floated set
+              rather than the last one's. */}
           <Labels
-            boardTexts={boardTexts}
             floated={floated}
             focusNeighbours={focusNeighbours}
             heights={heights}
@@ -2623,6 +2613,16 @@ export default function Scene({
             placementsById={placementsById}
             reducedMotion={reducedMotion}
             selected={selected}
+          />
+          <BoardLabels
+            cityPlacements={city.placements}
+            floated={floated}
+            interaction={interaction}
+            nodesById={nodesById}
+            palette={palette}
+            placementsById={placementsById}
+            reducedMotion={reducedMotion}
+            usage={usage}
           />
           <Flight cameraFlight={cameraFlight} />
           <CameraRig
