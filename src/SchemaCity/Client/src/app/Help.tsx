@@ -79,6 +79,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { keys: ["T"], does: "Creation tree view, or back to the city" },
       { keys: ["M"], does: "Matrix view, or back to the city" },
       { keys: ["E"], does: "Editor view, or back to the city" },
+      { keys: ["I"], does: "Impact view, or back to the city" },
       { keys: ["?"], does: "Show this page" },
     ],
   },
@@ -101,7 +102,11 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       },
       {
         keys: ["Show in city"],
-        does: "Lights the types that use a Data Type. Clear over the canvas ends it",
+        does: "Lights the types that use a Data Type, or the types an impact trace reaches. Clear over the canvas ends it",
+      },
+      {
+        keys: ["Impact"],
+        does: "Traces what a change to a type or one of its properties reaches, with each path in words, and copies it as Markdown or saves it as CSV",
       },
       { keys: ["Lens"], does: "Recolours the city by usage" },
     ],

@@ -611,6 +611,15 @@ Done 2026-10-07 on `m8/data-types`, after two user tests named Data Types and st
 - Findings: `unusedDataType` (note, a finding with no `nodeId`, id `unusedDataType:<key>`), `orphanedBlocks` (problem, replaces `unusedElementType` once stored blocks exist), stored counts as evidence on `unusedElementType` and `brokenBlock`, and `dataTypeIds` on every finding that names a Data Type. The server marks built-in Data Types (`isBuiltIn`, read by reflection from `Constants.DataTypes.Guids`, 37 on the seeded site), which the unused rule skips and the list hides behind Show built-in. On the seeded site with usage: 67 findings, no unused Data Types, no orphaned blocks.
 - View: `view=datatypes&dataType=<key>`, a sortable, filterable table beside a page per Data Type, Show in city through a binary lens scale, and links from the Matrix, Editor, inspector, Compare and findings. No shortcut key: D pans.
 
+### M9, Impact trace (medium)
+
+Done 2026-10-07 on `m9/impact`, planned feature 1 in `docs/product-direction.md`, after a tech lead asked for every type a change reaches, with content counts and alias collisions, exportable for the ticket.
+
+- Model: `model/impact.ts`, client only, no contract change. `impactOf` walks paths breadth first rather than types, so a type keeps up to three paths, shortest first; a path never revisits a type, which ends cycles. Dependents follow composition and inheritance users, block hosts (then the types that inherit a host and the blocks that nest it), parents that allow the type, the allowed children only it leads to from a root (creation-tree reachability with the type removed), and picker hosts. A parent that loses a creation option passes nothing on. Dependencies walk the same edges forwards, one relationship at a time. Groups are by the first step's kind; totals count each type once. An Element Type's stored blocks come from `usage.blocks` per Data Type.
+- Alias check: `aliasImpact` traces an existing alias from the type that declares it, or a planned one from the start type, over the types that get its properties, and reports carriers with the alias from another source as collisions, compared without case as Umbraco does. A duplicate's row in the Editor view passes its source, so each row traces its own.
+- Exports: `impactMarkdown` for a ticket, `impactCsv` with the findings export's escaping and formula protection, settings repeated on every row.
+- UI: an Impact tab in the inspector (totals and chips), `view=impact` with key I, toggles for the four relationships, depth 1, 2 or all, direction, the alias field, Show in city on the shared highlight (now a label and a set of ids), Copy as Markdown with a selected-text fallback, Export CSV, and an Impact action on every Editor view property row. Seo Composition on the seeded site: 37 types, 188 content items, Press Release through Article, a seoTitle collision on Dup Alias Page.
+
 ### Later, explicitly not v1
 
 - Content mode: instances of a type as a tree, entered from a building.

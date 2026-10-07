@@ -266,6 +266,46 @@ bound. Media and member values are not counted.
 
 ![SC Page Grid's page: its Element Types with what content stores of each, two offered but never stored, and the types that use it.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/datatypes.png)
 
+### Trace the impact of a change
+
+The inspector's Impact tab lists every type a change to the selected type reaches, by group, with
+its content count, and Open impact shows the full trace in place of the view; I or the Impact view
+opens it on the selection. The trace follows four relationships, each a toggle:
+
+- Compositions and inheritance: every type that gets the type's properties, directly or through a
+  type that inherits or composes it. Press Release reaches Seo Composition through Article.
+- Blocks: for an Element Type, every type whose properties offer it, with the property and its
+  Data Type, then the types that inherit those properties and the blocks that nest it. The header
+  says how many blocks of it content stores, per Data Type.
+- Allowed children: the types that allow it as a child and lose a creation option, and the
+  allowed children only it leads to from a root, which nobody could create if it were removed.
+- Pickers: the types whose picker properties allow it, and the types that carry those properties.
+
+Depth stops the trace after one step, two, or none. Direction turns it round to what the type
+depends on: its compositions, the blocks it offers, the types allowed under it and the types its
+pickers allow. Every row writes its paths out in words, shortest first, up to three, such as
+"Press Release inherits Article, which composes Seo Composition", and says whether the type is
+reached directly. A path never visits a type twice, so cycles end. The totals at the top count each
+type once.
+
+Planned or existing alias checks a property alias. An alias the type has is traced from the type
+that declares it, and lists every type it lands on; a new one is checked against every type it
+would land on if added here. Either way, a type that already has the alias from another source is
+a collision, the trap in adding a property to a composition: Umbraco compares aliases without
+case and a type cannot hold one twice. In the Editor view, each property row's Impact opens the
+trace with its alias filled in.
+
+Copy as Markdown copies a ticket-ready summary: the start type, the relationships and depth, the
+snapshot dates, the totals, a table per group with each path and content count, and the
+collisions. Where the clipboard is blocked, the text is shown selected instead. Export CSV writes
+one row per type per group and one per collision, with the same escaping and spreadsheet formula
+protection as the findings export. Show in city lights the type and everything the trace reaches.
+
+A trace lists configured relationships to review. It does not say a change is harmless or that it
+breaks something: code, templates, and stored values outside the schema can depend on a type too.
+
+![Seo Composition's impact: 37 types and 188 content items, the types that get its properties with each path, and a seoTitle collision on Dup Alias Page.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/impact.png)
+
 ## Compare schema snapshots
 
 Open Compare and export the current schema before making a change. Later, import that JSON file

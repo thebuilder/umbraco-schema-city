@@ -149,6 +149,22 @@ const shots = [
     name: "datatypes",
     query: "?view=datatypes&dataType=7fa85b72-1d36-24f2-763f-e1719f0e9c41",
   },
+  // Seo Composition's impact with a planned seoTitle, which collides on Dup Alias
+  // Page, over the types that get its properties.
+  {
+    name: "impact",
+    query: "?view=impact&type=seoComposition",
+    async after() {
+      await run(`(() => {
+        const field = document.querySelector("input[aria-describedby]");
+        if (!field) return "miss";
+        field.focus();
+        return "ok";
+      })()`);
+      await send("Input.insertText", { text: "seoTitle" });
+      await wait(400);
+    },
+  },
   // Orbited round and down to a few degrees above the ground, where the city meets
   // the horizon.
   {
