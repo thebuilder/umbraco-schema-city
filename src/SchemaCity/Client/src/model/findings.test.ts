@@ -679,6 +679,43 @@ describe("findFindings, one rule at a time", () => {
     expect(aliasesFor(single, "nearDuplicateDataType")).toEqual([]);
   });
 
+  it("anchors a tie by id and reads a copy suffix as the same name", () => {
+    const text = (id: string, name: string) =>
+      property("title", null, { dataTypeId: id, dataTypeName: name });
+    const nodes = [
+      node("b", {
+        allowedAsRoot: true,
+        groups: [group("content", [text("dt-b", "Teaser")])],
+      }),
+      node("a", {
+        allowedAsRoot: true,
+        groups: [group("content", [text("dt-a", "Teaser (1)")])],
+      }),
+    ];
+    // One set despite the suffix. Equal counts, so the plain name anchors it,
+    // whichever node comes first.
+    expect(aliasesFor(graphOf(nodes), "nearDuplicateDataType")).toEqual(["b"]);
+    expect(
+      aliasesFor(graphOf([...nodes].reverse()), "nearDuplicateDataType")
+    ).toEqual(["b"]);
+    const twins = [
+      node("x", {
+        allowedAsRoot: true,
+        groups: [group("content", [text("dt-2", "Teaser")])],
+      }),
+      node("y", {
+        allowedAsRoot: true,
+        name: "x",
+        groups: [group("content", [text("dt-1", "Teaser")])],
+      }),
+    ];
+    // Same Data Type name, same counts, and types with one name: the id decides.
+    expect(aliasesFor(graphOf(twins), "nearDuplicateDataType")).toEqual(["y"]);
+    expect(
+      aliasesFor(graphOf([...twins].reverse()), "nearDuplicateDataType")
+    ).toEqual(["y"]);
+  });
+
   it("reports a tab with more than twenty properties, composed ones included", () => {
     const graph = graphOf([
       node("page", {

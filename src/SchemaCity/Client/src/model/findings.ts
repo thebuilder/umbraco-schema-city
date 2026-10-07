@@ -116,7 +116,7 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
     "An editor can create these Document Types, but the usage snapshot counts no content of them. Custom code, migrations and external consumers can still depend on a type.",
   overloadedTab: `One tab, or one group on a type without tabs, holds more than ${TAB_LIMIT} properties. Composed properties count, merged the way the Editor view shows them.`,
   nearDuplicateDataType:
-    "Data Types whose names match once case, spaces, hyphens and underscores are ignored. They can differ in configuration. Each set is one row, on a type that uses the least-used of them, and the related types are every other type that uses any of them. Only own properties count, so a composed property counts on its composition.",
+    "Data Types whose names match once case, spaces, hyphens, underscores and a copy number such as (1) are ignored. They can differ in configuration. Each set is one row, on a type that uses the least-used of them, and the related types are every other type that uses any of them. Only own properties count, so a composed property counts on its composition.",
   noProperties: "These types have no own and no composed properties.",
   complexity: `In the highest of ${COMPLEXITY_TIERS} complexity tiers in this schema. The score is own and composed properties, plus twice the compositions, plus distinct block targets.`,
   pureMixin:
@@ -315,7 +315,8 @@ export function findFindings(
     pages.length;
   const nameOf = new Map(nodes.map((node) => [node.id, node.name]));
   const byName = (a: string, b: string) =>
-    (nameOf.get(a) ?? a).localeCompare(nameOf.get(b) ?? b);
+    (nameOf.get(a) ?? a).localeCompare(nameOf.get(b) ?? b) ||
+    a.localeCompare(b);
   const twins = dataTypeTwins(nodes, byName);
   const names = (ids: string[]) => list(ids.map((id) => nameOf.get(id) ?? id));
   // Without a report the row has nothing usage-based to add, so it says nothing.
@@ -637,8 +638,12 @@ function duplicateAliases(node: SchemaNode) {
 
 const SEPARATORS = /[\s_-]+/g;
 
-/** "SEO Toggle", "seo-toggle" and "Seo_Toggle" all become "seotoggle". */
-const normalName = (name: string) => name.toLowerCase().replace(SEPARATORS, "");
+/** Umbraco saves a second Data Type of the same name as "Name (1)". */
+const COPY_SUFFIX = /\s*\(\d+\)$/;
+
+/** "SEO Toggle", "seo-toggle", "Seo_Toggle" and "SEO Toggle (1)" all become "seotoggle". */
+const normalName = (name: string) =>
+  name.toLowerCase().replace(COPY_SUFFIX, "").replace(SEPARATORS, "");
 
 /**
  * Data Types are only in the graph through the properties that use them, so the
@@ -686,11 +691,14 @@ function dataTypeTwins(
     { summary: string; related: string[]; properties: number }
   >();
   for (const set of dataTypeSets(nodes)) {
+    // Two Data Types with one name and the same counts tie, so the id decides,
+    // never the order the nodes arrived in.
     const uses = [...set].sort(
-      ([, a], [, b]) =>
+      ([idA, a], [idB, b]) =>
         a.properties - b.properties ||
         a.types.size - b.types.size ||
-        a.name.localeCompare(b.name)
+        a.name.localeCompare(b.name) ||
+        idA.localeCompare(idB)
     );
     const names = uses.map(([, use]) => use.name);
     const label = ([id, use]: [string, DataTypeUse]) =>
