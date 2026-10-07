@@ -253,6 +253,33 @@ describe("findFindings, one rule at a time", () => {
     expect(finding?.summary).toContain("blocks");
   });
 
+  it("reports a composed block property once, on the type that declares it", () => {
+    const blocks = property("heroBlocks", null);
+    const graph = graphOf(
+      [
+        node("hero", { groups: [group("hero", [blocks])] }),
+        node("home", {
+          allowedAsRoot: true,
+          name: "Home",
+          groups: [group("hero", [property("heroBlocks", "hero")])],
+        }),
+        node("spacer", { isElement: true, ownPropertyCount: 0 }),
+        node("localised", { isElement: true, variesByCulture: true }),
+      ],
+      [
+        edge("composition", "home", "hero"),
+        ...["hero", "home"].flatMap((host) => [
+          edge("block", host, "deleted-key", "heroBlocks"),
+          edge("block", host, "spacer", "heroBlocks"),
+          edge("block", host, "localised", "heroBlocks"),
+        ]),
+      ]
+    );
+    expect(aliasesFor(graph, "brokenBlock")).toEqual(["hero"]);
+    expect(aliasesFor(graph, "cultureMismatch")).toEqual(["hero"]);
+    expect(summaryOf(graph, "emptyBlock", "spacer")?.related).toEqual(["hero"]);
+  });
+
   it("reports a type with no properties at all", () => {
     const graph = graphOf([
       node("empty", { allowedAsRoot: true, ownPropertyCount: 0 }),

@@ -213,7 +213,8 @@ export function findFindings(
   const inBlock = counter();
   const outComposition = counter();
   const blockTargets = new Map<string, Set<string>>();
-  // Block edges to types the graph has, by host and by Element Type.
+  // Block edges to types the graph has, by host and by Element Type, from the type
+  // that declares the block property.
   const blocksFrom = new Map<string, SchemaEdge[]>();
   const blocksTo = new Map<string, SchemaEdge[]>();
   // Host id to the Element Type keys its block editors name and the graph does not
@@ -222,6 +223,22 @@ export function findFindings(
     string,
     { propertyAlias: string; to: string }[]
   >();
+
+  // A composed block property arrives with an edge from every type that uses the
+  // composition. Rules about the block editor itself read it once, on the type that
+  // declares the property.
+  const composedAliases = new Map(
+    nodes.map((node) => [
+      node.id,
+      new Set(
+        propertiesOf(node)
+          .filter((p) => p.fromCompositionId)
+          .map((p) => p.alias)
+      ),
+    ])
+  );
+  const declares = (edge: SchemaEdge) =>
+    !composedAliases.get(edge.from)?.has(edge.propertyAlias ?? "");
 
   for (const edge of edges) {
     switch (edge.kind) {
@@ -235,6 +252,7 @@ export function findFindings(
       case "block": {
         blockHosts.add(edge.from);
         if (!byId.has(edge.to)) {
+          if (!declares(edge)) break;
           append(missingBlocks, edge.from, {
             propertyAlias: edge.propertyAlias ?? "",
             to: edge.to,
@@ -242,8 +260,10 @@ export function findFindings(
           break;
         }
         bump(inBlock, edge.to);
-        append(blocksFrom, edge.from, edge);
-        append(blocksTo, edge.to, edge);
+        if (declares(edge)) {
+          append(blocksFrom, edge.from, edge);
+          append(blocksTo, edge.to, edge);
+        }
         // Two properties pointing at the same Element Type are one target, the same
         // way the scene draws them as one line.
         const targets = blockTargets.get(edge.from) ?? new Set<string>();
