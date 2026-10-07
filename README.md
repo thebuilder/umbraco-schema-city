@@ -54,9 +54,13 @@ is printed on the board beside its building, inside the silkscreen outline round
 names print as fit legibly without touching, at every zoom: the selected type and its neighbours
 first, then larger types, then types with more content. From the overview most names are already
 readable; as you come closer the print gets smaller on the board and more of each name fits. A
-name with no room for all of it drops the words its board shares first, such as Element on the
-Elements board, and then its middle, so two names that differ only at the end stay apart. The full
-name is always in the floating label and the inspector. Names and district names turn to stay
+name with no room on one line wraps onto two at a word. If it is still too wide it drops the words
+its board already says, such as Element on the Elements board or Page among pages, then whole
+trailing words behind an ellipsis, never so far that it could be another name on the same board. A
+name that still does not fit waits until you come closer; nothing is cut inside a word. Names keep
+off the traces where they can, and one that has to lie over a trace gets a patch of bare board under
+it, so the trace reads as passing beneath. The full name is always in the floating label and the
+inspector. Names and district names turn to stay
 readable when you orbit to the far side. Hover a building to see its direct connections and the
 names of connected types; the names of unrelated types dim. Floating labels that would overlap stay
 hidden until there is room for them. A name shows once: a related type whose whole name the board
