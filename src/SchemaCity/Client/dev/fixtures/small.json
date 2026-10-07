@@ -865,7 +865,7 @@
               "alias": "hideFromSearch",
               "name": "Hide from search",
               "dataTypeId": "d0000000-0000-4000-8000-00000000000a",
-              "dataTypeName": "Seo Toggle",
+              "dataTypeName": "Seo_Toggle",
               "editorAlias": "Umbraco.TrueFalse",
               "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
               "mandatory": false,

@@ -23,7 +23,7 @@
 //   host's block editor (block05), and a variant property on an invariant root (root2)
 //   block editors covering every Element Type from 30 hosts, plus 3 broken ones
 //   4 types with a property alias arriving from two compositions
-//   7 Data Types, two named nearly like another (Text String, SEO Toggle)
+//   7 Data Types, two named nearly like another (Text String, Seo_Toggle)
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -97,7 +97,7 @@ const EDITORS = [
   [
     "Umbraco.TrueFalse",
     "Umb.PropertyEditorUi.Toggle",
-    "SEO Toggle",
+    "Seo_Toggle",
     "SEO Toggle",
   ],
 ];

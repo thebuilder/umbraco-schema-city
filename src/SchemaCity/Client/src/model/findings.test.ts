@@ -943,8 +943,8 @@ describe("findFindings on the seeded medium.json", () => {
  * without a report. There is no unusedElementType row on purpose: the 30 block hosts
  * between them reach all 40 Element Types.
  *
- * nearDuplicateDataType is one row per set: Text String with Textstring, and SEO Toggle
- * with Seo Toggle. Per type it was 279 of the 300, which is why it is per set.
+ * nearDuplicateDataType is one row per set: Text String with Textstring, and Seo Toggle
+ * with Seo_Toggle. Per type it was 279 of the 300, which is why it is per set.
  * emptyBlock is block39, overloadedTab is editorial40,
  * and cultureMismatch is editorial05 hosting the variant block05, and root2.
  */
