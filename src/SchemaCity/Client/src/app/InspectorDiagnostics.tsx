@@ -110,6 +110,7 @@ function Check({
         finding={finding}
         nodesById={nodesById}
         onSelect={onSelect}
+        quiet={reviewed}
       />
       <ReviewControl finding={finding} subject={subject} />
     </li>

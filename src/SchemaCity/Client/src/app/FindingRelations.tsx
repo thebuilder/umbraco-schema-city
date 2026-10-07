@@ -10,10 +10,12 @@ function RelatedLink({
   id,
   node,
   onSelect,
+  quiet,
 }: {
   id: string;
   node: SchemaNode | undefined;
   onSelect: (id: string) => void;
+  quiet: boolean;
 }) {
   return node ? (
     <button
@@ -24,18 +26,27 @@ function RelatedLink({
       {node.name}
     </button>
   ) : (
-    <code className="text-signal">missing key {id}</code>
+    <code className={quiet ? "text-label" : "text-signal"}>
+      missing key {id}
+    </code>
   );
 }
 
+/**
+ * The types and Data Types a finding names. `quiet` is for a reviewed finding: a
+ * missing key keeps its words but drops the problem colour, which only open
+ * findings use.
+ */
 export function FindingRelations({
   finding,
   nodesById,
   onSelect,
+  quiet = false,
 }: {
   finding: Finding;
   nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
+  quiet?: boolean;
 }) {
   const [limit, setLimit] = useState(SHOWN);
   const related = [...new Set(finding.related ?? [])];
@@ -58,6 +69,7 @@ export function FindingRelations({
             key={id}
             node={nodesById.get(id)}
             onSelect={onSelect}
+            quiet={quiet}
           />
         ))}
         {hidden > 0 ? (
