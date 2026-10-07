@@ -517,6 +517,21 @@ function propertyDiff(
       details.push(
         `property ${at} ${key}: ${JSON.stringify(oldProperty[key])} -> ${JSON.stringify(property[key])}`
       );
+  return [
+    ...details,
+    ...targetDiff(at, oldProperty, property, matches, nameOf),
+  ];
+}
+
+/** Block and picker targets one property gained or lost, by name. */
+function targetDiff(
+  at: string,
+  oldProperty: SchemaProperty,
+  property: SchemaProperty,
+  matches: Map<string, string>,
+  nameOf: NameOf
+): string[] {
+  const details: string[] = [];
   const oldTargets = new Set(
     oldProperty.targets.map((target) => `${target.nodeId}:${target.role}`)
   );

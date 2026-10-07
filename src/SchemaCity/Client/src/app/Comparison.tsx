@@ -30,6 +30,36 @@ function downloadSnapshot(graph: SchemaGraph): string {
   return name;
 }
 
+/** The file the last export saved, and the last import's error. */
+function Status({
+  error,
+  saved,
+}: {
+  error: string | null;
+  saved: string | null;
+}) {
+  return (
+    <>
+      {saved ? (
+        <p className="mt-2 text-phosphor text-xs" role="status">
+          Exported {saved}.
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-signal text-xs" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** The two snapshot dates. An epoch date is a placeholder, so it is left out. */
+function datesLine(generatedAt: string, baselineCapturedAt: string | null) {
+  const current = dayOf(generatedAt);
+  return `Current graph${current ? `: ${current}` : ""} · baseline ${dayOf(baselineCapturedAt) ?? "loaded"}`;
+}
+
 export function Comparison({
   baseline,
   graph,
@@ -122,27 +152,13 @@ export function Comparison({
               type="file"
             />
           </div>
-          {saved ? (
-            <p className="mt-2 text-phosphor text-xs" role="status">
-              Exported {saved}.
-            </p>
-          ) : null}
-          {error ? (
-            <p className="mt-2 text-signal text-xs" role="alert">
-              {error}
-            </p>
-          ) : null}
+          <Status error={error} saved={saved} />
         </div>
         <ScrollArea className="min-h-0 flex-1">
           {comparison ? (
             <div className="space-y-3 px-3 py-4">
               <p className="text-3xs text-phosphor-dim">
-                {/* A pinned fixture carries the epoch, which is no date to show. */}
-                Current graph
-                {dayOf(graph.generatedAt)
-                  ? `: ${dayOf(graph.generatedAt)}`
-                  : ""}{" "}
-                · baseline {dayOf(baselineCapturedAt) ?? "loaded"}
+                {datesLine(graph.generatedAt, baselineCapturedAt)}
               </p>
               <ComparisonResults comparison={comparison} onSelect={onSelect} />
             </div>

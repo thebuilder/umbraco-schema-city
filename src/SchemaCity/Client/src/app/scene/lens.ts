@@ -53,6 +53,43 @@ export type LensScale = {
 };
 
 /**
+ * The same rules as the findings, so the lens and the drawer never disagree: a type
+ * is unused when an unused check flagged it, and in use when it has content, a type
+ * composes it or a block editor lists it. A dead end or an unreachable chain is
+ * neither, and the lens stays silent about it.
+ */
+function unusedScale(
+  graph: SchemaGraph,
+  usage: UsageReport,
+  findings: Finding[]
+): LensScale {
+  const flagged = new Set(
+    findings
+      .filter(
+        (finding) =>
+          finding.kind === "unusedType" || finding.kind === "unusedElementType"
+      )
+      .map((finding) => finding.nodeId)
+  );
+  const used = new Set(
+    (graph.edges ?? [])
+      .filter(
+        (edge) =>
+          (edge.kind === "composition" || edge.kind === "block") &&
+          edge.from !== edge.to
+      )
+      .map((edge) => edge.to)
+  );
+  const t = new Map<string, number>();
+  for (const node of graph.nodes) {
+    if (flagged.has(node.id)) t.set(node.id, 1);
+    else if (used.has(node.id) || (usage.byType[node.id]?.total ?? 0) > 0)
+      t.set(node.id, 0);
+  }
+  return { ramp: "binary", t, minLabel: "in use", maxLabel: "unused" };
+}
+
+/**
  * The scale for one lens, or null when the lens is off or has nothing to say. The
  * three counting lenses stretch their ramp over the values they actually found, so
  * a schema where every type has thousands of items still shows a difference.
@@ -65,37 +102,7 @@ export function lensScale(
 ): LensScale | null {
   if (!usage || lens === "none") return null;
 
-  if (lens === "unused") {
-    // The same rules as the findings, so the lens and the drawer never disagree: a
-    // type is unused when an unused check flagged it, and in use when it has
-    // content, a type composes it or a block editor lists it. A dead end or an
-    // unreachable chain is neither, and the lens stays silent about it.
-    const flagged = new Set(
-      findings
-        .filter(
-          (finding) =>
-            finding.kind === "unusedType" ||
-            finding.kind === "unusedElementType"
-        )
-        .map((finding) => finding.nodeId)
-    );
-    const used = new Set(
-      (graph.edges ?? [])
-        .filter(
-          (edge) =>
-            (edge.kind === "composition" || edge.kind === "block") &&
-            edge.from !== edge.to
-        )
-        .map((edge) => edge.to)
-    );
-    const t = new Map<string, number>();
-    for (const node of graph.nodes) {
-      if (flagged.has(node.id)) t.set(node.id, 1);
-      else if (used.has(node.id) || (usage.byType[node.id]?.total ?? 0) > 0)
-        t.set(node.id, 0);
-    }
-    return { ramp: "binary", t, minLabel: "in use", maxLabel: "unused" };
-  }
+  if (lens === "unused") return unusedScale(graph, usage, findings);
 
   if (lens === "published") {
     // Diverging around half. A type with no content has no share to show, so it

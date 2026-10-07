@@ -6,7 +6,7 @@ import {
   KIND_EXPLANATION,
   KIND_NEXT_STEP,
 } from "./findings";
-import type { SchemaGraph, UsageReport } from "./types";
+import type { SchemaGraph, TypeUsage, UsageReport } from "./types";
 
 const FORMULA = /^\s*[=+\-@]/;
 const QUOTED = /[",\n\r]/;
@@ -94,20 +94,14 @@ export function findingsCsv(
 
   const rows = findings.map((finding) => {
     const node = nodes.get(finding.nodeId);
-    const counts = usage?.byType[finding.nodeId];
     return [
       FINDING_LABEL[finding.kind],
       finding.kind,
       finding.severity,
-      node?.name ?? "deleted type",
-      node?.alias ?? "",
-      finding.nodeId,
-      folderPath(node?.folderId ?? null),
-      counts?.total ?? "",
-      counts?.published ?? "",
-      counts?.drafts ?? "",
-      counts?.trashed ?? "",
-      dayOf(counts?.lastEdited) ?? "",
+      ...(node
+        ? [node.name, node.alias, finding.nodeId, folderPath(node.folderId)]
+        : ["deleted type", "", finding.nodeId, ""]),
+      ...usageCells(usage?.byType[finding.nodeId]),
       `/umbraco/section/settings/workspace/document-type/edit/${finding.nodeId}`,
       finding.summary,
       KIND_EXPLANATION[finding.kind],
@@ -120,6 +114,39 @@ export function findingsCsv(
     ];
   });
   return `${[HEADER, ...rows].map((row) => row.map(csv).join(",")).join("\n")}\n`;
+}
+
+/** Total, published, drafts, trashed and last edited, or blanks without usage. */
+const usageCells = (counts: TypeUsage | undefined) =>
+  counts
+    ? [
+        counts.total,
+        counts.published,
+        counts.drafts,
+        counts.trashed,
+        dayOf(counts.lastEdited) ?? "",
+      ]
+    : ["", "", "", "", ""];
+
+/**
+ * The unused ancestors at the top of one unused type's branch, walking up the
+ * allowed-parent edges between unused types, cycle safe. A ring of unused types has
+ * no top, so every member of it stands for the branch.
+ */
+function branchTops(id: string, parents: Map<string, string[]>): string[] {
+  const seen = new Set([id]);
+  const tops: string[] = [];
+  for (let frontier = [id]; frontier.length > 0; ) {
+    const next: string[] = [];
+    for (const at of frontier) {
+      const up = parents.get(at) ?? [];
+      if (up.length === 0) tops.push(at);
+      next.push(...up.filter((parent) => !seen.has(parent)));
+      for (const parent of up) seen.add(parent);
+    }
+    frontier = next;
+  }
+  return tops.length > 0 ? tops : [...seen];
 }
 
 /**
@@ -147,28 +174,12 @@ function unusedBranchRoots(
     )
       parents.set(edge.to, [...(parents.get(edge.to) ?? []), edge.from]);
 
-  const roots = new Map<string, string>();
-  for (const id of unused) {
-    const seen = new Set([id]);
-    const tops: string[] = [];
-    for (let frontier = [id]; frontier.length > 0; ) {
-      const next: string[] = [];
-      for (const at of frontier) {
-        const up = parents.get(at) ?? [];
-        if (up.length === 0) tops.push(at);
-        for (const parent of up)
-          if (!seen.has(parent)) {
-            seen.add(parent);
-            next.push(parent);
-          }
-      }
-      frontier = next;
-    }
-    // A ring of unused types has no top; any member of it stands for the branch.
-    const names = (tops.length > 0 ? tops : [...seen]).map(
-      (top) => nameOf.get(top) ?? top
-    );
-    roots.set(id, names.sort((a, b) => a.localeCompare(b))[0] ?? "");
-  }
-  return roots;
+  return new Map(
+    [...unused].map((id) => [
+      id,
+      branchTops(id, parents)
+        .map((top) => nameOf.get(top) ?? top)
+        .sort((a, b) => a.localeCompare(b))[0] ?? "",
+    ])
+  );
 }
