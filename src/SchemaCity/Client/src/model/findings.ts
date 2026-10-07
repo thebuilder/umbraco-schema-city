@@ -360,7 +360,9 @@ export function findFindings(
       );
     }
 
-    if (node.isElement && at(inBlock, node.id) === 0) {
+    // An Element Type other Element Types compose is a mixin: its properties reach
+    // blocks through them, and an unused composer gets a row of its own.
+    if (node.isElement && at(inBlock, node.id) === 0 && composers === 0) {
       add(
         "unusedElementType",
         node,

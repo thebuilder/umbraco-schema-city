@@ -325,6 +325,21 @@ describe("findFindings, one rule at a time", () => {
     expect(finding?.related).toEqual(["page"]);
   });
 
+  it("leaves an Element Type that other Element Types compose out of unusedElementType", () => {
+    const graph = graphOf(
+      [
+        node("page", { allowedAsRoot: true }),
+        node("card", { isElement: true }),
+        node("linkMixin", { isElement: true }),
+      ],
+      [
+        edge("block", "page", "card", "body"),
+        edge("composition", "card", "linkMixin"),
+      ]
+    );
+    expect(aliasesFor(graph, "unusedElementType")).toEqual([]);
+  });
+
   it("counts a mixin's users through inheritance, as the Matrix does", () => {
     const graph = graphOf(
       [
