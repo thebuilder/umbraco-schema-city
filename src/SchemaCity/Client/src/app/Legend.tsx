@@ -205,7 +205,8 @@ function Key() {
         </ul>
         <p className="mt-2 text-muted-foreground text-xs">
           A wider building has more properties of its own. Height is not a
-          complexity score.
+          complexity score. A lens recolours every building by what it measures,
+          gold ones included.
         </p>
       </section>
     </div>
