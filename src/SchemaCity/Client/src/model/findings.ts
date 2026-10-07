@@ -93,7 +93,7 @@ export const FINDING_LABEL: Record<FindingKind, string> = {
 const COMPLEXITY_TIERS = 5;
 
 /** More properties than this in one tab makes it an overloaded tab. */
-const TAB_LIMIT = 20;
+export const TAB_LIMIT = 20;
 
 /** What every finding of a kind means, shown once per group rather than per row. */
 export const KIND_EXPLANATION: Record<FindingKind, string> = {
@@ -152,6 +152,18 @@ export const findingGroups = (findings: Finding[]) =>
     kind,
     rows: findings.filter((finding) => finding.kind === kind),
   })).filter((group) => group.rows.length > 0);
+
+/**
+ * Per type, the labels of its problem findings joined into one line, for the dot a
+ * list row shows and the tooltip that says why.
+ */
+export function problemLabels(findings: Finding[]): Map<string, string> {
+  const labels = new Map<string, string[]>();
+  for (const finding of findings)
+    if (finding.severity === "problem")
+      append(labels, finding.nodeId, FINDING_LABEL[finding.kind]);
+  return new Map([...labels].map(([id, kinds]) => [id, kinds.join(", ")]));
+}
 
 /** `own + composed properties + 2 * compositions + distinct block targets`. */
 function complexityScore(

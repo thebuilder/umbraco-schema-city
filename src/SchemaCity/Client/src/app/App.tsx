@@ -689,7 +689,9 @@ export function App({
               className={`absolute inset-0 ${selectedNode ? INSPECTOR_INSET : ""}`}
             >
               <FlatView
+                findings={findings}
                 graph={graph}
+                neighbourhoodById={neighbourhoodById}
                 nodesById={nodesById}
                 onPick={() => setPaletteOpen(true)}
                 onQuery={setQuery}

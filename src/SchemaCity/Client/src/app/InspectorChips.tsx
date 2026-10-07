@@ -1,5 +1,89 @@
 import { type ReactNode, useState } from "react";
-import type { Chip, Trace } from "../model/inspector";
+import { Badge } from "@/components/ui/badge";
+import type { FindingSeverity } from "../model/findings";
+import type { Chip, Role, Trace } from "../model/inspector";
+import type { SchemaNode } from "../model/types";
+
+/** The app's mono, uppercase controls, set in the panel's reading type instead. */
+export const READING = "font-sans font-medium normal-case tracking-normal";
+
+export const ROLE: Record<
+  Role,
+  { label: string; colour: string; badge: "default" | "azure" | "amber" }
+> = {
+  page: { label: "Page", colour: "var(--phosphor)", badge: "default" },
+  composition: {
+    label: "Composition",
+    colour: "var(--azure)",
+    badge: "azure",
+  },
+  element: { label: "Element Type", colour: "var(--amber)", badge: "amber" },
+};
+
+/**
+ * The role as a colour key: the swatch in the colour the city paints that role,
+ * quiet enough to sit on every row of a list where a badge would shout.
+ */
+export function RoleKey({ role }: { role: Role }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-label text-xs">
+      <span
+        aria-hidden
+        className="size-2 shrink-0"
+        style={{ background: ROLE[role].colour }}
+      />
+      {ROLE[role].label}
+    </span>
+  );
+}
+
+function RoleBadge({ role }: { role: Role }) {
+  return (
+    <Badge className={READING} variant={ROLE[role].badge}>
+      {ROLE[role].label}
+    </Badge>
+  );
+}
+
+/** The role badge, then Root and culture variance when the type has them. */
+export function RoleBadges({ node, role }: { node: SchemaNode; role: Role }) {
+  return (
+    <>
+      <RoleBadge role={role} />
+      {node.allowedAsRoot ? (
+        <Badge className={READING} variant="outline">
+          Root
+        </Badge>
+      ) : null}
+      {node.variesByCulture ? (
+        <Badge className={READING} variant="outline">
+          Varies by culture
+        </Badge>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * A dot beside a name that a check flagged: pink for a problem, grey for a note.
+ * The title names the checks, so a list row says why without opening the type.
+ */
+export function FindingDot({
+  severity = "problem",
+  title,
+}: {
+  severity?: FindingSeverity;
+  title: string;
+}) {
+  return (
+    <span
+      aria-label={title}
+      className={`inline-block size-1.5 shrink-0 rounded-full ${severity === "problem" ? "bg-signal" : "bg-label"}`}
+      role="img"
+      title={title}
+    />
+  );
+}
 
 /** The swatch beside a heading, in the colour the city draws that kind of link. */
 const TRACE_SWATCH: Record<Trace, string> = {

@@ -1,6 +1,9 @@
 // The view switcher and the 2D views it chooses between. Kept out of App so the
 // toolbar there only places the switcher.
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { Finding } from "../model/findings";
+import { roleOf } from "../model/inspector";
+import type { Neighbourhood } from "../model/neighbourhood";
 import type { SchemaGraph, SchemaNode, UsageReport } from "../model/types";
 import { CreationTree } from "./CreationTree";
 import { EditorLayout } from "./EditorLayout";
@@ -56,6 +59,8 @@ export function FlatView({
   onSelect,
   nodesById,
   onPick,
+  findings,
+  neighbourhoodById,
 }: {
   view: View;
   graph: SchemaGraph;
@@ -66,13 +71,23 @@ export function FlatView({
   onSelect: (id: string) => void;
   nodesById: Map<string, SchemaNode>;
   onPick: () => void;
+  findings: Finding[];
+  neighbourhoodById: Map<string, Neighbourhood>;
 }) {
   const shared = { graph, onQuery, onSelect, query, selected };
-  if (view === "tree") return <CreationTree {...shared} />;
+  if (view === "tree")
+    return <CreationTree {...shared} findings={findings} usage={usage} />;
   if (view === "matrix") return <Matrix {...shared} />;
   if (view === "editor")
     return (
-      <EditorLayout nodesById={nodesById} onPick={onPick} selected={selected} />
+      <EditorLayout
+        findings={findings}
+        nodesById={nodesById}
+        onPick={onPick}
+        onSelect={onSelect}
+        roleOf={(node) => roleOf(node, neighbourhoodById.get(node.id))}
+        selected={selected}
+      />
     );
-  return <TypeTable {...shared} usage={usage} />;
+  return <TypeTable {...shared} findings={findings} usage={usage} />;
 }

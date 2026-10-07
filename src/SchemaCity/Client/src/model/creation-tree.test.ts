@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { creationTree, ROW_LIMIT, treeRows } from "./creation-tree";
+import {
+  creationTree,
+  exclusionLine,
+  ROW_LIMIT,
+  treeRows,
+} from "./creation-tree";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "./types";
 
 const graph = (
@@ -171,4 +176,14 @@ describe("treeRows", () => {
     expect(rows).toHaveLength(ROW_LIMIT);
     expect(truncated).toBe(true);
   });
+});
+
+it("says what the unreachable list leaves out, in the singular when it is one", () => {
+  expect(exclusionLine({ elements: 17, compositions: 6 })).toBe(
+    "17 Element Types and 6 compositions are left out, since editors never create them in the content tree."
+  );
+  expect(exclusionLine({ elements: 0, compositions: 1 })).toBe(
+    "1 composition is left out, since editors never create it in the content tree."
+  );
+  expect(exclusionLine({ elements: 0, compositions: 0 })).toBe(null);
 });

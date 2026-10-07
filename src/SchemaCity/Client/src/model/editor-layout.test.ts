@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import mediumFixture from "../../dev/fixtures/medium.json";
-import { editorLabel, editorLayout, GENERIC_TAB } from "./editor-layout";
+import {
+  editorLabel,
+  editorLayout,
+  editorSummary,
+  firstOwnTab,
+  GENERIC_TAB,
+  MIXED,
+  panelSource,
+} from "./editor-layout";
 import type {
   PropertyGroup,
   SchemaGraph,
@@ -116,4 +124,68 @@ describe("editorLabel", () => {
     );
     expect(editorLabel(property(null))).toBe("Umb.PropertyEditorUi.TextBox");
   });
+});
+
+describe("panelSource", () => {
+  const panel = (...from: (string | null)[]) => ({
+    key: "",
+    name: "",
+    properties: from.map(
+      (fromCompositionId) => ({ fromCompositionId }) as SchemaProperty
+    ),
+  });
+
+  it("names one composition, the type itself, or a mix", () => {
+    expect(panelSource(panel("seo", "seo"))).toBe("seo");
+    expect(panelSource(panel(null, null))).toBe(null);
+    expect(panelSource(panel(null, "seo"))).toBe(MIXED);
+    expect(panelSource(panel("seo", "hero"))).toBe(MIXED);
+  });
+});
+
+describe("editorSummary", () => {
+  const property = (fromCompositionId: string | null, mandatory = false) =>
+    ({ fromCompositionId, mandatory }) as SchemaProperty;
+  const tab = (key: string, ...properties: SchemaProperty[]) => ({
+    key,
+    name: key,
+    count: properties.length,
+    panels: [{ key, name: null, properties }],
+  });
+
+  it("says own and composed in one line, tabs and mandatory only when there", () => {
+    expect(
+      editorSummary([
+        tab("content", property(null), property("seo"), property("hero")),
+        tab("more", property(null, true)),
+      ])
+    ).toBe(
+      "4 properties, 2 own and 2 from 2 compositions, 2 tabs, 1 mandatory"
+    );
+    expect(editorSummary([tab("", property(null))])).toBe("1 property");
+    expect(editorSummary([tab("", property("seo"), property("seo"))])).toBe(
+      "2 properties, all from 1 composition"
+    );
+    expect(editorSummary([])).toBe("No properties");
+  });
+});
+
+it("opens on the first tab with a property of the type's own", () => {
+  const tab = (key: string, from: string | null) => ({
+    key,
+    name: key,
+    count: 1,
+    panels: [
+      {
+        key,
+        name: null,
+        properties: [{ fromCompositionId: from } as SchemaProperty],
+      },
+    ],
+  });
+  expect(firstOwnTab([tab("", "seo"), tab("content", null)])?.key).toBe(
+    "content"
+  );
+  expect(firstOwnTab([tab("", "seo")])?.key).toBe("");
+  expect(firstOwnTab([])).toBe(undefined);
 });
