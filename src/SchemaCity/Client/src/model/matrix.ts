@@ -23,21 +23,50 @@ export type Matrix<Cell> = {
 export type CompositionUse = { via: string | null };
 
 /**
- * Types by the compositions they use. A composition edge is direct, inheritance
+ * Per type, every composition it uses. A composition edge is direct, inheritance
  * included, so anything further down the chain arrives through one of them.
  */
-export function compositionMatrix(graph: SchemaGraph): Matrix<CompositionUse> {
-  const known = new Map(graph.nodes.map((node) => [node.id, node]));
+function compositionUses(
+  graph: SchemaGraph
+): Map<string, Map<string, CompositionUse>> {
+  const known = new Set(graph.nodes.map((node) => node.id));
   const direct = new Map<string, string[]>();
   for (const edge of graph.edges ?? []) {
-    if (edge.kind !== "composition" || !known.has(edge.to)) continue;
+    if (
+      edge.kind !== "composition" ||
+      edge.from === edge.to ||
+      !known.has(edge.to)
+    )
+      continue;
     direct.set(edge.from, [...(direct.get(edge.from) ?? []), edge.to]);
   }
-
-  const cells = new Map(
+  return new Map(
     [...direct.keys()].map((id) => [id, compositionsOf(id, direct)])
   );
-  return build(known, cells, (id) => ({
+}
+
+/** A type that gets a composition's properties, and the type it gets them through. */
+export type CompositionUser = { id: string; via: string | null };
+
+/**
+ * Per composition, every type that gets its properties: the ones that compose it,
+ * and the ones that inherit or compose one of those. The Matrix, the inspector and
+ * the findings all count users from here, so they agree.
+ */
+export function compositionUsers(
+  graph: SchemaGraph
+): Map<string, CompositionUser[]> {
+  const users = new Map<string, CompositionUser[]>();
+  for (const [id, uses] of compositionUses(graph))
+    for (const [to, use] of uses)
+      users.set(to, [...(users.get(to) ?? []), { id, via: use.via }]);
+  return users;
+}
+
+/** Types by the compositions they use, direct or through another one. */
+export function compositionMatrix(graph: SchemaGraph): Matrix<CompositionUse> {
+  const known = new Map(graph.nodes.map((node) => [node.id, node]));
+  return build(known, compositionUses(graph), (id) => ({
     label: known.get(id)?.name ?? id,
     detail: known.get(id)?.alias ?? "",
   }));

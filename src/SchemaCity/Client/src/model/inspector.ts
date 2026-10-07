@@ -28,19 +28,16 @@ export type ThroughUsage = {
   published: number;
   drafts: number;
   trashed: number;
-  /** Types that compose this one and have content of their own. */
+  /** Types that use this one and have content of their own. */
   withContent: number;
-  /** Types that compose this one. */
+  /** Types that use this one, directly or through another type. */
   of: number;
 };
 
 /**
- * Content that carries a composition's properties, summed over the types that
- * compose it.
- *
- * ponytail: one level only. A composition composed into another composition counts
- * that one's own content, which is none; walk composedBy transitively if nested
- * mixins turn up in real schemas.
+ * Content that carries a composition's properties, summed over every type that
+ * gets them, through inheritance and nested compositions included. Each user is a
+ * different type, so no item is counted twice.
  */
 function throughUsage(
   around: Neighbourhood,
@@ -52,9 +49,9 @@ function throughUsage(
     drafts: 0,
     trashed: 0,
     withContent: 0,
-    of: around.composedBy.length,
+    of: around.usedBy.length,
   };
-  for (const id of around.composedBy) {
+  for (const { id } of around.usedBy) {
     const usage = report.byType[id];
     if (!usage || usage.total === 0) continue;
     sum.total += usage.total;
@@ -86,7 +83,7 @@ export function usageState(
   // Block values are stored inside the content that hosts them, so an Element
   // Type is never counted as a content item of its own.
   if (node.isElement) return { kind: "element" };
-  if (around.composedBy.length === 0) return { kind: "none" };
+  if (around.usedBy.length === 0) return { kind: "none" };
   return { kind: "through", through: throughUsage(around, report) };
 }
 
@@ -157,7 +154,13 @@ export function contentCountOf(
       : undefined;
 }
 
-export type Chip = { id: string; name: string | null; count?: number };
+export type Chip = {
+  id: string;
+  name: string | null;
+  count?: number;
+  /** The type's name it arrives through, for an indirect composition user. */
+  through?: string;
+};
 
 /**
  * Most content first, then by name, so the types that matter most lead a long
@@ -167,14 +170,21 @@ export type Chip = { id: string; name: string | null; count?: number };
 export function chips(
   ids: string[],
   nodesById: Map<string, SchemaNode>,
-  countOf: (id: string) => number | undefined
+  countOf: (id: string) => number | undefined,
+  via?: Map<string, string>
 ): Chip[] {
   return ids
-    .map((id) => ({
-      id,
-      name: nodesById.get(id)?.name ?? null,
-      count: countOf(id),
-    }))
+    .map((id) => {
+      const through = via?.get(id);
+      return {
+        id,
+        name: nodesById.get(id)?.name ?? null,
+        count: countOf(id),
+        ...(through
+          ? { through: nodesById.get(through)?.name ?? through }
+          : {}),
+      };
+    })
     .sort(
       (a, b) =>
         Number(a.name === null) - Number(b.name === null) ||
@@ -210,7 +220,14 @@ export type ConnectionGroup = {
   trace: Trace;
   /** Distinct types in the group. */
   count: number;
-} & ({ ids: string[] } | { fields: Field[] });
+} & (
+  | {
+      ids: string[];
+      /** Id to the type it arrives through, for a user that does not compose it itself. */
+      via?: Map<string, string>;
+    }
+  | { fields: Field[] }
+);
 
 const LABEL: Record<FlatKind | FieldKind, string> = {
   allowedParents: "Allowed under",
@@ -269,7 +286,10 @@ export function connectionGroups(
     inherits: around.inherits,
     compositions: without(around.compositions, around.inherits),
     inheritedBy: around.inheritedBy,
-    composedBy: without(around.composedBy, around.inheritedBy),
+    composedBy: without(
+      around.usedBy.map((user) => user.id),
+      around.inheritedBy
+    ),
     blockHosts: around.blockHosts,
     referencesIn: around.referencesIn,
   };
@@ -303,6 +323,13 @@ export function connectionGroups(
       const list = byField[kind];
       const count = new Set(list.flatMap((field) => field.ids)).size;
       if (count > 0) groups.push({ ...base, count, fields: list });
+    } else if (kind === "composedBy" && flat[kind].length > 0) {
+      const via = new Map(
+        around.usedBy.flatMap((user) =>
+          user.via ? [[user.id, user.via] as const] : []
+        )
+      );
+      groups.push({ ...base, count: flat[kind].length, ids: flat[kind], via });
     } else if (flat[kind].length > 0)
       groups.push({ ...base, count: flat[kind].length, ids: flat[kind] });
   }

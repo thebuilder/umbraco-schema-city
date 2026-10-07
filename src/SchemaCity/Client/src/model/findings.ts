@@ -5,6 +5,7 @@
 // the whole set is cheap enough to recompute whenever either input changes.
 import { creationTree } from "./creation-tree";
 import { editorLayout } from "./editor-layout";
+import { compositionUsers } from "./matrix";
 import type {
   SchemaEdge,
   SchemaGraph,
@@ -212,7 +213,6 @@ export function findFindings(
   const inBlock = counter();
   const outComposition = counter();
   const blockTargets = new Map<string, Set<string>>();
-  const composedBy = new Map<string, string[]>();
   // Block edges to types the graph has, by host and by Element Type.
   const blocksFrom = new Map<string, SchemaEdge[]>();
   const blocksTo = new Map<string, SchemaEdge[]>();
@@ -231,7 +231,6 @@ export function findFindings(
       case "composition":
         bump(inComposition, edge.to);
         bump(outComposition, edge.from);
-        append(composedBy, edge.to, edge.from);
         break;
       case "block": {
         blockHosts.add(edge.from);
@@ -259,6 +258,7 @@ export function findFindings(
 
   // The creation tree already walks down from every root, so the chains it cannot
   // reach come from there. Types with no parent at all are the dead end rule's.
+  const users = compositionUsers(graph);
   const unreachable = new Map(
     creationTree(graph)
       .unreachable.filter((row) => row.parents.length > 0)
@@ -541,13 +541,18 @@ export function findFindings(
     }
 
     if (composers > 0 && !canCreate && at(inBlock, node.id) === 0) {
-      // A mixin only one or two types compose is the one worth folding back in.
+      // Users through inheritance and nested compositions count, the same set the
+      // inspector and the Matrix show. A mixin only one or two types use is the one
+      // worth folding back in.
+      const all = users.get(node.id) ?? [];
+      const using = all.map((user) => user.id);
+      const indirect = all.filter((user) => user.via).length;
       add(
         "pureMixin",
         node,
-        `Composed by ${plural(composers, "type")}`,
-        composedBy.get(node.id),
-        -composers
+        `Composed by ${plural(all.length - indirect, "type")}${indirect > 0 ? `, and ${indirect} more through them` : ""}`,
+        using.sort(byName),
+        -using.length
       );
     }
 

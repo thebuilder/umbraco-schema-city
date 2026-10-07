@@ -325,6 +325,24 @@ describe("findFindings, one rule at a time", () => {
     expect(finding?.related).toEqual(["page"]);
   });
 
+  it("counts a mixin's users through inheritance, as the Matrix does", () => {
+    const graph = graphOf(
+      [
+        node("article", { allowedAsRoot: true }),
+        node("press", { allowedAsRoot: true }),
+        node("seo"),
+      ],
+      [
+        edge("composition", "article", "seo"),
+        edge("inherits", "press", "article"),
+        edge("composition", "press", "article"),
+      ]
+    );
+    const [finding] = findFindings(graph).filter((f) => f.kind === "pureMixin");
+    expect(finding?.summary).toBe("Composed by 1 type, and 1 more through them");
+    expect(finding?.related).toEqual(["article", "press"]);
+  });
+
   it("reports only the top complexity tier", () => {
     const graph = graphOf([
       node("big", { allowedAsRoot: true, ownPropertyCount: 40 }),

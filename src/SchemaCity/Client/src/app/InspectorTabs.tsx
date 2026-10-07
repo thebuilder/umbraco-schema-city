@@ -126,7 +126,7 @@ function GroupSection({
       </Heading>
       {"ids" in group ? (
         <TypeChips
-          chips={chips(group.ids, nodesById, countOf)}
+          chips={chips(group.ids, nodesById, countOf, group.via)}
           limit={limit}
           onSelect={onSelect}
         />

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import mediumFixture from "../../dev/fixtures/medium.json";
-import { compositionMatrix, dataTypeMatrix, sortColumns } from "./matrix";
+import {
+  compositionMatrix,
+  compositionUsers,
+  dataTypeMatrix,
+  sortColumns,
+} from "./matrix";
 import type { SchemaGraph, SchemaNode, SchemaProperty } from "./types";
 
 const property = (
@@ -69,6 +74,39 @@ describe("compositionMatrix", () => {
       ],
     } as SchemaGraph);
     expect([...(cyclic.cells.get("a")?.keys() ?? [])]).toEqual(["b"]);
+  });
+});
+
+describe("compositionUsers", () => {
+  it("lists a composition's users through inheritance, with the type in between", () => {
+    const graph = {
+      nodes: ["press", "article", "seo", "home"].map((id) => node(id)),
+      edges: [
+        { kind: "inherits", from: "press", to: "article" },
+        { kind: "composition", from: "press", to: "article" },
+        { kind: "composition", from: "article", to: "seo" },
+        { kind: "composition", from: "home", to: "seo" },
+        { kind: "composition", from: "seo", to: "seo" },
+      ],
+    } as SchemaGraph;
+    expect(compositionUsers(graph).get("seo")).toEqual([
+      { id: "press", via: "article" },
+      { id: "article", via: null },
+      { id: "home", via: null },
+    ]);
+  });
+
+  it("agrees with the Matrix column for Seo Composition in the seeded site", () => {
+    const medium = mediumFixture as unknown as SchemaGraph;
+    const seo = medium.nodes.find((n) => n.alias === "seoComposition");
+    const press = medium.nodes.find((n) => n.alias === "pressRelease");
+    const article = medium.nodes.find((n) => n.alias === "article");
+    const users = compositionUsers(medium).get(seo?.id ?? "") ?? [];
+    expect(users).toHaveLength(37);
+    expect(users).toContainEqual({ id: press?.id, via: article?.id });
+    expect(
+      compositionMatrix(medium).columns.find((c) => c.id === seo?.id)?.total
+    ).toBe(37);
   });
 });
 
