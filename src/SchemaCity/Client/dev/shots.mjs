@@ -8,7 +8,8 @@
 // Every shot starts from a fresh navigation, because the app reads the query string
 // once on mount. `medium.json` is the harness's first fixture, so it is the one the
 // picker already has, and its usage report loads with it.
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { plannedBaseline } from "./planned-baseline.ts";
 import { quantise } from "./quantise.mjs";
 
 const out = process.argv[2] ?? ".";
@@ -62,6 +63,35 @@ const clickButton = (pattern, nth = 1) =>
     hits[${nth} - 1].click();
     return "ok";
   })()`);
+
+/**
+ * Opens Compare and imports the medium schema as it stood before four planned
+ * edits, through the drawer's own file input, as a reader would.
+ */
+async function importBaseline() {
+  const medium = JSON.parse(
+    readFileSync(new URL("./fixtures/medium.json", import.meta.url), "utf8")
+  );
+  const snapshot = JSON.stringify({
+    format: "schema-city",
+    version: 1,
+    capturedAt: "2026-10-01T09:00:00.000Z",
+    host: "live.example.com",
+    graph: plannedBaseline(medium),
+  });
+  await clickButton("/^Compare/");
+  await wait(600);
+  await run(`(() => {
+    const input = document.querySelector('input[type="file"]');
+    if (!input) return "miss";
+    const files = new DataTransfer();
+    files.items.add(new File([${JSON.stringify(snapshot)}], "baseline.json", { type: "application/json" }));
+    input.files = files.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return "ok";
+  })()`);
+  await wait(1500);
+}
 
 /** Drag across the canvas, which orbits the camera: sideways turns it, upwards lowers it. */
 async function orbit(from, to) {
@@ -163,6 +193,29 @@ const shots = [
       })()`);
       await send("Input.insertText", { text: "seoTitle" });
       await wait(400);
+    },
+  },
+  // Compare against a baseline from before four planned edits, three of them
+  // marked planned from a pasted list, and Press Release opened on its side
+  // effects. The change layer colours the city behind the drawer.
+  {
+    name: "compare",
+    query: "?layers=structure",
+    async after() {
+      await importBaseline();
+      await clickButton("/^Paste a plan$/");
+      await run(`(() => {
+        const field = document.querySelector("textarea");
+        if (!field) return "miss";
+        const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+        set.call(field, "pressRelease, seoComposition, article");
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        return "ok";
+      })()`);
+      await clickButton("/^Mark as planned$/");
+      await clickButton("/^Paste a plan$/");
+      await clickButton("/^▸Press Release/");
+      await wait(900);
     },
   },
   // Orbited round and down to a few degrees above the ground, where the city meets

@@ -273,6 +273,14 @@ describe("change causes", () => {
     expect(press.filter((name) => name.startsWith("Element"))).toHaveLength(14);
     expect(changeSummary(groups)).toBe("4 causes, 48 side effects");
     expect(effectNames(groups, "seoComposition")).toContain("Home");
+    // A cause that is also a side effect says of what, both ways round.
+    const alsoOf = (alias: string) =>
+      groups.causes
+        .find((cause) => cause.change.alias === alias)
+        ?.effectOf.map((root) => root.name);
+    expect(alsoOf("article")).toEqual(["Press Release", "Seo Composition"]);
+    expect(alsoOf("blogPost")).toEqual(["Seo Composition"]);
+    expect(alsoOf("pressRelease")).toEqual([]);
     expect(allLines(groups)).toEqual(flatLines(baseline, medium));
   });
 

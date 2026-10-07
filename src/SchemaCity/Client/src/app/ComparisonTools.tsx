@@ -53,7 +53,7 @@ export function ComparisonTools({
 const KEY: { kind: ChangeKind | "none"; label: string; swatch: string }[] = [
   { kind: "added", label: "added", swatch: "bg-azure" },
   { kind: "changed", label: "changed", swatch: "bg-amber" },
-  { kind: "side effect", label: "side effect", swatch: "bg-amber/45" },
+  { kind: "side effect", label: "side effect", swatch: "bg-amber/35" },
   {
     kind: "removed",
     label: "removed, outline",
@@ -76,17 +76,20 @@ export function ComparisonLegend({
       aria-label="Change layer"
       className="absolute bottom-3 left-3 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 border border-line bg-panel px-3 py-2 font-sans text-label text-xs"
     >
-      {KEY.map(({ kind, label, swatch }) => (
-        <li className="flex items-center gap-1.5" key={kind}>
-          <span aria-hidden className={`size-2.5 shrink-0 ${swatch}`} />
-          {kind === "none" ? null : (
-            <span className="font-mono text-prose">
-              {counts.get(kind) ?? 0}
-            </span>
-          )}
-          {label}
-        </li>
-      ))}
+      {KEY.map(({ kind, label, swatch }) => {
+        const count = kind === "none" ? null : (counts.get(kind) ?? 0);
+        const word =
+          count !== 1 && kind === "side effect" ? "side effects" : label;
+        return (
+          <li className="flex items-center gap-1.5" key={kind}>
+            <span aria-hidden className={`size-2.5 shrink-0 ${swatch}`} />
+            {count === null ? null : (
+              <span className="font-mono text-prose">{count}</span>
+            )}
+            {word}
+          </li>
+        );
+      })}
       <li className="text-faint">Baseline positions</li>
     </ul>
   );

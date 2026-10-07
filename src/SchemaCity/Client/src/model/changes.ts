@@ -21,6 +21,8 @@ export type ChangeCause = {
   /** The type's own edits. */
   details: ChangeDetail[];
   effects: ChangeEffect[];
+  /** The other causes this type is also a side effect of. */
+  effectOf: SchemaChange[];
 };
 
 export type ChangeKind = "added" | "removed" | "changed" | "side effect";
@@ -130,6 +132,10 @@ export function groupChanges(comparison: SchemaComparison): ChangeGroups {
           alsoCause: isCause(effect),
         }))
         .sort((a, b) => byName(a.change, b.change)),
+      effectOf: [...effects]
+        .filter(([, under]) => under.has(change))
+        .map(([root]) => root)
+        .sort(byName),
     }));
   return {
     causes,
@@ -179,6 +185,11 @@ export const sideLabel = (
   date: string | null | undefined
 ) => [host, dayOf(date)].filter(Boolean).join(", ") || "unknown";
 
+const alsoEffect = (cause: ChangeCause) =>
+  cause.effectOf.length > 0
+    ? `, also a side effect of ${cause.effectOf.map((root) => root.name).join(" and ")}`
+    : "";
+
 const STATUS_WORD = { added: "added", removed: "removed", changed: "changed" };
 
 /**
@@ -205,7 +216,7 @@ export function changesMarkdown(
     const { change } = cause;
     const mark = planned.has(cause.key) ? "x" : " ";
     lines.push(
-      `- [${mark}] **${change.name}** (\`${change.alias}\`), ${STATUS_WORD[change.status]}, ${planned.has(cause.key) ? "planned" : "unplanned"}`
+      `- [${mark}] **${change.name}** (\`${change.alias}\`), ${STATUS_WORD[change.status]}, ${planned.has(cause.key) ? "planned" : "unplanned"}${alsoEffect(cause)}`
     );
     for (const detail of cause.details) lines.push(`  - ${detail.text}`);
     if (cause.effects.length > 0)

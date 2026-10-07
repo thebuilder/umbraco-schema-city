@@ -111,6 +111,9 @@ function Cause({
         {effects.length > 0
           ? `, ${plural(effects.length, "side effect")}`
           : ", no side effects"}
+        {cause.effectOf.length > 0
+          ? `, and itself a side effect of ${cause.effectOf.map((root) => root.name).join(" and ")}`
+          : ""}
       </p>
       {open ? (
         <div
