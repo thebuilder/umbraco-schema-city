@@ -666,7 +666,8 @@
   [data-slot="checkbox"],
   [data-slot="radio-group-item"],
   [data-slot="switch"],
-  [data-slot="select-trigger"],
+  /* The select trigger is left out on purpose: its border change alone was too
+     faint to find, so it takes the same 2 px outline as every button. */
   [data-slot="command-input"],
   [data-slot="input-otp"]
 ):focus-visible,
@@ -877,43 +878,15 @@
   }
 }
 
+/* Matched by substring rather than by name, because the classes that animate are
+   variants such as data-open:animate-fade-in, which a list of .animate-* names
+   never matched, so dialogs and the findings sheet kept moving. The popups' own
+   transitions go too. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-alarm,
-  .animate-beam,
-  .animate-caret,
-  .animate-chart-in,
-  .animate-close,
-  .animate-fade-in,
-  .animate-fade-out,
-  .animate-flicker,
-  .animate-glitch,
-  .animate-glyph,
-  .animate-jitter,
-  .animate-led,
-  .animate-line-in,
-  .animate-open,
-  .animate-pixel,
-  .animate-power-line-in,
-  .animate-power-line-out,
-  .animate-power-off,
-  .animate-power-on,
-  .animate-roll,
-  .animate-select-fold-in-down,
-  .animate-select-fold-in-up,
-  .animate-select-fold-out-down,
-  .animate-select-fold-out-up,
-  .animate-slide-in-bottom,
-  .animate-slide-in-left,
-  .animate-slide-in-right,
-  .animate-slide-in-top,
-  .animate-slide-out-bottom,
-  .animate-slide-out-left,
-  .animate-slide-out-right,
-  .animate-slide-out-top,
-  .animate-sweep,
-  .animate-toast-in,
-  .animate-toast-out,
-  .animate-type {
+  [class*="animate-"],
+  [data-slot$="-content"],
+  [data-slot$="-overlay"] {
+    transition: none !important;
     animation: none !important;
   }
 }
