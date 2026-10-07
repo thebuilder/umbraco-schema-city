@@ -1670,6 +1670,17 @@ const FLIGHT_MS = 700;
 /** Home is a shorter trip: the city is already on screen, only badly aimed. */
 const REFRAME_MS = 400;
 /**
+ * How long after a reframe a change of canvas size frames again. Entering or leaving
+ * presentation asks for a reframe and then resizes the canvas, once when the toolbar
+ * goes and again when full screen lands, so the framing asked for is the one at the
+ * size the canvas settles on.
+ *
+ * ponytail: a time window, not the end of the resize. A full-screen animation slower
+ * than this lands on the last size it framed for; reading the fullscreenchange event
+ * is the upgrade if that shows.
+ */
+const RESIZE_SETTLE_MS = 1500;
+/**
  * The establishing shot, which lands about as the connections finish drawing. fsn's
  * runs 2.6 seconds over a skyline that rises for longer.
  */
@@ -1854,6 +1865,7 @@ function CameraRig({
     reframe: number;
   } | null>(null);
   const restored = useRef<View | null>(null);
+  const settling = useRef({ until: 0, view: null as View | null });
   const framing = useMemo(() => JSON.stringify(bounds), [bounds]);
   // The canvas is as wide as the area the panel sizes itself to.
   const covered = inspectorOpen ? inspectorWidthFor(size.width) : 0;
@@ -1897,7 +1909,17 @@ function CameraRig({
     // it started, so only a new set of bounds is allowed to move it.
     const first = framed.current === null;
     const asked = !first && framed.current?.reframe !== reframe;
-    const action = framingAction(framed.current, { bounds, controls, reframe });
+    const resized =
+      settling.current.view !== null && settling.current.view !== view;
+    settling.current.view = view;
+    if (asked) settling.current.until = performance.now() + RESIZE_SETTLE_MS;
+    let action = framingAction(framed.current, { bounds, controls, reframe });
+    if (
+      action === "none" &&
+      resized &&
+      performance.now() < settling.current.until
+    )
+      action = "fly";
     framed.current = { bounds, controls, reframe };
     const back = kept.get(graph);
     const step = framingStep({
@@ -1930,11 +1952,12 @@ function CameraRig({
       flight.current = flightTo(opening, view, INTRO_MS, smootherstep);
       return;
     }
+    const short = asked || resized;
     flight.current = flightTo(
       poseOf(camera, controls, view.target),
       view,
-      asked ? REFRAME_MS : FLIGHT_MS,
-      asked ? smootherstep : easeInOutCubic
+      short ? REFRAME_MS : FLIGHT_MS,
+      short ? smootherstep : easeInOutCubic
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, bounds, controls, reframe, reducedMotion]);

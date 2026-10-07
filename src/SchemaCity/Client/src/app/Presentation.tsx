@@ -122,7 +122,7 @@ export function CaptionCard({
   return (
     <aside
       aria-label="Caption"
-      className={`absolute left-3 w-[min(26rem,calc(100%-1.5rem))] border border-line-strong bg-panel p-3 font-sans text-prose text-sm shadow-panel ${raised ? "bottom-16" : "bottom-3"}`}
+      className={`absolute left-3 w-[min(22rem,calc(100%-1.5rem))] border border-line-strong bg-panel p-3 font-sans text-prose text-sm shadow-panel ${raised ? "bottom-16" : "bottom-3"}`}
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
@@ -141,7 +141,8 @@ export function CaptionCard({
               style={{ background: role.colour }}
             />
             {role.label}
-            <span className="truncate font-mono text-label">{node.alias}</span>
+            <span aria-hidden>·</span>
+            <span className="truncate font-mono">{node.alias}</span>
           </p>
         </div>
         <Button

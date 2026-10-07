@@ -250,6 +250,8 @@ export function App({
   const present = (on: boolean) => {
     setPresenting(on);
     setDetails(false);
+    // The canvas changes size both ways, so whatever is on it is framed again.
+    setReframe((count) => count + 1);
     if (!on) {
       if (ownsFullscreen.current) {
         ownsFullscreen.current = false;
@@ -278,6 +280,7 @@ export function App({
       ownsFullscreen.current = false;
       setPresenting(false);
       setDetails(false);
+      setReframe((count) => count + 1);
     };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
@@ -868,7 +871,7 @@ export function App({
               // The inspector is an overlay, so the view is inset by its width while
               // it is open rather than sliding under it.
               <div
-                className={`absolute inset-0 outline-none [zoom:var(--present,1)] ${selectedNode && !presenting ? INSPECTOR_INSET : ""}`}
+                className={`absolute inset-0 isolate outline-none [zoom:var(--present,1)] ${selectedNode && !presenting ? INSPECTOR_INSET : ""}`}
                 data-focus-home
                 tabIndex={-1}
               >
