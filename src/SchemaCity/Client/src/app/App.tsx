@@ -520,10 +520,15 @@ export function App({
     () => (baseline ? compareSchemas(baseline, graph) : null),
     [baseline, graph]
   );
-  const focusCount = useMemo(
-    () => (focus ? reachableWithin(graph, focus, focusDepth).size : 0),
+  // The focused neighbourhood, which the 2D views narrow to as the city does.
+  const scope = useMemo(
+    () =>
+      focus
+        ? { ids: reachableWithin(graph, focus, focusDepth), around: focus }
+        : null,
     [graph, focus, focusDepth]
   );
+  const focusCount = scope?.ids.size ?? 0;
   const canExpandFocus = useMemo(
     () =>
       focus
@@ -803,8 +808,9 @@ export function App({
             // The inspector is an overlay, so the view is inset by its width while
             // it is open rather than sliding under it.
             <div
-              className={`absolute inset-0 ${selectedNode ? INSPECTOR_INSET : ""}`}
+              className={`absolute inset-0 outline-none ${selectedNode ? INSPECTOR_INSET : ""}`}
               data-focus-home
+              tabIndex={-1}
             >
               <FlatView
                 findings={findings}
@@ -814,7 +820,9 @@ export function App({
                 onPick={() => setPaletteOpen(true)}
                 onQuery={setQuery}
                 onSelect={setSelected}
+                onShowAll={() => setFocus(null)}
                 query={query}
+                scope={scope}
                 selected={selected}
                 usage={usage}
                 view={view}

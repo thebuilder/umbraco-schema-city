@@ -7,13 +7,14 @@ import {
   type CompositionUse,
   compositionMatrix,
   dataTypeMatrix,
+  type MatrixColumn,
   type Matrix as MatrixData,
   sortColumns,
 } from "../model/matrix";
-import type { SchemaGraph } from "../model/types";
-import { useAnnounceChange } from "./a11y";
+import type { SchemaGraph, SchemaNode } from "../model/types";
+import { plural, useAnnounceChange } from "./a11y";
 import { READING } from "./InspectorChips";
-import { FilterField, useMatches } from "./TypeTable";
+import { FilterField, Scroller, useMatches } from "./TypeTable";
 
 type Kind = "compositions" | "dataTypes";
 type ColumnSort = "usage" | "name";
@@ -60,21 +61,35 @@ export function Matrix({
   onQuery,
   selected,
   onSelect,
+  scope,
 }: {
   graph: SchemaGraph;
   query: string;
   onQuery: (query: string) => void;
   selected: string | null;
   onSelect: (id: string) => void;
+  scope: ReadonlySet<string> | null;
 }) {
   const [kind, setKind] = useState<Kind>("compositions");
   const [columnSort, setColumnSort] = useState<ColumnSort>("usage");
   const compositions = useMemo(() => compositionMatrix(graph), [graph]);
   const dataTypes = useMemo(() => dataTypeMatrix(graph), [graph]);
-  const matched = useMatches(graph, query);
+  const matched = useMatches(graph, query, scope);
   const names = useMemo(
     () => new Map(graph.nodes.map((node) => [node.id, node.name])),
     [graph.nodes]
+  );
+  // Umbraco records a parent type as a composition of its children, so a parent
+  // such as Article is a column here. Marked, so it does not read as a mixin.
+  const inherits = useMemo(() => {
+    const pairs = new Set<string>();
+    for (const edge of graph.edges ?? [])
+      if (edge.kind === "inherits") pairs.add(`${edge.from}>${edge.to}`);
+    return pairs;
+  }, [graph.edges]);
+  const parents = useMemo(
+    () => new Set([...inherits].map((pair) => pair.split(">")[1])),
+    [inherits]
   );
 
   const composition = (use: CompositionUse) =>
@@ -83,10 +98,17 @@ export function Matrix({
     ) : (
       <span className="text-azure/70 text-sm">○</span>
     );
-  const compositionTitle = (use: CompositionUse) =>
-    use.via === null
-      ? "composed directly"
-      : `through ${names.get(use.via) ?? "another composition"}`;
+  const compositionSays = (
+    row: SchemaNode,
+    column: MatrixColumn,
+    use: CompositionUse
+  ) => {
+    if (use.via !== null)
+      return `${row.name} uses ${column.label} through ${names.get(use.via) ?? "another composition"}`;
+    return inherits.has(`${row.id}>${column.id}`)
+      ? `${row.name} inherits from ${column.label}`
+      : `${row.name} uses ${column.label} directly`;
+  };
 
   return (
     <div className="flex h-full flex-col bg-background font-sans text-[13px] text-prose leading-normal">
@@ -114,36 +136,48 @@ export function Matrix({
       {kind === "compositions" ? (
         <Grid
           cell={composition}
+          columnName={(column) =>
+            `${column.label}${parents.has(column.id) ? ", a parent type" : ""}, used by ${plural(column.total, "type")}`
+          }
           columnSort={columnSort}
           data={compositions}
           empty="No type uses a composition."
           matched={matched}
           note={
             <>
-              <span className="text-azure">●</span> composed directly,{" "}
-              <span className="text-azure/70">○</span> through another
-              composition. Inheriting from a parent counts as a direct
-              composition, as Umbraco models it. The column total counts the
-              types that use it.
+              <span aria-hidden className="text-azure">
+                ●
+              </span>{" "}
+              composed directly,{" "}
+              <span aria-hidden className="text-azure/70">
+                ○
+              </span>{" "}
+              through another composition. A column marked parent is a type
+              others inherit from, which Umbraco records as a direct
+              composition. The column total counts the types that use it.
             </>
           }
           onSelect={onSelect}
+          says={compositionSays}
           selected={selected}
-          title={compositionTitle}
+          tag={(column) => (parents.has(column.id) ? "parent" : null)}
         />
       ) : (
         <Grid
           cell={(count) => <span className="font-mono text-xs">{count}</span>}
+          columnName={(column) =>
+            `${column.label}, ${plural(column.total, "property", "properties")}`
+          }
           columnSort={columnSort}
           data={dataTypes}
           empty="No type has properties of its own."
           matched={matched}
           note="Counts each type's own properties. A composed property counts once, on the composition that declares it, so the column total is the number of properties using that Data Type."
           onSelect={onSelect}
-          selected={selected}
-          title={(count) =>
-            `${count} ${count === 1 ? "property" : "properties"}`
+          says={(row, column, count) =>
+            `${row.name}: ${plural(count, "property", "properties")} on ${column.label}`
           }
+          selected={selected}
         />
       )}
     </div>
@@ -153,7 +187,9 @@ export function Matrix({
 function Grid<Cell>({
   data,
   cell,
-  title,
+  says,
+  columnName,
+  tag = () => null,
   columnSort,
   matched,
   selected,
@@ -162,8 +198,14 @@ function Grid<Cell>({
   empty,
 }: {
   data: MatrixData<Cell>;
+  /** The mark drawn in a cell, hidden from screen readers in favour of `says`. */
   cell: (value: Cell) => ReactNode;
-  title: (value: Cell) => string;
+  /** A cell as one sentence, for a screen reader and on hover. */
+  says: (row: SchemaNode, column: MatrixColumn, value: Cell) => string;
+  /** A column header as read aloud, by name and without the Data Type key. */
+  columnName: (column: MatrixColumn) => string;
+  /** A short word printed on a column header, such as "parent". */
+  tag?: (column: MatrixColumn) => string | null;
   columnSort: ColumnSort;
   matched: ReadonlySet<string> | null;
   selected: string | null;
@@ -186,7 +228,7 @@ function Grid<Cell>({
         {note} <span className="font-mono">{rows.length}</span> of{" "}
         <span className="font-mono">{data.rows.length}</span> types.
       </p>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <Scroller label="Matrix">
         {data.rows.length === 0 ? (
           <p className="px-4 py-6 text-faint text-xs">{empty}</p>
         ) : (
@@ -204,25 +246,35 @@ function Grid<Cell>({
                 >
                   Type
                 </th>
-                {columns.map((column) => (
-                  <th
-                    className={`${CELL} sticky top-0 z-20 bg-panel px-1 py-2 align-bottom font-normal`}
-                    key={column.id}
-                    scope="col"
-                    title={`${column.label} (${column.id})`}
-                  >
-                    {/* Vertical, so a long editor alias costs height once instead
-                        of width in every row. */}
-                    <span className="inline-block rotate-180 text-left [writing-mode:vertical-rl]">
-                      <span className="block max-h-48 truncate text-prose text-xs">
-                        {column.label}
+                {columns.map((column) => {
+                  const marked = tag(column);
+                  return (
+                    <th
+                      className={`${CELL} sticky top-0 z-20 bg-panel px-1 py-2 align-bottom font-normal`}
+                      key={column.id}
+                      scope="col"
+                    >
+                      <span className="sr-only">{columnName(column)}</span>
+                      {/* Vertical, so a long editor alias costs height once instead
+                          of width in every row. The key in the detail line keeps
+                          two same-named Data Types apart for the eye only. */}
+                      <span
+                        aria-hidden
+                        className="inline-block rotate-180 text-left [writing-mode:vertical-rl]"
+                      >
+                        <span className="block max-h-48 truncate text-prose text-xs">
+                          {column.label}
+                          {marked ? (
+                            <span className="text-azure"> · {marked}</span>
+                          ) : null}
+                        </span>
+                        <span className="block max-h-48 truncate font-mono text-2xs text-faint">
+                          {column.detail} · {column.total}
+                        </span>
                       </span>
-                      <span className="block max-h-48 truncate font-mono text-2xs text-faint">
-                        {column.detail} · {column.total}
-                      </span>
-                    </span>
-                  </th>
-                ))}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -252,17 +304,22 @@ function Grid<Cell>({
                     </th>
                     {columns.map((column) => {
                       const value = cells?.get(column.id);
+                      const said =
+                        value === undefined
+                          ? undefined
+                          : says(row, column, value);
                       return (
                         <td
                           className={`${CELL} min-w-7 px-1 text-center`}
                           key={column.id}
-                          title={
-                            value === undefined
-                              ? undefined
-                              : `${row.name}, ${column.label}: ${title(value)}`
-                          }
+                          title={said}
                         >
-                          {value === undefined ? "" : cell(value)}
+                          {value === undefined ? null : (
+                            <>
+                              <span aria-hidden>{cell(value)}</span>
+                              <span className="sr-only">{said}</span>
+                            </>
+                          )}
                         </td>
                       );
                     })}
@@ -272,7 +329,7 @@ function Grid<Cell>({
             </tbody>
           </table>
         )}
-      </div>
+      </Scroller>
     </>
   );
 }
