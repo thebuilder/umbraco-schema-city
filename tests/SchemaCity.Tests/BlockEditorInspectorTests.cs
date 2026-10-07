@@ -110,6 +110,32 @@ public class BlockEditorInspectorTests
         Assert.Empty(index);
     }
 
+    [Fact]
+    public void Summary_keeps_the_limits_that_are_set_and_drops_the_rest()
+    {
+        var blockList = new FakeDataType(new BlockListConfiguration
+        {
+            ValidationLimit = new BlockListConfiguration.NumberRange { Min = 1, Max = null },
+            Blocks = [new() { ContentElementTypeKey = ContentKey }],
+        });
+        var picker = new FakeDataType(new MultiNodePickerConfiguration { MaxNumber = 5 });
+
+        Assert.Equal(
+            new Dictionary<string, object> { ["blocks"] = 1, ["min"] = 1 },
+            BlockEditorInspector.Summary(blockList));
+        Assert.Equal(new Dictionary<string, object> { ["max"] = 5 }, BlockEditorInspector.Summary(picker));
+        Assert.Null(BlockEditorInspector.Summary(new FakeDataType(new object())));
+    }
+
+    [Fact]
+    public void A_configuration_that_throws_reads_as_no_targets_and_no_summary()
+    {
+        var broken = new FakeDataType(new InvalidOperationException("Stored configuration does not match the editor."));
+
+        Assert.Empty(BlockEditorInspector.TargetsOf(broken));
+        Assert.Null(BlockEditorInspector.Summary(broken));
+    }
+
     private static SchemaTarget[] SingleResult(IDataType dataType)
     {
         Dictionary<Guid, SchemaTarget[]> index = BlockEditorInspector.Index([dataType]);
@@ -119,10 +145,11 @@ public class BlockEditorInspectorTests
 
 /// <summary>
 /// The block inspector only reads <see cref="IDataType.Key"/> and
-/// <see cref="IDataType.ConfigurationObject"/>, and the graph builder also reads
-/// <see cref="IDataType.EditorUiAlias"/>, so this leaves everything else unimplemented rather than
-/// wiring up the real property editor pipeline the seeder needs. Shared with
-/// <see cref="SchemaGraphBuilderTests"/>.
+/// <see cref="IDataType.ConfigurationObject"/>, and the graph builder also reads the name, the
+/// editor aliases and <see cref="IDataType.ParentId"/>, so this leaves everything else
+/// unimplemented rather than wiring up the real property editor pipeline the seeder needs. An
+/// Exception passed as the configuration is thrown on read, the way a stored configuration that no
+/// longer fits its editor fails. Shared with <see cref="SchemaGraphBuilderTests"/>.
 /// </summary>
 internal sealed class FakeDataType(object configuration) : IDataType
 {
@@ -132,7 +159,7 @@ internal sealed class FakeDataType(object configuration) : IDataType
 
         public bool HasIdentity => true;
 
-        public object ConfigurationObject => configuration;
+        public object ConfigurationObject => configuration is Exception thrown ? throw thrown : configuration;
 
         public string? EditorUiAlias { get; set; } = string.Empty;
 
@@ -152,7 +179,7 @@ internal sealed class FakeDataType(object configuration) : IDataType
 
         public int CreatorId { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
-        public int ParentId { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public int ParentId { get; set; } = -1;
 
         public int Level { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 

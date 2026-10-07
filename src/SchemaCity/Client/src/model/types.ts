@@ -1,11 +1,36 @@
 // The payload the backend returns, mirrored by the C# records in Models/.
-// M0 fills in generatedAt, folders and nodes without groups or edges; M1 completes it.
+// Every property is filled in since M1; dataTypes arrived with the Data Types view.
 
 export type SchemaGraph = {
   generatedAt: string;
   folders: SchemaFolder[];
   nodes: SchemaNode[];
   edges: SchemaEdge[];
+  /**
+   * Every Data Type in the site, used or not. Graphs and snapshots from before the
+   * Data Types view lack it, and then the client knows only the ones properties name.
+   */
+  dataTypes?: SchemaDataType[];
+};
+
+export type SchemaTarget = {
+  nodeId: string;
+  role: "content" | "settings" | "picker";
+};
+
+export type SchemaDataType = {
+  id: string; // Data Type key (guid)
+  name: string;
+  editorAlias: string;
+  editorUiAlias: string | null;
+  /** Folder path, "Blocks/Grids", or null at the root. */
+  folder: string | null;
+  /** Element Types a block editor offers and Document Types a picker allows, missing keys included. */
+  targets: SchemaTarget[];
+  /** Media and Member Type properties and collection views using it, which have no node here. */
+  otherUses: number;
+  /** A few cheap values, such as a block list's min and max. Only for the editors read. */
+  configuration?: Record<string, string | number | boolean>;
 };
 
 export type SchemaFolder = {
@@ -54,7 +79,7 @@ export type SchemaProperty = {
   variesByCulture: boolean;
   fromCompositionId: string | null;
   /** Element Types this property can contain (block editors) or point at (pickers). */
-  targets: { nodeId: string; role: "content" | "settings" | "picker" }[];
+  targets: SchemaTarget[];
 };
 
 export type EdgeKind =

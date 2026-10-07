@@ -1,5 +1,6 @@
 import type {
   PropertyGroup,
+  SchemaDataType,
   SchemaEdge,
   SchemaGraph,
   SchemaNode,
@@ -178,18 +179,7 @@ function validateNode(value: unknown, index: number): SchemaNode {
           property.variesByCulture,
           `${propertyPath}.variesByCulture`
         );
-        requiredArray(property.targets, `${propertyPath}.targets`).forEach(
-          (target, targetIndex) => {
-            const targetPath = `${propertyPath}.targets[${targetIndex}]`;
-            if (!record(target))
-              throw new Error(`${targetPath} must be an object`);
-            requiredString(target.nodeId, `${targetPath}.nodeId`);
-            if (
-              !["content", "settings", "picker"].includes(String(target.role))
-            )
-              throw new Error(`${targetPath}.role is invalid`);
-          }
-        );
+        validateTargets(property.targets, `${propertyPath}.targets`);
       }
     );
   });
@@ -213,12 +203,46 @@ function validateGraph(value: unknown): SchemaGraph {
   validateNodeIds(nodes);
   const edges = requiredArray(value.edges, "graph.edges");
   validateEdges(edges);
+  // Snapshots exported before the Data Types view have no list, and stay importable.
+  const dataTypes =
+    value.dataTypes === undefined
+      ? undefined
+      : requiredArray(value.dataTypes, "graph.dataTypes");
+  dataTypes?.forEach(validateDataType);
   return {
     generatedAt: timestamp(value.generatedAt, "graph.generatedAt"),
     folders: folders as SchemaGraph["folders"],
     nodes,
     edges: edges as SchemaGraph["edges"],
+    ...(dataTypes ? { dataTypes: dataTypes as SchemaDataType[] } : {}),
   };
+}
+
+function validateTargets(value: unknown, path: string) {
+  for (const [index, target] of requiredArray(value, path).entries()) {
+    const at = `${path}[${index}]`;
+    if (!record(target)) throw new Error(`${at} must be an object`);
+    requiredString(target.nodeId, `${at}.nodeId`);
+    if (!["content", "settings", "picker"].includes(String(target.role)))
+      throw new Error(`${at}.role is invalid`);
+  }
+}
+
+function validateDataType(value: unknown, index: number) {
+  const path = `graph.dataTypes[${index}]`;
+  if (!record(value)) throw new Error(`${path} must be an object`);
+  for (const key of ["id", "name", "editorAlias"])
+    requiredString(value[key], `${path}.${key}`);
+  nullableString(value.editorUiAlias, `${path}.editorUiAlias`);
+  nullableString(value.folder, `${path}.folder`);
+  count(value.otherUses, `${path}.otherUses`);
+  validateTargets(value.targets, `${path}.targets`);
+  if (value.configuration === undefined) return;
+  if (!record(value.configuration))
+    throw new Error(`${path}.configuration must be an object`);
+  for (const [key, setting] of Object.entries(value.configuration))
+    if (!["string", "number", "boolean"].includes(typeof setting))
+      throw new Error(`${path}.configuration.${key} must be a plain value`);
 }
 
 function validateNodeIds(nodes: SchemaNode[]) {

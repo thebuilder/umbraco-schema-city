@@ -144,6 +144,43 @@ describe("schema snapshots", () => {
     );
   });
 
+  it("keeps a valid Data Type list, imports one without it, and rejects a wrong one", () => {
+    const withDataTypes = (dataTypes?: unknown) => ({
+      format: "schema-city",
+      version: 1,
+      capturedAt: "2026-09-06T00:00:00Z",
+      graph: { ...graph([node("a", "page")]), dataTypes },
+    });
+    const grid = {
+      id: "dt",
+      name: "Page Grid",
+      editorAlias: "Umbraco.BlockGrid",
+      editorUiAlias: null,
+      folder: null,
+      targets: [{ nodeId: "gone", role: "content" }],
+      otherUses: 0,
+      configuration: { gridColumns: 12 },
+    };
+
+    expect(parseSnapshot(withDataTypes()).snapshot?.graph.dataTypes).toBe(
+      undefined
+    );
+    expect(
+      parseSnapshot(withDataTypes([grid])).snapshot?.graph.dataTypes
+    ).toEqual([grid]);
+    expect(
+      parseSnapshot(withDataTypes([{ ...grid, otherUses: -1 }])).error
+    ).toContain("graph.dataTypes[0].otherUses");
+    expect(
+      parseSnapshot(withDataTypes([{ ...grid, targets: [{ nodeId: "x" }] }]))
+        .error
+    ).toContain("graph.dataTypes[0].targets[0].role is invalid");
+    expect(
+      parseSnapshot(withDataTypes([{ ...grid, configuration: { a: {} } }]))
+        .error
+    ).toContain("configuration.a must be a plain value");
+  });
+
   it("rejects duplicate ids, cyclic folders, invalid dates, and ambiguous aliases", () => {
     const duplicate = graph([node("a", "page"), node("a", "other")]);
     expect(

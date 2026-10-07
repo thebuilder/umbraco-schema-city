@@ -10,7 +10,27 @@ public record SchemaGraph(
     DateTimeOffset GeneratedAt,
     IReadOnlyList<SchemaFolder> Folders,
     IReadOnlyList<SchemaNode> Nodes,
-    IReadOnlyList<SchemaEdge> Edges);
+    IReadOnlyList<SchemaEdge> Edges,
+    IReadOnlyList<SchemaDataType> DataTypes);
+
+/// <summary>
+/// One Data Type, listed whether or not a property uses it. Folder is the path of the Data Type
+/// folders it sits in, joined with "/", or null at the root. Targets are the Element Type keys a
+/// block editor offers and the Document Type keys a Multi Node Tree Picker allows, including keys
+/// that no longer resolve. OtherUses counts what the graph has no node for: properties on Media and
+/// Member Types, and types whose collection view is this Data Type. Configuration holds a few cheap
+/// values, such as a block list's min and max, and is omitted for every other editor.
+/// </summary>
+public record SchemaDataType(
+    string Id,
+    string Name,
+    string EditorAlias,
+    string? EditorUiAlias,
+    string? Folder,
+    IReadOnlyList<SchemaTarget> Targets,
+    int OtherUses,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyDictionary<string, object>? Configuration = null);
 
 /// <summary>A Document Type container. ParentId is null for a folder at the tree root.</summary>
 public record SchemaFolder(string Id, string Name, string? ParentId);

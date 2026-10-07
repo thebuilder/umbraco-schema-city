@@ -37,7 +37,7 @@ public static class BlockEditorInspector
 
         foreach (IDataType dataType in dataTypes)
         {
-            SchemaTarget[] targets = Targets(dataType).Distinct().ToArray();
+            SchemaTarget[] targets = TargetsOf(dataType);
             if (targets.Length > 0)
             {
                 byDataTypeKey[dataType.Key] = targets;
@@ -47,12 +47,47 @@ public static class BlockEditorInspector
         return byDataTypeKey;
     }
 
-    private static IEnumerable<SchemaTarget> Targets(IDataType dataType)
+    /// <summary>
+    /// A few configuration values worth seeing beside a Data Type's name, for the editors this
+    /// already reads, or null for any other editor. Limits Umbraco stores as unset are left out.
+    /// </summary>
+    public static IReadOnlyDictionary<string, object>? Summary(IDataType dataType)
     {
-        object? configuration;
+        Dictionary<string, object?>? summary = ConfigurationOf(dataType) switch
+        {
+            BlockListConfiguration c => new()
+            {
+                ["blocks"] = c.Blocks?.Length ?? 0,
+                ["min"] = c.ValidationLimit?.Min,
+                ["max"] = c.ValidationLimit?.Max,
+            },
+            BlockGridConfiguration c => new()
+            {
+                ["blocks"] = c.Blocks?.Length ?? 0,
+                ["gridColumns"] = c.GridColumns,
+                ["min"] = c.ValidationLimit?.Min,
+                ["max"] = c.ValidationLimit?.Max,
+            },
+            RichTextConfiguration c => new() { ["blocks"] = c.Blocks?.Length ?? 0 },
+            SingleBlockConfiguration c => new() { ["blocks"] = c.Blocks?.Length ?? 0 },
+            MultiNodePickerConfiguration c => new()
+            {
+                ["min"] = c.MinNumber > 0 ? c.MinNumber : null,
+                ["max"] = c.MaxNumber > 0 ? c.MaxNumber : null,
+            },
+            _ => null,
+        };
+
+        return summary?
+            .Where(entry => entry.Value is not null)
+            .ToDictionary(entry => entry.Key, entry => entry.Value!, StringComparer.Ordinal);
+    }
+
+    private static object? ConfigurationOf(IDataType dataType)
+    {
         try
         {
-            configuration = dataType.ConfigurationObject;
+            return dataType.ConfigurationObject;
         }
         catch (Exception)
         {
@@ -60,10 +95,13 @@ public static class BlockEditorInspector
             // while deserialising, and one bad row should not empty the whole graph. Skipping it
             // loses that editor's block edges silently. Turn it into a finding of its own if a real
             // install hits it.
-            return [];
+            return null;
         }
+    }
 
-        return configuration switch
+    /// <summary>The block or picker targets of one Data Type, in configuration order, without repeats.</summary>
+    public static SchemaTarget[] TargetsOf(IDataType dataType) =>
+        (ConfigurationOf(dataType) switch
         {
             // BlockListConfiguration also covers single block mode, which is the same editor with
             // UseSingleBlockMode set. SingleBlockConfiguration is the separate Umbraco.SingleBlock
@@ -74,8 +112,7 @@ public static class BlockEditorInspector
             SingleBlockConfiguration c => Blocks(c.Blocks),
             MultiNodePickerConfiguration c => Picked(c.Filter),
             _ => [],
-        };
-    }
+        }).Distinct().ToArray();
 
     private static IEnumerable<SchemaTarget> Blocks(IEnumerable<IBlockConfiguration>? blocks)
     {
