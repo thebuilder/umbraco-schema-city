@@ -279,6 +279,9 @@ await send("Page.addScriptToEvaluateOnNewDocument", {
     document.head.append(style);
   });`,
 });
+// Times in the app are shown in the viewer's zone, so the shots fix it to UTC and
+// come out the same on every machine.
+await send("Emulation.setTimezoneOverride", { timezoneId: "UTC" });
 await send("Emulation.setDeviceMetricsOverride", {
   width: 1600,
   height: 1000,
