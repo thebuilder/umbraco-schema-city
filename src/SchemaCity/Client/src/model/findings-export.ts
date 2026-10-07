@@ -107,7 +107,7 @@ export function findingsCsv(
       KIND_EXPLANATION[finding.kind],
       KIND_NEXT_STEP[finding.kind],
       related(finding),
-      branchRoot.get(finding.nodeId) ?? "",
+      (finding.kind === "unusedType" && branchRoot.get(finding.nodeId)) || "",
       filter,
       schemaDate,
       usageDate,

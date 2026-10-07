@@ -100,12 +100,22 @@ describe("findingsCsv", () => {
       summary: "",
     });
     const rows = lines(
-      findingsCsv([unused("hub"), unused("leaf")], graph, usage)
+      findingsCsv(
+        [
+          unused("hub"),
+          unused("leaf"),
+          { ...broken, nodeId: "hub", summary: "x" },
+        ],
+        graph,
+        usage
+      )
     ).slice(1);
     // Hub's parent has content, so hub tops its own branch, and leaf is under it.
+    // The column is for unused type rows only, not another kind on the same type.
     expect(rows.map((row) => row.split(",").slice(-4)[0])).toEqual([
       "Hub",
       "Hub",
+      "",
     ]);
   });
 
