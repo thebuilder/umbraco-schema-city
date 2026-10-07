@@ -35,7 +35,7 @@ export type ChangeGroups = {
   kinds: Map<string, ChangeKind>;
 };
 
-export const changeKey = (change: SchemaChange) =>
+const changeKey = (change: SchemaChange) =>
   change.currentId ?? change.baselineId ?? change.alias;
 
 const ORDER = { added: 0, removed: 1, changed: 2 } as const;
@@ -189,6 +189,14 @@ const alsoEffect = (cause: ChangeCause) =>
   cause.effectOf.length > 0
     ? `, also a side effect of ${cause.effectOf.map((root) => root.name).join(" and ")}`
     : "";
+
+/** "2 edits, 2 side effects, also a side effect of Press Release", under a cause. */
+export const causeLine = (cause: ChangeCause) =>
+  `${counted(cause.details.length, "edit")}, ${
+    cause.effects.length > 0
+      ? counted(cause.effects.length, "side effect")
+      : "no side effects"
+  }${alsoEffect(cause)}`;
 
 const STATUS_WORD = { added: "added", removed: "removed", changed: "changed" };
 

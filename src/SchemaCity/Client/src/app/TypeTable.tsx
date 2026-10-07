@@ -1,7 +1,15 @@
 // The list view: every type as a row in a real table. This is the accessible
 // reading of the city, so it is plain semantic markup with no canvas anywhere near
 // it, and the same search that feeds the palette filters it.
-import { type ReactNode, useId, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Input } from "@/components/ui/input";
 import type { ChangeGroups, ChangeKind } from "../model/changes";
 import { type Finding, problemLabels } from "../model/findings";
@@ -78,7 +86,7 @@ export function typeRows(
 export function compareRows(
   graph: SchemaGraph,
   usage: UsageReport | undefined,
-  compare: { baseline: SchemaGraph; changes: ChangeGroups } | null
+  compare: Compare | null
 ): TypeRow[] {
   if (!compare) return typeRows(graph, usage);
   const { kinds } = compare.changes;
@@ -101,11 +109,103 @@ const CHANGE_FILTERS = [
   ["none", "Unchanged"],
 ] as const;
 
-type ChangeFilter = (typeof CHANGE_FILTERS)[number][0];
+export type ChangeFilter = (typeof CHANGE_FILTERS)[number][0];
 
+/** Without a comparison a row has no change, and every filter lets it through. */
 const passes = (filter: ChangeFilter, row: TypeRow) =>
   filter === "all" ||
+  row.change === undefined ||
   (filter === "any" ? row.change !== "none" : row.change === filter);
+
+/**
+ * The rows the filters leave. A removed type is not in the graph the search reads,
+ * so it matches by name or alias, and focus, which is about the current graph,
+ * leaves it out.
+ */
+export function visibleRows(
+  rows: TypeRow[],
+  {
+    matched,
+    query,
+    scope,
+    filter,
+  }: {
+    matched: ReadonlySet<string> | null;
+    query: string;
+    scope: ReadonlySet<string> | null;
+    filter: ChangeFilter;
+  }
+): TypeRow[] {
+  const needle = query.trim().toLowerCase();
+  const found = (row: TypeRow) =>
+    row.change === "removed"
+      ? scope === null &&
+        `${row.name} ${row.alias}`.toLowerCase().includes(needle)
+      : !matched || matched.has(row.id);
+  return rows.filter((row) => found(row) && passes(filter, row));
+}
+
+function ChangeFilterField({
+  compare,
+  value,
+  onChange,
+}: {
+  compare: Compare | null;
+  value: ChangeFilter;
+  onChange: (value: ChangeFilter) => void;
+}) {
+  const id = useId();
+  if (!compare) return null;
+  return (
+    <div className="flex items-center gap-2 font-sans text-label text-xs">
+      <label htmlFor={id}>Change</label>
+      <select
+        className="h-8 border border-input bg-secondary px-2 text-prose text-xs focus-visible:border-phosphor"
+        id={id}
+        onChange={(event) => onChange(event.target.value as ChangeFilter)}
+        value={value}
+      >
+        {CHANGE_FILTERS.map(([option, label]) => (
+          <option key={option} value={option}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** The row's name, as a button that opens the type, or as text once removed. */
+function NameCell({
+  row,
+  on,
+  flagged,
+  onSelect,
+}: {
+  row: TypeRow;
+  on: boolean;
+  flagged: string | undefined;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <th className={`${CELL} font-normal`} scope="row">
+      <span className="flex items-center gap-1.5">
+        {row.change === "removed" ? (
+          <span className="text-label">{row.name}</span>
+        ) : (
+          <button
+            className={`text-left hover:text-phosphor hover:underline ${on ? "text-phosphor-bright" : "text-prose"}`}
+            onClick={() => onSelect(row.id)}
+            type="button"
+          >
+            {row.name}
+          </button>
+        )}
+        {flagged ? <FindingDot title={flagged} /> : null}
+      </span>
+    </th>
+  );
+}
 
 /** The Change column's word, in the colour the city's change layer uses for it. */
 const CHANGE_TONE: Record<ChangeKind | "none", string> = {
@@ -167,6 +267,12 @@ function Count({ value, on }: { value: number | null; on: boolean }) {
       {value?.toLocaleString()}
     </td>
   );
+}
+
+/** The Change column's cell, while a baseline is loaded. */
+function ChangeCell({ change }: { change: TypeRow["change"] }) {
+  if (!change) return null;
+  return <td className={`${CELL} text-xs ${CHANGE_TONE[change]}`}>{change}</td>;
 }
 
 /** The filter box the 2D views share, fed by the palette's query. */
@@ -247,9 +353,22 @@ export type ListProps = {
   onSelect: (id: string) => void;
   /** In focus mode, the types around the focused one; null shows every type. */
   scope: ReadonlySet<string> | null;
-  /** The loaded baseline and the comparison against it, which the List shows. */
-  compare?: { baseline: SchemaGraph; changes: ChangeGroups } | null;
 };
+
+type Compare = { baseline: SchemaGraph; changes: ChangeGroups };
+
+/**
+ * The loaded baseline and the comparison against it, which the List shows as a
+ * Change column. A context, so the views between App and the List pass nothing.
+ */
+export const CompareContext = createContext<Compare | null>(null);
+
+/** The columns that have something to say: Content with usage, Change with a baseline. */
+const columnsFor = (usage: UsageReport | undefined, compare: Compare | null) =>
+  COLUMNS.filter(
+    (column) =>
+      (column.key !== "usage" || usage) && (column.key !== "change" || compare)
+  );
 
 /**
  * A scrolling area a keyboard can reach and a screen reader can name. A table wider
@@ -350,11 +469,10 @@ export function TypeTable({
   selected,
   onSelect,
   scope,
-  compare = null,
 }: ListProps) {
+  const compare = use(CompareContext);
   const [sort, toggle] = useSort<SortKey>();
   const [changeFilter, setChangeFilter] = useState<ChangeFilter>("all");
-  const changeId = useId();
 
   const rows = useMemo(
     () => compareRows(graph, usage, compare),
@@ -364,55 +482,33 @@ export function TypeTable({
   // The same ranking the palette uses, kept only as a set: the table's own sort
   // decides the order, and searchNodes decides what is in it.
   const matched = useMatches(graph, query, scope);
-  const shown = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    // A removed type is not in the graph the search reads, so it matches by name
-    // or alias, and focus, which is about the current graph, leaves it out.
-    const kept = (row: TypeRow) =>
-      row.change === "removed"
-        ? scope === null &&
-          (needle === "" ||
-            `${row.name} ${row.alias}`.toLowerCase().includes(needle))
-        : !matched || matched.has(row.id);
-    return sortRows(
-      rows.filter(
-        (row) => kept(row) && (!compare || passes(changeFilter, row))
+  const shown = useMemo(
+    () =>
+      sortRows(
+        visibleRows(rows, { matched, query, scope, filter: changeFilter }),
+        sort.key,
+        sort.ascending
       ),
-      sort.key,
-      sort.ascending
-    );
-  }, [rows, matched, sort, query, scope, compare, changeFilter]);
+    [rows, matched, sort, query, scope, changeFilter]
+  );
 
   useAnnounceChange(`${shown.length} of ${rows.length} types`);
+  // A removed type has nothing left to inspect.
+  const select = (row: TypeRow) => {
+    if (row.change !== "removed") onSelect(row.id);
+  };
 
-  const columns = COLUMNS.filter(
-    (column) =>
-      (column.key !== "usage" || usage) && (column.key !== "change" || compare)
-  );
+  const columns = columnsFor(usage, compare);
 
   return (
     <div className="flex h-full flex-col bg-background font-sans text-[13px] text-prose leading-normal">
       <div className="flex items-center gap-3 border-line border-b px-4 py-2">
         <FilterField onQuery={onQuery} query={query} />
-        {compare ? (
-          <div className="flex items-center gap-2 font-sans text-label text-xs">
-            <label htmlFor={changeId}>Change</label>
-            <select
-              className="h-8 border border-input bg-secondary px-2 text-prose text-xs focus-visible:border-phosphor"
-              id={changeId}
-              onChange={(event) =>
-                setChangeFilter(event.target.value as ChangeFilter)
-              }
-              value={changeFilter}
-            >
-              {CHANGE_FILTERS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
+        <ChangeFilterField
+          compare={compare}
+          onChange={setChangeFilter}
+          value={changeFilter}
+        />
         <p className="text-label text-xs">
           <span className="font-mono">{shown.length}</span> of{" "}
           <span className="font-mono">{rows.length}</span> types
@@ -429,31 +525,18 @@ export function TypeTable({
           <tbody>
             {shown.map((row) => {
               const on = row.id === selected;
-              const flagged = problems.get(row.id);
-              // A removed type has nothing left to inspect.
-              const gone = row.change === "removed";
               return (
                 <tr
                   className={on ? "bg-accent" : "hover:bg-accent/50"}
                   key={row.id}
-                  onClick={gone ? undefined : () => onSelect(row.id)}
+                  onClick={() => select(row)}
                 >
-                  <th className={`${CELL} font-normal`} scope="row">
-                    <span className="flex items-center gap-1.5">
-                      {gone ? (
-                        <span className="text-label">{row.name}</span>
-                      ) : (
-                        <button
-                          className={`text-left hover:text-phosphor hover:underline ${on ? "text-phosphor-bright" : "text-prose"}`}
-                          onClick={() => onSelect(row.id)}
-                          type="button"
-                        >
-                          {row.name}
-                        </button>
-                      )}
-                      {flagged ? <FindingDot title={flagged} /> : null}
-                    </span>
-                  </th>
+                  <NameCell
+                    flagged={problems.get(row.id)}
+                    on={on}
+                    onSelect={onSelect}
+                    row={row}
+                  />
                   <td
                     className={`${CELL} font-mono text-xs ${on ? "text-label" : "text-faint"}`}
                   >
@@ -469,13 +552,7 @@ export function TypeTable({
                   <Count on={on} value={row.composed} />
                   <Count on={on} value={row.children} />
                   {usage ? <Count on={on} value={row.usage} /> : null}
-                  {row.change ? (
-                    <td
-                      className={`${CELL} text-xs ${CHANGE_TONE[row.change]}`}
-                    >
-                      {row.change}
-                    </td>
-                  ) : null}
+                  <ChangeCell change={row.change} />
                 </tr>
               );
             })}

@@ -2,15 +2,17 @@
 // mark it planned, and a button that opens its edits and the side effects they had
 // on other types. Marking causes planned and showing only the unplanned ones is how
 // a review after a deployment finds the change nobody asked for.
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   type ChangeCause,
+  type ChangeEffect,
   type ChangeGroups,
+  causeLine,
   changeSummary,
   plannedFromAliases,
 } from "../model/changes";
-import type { SchemaChange } from "../model/snapshots";
+import type { ChangeDetail, SchemaChange } from "../model/snapshots";
 import { plural, useAnnounceChange } from "./a11y";
 import { DataTypeLink, TextButton } from "./InspectorChips";
 
@@ -21,41 +23,128 @@ const TONE: Record<SchemaChange["status"], { border: string; text: string }> = {
   changed: { border: "border-amber", text: "text-amber" },
 };
 
-function Lines({ lines }: { lines: string[] }) {
+const LINK =
+  "px-1 py-0.5 text-phosphor text-xs hover:text-phosphor-bright hover:underline";
+
+function Lines({ details }: { details: ChangeDetail[] }) {
   return (
     <ul className="space-y-0.5 text-label text-xs">
-      {lines.map((text, index) => (
+      {details.map((detail, index) => (
         // The same line can repeat for a block offered as content and as settings.
         // biome-ignore lint/suspicious/noArrayIndexKey: the lines never reorder.
-        <li className="break-words" key={`${index}:${text}`}>
-          {text}
+        <li className="break-words" key={`${index}:${detail.text}`}>
+          {detail.text}
         </li>
       ))}
     </ul>
   );
 }
 
-/** A type's name as a link to its inspector, or plain text once it is removed. */
-function TypeName({
+/** One type a cause changed, with a link to it while it still exists. */
+function Effect({
+  effect,
+  onSelect,
+}: {
+  effect: ChangeEffect;
+  onSelect: (id: string) => void;
+}) {
+  const { change } = effect;
+  const id = change.currentId;
+  return (
+    <li className="border-line/60 border-l pl-2">
+      <p className="text-xs">
+        {id ? (
+          <button
+            className="text-left text-phosphor hover:text-phosphor-bright hover:underline"
+            onClick={() => onSelect(id)}
+            type="button"
+          >
+            {change.name}
+          </button>
+        ) : (
+          <span className="text-prose">{change.name}</span>
+        )}
+        {effect.alsoCause ? (
+          <span className="ml-2 text-amber">also a cause</span>
+        ) : null}
+      </p>
+      <Lines details={effect.details} />
+    </li>
+  );
+}
+
+/** The Data Types a cause's properties moved onto, and the way to the type. */
+function OwnLinks({
   change,
   onSelect,
-  children,
 }: {
   change: SchemaChange;
   onSelect: (id: string) => void;
-  children?: ReactNode;
 }) {
   const id = change.currentId;
-  if (!id) return <span className="text-prose">{change.name}</span>;
   return (
-    <button
-      className="text-left text-phosphor hover:text-phosphor-bright hover:underline"
-      onClick={() => onSelect(id)}
-      type="button"
+    <>
+      {change.dataTypeIds ? (
+        <p className="flex flex-wrap gap-x-2 text-label text-xs">
+          Data Types now:
+          {change.dataTypeIds.map((dataType) => (
+            <DataTypeLink
+              className="text-phosphor"
+              id={dataType}
+              key={dataType}
+            />
+          ))}
+        </p>
+      ) : null}
+      {id ? (
+        <TextButton onClick={() => onSelect(id)}>
+          Inspect {change.name}
+        </TextButton>
+      ) : (
+        <p className="text-label text-xs">
+          Removed from the current schema; these lines come from the baseline
+          snapshot.
+        </p>
+      )}
+    </>
+  );
+}
+
+/** What an open cause shows: its own edits, then its side effects. */
+function CausePanel({
+  cause,
+  id,
+  onSelect,
+}: {
+  cause: ChangeCause;
+  id: string;
+  onSelect: (id: string) => void;
+}) {
+  const { change, effects } = cause;
+  return (
+    <div
+      className="space-y-2 border-line/40 border-t bg-panel px-3 py-2 pl-8"
+      id={id}
     >
-      {change.name}
-      {children}
-    </button>
+      <Lines details={cause.details} />
+      <OwnLinks change={change} onSelect={onSelect} />
+      {effects.length > 0 ? (
+        <section aria-label={`Side effects of ${change.name}`}>
+          <h4 className="mt-1 mb-1 font-medium text-label text-xs">
+            Side effects
+          </h4>
+          <ul className="space-y-1.5">
+            {effects.map((effect) => (
+              <Effect
+                effect={effect}
+                key={effect.change.currentId ?? effect.change.baselineId}
+                onSelect={onSelect}
+              />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
   );
 }
 
@@ -75,9 +164,8 @@ function Cause({
   onSelect: (id: string) => void;
 }) {
   const panel = useId();
-  const { change, details, effects } = cause;
+  const { change } = cause;
   const tone = TONE[change.status];
-  const dataTypes = change.dataTypeIds ?? [];
   return (
     <li className={`border-l-2 bg-muted ${tone.border}`}>
       <div className="flex items-start gap-2 px-3 pt-2.5 pb-1">
@@ -106,65 +194,9 @@ function Cause({
           Planned<span className="sr-only">: {change.name}</span>
         </label>
       </div>
-      <p className="px-3 pb-2 pl-8 text-faint text-xs">
-        {plural(details.length, "edit")}
-        {effects.length > 0
-          ? `, ${plural(effects.length, "side effect")}`
-          : ", no side effects"}
-        {cause.effectOf.length > 0
-          ? `, and itself a side effect of ${cause.effectOf.map((root) => root.name).join(" and ")}`
-          : ""}
-      </p>
+      <p className="px-3 pb-2 pl-8 text-faint text-xs">{causeLine(cause)}</p>
       {open ? (
-        <div
-          className="space-y-2 border-line/40 border-t bg-panel px-3 py-2 pl-8"
-          id={panel}
-        >
-          <Lines lines={details.map((detail) => detail.text)} />
-          {dataTypes.length > 0 ? (
-            <p className="flex flex-wrap gap-x-2 text-label text-xs">
-              Data Types now:
-              {dataTypes.map((id) => (
-                <DataTypeLink className="text-phosphor" id={id} key={id} />
-              ))}
-            </p>
-          ) : null}
-          {change.currentId ? (
-            <TextButton onClick={() => onSelect(change.currentId as string)}>
-              Inspect {change.name}
-            </TextButton>
-          ) : (
-            <p className="text-label text-xs">
-              Removed from the current schema; these lines come from the
-              baseline snapshot.
-            </p>
-          )}
-          {effects.length > 0 ? (
-            <section aria-label={`Side effects of ${change.name}`}>
-              <h4 className="mt-1 mb-1 font-medium text-label text-xs">
-                Side effects
-              </h4>
-              <ul className="space-y-1.5">
-                {effects.map((effect) => (
-                  <li
-                    className="border-line/60 border-l pl-2"
-                    key={effect.change.currentId ?? effect.change.baselineId}
-                  >
-                    <p className="text-xs">
-                      <TypeName change={effect.change} onSelect={onSelect} />
-                      {effect.alsoCause ? (
-                        <span className="ml-2 text-amber">also a cause</span>
-                      ) : null}
-                    </p>
-                    <Lines
-                      lines={effect.details.map((detail) => detail.text)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </div>
+        <CausePanel cause={cause} id={panel} onSelect={onSelect} />
       ) : null}
     </li>
   );
@@ -180,7 +212,7 @@ function PastePlan({
 }) {
   const id = useId();
   const [text, setText] = useState("");
-  const [result, setResult] = useState<string | null>(null);
+  const [result, setResult] = useState("");
   return (
     <form
       className="space-y-1.5"
@@ -212,6 +244,114 @@ function PastePlan({
   );
 }
 
+/**
+ * Where focus goes when a Planned box takes its own cause out of the filtered
+ * list: to the box that took its place, or to the filter once the list ran out.
+ * `after(index)` is called with the box's place just before it goes.
+ */
+function useRefocus(
+  list: RefObject<HTMLUListElement | null>,
+  fallback: RefObject<HTMLInputElement | null>
+) {
+  const at = useRef<number | null>(null);
+  useEffect(() => {
+    if (at.current === null) return;
+    const boxes =
+      list.current?.querySelectorAll<HTMLInputElement>("input[data-plan]") ??
+      [];
+    (
+      boxes[Math.min(at.current, boxes.length - 1)] ?? fallback.current
+    )?.focus();
+    at.current = null;
+  });
+  return (index: number) => {
+    at.current = index;
+  };
+}
+
+/** Show unplanned only, Mark all as planned, and the way to paste a plan. */
+function PlanControls({
+  changes,
+  allPlanned,
+  unplannedOnly,
+  filter,
+  onUnplannedOnly,
+  onMark,
+}: {
+  changes: ChangeGroups;
+  allPlanned: boolean;
+  unplannedOnly: boolean;
+  filter: RefObject<HTMLInputElement | null>;
+  onUnplannedOnly: (on: boolean) => void;
+  onMark: (keys: string[], on: boolean) => void;
+}) {
+  const [pasting, setPasting] = useState(false);
+  const every = changes.causes.map((cause) => cause.key);
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <label className="flex items-center gap-1.5 text-prose text-xs">
+          <input
+            checked={unplannedOnly}
+            className="accent-phosphor"
+            onChange={(event) => onUnplannedOnly(event.target.checked)}
+            ref={filter}
+            type="checkbox"
+          />
+          Show unplanned only
+        </label>
+        <TextButton onClick={() => onMark(every, !allPlanned)}>
+          {allPlanned ? "Clear the plan" : "Mark all as planned"}
+        </TextButton>
+        <button
+          aria-expanded={pasting}
+          className={LINK}
+          onClick={() => setPasting(!pasting)}
+          type="button"
+        >
+          Paste a plan
+        </button>
+      </div>
+      {pasting ? (
+        <PastePlan changes={changes} onMark={(keys) => onMark(keys, true)} />
+      ) : null}
+    </>
+  );
+}
+
+/** The totals, and what the filter leaves, said aloud whenever it changes. */
+function Summary({
+  changes,
+  unplanned,
+  unplannedOnly,
+}: {
+  changes: ChangeGroups;
+  unplanned: number;
+  unplannedOnly: boolean;
+}) {
+  const total = changes.causes.length;
+  useAnnounceChange(
+    unplannedOnly
+      ? `${unplanned} of ${plural(total, "cause")} shown, unplanned only`
+      : `All ${plural(total, "cause")} shown`
+  );
+  return (
+    <p className="text-prose">
+      {changeSummary(changes)},{" "}
+      <span className={unplanned > 0 ? "text-amber" : ""}>
+        {unplanned} unplanned
+      </span>
+    </p>
+  );
+}
+
+const toggled = (set: ReadonlySet<string>, key: string, on: boolean) => {
+  const next = new Set(set);
+  if (on) next.add(key);
+  else next.delete(key);
+  return next;
+};
+
 export function ComparisonResults({
   changes,
   planned,
@@ -225,103 +365,42 @@ export function ComparisonResults({
 }) {
   const [unplannedOnly, setUnplannedOnly] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-  const [pasting, setPasting] = useState(false);
   const list = useRef<HTMLUListElement>(null);
   const filter = useRef<HTMLInputElement>(null);
-  // Where focus was when a planned box took its cause out of the filtered list.
-  const refocus = useRef<number | null>(null);
+  const refocus = useRefocus(list, filter);
 
   const { causes } = changes;
   const unplanned = causes.filter((cause) => !planned.has(cause.key));
   const shown = unplannedOnly ? unplanned : causes;
-  const allPlanned = unplanned.length === 0;
 
-  useAnnounceChange(
-    unplannedOnly
-      ? `${shown.length} of ${plural(causes.length, "cause")} shown, unplanned only`
-      : `All ${plural(causes.length, "cause")} shown`
-  );
-
-  // The box that had focus left with its cause, so focus goes to the box that
-  // took its place, or to the filter when the list ran out.
-  useEffect(() => {
-    const at = refocus.current;
-    if (at === null) return;
-    refocus.current = null;
-    const boxes =
-      list.current?.querySelectorAll<HTMLInputElement>("input[data-plan]");
-    (boxes?.[Math.min(at, boxes.length - 1)] ?? filter.current)?.focus();
-  });
-
-  const mark = (keys: string[], on: boolean) => {
-    const next = new Set(planned);
-    for (const key of keys) {
-      if (on) next.add(key);
-      else next.delete(key);
-    }
-    onPlanned(next);
-  };
-
-  if (causes.length === 0)
-    return (
-      <p className="border border-line bg-muted px-3 py-2 text-phosphor text-xs">
-        No schema changes between these snapshots.
-      </p>
-    );
+  const mark = (keys: string[], on: boolean) =>
+    onPlanned(keys.reduce((set, key) => toggled(set, key, on), planned));
 
   return (
     <div className="space-y-3">
-      <p className="text-prose">
-        {changeSummary(changes)},{" "}
-        <span className={allPlanned ? "" : "text-amber"}>
-          {unplanned.length} unplanned
-        </span>
-      </p>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <label className="flex items-center gap-1.5 text-prose text-xs">
-          <input
-            checked={unplannedOnly}
-            className="accent-phosphor"
-            onChange={(event) => setUnplannedOnly(event.target.checked)}
-            ref={filter}
-            type="checkbox"
-          />
-          Show unplanned only
-        </label>
-        <TextButton
-          onClick={() =>
-            mark(
-              causes.map((cause) => cause.key),
-              !allPlanned
-            )
-          }
-        >
-          {allPlanned ? "Clear the plan" : "Mark all as planned"}
-        </TextButton>
-        <button
-          aria-expanded={pasting}
-          className="px-1 py-0.5 text-phosphor text-xs hover:text-phosphor-bright hover:underline"
-          onClick={() => setPasting(!pasting)}
-          type="button"
-        >
-          Paste a plan
-        </button>
-      </div>
-      {pasting ? (
-        <PastePlan changes={changes} onMark={(keys) => mark(keys, true)} />
-      ) : null}
+      <Summary
+        changes={changes}
+        unplanned={unplanned.length}
+        unplannedOnly={unplannedOnly}
+      />
+      <PlanControls
+        allPlanned={unplanned.length === 0}
+        changes={changes}
+        filter={filter}
+        onMark={mark}
+        onUnplannedOnly={setUnplannedOnly}
+        unplannedOnly={unplannedOnly}
+      />
       <ul aria-label="Causes" className="space-y-2" ref={list}>
         {shown.map((cause, index) => (
           <Cause
             cause={cause}
             key={cause.key}
-            onOpen={() => {
-              const next = new Set(open);
-              if (!next.delete(cause.key)) next.add(cause.key);
-              setOpen(next);
-            }}
+            onOpen={() =>
+              setOpen(toggled(open, cause.key, !open.has(cause.key)))
+            }
             onPlanned={(on) => {
-              if (on && unplannedOnly) refocus.current = index;
+              if (unplannedOnly) refocus(index);
               mark([cause.key], on);
             }}
             onSelect={onSelect}
@@ -330,9 +409,9 @@ export function ComparisonResults({
           />
         ))}
       </ul>
-      {shown.length === 0 ? (
-        <p className="text-faint text-xs">Every cause is marked as planned.</p>
-      ) : null}
+      <p className="text-faint text-xs empty:hidden">
+        {shown.length === 0 ? "Every cause is marked as planned." : ""}
+      </p>
     </div>
   );
 }

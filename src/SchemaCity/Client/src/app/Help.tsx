@@ -224,8 +224,8 @@ export function Help({
                 Compare lists causes: the types with an edit of their own. The
                 types that only changed because of one, such as every type
                 composing a composition that lost a property, are its side
-                effects and sit under it. Mark the causes you planned, then
-                Show unplanned only leaves the ones nobody asked for. While a
+                effects and sit under it. Mark the causes you planned, then Show
+                unplanned only leaves the ones nobody asked for. While a
                 baseline is loaded the city colours buildings by change, side
                 effects quieter than causes, and the List gets a Change column.
                 Comparing never changes Umbraco.

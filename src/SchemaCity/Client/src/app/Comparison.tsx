@@ -55,18 +55,30 @@ function Status({
   );
 }
 
-/** Copy as Markdown and Export CSV, both with the plan as it stands. */
+/** Both snapshots' origins, the current one by this site's host. */
+const sidesOf = (
+  source: BaselineSource | null,
+  graph: SchemaGraph
+): ComparedSides => ({
+  baseline: source
+    ? sideLabel(source.from, source.capturedAt)
+    : "the loaded snapshot",
+  current: sideLabel(window.location.hostname, graph.generatedAt),
+});
+
+/** Where both snapshots came from, then Copy as Markdown and Export CSV with the plan. */
 function ExportButtons({
   changes,
   planned,
   sides,
   onDone,
 }: {
-  changes: ChangeGroups;
+  changes: ChangeGroups | null;
   planned: ReadonlySet<string>;
   sides: ComparedSides;
   onDone: (message: string) => void;
 }) {
+  if (!changes) return null;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(
@@ -91,23 +103,65 @@ function ExportButtons({
     onDone(`Exported ${name}.`);
   };
   return (
-    <div className="mt-2 flex flex-wrap gap-2">
-      <Button
-        className={READING}
-        onClick={() => void copy()}
-        size="sm"
-        variant="outline"
-      >
-        Copy as Markdown
-      </Button>
-      <Button
-        className={READING}
-        onClick={exportCsv}
-        size="sm"
-        variant="outline"
-      >
-        Export CSV
-      </Button>
+    <>
+      <p className="mt-3 text-faint text-xs">
+        Baseline {sides.baseline}. Current {sides.current}.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button
+          className={READING}
+          onClick={() => void copy()}
+          size="sm"
+          variant="outline"
+        >
+          Copy as Markdown
+        </Button>
+        <Button
+          className={READING}
+          onClick={exportCsv}
+          size="sm"
+          variant="outline"
+        >
+          Export CSV
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/** The causes, or why there are none to list. */
+function ComparisonBody({
+  changes,
+  planned,
+  onPlanned,
+  onSelect,
+}: {
+  changes: ChangeGroups | null;
+  planned: ReadonlySet<string>;
+  onPlanned: (planned: ReadonlySet<string>) => void;
+  onSelect: (id: string) => void;
+}) {
+  if (!changes)
+    return (
+      <p className="px-4 py-4 text-label text-xs">
+        Export this schema first, or import a previous snapshot to begin a
+        comparison.
+      </p>
+    );
+  if (changes.causes.length === 0)
+    return (
+      <p className="mx-4 my-4 border border-line bg-muted px-3 py-2 text-phosphor text-xs">
+        No schema changes between these snapshots.
+      </p>
+    );
+  return (
+    <div className="px-4 py-4">
+      <ComparisonResults
+        changes={changes}
+        onPlanned={onPlanned}
+        onSelect={onSelect}
+        planned={planned}
+      />
     </div>
   );
 }
@@ -140,12 +194,7 @@ export function Comparison({
   // Inspecting a type closes the drawer, so focus goes to the inspector heading.
   const handOff = useHandOff(input);
 
-  const sides: ComparedSides = {
-    baseline: source
-      ? sideLabel(source.from, source.capturedAt)
-      : "the loaded snapshot",
-    current: sideLabel(window.location.hostname, graph.generatedAt),
-  };
+  const sides = sidesOf(source, graph);
 
   const startOver = (next: BaselineSource | null) => {
     setSource(next);
@@ -230,43 +279,27 @@ export function Comparison({
               type="file"
             />
           </div>
-          {changes ? (
-            <>
-              <p className="mt-3 text-faint text-xs">
-                Baseline {sides.baseline}. Current {sides.current}.
-              </p>
-              <ExportButtons
-                changes={changes}
-                onDone={setSaved}
-                planned={planned}
-                sides={sides}
-              />
-            </>
-          ) : null}
+          <ExportButtons
+            changes={changes}
+            onDone={setSaved}
+            planned={planned}
+            sides={sides}
+          />
           <Status error={error} saved={saved} />
         </div>
         <ScrollArea
           className="min-h-0 flex-1"
           viewport={{ "aria-label": "Schema changes" }}
         >
-          {changes ? (
-            <div className="px-4 py-4">
-              <ComparisonResults
-                changes={changes}
-                onPlanned={setPlanned}
-                onSelect={(id) => {
-                  handOff.chose();
-                  onSelect(id);
-                }}
-                planned={planned}
-              />
-            </div>
-          ) : (
-            <p className="px-4 py-4 text-label text-xs">
-              Export this schema first, or import a previous snapshot to begin a
-              comparison.
-            </p>
-          )}
+          <ComparisonBody
+            changes={changes}
+            onPlanned={setPlanned}
+            onSelect={(id) => {
+              handOff.chose();
+              onSelect(id);
+            }}
+            planned={planned}
+          />
         </ScrollArea>
       </SheetContent>
     </Sheet>

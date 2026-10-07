@@ -28,14 +28,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { groupChanges } from "../model/changes";
 import { dataTypeNames, dataTypeUsers } from "../model/data-types";
 import { findFindings } from "../model/findings";
 import { impactOf } from "../model/impact";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import { searchNodes } from "../model/search";
-import { compareSchemas } from "../model/snapshots";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import {
   citySummary,
@@ -44,7 +42,11 @@ import {
   SEARCH_KEY,
   useHandOff,
 } from "./a11y";
-import { ComparisonLegend, ComparisonTools } from "./ComparisonTools";
+import {
+  ComparisonLegend,
+  ComparisonTools,
+  useComparison,
+} from "./ComparisonTools";
 import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_INSET, Inspector } from "./Inspector";
@@ -53,15 +55,16 @@ import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
-  changeScale,
   highlightScale,
   LENS_LABEL,
   LENSES,
   type Lens,
+  type LensScale,
   lensScale,
   type Ramp,
 } from "./scene/lens";
 import { enterFocuses } from "./shortcuts";
+import { CompareContext } from "./TypeTable";
 import {
   FLAT_VIEWS,
   parseUrl,
@@ -108,6 +111,17 @@ const RAMP_BAR: Record<Ramp, string> = {
   binary: "bg-linear-to-r from-phosphor-dim to-signal",
   change: "bg-linear-to-r from-phosphor-dim via-amber to-azure",
 };
+
+/**
+ * What colours the buildings. Show in city takes the lens's place while it is on,
+ * and a lens takes the change layer's, so loading a baseline turns the lens off.
+ */
+const cityScale = (
+  graph: SchemaGraph,
+  lens: LensScale | null,
+  lit: ReadonlySet<string> | null,
+  layer: LensScale | null
+) => (lit ? highlightScale(graph, lit) : (lens ?? layer));
 
 // three.js, fiber and drei are a third of the bundle, so they load with the scene
 // rather than with the workspace element.
@@ -358,27 +372,19 @@ export function App({
   }, [graph.edges]);
   const findings = useMemo(() => findFindings(graph, usage), [graph, usage]);
   const dataTypeName = useMemo(() => dataTypeNames(graph), [graph]);
-  const comparison = useMemo(
-    () => (baseline ? compareSchemas(baseline, graph) : null),
-    [baseline, graph]
+  const {
+    comparison,
+    changes,
+    compare,
+    layer: changeLayer,
+  } = useComparison(baseline, graph);
+  const lensColours = useMemo(
+    () => lensScale(graph, usage, lens, findings),
+    [graph, usage, lens, findings]
   );
-  const changes = useMemo(
-    () => (comparison ? groupChanges(comparison) : null),
-    [comparison]
-  );
-  const compare = useMemo(
-    () => (baseline && changes ? { baseline, changes } : null),
-    [baseline, changes]
-  );
-  // Show in city takes the lens's place on the buildings while it is on, and a
-  // lens takes the change layer's, so loading a baseline turns the lens off.
   const scale = useMemo(
-    () =>
-      highlight
-        ? highlightScale(graph, highlight.ids)
-        : (lensScale(graph, usage, lens, findings) ??
-          (changes ? changeScale(graph, changes.kinds) : null)),
-    [graph, usage, lens, findings, highlight, changes]
+    () => cityScale(graph, lensColours, highlight?.ids ?? null, changeLayer),
+    [graph, lensColours, highlight, changeLayer]
   );
   // The focused neighbourhood, which the 2D views narrow to as the city does.
   const scope = useMemo(
@@ -695,24 +701,22 @@ export function App({
                   Clear
                 </TextButton>
               </div>
-            ) : scale && !flat && scale.ramp !== "change" ? (
+            ) : lensColours && !flat ? (
               <div className="absolute top-0 left-0 z-10 flex items-center gap-2 border-line border-r border-b bg-background px-4 py-1.5 text-2xs text-phosphor-dim">
                 <span className="font-bold uppercase tracking-terminal">
                   {LENS_LABEL[lens]}
                 </span>
-                <span>{scale.minLabel}</span>
+                <span>{lensColours.minLabel}</span>
                 <span
                   aria-hidden
-                  className={`h-2 w-32 ${RAMP_BAR[scale.ramp]}`}
+                  className={`h-2 w-32 ${RAMP_BAR[lensColours.ramp]}`}
                 />
-                <span>{scale.maxLabel}</span>
+                <span>{lensColours.maxLabel}</span>
               </div>
             ) : null}
             {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}
-            {flat || scale?.ramp !== "change" ? null : (
-              <ComparisonLegend changes={changes} />
-            )}
+            {flat ? null : <ComparisonLegend changes={changes} scale={scale} />}
             {flat ? (
               // The inspector is an overlay, so the view is inset by its width while
               // it is open rather than sliding under it.
@@ -721,43 +725,44 @@ export function App({
                 data-focus-home
                 tabIndex={-1}
               >
-                <FlatView
-                  compare={compare}
-                  dataTypes={{
-                    selected: dataType,
-                    onChoose: setDataType,
-                    onOpenDataType,
-                    onShowInCity: (id) =>
-                      showInCity(
-                        `types using ${dataTypeName.get(id) ?? "the Data Type"}`,
-                        new Set(
-                          dataTypeUsers(graph, id).map((user) => user.node.id)
-                        )
-                      ),
-                  }}
-                  findings={findings}
-                  graph={graph}
-                  impact={{
-                    start: impactStart ?? selected,
-                    alias: impactAlias,
-                    onAlias: (text) => setImpactAlias({ text }),
-                    onShowInCity: showInCity,
-                  }}
-                  neighbourhoodById={neighbourhoodById}
-                  nodesById={nodesById}
-                  onImpact={(text, from) =>
-                    openImpact(selected, { text, from })
-                  }
-                  onPick={() => setPaletteOpen(true)}
-                  onQuery={setQuery}
-                  onSelect={setSelected}
-                  onShowAll={() => setFocus(null)}
-                  query={query}
-                  scope={scope}
-                  selected={selected}
-                  usage={usage}
-                  view={view}
-                />
+                <CompareContext value={compare}>
+                  <FlatView
+                    dataTypes={{
+                      selected: dataType,
+                      onChoose: setDataType,
+                      onOpenDataType,
+                      onShowInCity: (id) =>
+                        showInCity(
+                          `types using ${dataTypeName.get(id) ?? "the Data Type"}`,
+                          new Set(
+                            dataTypeUsers(graph, id).map((user) => user.node.id)
+                          )
+                        ),
+                    }}
+                    findings={findings}
+                    graph={graph}
+                    impact={{
+                      start: impactStart ?? selected,
+                      alias: impactAlias,
+                      onAlias: (text) => setImpactAlias({ text }),
+                      onShowInCity: showInCity,
+                    }}
+                    neighbourhoodById={neighbourhoodById}
+                    nodesById={nodesById}
+                    onImpact={(text, from) =>
+                      openImpact(selected, { text, from })
+                    }
+                    onPick={() => setPaletteOpen(true)}
+                    onQuery={setQuery}
+                    onSelect={setSelected}
+                    onShowAll={() => setFocus(null)}
+                    query={query}
+                    scope={scope}
+                    selected={selected}
+                    usage={usage}
+                    view={view}
+                  />
+                </CompareContext>
               </div>
             ) : nodes.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-8 text-center">

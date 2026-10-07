@@ -3,6 +3,7 @@ import mediumFixture from "../../dev/fixtures/medium.json";
 import { plannedBaseline } from "../../dev/planned-baseline";
 import {
   type ChangeGroups,
+  causeLine,
   changeSummary,
   changesCsv,
   changesMarkdown,
@@ -281,6 +282,13 @@ describe("change causes", () => {
     expect(alsoOf("article")).toEqual(["Press Release", "Seo Composition"]);
     expect(alsoOf("blogPost")).toEqual(["Seo Composition"]);
     expect(alsoOf("pressRelease")).toEqual([]);
+    const [, article, blogPost] = groups.causes;
+    expect(article && causeLine(article)).toBe(
+      "2 edits, 2 side effects, also a side effect of Press Release and Seo Composition"
+    );
+    expect(blogPost && causeLine(blogPost)).toBe(
+      "1 edit, no side effects, also a side effect of Seo Composition"
+    );
     expect(allLines(groups)).toEqual(flatLines(baseline, medium));
   });
 
