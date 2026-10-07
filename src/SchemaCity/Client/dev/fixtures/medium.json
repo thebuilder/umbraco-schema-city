@@ -11829,7 +11829,7 @@
       "allowedAsRoot": true,
       "variesByCulture": false,
       "variesBySegment": false,
-      "description": "Seeded Site, seed version 2026-10-07.2.",
+      "description": "Seeded Site, seed version 2026-10-07.3.",
       "groups": [
         {
           "id": "31ac64c5-6e14-83a1-dfe2-f37b5dde5965",
@@ -16953,7 +16953,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.ColorPicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "fbaf13a8-4036-41f2-93a3-974f678c312a",
@@ -16962,7 +16963,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.CheckBoxList",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "fd1e0da5-5606-4862-b679-5d0cf3a52a59",
@@ -16971,7 +16973,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.DocumentPicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "5046194e-4237-453c-a547-15db3a07c4e1",
@@ -16980,7 +16983,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.DatePicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "e4d66c0f-b935-4200-81f0-025f7256b89a",
@@ -16989,7 +16993,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.DatePicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "88e8a052-30ee-4d44-a507-59f2cdfc769c",
@@ -16998,7 +17003,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.DateTimeWithTimeZonePicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "0b6a45e7-44ba-430d-9da5-4e46060b9e03",
@@ -17007,7 +17013,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Dropdown",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "f38f0ac7-1d27-439c-9f3f-089cd8825a53",
@@ -17016,7 +17023,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Dropdown",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "1df9f033-e6d4-451f-b8d2-e0cbc50a836f",
@@ -17025,7 +17033,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.ImageCropper",
       "folder": null,
       "targets": [],
-      "otherUses": 1
+      "otherUses": 1,
+      "isBuiltIn": true
     },
     {
       "id": "ad9f0cf2-bda2-45d5-9ea1-a63cfc873fd3",
@@ -17034,7 +17043,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "930861bf-e262-4ead-a704-f99453565708",
@@ -17043,7 +17053,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Label",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "ba5bdbe6-ab3e-46a8-82b3-2c45f10bc47f",
@@ -17052,7 +17063,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Label",
       "folder": null,
       "targets": [],
-      "otherUses": 6
+      "otherUses": 6,
+      "isBuiltIn": true
     },
     {
       "id": "0e9794eb-f9b5-4f20-a788-93acd233a7e4",
@@ -17061,7 +17073,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Label",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "8f1ef1e1-9de4-40d3-a072-6673f631ca64",
@@ -17070,7 +17083,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Label",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "8e7f995c-bd81-4627-9932-c40e568ec788",
@@ -17079,7 +17093,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Label",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "5eb57825-e15e-4fc7-8e37-fca65cdafbde",
@@ -17088,7 +17103,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Label",
       "folder": null,
       "targets": [],
-      "otherUses": 4
+      "otherUses": 4,
+      "isBuiltIn": true
     },
     {
       "id": "f0bc4bfb-b499-40d6-ba86-058885a5178c",
@@ -17097,7 +17113,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Label",
       "folder": null,
       "targets": [],
-      "otherUses": 6
+      "otherUses": 6,
+      "isBuiltIn": true
     },
     {
       "id": "a97cec69-9b71-4c30-8b12-ec398860d7e8",
@@ -17106,7 +17123,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Label",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "c0808dd3-8133-4e4b-8ce8-e2bea84a96a4",
@@ -17115,7 +17133,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Collection",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "3a0156c4-3b8c-4803-bdc1-6871faa83fff",
@@ -17124,7 +17143,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Collection",
       "folder": null,
       "targets": [],
-      "otherUses": 1
+      "otherUses": 1,
+      "isBuiltIn": true
     },
     {
       "id": "4309a3ea-0d78-4329-a06c-c80b036af19a",
@@ -17133,7 +17153,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "1ea2e01f-ebd8-4ce1-8d71-6b1149e63548",
@@ -17142,7 +17163,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.MemberPicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "b4e3535a-1753-47e2-8568-602cf8cfee6f",
@@ -17151,7 +17173,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.MultiUrlPicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "0e63d883-b62b-4799-88c3-157f82e83ecc",
@@ -17160,7 +17183,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "1b661f40-2242-4b44-b9cb-3990ee2b13c0",
@@ -17169,7 +17193,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.MediaPicker",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "2e6d3631-066e-44b8-aec4-96f09099b2b5",
@@ -17178,7 +17203,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Integer",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "bb5f57c9-ce2b-4bb9-b697-4caca783a805",
@@ -17187,7 +17213,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.RadioButtonList",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "ca90c950-0aff-4e72-b976-a30b1ac57dad",
@@ -17197,6 +17224,7 @@
       "folder": null,
       "targets": [],
       "otherUses": 0,
+      "isBuiltIn": true,
       "configuration": {
         "blocks": 0
       }
@@ -17238,6 +17266,7 @@
         }
       ],
       "otherUses": 0,
+      "isBuiltIn": false,
       "configuration": {
         "blocks": 6,
         "min": 0,
@@ -17261,6 +17290,7 @@
         }
       ],
       "otherUses": 0,
+      "isBuiltIn": false,
       "configuration": {
         "blocks": 2
       }
@@ -17278,6 +17308,7 @@
         }
       ],
       "otherUses": 0,
+      "isBuiltIn": false,
       "configuration": {
         "blocks": 1
       }
@@ -17315,6 +17346,7 @@
         }
       ],
       "otherUses": 0,
+      "isBuiltIn": false,
       "configuration": {
         "blocks": 5,
         "gridColumns": 12
@@ -17337,6 +17369,7 @@
         }
       ],
       "otherUses": 0,
+      "isBuiltIn": false,
       "configuration": {
         "max": 5
       }
@@ -17358,6 +17391,7 @@
         }
       ],
       "otherUses": 0,
+      "isBuiltIn": false,
       "configuration": {
         "blocks": 2
       }
@@ -17375,6 +17409,7 @@
         }
       ],
       "otherUses": 0,
+      "isBuiltIn": false,
       "configuration": {
         "blocks": 1
       }
@@ -17386,7 +17421,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": false
     },
     {
       "id": "1c3a7a5e-3d8d-8efc-de30-5a6b0f54861e",
@@ -17395,7 +17431,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": false
     },
     {
       "id": "b6b73142-b9c1-4bf8-a16d-e1c23320b549",
@@ -17404,7 +17441,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Tags",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "c6bac0dd-4ab9-45b1-8e30-e4b619ee5da3",
@@ -17413,7 +17451,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.TextArea",
       "folder": null,
       "targets": [],
-      "otherUses": 1
+      "otherUses": 1,
+      "isBuiltIn": true
     },
     {
       "id": "0cc0eba1-9960-42c9-bf9b-60e150b429ae",
@@ -17422,7 +17461,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.TextBox",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "92897bc6-a5f3-4ffe-ae27-f2e7e33dda49",
@@ -17431,7 +17471,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.Toggle",
       "folder": null,
       "targets": [],
-      "otherUses": 0
+      "otherUses": 0,
+      "isBuiltIn": true
     },
     {
       "id": "bc1e266c-dac4-4164-bf08-8a1ec6a7143d",
@@ -17440,7 +17481,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.UploadField",
       "folder": null,
       "targets": [],
-      "otherUses": 1
+      "otherUses": 1,
+      "isBuiltIn": true
     },
     {
       "id": "8f430dd6-4e96-447e-9dc0-cb552c8cd1f3",
@@ -17449,7 +17491,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.UploadField",
       "folder": null,
       "targets": [],
-      "otherUses": 1
+      "otherUses": 1,
+      "isBuiltIn": true
     },
     {
       "id": "84c6b441-31df-4ffe-b67e-67d5bc3ae65a",
@@ -17458,7 +17501,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.UploadField",
       "folder": null,
       "targets": [],
-      "otherUses": 1
+      "otherUses": 1,
+      "isBuiltIn": true
     },
     {
       "id": "215cb418-2153-4429-9aef-8c0f0041191b",
@@ -17467,7 +17511,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.UploadField",
       "folder": null,
       "targets": [],
-      "otherUses": 1
+      "otherUses": 1,
+      "isBuiltIn": true
     },
     {
       "id": "70575fe7-9812-4396-bbe1-c81a76db71b5",
@@ -17476,7 +17521,8 @@
       "editorUiAlias": "Umb.PropertyEditorUi.UploadField",
       "folder": null,
       "targets": [],
-      "otherUses": 1
+      "otherUses": 1,
+      "isBuiltIn": true
     }
   ]
 }

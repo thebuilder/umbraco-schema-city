@@ -284,6 +284,33 @@ public class SchemaGraphBuilderTests
         Assert.Equal(0, unusedType.OtherUses);
 
         Assert.Equal(1, graph.DataTypes[2].OtherUses);
+        Assert.DoesNotContain(graph.DataTypes, d => d.IsBuiltIn);
+    }
+
+    /// <summary>
+    /// Built-in Data Types are recognised by Umbraco's own keys, both the ones it exposes as Guid
+    /// fields and the ones it exposes only as strings, such as Label (bytes).
+    /// </summary>
+    [Fact]
+    public void BuildGraph_marks_the_data_types_umbraco_installs_itself()
+    {
+        var textstring = new FakeDataType(new object())
+        {
+            Key = Umbraco.Cms.Core.Constants.DataTypes.Guids.TextstringGuid,
+            Name = "Textstring",
+        };
+        var labelBytes = new FakeDataType(new object())
+        {
+            Key = Guid.Parse(Umbraco.Cms.Core.Constants.DataTypes.Guids.LabelBytes),
+            Name = "Label (bytes)",
+        };
+        var own = new FakeDataType(new object()) { Name = "Page Blocks" };
+
+        SchemaGraph graph = SchemaGraphBuilder.BuildGraph([], [], [textstring, labelBytes, own]);
+
+        Assert.Equal(
+            [("Label (bytes)", true), ("Page Blocks", false), ("Textstring", true)],
+            graph.DataTypes.Select(d => (d.Name, d.IsBuiltIn)));
     }
 
     /// <summary>Building the same content types twice has to produce byte-identical JSON.</summary>

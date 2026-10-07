@@ -238,6 +238,8 @@ function validateDataType(value: unknown, index: number) {
   nullableString(value.editorUiAlias, `${path}.editorUiAlias`);
   nullableString(value.folder, `${path}.folder`);
   count(value.otherUses, `${path}.otherUses`);
+  if (value.isBuiltIn !== undefined)
+    requiredBoolean(value.isBuiltIn, `${path}.isBuiltIn`);
   validateTargets(value.targets, `${path}.targets`);
   if (value.configuration === undefined) return;
   if (!record(value.configuration))

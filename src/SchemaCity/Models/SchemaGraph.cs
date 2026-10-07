@@ -18,8 +18,9 @@ public record SchemaGraph(
 /// folders it sits in, joined with "/", or null at the root. Targets are the Element Type keys a
 /// block editor offers and the Document Type keys a Multi Node Tree Picker allows, including keys
 /// that no longer resolve. OtherUses counts what the graph has no node for: properties on Media and
-/// Member Types, and types whose collection view is this Data Type. Configuration holds a few cheap
-/// values, such as a block list's min and max, and is omitted for every other editor.
+/// Member Types, and types whose collection view is this Data Type. IsBuiltIn marks one of the Data
+/// Types Umbraco installs itself. Configuration holds a few cheap values, such as a block list's min
+/// and max, and is omitted for every other editor.
 /// </summary>
 public record SchemaDataType(
     string Id,
@@ -29,6 +30,7 @@ public record SchemaDataType(
     string? Folder,
     IReadOnlyList<SchemaTarget> Targets,
     int OtherUses,
+    bool IsBuiltIn,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     IReadOnlyDictionary<string, object>? Configuration = null);
 

@@ -29,6 +29,8 @@ export type SchemaDataType = {
   targets: SchemaTarget[];
   /** Media and Member Type properties and collection views using it, which have no node here. */
   otherUses: number;
+  /** One of the Data Types Umbraco installs itself. Absent from graphs before it was sent. */
+  isBuiltIn?: boolean;
   /** A few cheap values, such as a block list's min and max. Only for the editors read. */
   configuration?: Record<string, string | number | boolean>;
 };

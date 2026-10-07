@@ -138,7 +138,7 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
   nearDuplicateDataType:
     "Data Types whose names match once case, spaces, hyphens, underscores and a copy number such as (1) are ignored. They can differ in configuration. Each set is one row, on a type that uses the least-used of them, and the related types are every other type that uses any of them. Only own properties count, so a composed property counts on its composition.",
   unusedDataType:
-    "No property on a Document, Media or Member Type uses these Data Types, and no collection view does. Custom code and packages can still refer to one by its key.",
+    "No property on a Document, Media or Member Type uses these Data Types, and no collection view does. The Data Types Umbraco installs itself are left out. Custom code and packages can still refer to one by its key.",
   noProperties: "These types have no own and no composed properties.",
   complexity: `In the highest of ${COMPLEXITY_TIERS} complexity tiers in this schema. The score is own and composed properties, plus twice the compositions, plus distinct block targets.`,
   pureMixin:
@@ -731,7 +731,8 @@ export function findFindings(
 
 /**
  * Data Types no property uses and nothing else the graph cannot show, such as a
- * Media Type property or a collection view. Only a graph that lists its Data Types
+ * Media Type property or a collection view. Umbraco's own defaults are left out:
+ * every site has a dozen it never uses, and a row each buried the rest. Only a graph that lists its Data Types
  * can say one is unused: an older one knows only the ones properties name.
  */
 function unusedDataTypes(graph: SchemaGraph): Finding[] {
@@ -739,7 +740,11 @@ function unusedDataTypes(graph: SchemaGraph): Finding[] {
     graph.nodes.flatMap((node) => propertiesOf(node).map((p) => p.dataTypeId))
   );
   return (graph.dataTypes ?? [])
-    .filter((dataType) => !used.has(dataType.id) && dataType.otherUses === 0)
+    .filter(
+      (dataType) =>
+        !(used.has(dataType.id) || dataType.isBuiltIn) &&
+        dataType.otherUses === 0
+    )
     .map((dataType) => ({
       id: `unusedDataType:${dataType.id}`,
       kind: "unusedDataType" as const,

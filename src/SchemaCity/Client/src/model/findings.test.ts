@@ -943,6 +943,7 @@ describe("findFindings about Data Types and stored blocks", () => {
       dataType("dt-body"),
       dataType("dt-spare", { folder: "Old", editorAlias: "Umbraco.TextBox" }),
       dataType("dt-upload", { otherUses: 1 }),
+      dataType("dt-label", { isBuiltIn: true }),
     ]);
     const unused = findFindings(graph).filter(
       (finding) => finding.kind === "unusedDataType"
@@ -1098,10 +1099,9 @@ describe("findFindings on the seeded medium.json", () => {
       nodeId: banner,
       summary: expect.stringContaining("Content stores 0 blocks of it"),
     });
-    // The built-in Data Types no Document, Media or Member Type uses.
-    expect(findings.filter((f) => f.kind === "unusedDataType")).toHaveLength(
-      20
-    );
+    // Every Data Type no type uses on the seeded site is one Umbraco installs itself.
+    expect(findings.filter((f) => f.kind === "unusedDataType")).toEqual([]);
+    expect(medium.dataTypes?.filter((d) => d.isBuiltIn)).toHaveLength(37);
     expect(
       findings.find((f) => f.kind === "brokenBlock")?.dataTypeIds
     ).toHaveLength(1);

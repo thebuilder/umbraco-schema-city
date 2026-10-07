@@ -1,3 +1,4 @@
+using System.Reflection;
 using SchemaCity.Models;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Models;
@@ -106,6 +107,22 @@ public sealed class SchemaGraphBuilder :
             DescribeDataTypes(editors, targetsByDataTypeKey, dataTypeContainers ?? [], types, otherTypes ?? []));
     }
 
+    /// <summary>
+    /// The keys of the Data Types Umbraco installs itself, read from its own constants, so a default
+    /// added in a later version arrives with the package. Some are Guid fields and some only string
+    /// constants, so both are read.
+    /// </summary>
+    private static readonly HashSet<Guid> BuiltInKeys = typeof(Umbraco.Cms.Core.Constants.DataTypes.Guids)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Select(field => field.GetValue(null) switch
+        {
+            Guid key => key,
+            string text when Guid.TryParse(text, out Guid key) => key,
+            _ => Guid.Empty,
+        })
+        .Where(key => key != Guid.Empty)
+        .ToHashSet();
+
     /// <summary>Every Data Type, sorted by name, whether a property uses it or not.</summary>
     private static SchemaDataType[] DescribeDataTypes(
         IDataType[] dataTypes,
@@ -134,6 +151,7 @@ public sealed class SchemaGraphBuilder :
                 Folder: FolderPath(d.ParentId, folders),
                 Targets: targetsByDataTypeKey.GetValueOrDefault(d.Key) ?? [],
                 OtherUses: otherUses.GetValueOrDefault(d.Key),
+                IsBuiltIn: BuiltInKeys.Contains(d.Key),
                 Configuration: BlockEditorInspector.Summary(d)))
             .OrderBy(d => d.Name, StringComparer.Ordinal)
             .ThenBy(d => d.Id, StringComparer.Ordinal)

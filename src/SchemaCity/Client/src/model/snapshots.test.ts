@@ -176,6 +176,9 @@ describe("schema snapshots", () => {
         .error
     ).toContain("graph.dataTypes[0].targets[0].role is invalid");
     expect(
+      parseSnapshot(withDataTypes([{ ...grid, isBuiltIn: "yes" }])).error
+    ).toContain("graph.dataTypes[0].isBuiltIn must be a boolean");
+    expect(
       parseSnapshot(withDataTypes([{ ...grid, configuration: { a: {} } }]))
         .error
     ).toContain("configuration.a must be a plain value");

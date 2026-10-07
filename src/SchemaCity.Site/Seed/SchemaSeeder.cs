@@ -69,7 +69,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     /// the export leaves the fixtures alone when the database was seeded by another version, so an
     /// old database never rewrites them with a stale schema.
     /// </summary>
-    private const string SeedVersion = "2026-10-07.2";
+    private const string SeedVersion = "2026-10-07.3";
 
     private const string SiteDescription = $"Seeded Site, seed version {SeedVersion}.";
 
