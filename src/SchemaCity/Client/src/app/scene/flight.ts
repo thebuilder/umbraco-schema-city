@@ -38,7 +38,7 @@ export function translateFlightEndpoints(
  * brackets and PageUp and PageDown orbit rather than fly: without them a keyboard
  * could pan and rise but never change the angle.
  */
-export const FLIGHT_CODES: ReadonlySet<string> = new Set([
+const FLIGHT_CODES: ReadonlySet<string> = new Set([
   "KeyW",
   "KeyA",
   "KeyS",

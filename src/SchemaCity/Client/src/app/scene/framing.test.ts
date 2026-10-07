@@ -1,11 +1,6 @@
 import { expect, test } from "vitest";
-import {
-  type Framed,
-  maxDistanceFor,
-  revealShift,
-  type Vec3,
-  viewOf,
-} from "./framing";
+import type { Vec3 } from "./flight";
+import { type Framed, maxDistanceFor, revealShift, viewOf } from "./framing";
 import { CAMERA_FOV } from "./stage";
 
 const sub = (a: Vec3, b: Vec3): Vec3 => ({

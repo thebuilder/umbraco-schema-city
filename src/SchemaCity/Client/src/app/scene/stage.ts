@@ -83,6 +83,35 @@ export function framingAction<B, C>(
 }
 
 /**
+ * What the camera rig does with a framing action, given the rest of its state:
+ * nothing, put back the pose it was left in after a 2D view, place the camera on
+ * the framing, play the establishing shot into it, or fly to it.
+ *
+ * Coming back from a 2D view to the framing it left is a restore, with no shot and
+ * no flight. The controls arriving while a flight runs need nothing, since the
+ * flight writes their target and hands them the camera when it lands. Reduced
+ * motion places rather than flies. The first framing in a browser plays the
+ * establishing shot, once: `introSeen` marks it seen, so it is only asked when the
+ * shot would otherwise play.
+ */
+export function framingStep(state: {
+  action: "none" | "snap" | "fly";
+  first: boolean;
+  flying: boolean;
+  reducedMotion: boolean;
+  restorable: boolean;
+  introSeen: () => boolean;
+}): "none" | "restore" | "place" | "intro" | "fly" {
+  const { action, first } = state;
+  if (action === "none") return "none";
+  if (first && state.restorable) return "restore";
+  if (action === "snap" && !first && state.flying) return "none";
+  if (!state.reducedMotion && action === "fly") return "fly";
+  if (state.reducedMotion || !first) return "place";
+  return state.introSeen() ? "place" : "intro";
+}
+
+/**
  * Cap height of a district's name printed on its island, in world units. At three it
  * rasterised to a 17 pixel cap once the whole city was framed, which is where a mono
  * face at this tracking starts to average into the slab.

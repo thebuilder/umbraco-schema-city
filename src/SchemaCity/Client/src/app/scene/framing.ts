@@ -1,8 +1,7 @@
 // Where the camera stands to frame the city. Pure: no three.js, no React.
 
+import type { Vec3 } from "./flight";
 import { CAMERA_FOV } from "./stage";
-
-export type Vec3 = { x: number; y: number; z: number };
 
 const cross = (a: Vec3, b: Vec3): Vec3 => ({
   x: a.y * b.z - a.z * b.y,
@@ -19,7 +18,7 @@ const unit = (a: Vec3): Vec3 => {
  * The default view looks down the isometric diagonal, from the south-east at about
  * 35 degrees, so the city opens on the overview it always has, now with depth.
  */
-export const FRAMING_DIRECTION = unit({ x: 1, y: 1, z: 1 });
+const FRAMING_DIRECTION = unit({ x: 1, y: 1, z: 1 });
 
 /**
  * How far back the camera stands along `direction` (from the target toward the
@@ -42,7 +41,7 @@ export const FRAMING_DIRECTION = unit({ x: 1, y: 1, z: 1 });
  * larger of the two, kept inside `range`. The shift then centres the corners in
  * the window.
  */
-export function framing(
+function framing(
   corners: readonly Vec3[],
   direction: Vec3,
   viewport: { width: number; height: number },

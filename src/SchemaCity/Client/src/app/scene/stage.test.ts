@@ -3,6 +3,7 @@ import {
   atmosphere,
   districtStamp,
   framingAction,
+  framingStep,
   pixelsPerUnit,
   STAMP_BAND,
   STAMP_CAP,
@@ -98,4 +99,51 @@ test("a name too wide for its island shrinks instead of hanging over the void", 
   );
   // Cap height and width shrink together, so the letters keep their shape.
   expect(stamp.width / stamp.height).toBeCloseTo(7);
+});
+
+test("the camera rig snaps, flies, restores or plays the shot as the state asks", () => {
+  const base = {
+    action: "snap" as const,
+    first: true,
+    flying: false,
+    reducedMotion: false,
+    restorable: false,
+    introSeen: () => false,
+  };
+  // The first framing in a browser plays the establishing shot, later ones snap.
+  expect(framingStep(base)).toBe("intro");
+  expect(framingStep({ ...base, introSeen: () => true })).toBe("place");
+  // Back from a 2D view to the same framing: the pose, without a shot.
+  expect(framingStep({ ...base, restorable: true })).toBe("restore");
+  // The controls arriving: placed again, unless a flight is under way.
+  expect(framingStep({ ...base, first: false })).toBe("place");
+  expect(framingStep({ ...base, first: false, flying: true })).toBe("none");
+  // A new framing flies, or lands at once under reduced motion.
+  const fly = { ...base, action: "fly" as const, first: false };
+  expect(framingStep(fly)).toBe("fly");
+  expect(framingStep({ ...fly, reducedMotion: true })).toBe("place");
+  expect(framingStep({ ...base, reducedMotion: true })).toBe("place");
+  expect(framingStep({ ...base, action: "none" })).toBe("none");
+});
+
+test("the establishing shot is only marked seen when it would play", () => {
+  let asked = 0;
+  const introSeen = () => {
+    asked += 1;
+    return true;
+  };
+  const state = {
+    action: "fly" as const,
+    first: false,
+    flying: false,
+    reducedMotion: false,
+    restorable: false,
+    introSeen,
+  };
+  framingStep(state);
+  framingStep({ ...state, reducedMotion: true });
+  framingStep({ ...state, action: "snap", first: true, restorable: true });
+  expect(asked).toBe(0);
+  framingStep({ ...state, action: "snap", first: true });
+  expect(asked).toBe(1);
 });

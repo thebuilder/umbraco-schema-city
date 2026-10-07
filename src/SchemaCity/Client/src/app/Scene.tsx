@@ -88,6 +88,7 @@ import {
   keydownAction,
   orbitOffset,
   translateFlightEndpoints,
+  type Vec3,
   verticalStep,
 } from "./scene/flight";
 import {
@@ -95,7 +96,6 @@ import {
   MIN_DISTANCE,
   maxDistanceFor,
   revealShift,
-  type Vec3,
   viewOf,
 } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
@@ -132,6 +132,7 @@ import {
   atmosphere,
   CAMERA_FOV,
   framingAction,
+  framingStep,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
   pixelsPerUnit,
@@ -1699,6 +1700,68 @@ type CameraFlight = {
 /** Stands in for the orbit target in the frame before the controls exist. */
 const LOOSE_TARGET = new THREE.Vector3();
 
+/** The camera's pose now, copied, with `fallback` as the target before the controls exist. */
+function poseOf(
+  camera: THREE.Camera,
+  controls: Rig | null,
+  fallback: THREE.Vector3
+): View {
+  return {
+    position: camera.position.clone(),
+    target: (controls?.target ?? fallback).clone(),
+  };
+}
+
+function flightTo(
+  from: View,
+  to: View,
+  ms: number,
+  ease: (t: number) => number
+): CameraFlight {
+  return { from, to, started: performance.now(), ms, ease };
+}
+
+/**
+ * Slides the camera when a new type is selected, so its building stands beside the
+ * inspector rather than under it. Only a new selection does: the panel resizing or
+ * the reader moving away from the building afterwards is theirs to keep, a framing
+ * flight already places the city beside the panel, and what is already selected
+ * when the scene mounts is not new.
+ */
+function useRevealSelection(
+  selectedAt: { id: string; point: Vec3 } | null,
+  flight: RefObject<CameraFlight | null>,
+  covered: number,
+  reducedMotion: boolean
+) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as Rig | null;
+  const size = useThree((state) => state.size);
+  const revealed = useRef<string | null>(selectedAt?.id ?? null);
+
+  useEffect(() => {
+    const id = selectedAt?.id ?? null;
+    const fresh = id !== revealed.current;
+    revealed.current = id;
+    if (!(fresh && selectedAt && controls) || flight.current) return;
+    const slide = revealShift(
+      selectedAt.point,
+      { position: camera.position, target: controls.target },
+      size,
+      covered,
+      CAMERA_FOV
+    );
+    if (slide.x === 0 && slide.z === 0) return;
+    const from = poseOf(camera, controls, LOOSE_TARGET);
+    const to = {
+      position: from.position.clone().add(slide),
+      target: from.target.clone().add(slide),
+    };
+    if (reducedMotion) placeCamera(camera, controls, to);
+    else flight.current = flightTo(from, to, REFRAME_MS, smootherstep);
+  }, [selectedAt, camera, controls, covered, flight, reducedMotion, size]);
+}
+
 /**
  * Where the camera was when the scene last unmounted, per graph, with the framing
  * it was on. A 2D view replaces the canvas, and coming back to the city framed it
@@ -1756,8 +1819,6 @@ function CameraRig({
     controls: unknown;
     reframe: number;
   } | null>(null);
-  // What is already selected when the scene mounts is not a new selection.
-  const revealed = useRef<string | null>(selectedAt?.id ?? null);
   const restored = useRef<View | null>(null);
   const framing = useMemo(() => JSON.stringify(bounds), [bounds]);
   // The canvas is as wide as the area the panel sizes itself to.
@@ -1804,61 +1865,50 @@ function CameraRig({
     const asked = !first && framed.current?.reframe !== reframe;
     const action = framingAction(framed.current, { bounds, controls, reframe });
     framed.current = { bounds, controls, reframe };
-    if (action === "none") return;
     const back = kept.get(graph);
-    if (first && back?.framing === framing) {
+    const step = framingStep({
+      action,
+      first,
+      flying: flight.current !== null,
+      reducedMotion,
+      restorable: back?.framing === framing,
+      introSeen,
+    });
+    if (step === "none") return;
+    if (step === "restore" && back) {
       // Back from a 2D view: no establishing shot and no flight, just the pose.
       restored.current = back.pose;
       flight.current = null;
       placeCamera(camera, controls, back.pose);
       return;
     }
-    // The controls arriving mid-establishing-shot need nothing: the flight writes
-    // their target every frame and hands them the camera when it lands.
-    if (action === "snap" && !first && flight.current) return;
-    if (reducedMotion || action === "snap") {
-      if (reducedMotion || !first || introSeen()) {
-        flight.current = null;
-        // The controls arriving after a restore take the restored pose, not a frame.
-        placeCamera(
-          camera,
-          controls,
-          action === "snap" ? (restored.current ?? view) : view
-        );
-        restored.current = null;
-        return;
-      }
-      const opening = introOf(view);
-      placeCamera(camera, controls, opening);
-      flight.current = {
-        from: opening,
-        to: view,
-        started: performance.now(),
-        ms: INTRO_MS,
-        ease: smootherstep,
-      };
+    if (step === "place") {
+      flight.current = null;
+      // The controls arriving after a restore take the restored pose, not a frame.
+      const pose = action === "snap" ? restored.current : null;
+      placeCamera(camera, controls, pose ?? view);
+      restored.current = null;
       return;
     }
-    flight.current = {
-      from: {
-        position: camera.position.clone(),
-        target: (controls?.target ?? view.target).clone(),
-      },
-      to: view,
-      started: performance.now(),
-      ms: asked ? REFRAME_MS : FLIGHT_MS,
-      ease: asked ? smootherstep : easeInOutCubic,
-    };
+    if (step === "intro") {
+      const opening = introOf(view);
+      placeCamera(camera, controls, opening);
+      flight.current = flightTo(opening, view, INTRO_MS, smootherstep);
+      return;
+    }
+    flight.current = flightTo(
+      poseOf(camera, controls, view.target),
+      view,
+      asked ? REFRAME_MS : FLIGHT_MS,
+      asked ? smootherstep : easeInOutCubic
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, bounds, controls, reframe, reducedMotion]);
 
   useEffect(
     () => () => {
       // Where a flight was going rather than where it had got to.
-      const pose = flight.current?.to ?? {
-        position: camera.position,
-        target: controls?.target ?? LOOSE_TARGET,
-      };
+      const pose = flight.current?.to ?? poseOf(camera, controls, LOOSE_TARGET);
       kept.set(graph, {
         pose: { position: pose.position.clone(), target: pose.target.clone() },
         framing,
@@ -1867,41 +1917,7 @@ function CameraRig({
     [camera, controls, flight, framing, graph]
   );
 
-  useEffect(() => {
-    // Only a new selection slides the camera. The panel resizing or the reader
-    // moving away from the building afterwards is theirs to keep, and a framing
-    // flight already places the city beside the panel.
-    const id = selectedAt?.id ?? null;
-    const fresh = id !== revealed.current;
-    revealed.current = id;
-    if (!(fresh && selectedAt && controls) || flight.current) return;
-    const slide = revealShift(
-      selectedAt.point,
-      { position: camera.position, target: controls.target },
-      size,
-      covered,
-      CAMERA_FOV
-    );
-    if (slide.x === 0 && slide.z === 0) return;
-    const to = {
-      position: camera.position.clone().add(slide),
-      target: controls.target.clone().add(slide),
-    };
-    if (reducedMotion) {
-      placeCamera(camera, controls, to);
-      return;
-    }
-    flight.current = {
-      from: {
-        position: camera.position.clone(),
-        target: controls.target.clone(),
-      },
-      to,
-      started: performance.now(),
-      ms: REFRAME_MS,
-      ease: smootherstep,
-    };
-  }, [selectedAt, camera, controls, covered, flight, reducedMotion, size]);
+  useRevealSelection(selectedAt, flight, covered, reducedMotion);
 
   useFrame(() => {
     const moving = flight.current;
