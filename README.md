@@ -400,6 +400,32 @@ Type sits under the pages that use it, a composition over the pages that compose
 removing types, or connections between them, can rearrange the city; manual pinning is not
 available.
 
+## Present the city in a meeting
+
+Press P, or choose Present in the toolbar, to show the schema to a room. Presentation mode takes
+the whole screen where the browser allows it. A backoffice that is not allowed to go full screen,
+or a link opened with `present=1`, fills the window instead; press P twice for full screen. The
+toolbar and the Reset view button go, and the names over and on the city, the 2D views, the
+legends and the inspector are drawn 1.4 times larger so they read on a projector. A printed name
+too small to read at that size is left off until the camera comes closer, so the overview leaves
+most building names to the hover and the district names carry it.
+
+Move the mouse and a slim bar appears at the top right with the views, Search and Leave
+presentation. It fades when the mouse rests, and Tab reaches it at any time.
+
+Selecting a type shows a caption card in the bottom-left corner instead of the inspector: its name
+and role, how much content it has, and how many types it has in each relationship. Details opens
+the full inspector over the view, and the camera frames on the whole screen either way. Closing
+the card, or clicking bare ground, puts the type down and keeps focus, so the neighbourhood stays
+on screen; Leave focus on the card, or Home, leaves it.
+
+Escape closes Details first, then leaves presentation with the focus, the selection and the view
+kept. Leaving full screen the browser's way leaves presentation too. Focus, Impact, Show in city,
+the change layer and lenses all work as they do outside it. A typical run: the city overview,
+Search for a type and Enter to focus it, I for its Impact and Show in city, then M for the Matrix.
+
+![Presenting Home's neighbourhood: no toolbar, larger names, the caption card and the bar a mouse move brings back.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/present.png)
+
 ## Navigate the city
 
 The city stands in a 3D world with a sky, a horizon and a ground that runs out to it. It opens on a
@@ -431,6 +457,7 @@ the city as a table.
 | Toggle connection layers | 1, 2, 3, 4 |
 | Switch to List, Tree, Matrix or Editor, or back to the city | L, T, M, E |
 | Search | ⌘K / Ctrl+K |
+| Present full screen, or leave | P, or Escape to leave |
 | Show controls | ? |
 
 ## Development

@@ -239,6 +239,20 @@ const shots = [
       await wait(900);
     },
   },
+  // Presenting Home's neighbourhood from a shared link: no toolbar, larger names,
+  // the caption card, and the bar a pointer move brings back.
+  {
+    name: "present",
+    query: "?type=home&focus=1&layers=structure&present=1",
+    async after() {
+      await send("Input.dispatchMouseEvent", {
+        type: "mouseMoved",
+        x: 1560,
+        y: 960,
+      });
+      await wait(500);
+    },
+  },
   // Orbited round and down to a few degrees above the ground, where the city meets
   // the horizon.
   {

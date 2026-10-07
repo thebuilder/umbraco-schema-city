@@ -69,7 +69,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     title: "Keys",
     rows: [
       { keys: ["Enter"], does: "Focus the selected building" },
-      { keys: ["Esc"], does: "Leave focus, then clear the selection" },
+      {
+        keys: ["Esc"],
+        does: "Leave focus, then clear the selection. While presenting, close Details, then leave presentation",
+      },
       { keys: ["⌘K", "Ctrl K"], does: "Search types and property aliases" },
       {
         keys: ["1", "2", "3", "4"],
@@ -80,6 +83,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { keys: ["M"], does: "Matrix view, or back to the city" },
       { keys: ["E"], does: "Editor view, or back to the city" },
       { keys: ["I"], does: "Impact view, or back to the city" },
+      {
+        keys: ["P"],
+        does: "Present: full screen, larger type, and a caption card for the selected type",
+      },
       { keys: ["?"], does: "Show this page" },
     ],
   },
