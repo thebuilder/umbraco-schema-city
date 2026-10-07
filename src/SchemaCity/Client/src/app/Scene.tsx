@@ -2799,12 +2799,15 @@ export default function Scene({
   return (
     // Focusable, so the flight keys have somewhere to belong: they fly only while
     // this or nothing has focus, and a click on the city focuses it. Closing the
-    // inspector hands focus back here for the same reason. A named region rather
-    // than an application, so a screen reader stays in its reading mode around it.
+    // inspector hands focus back here for the same reason, and a type picked in the
+    // city leaves focus here (data-keeps-focus) rather than moving it to the
+    // inspector. A named region rather than an application, so a screen reader stays
+    // in its reading mode around it.
     <section
       aria-label="City. W A S D or the arrows move the camera, [ and ] orbit. Press ? for all controls."
       className="absolute inset-0 outline-none focus-visible:outline-2 focus-visible:outline-phosphor-bright focus-visible:outline-offset-[-2px]"
       data-focus-home
+      data-keeps-focus
       ref={host}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the city takes keys, so a keyboard has to be able to reach it.
       tabIndex={0}

@@ -178,6 +178,13 @@ export function usePanelFocus(
   useEffect(() => {
     const at = deepActive();
     const inApp = at !== null && Boolean(appRoot(panel.current)?.contains(at));
+    // A type picked in the city keeps focus on the city, where the flight keys
+    // belong; the live region already says what was selected. Picked anywhere else,
+    // the panel's heading takes focus so the reader lands on what opened.
+    if (at?.closest("[data-keeps-focus]")) {
+      opened.current = true;
+      return;
+    }
     // On the first open, only a reader already working in the app is moved, so a
     // page that loads with a type selected leaves focus where the host put it.
     if (inApp || (opened.current && focusLost(at)))
