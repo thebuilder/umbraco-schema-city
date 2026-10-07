@@ -475,7 +475,30 @@ describe("findFindings, one rule at a time", () => {
     const [finding] = findFindings(graph).filter(
       (f) => f.kind === "duplicateAlias"
     );
-    expect(finding?.summary).toBe("seoTitle from Seo A, page");
+    expect(finding?.summary).toBe("seoTitle from Seo A, this type");
+    // The type itself is where the row already is, so it is not a related link.
+    expect(finding?.related).toEqual(["seoA"]);
+  });
+
+  it("names the editors when a clashing alias uses different ones", () => {
+    const graph = graphOf([
+      node("seo", { name: "Seo Composition" }),
+      node("mirror", { name: "Dup Seo Mirror" }),
+      node("page", {
+        allowedAsRoot: true,
+        groups: [
+          group("seo", [
+            property("seoTitle", "seo", { dataTypeName: "Textstring" }),
+          ]),
+          group("mirror", [
+            property("seoTitle", "mirror", { dataTypeName: "Media Picker" }),
+          ]),
+        ],
+      }),
+    ]);
+    expect(summaryOf(graph, "duplicateAlias", "page")?.summary).toBe(
+      "seoTitle: Textstring from Seo Composition, Media Picker from Dup Seo Mirror"
+    );
   });
 
   it("reports a type whose only parents no root reaches", () => {

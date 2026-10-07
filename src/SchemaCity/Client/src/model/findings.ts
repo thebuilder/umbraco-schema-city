@@ -101,7 +101,7 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
   brokenBlock:
     "A block editor lists an Element Type that no longer exists in the schema.",
   duplicateAlias:
-    "A property alias arrives from more than one composition. The editor that results cannot save both values.",
+    "A property alias arrives from more than one place, the type's own properties or its compositions. The editor that results cannot save both values, and where the editors differ the stored value may not suit one of them.",
   emptyBlock:
     "A block editor offers these Element Types as content blocks, but they have no own and no composed properties, so an editor who adds one has nothing to fill in. A deliberate divider or spacer block looks the same.",
   cultureMismatch:
@@ -425,9 +425,21 @@ export function findFindings(
         "duplicateAlias",
         node,
         duplicates
-          .map(({ alias, origins }) => `${alias} from ${names(origins)}`)
+          .map(({ alias, origins }) => {
+            const editors = new Set(origins.map((origin) => origin.editor));
+            // Different editors under one alias is the real data risk, so name them.
+            return editors.size > 1
+              ? `${alias}: ${origins.map((origin) => `${origin.editor} from ${source(origin.id)}`).join(", ")}`
+              : `${alias} from ${list(origins.map((origin) => source(origin.id)))}`;
+          })
           .join("; "),
-        duplicates.flatMap((duplicate) => duplicate.origins),
+        [
+          ...new Set(
+            duplicates.flatMap((duplicate) =>
+              duplicate.origins.map((origin) => origin.id)
+            )
+          ),
+        ].filter((id) => id !== node.id),
         duplicates.length
       );
     }
@@ -457,6 +469,8 @@ export function findFindings(
       );
       const variantBlocks = (blocksFrom.get(node.id) ?? []).filter(
         (edge) => byId.get(edge.to)?.variesByCulture
+      const source = (id: string) =>
+        id === node.id ? "this type" : (nameOf.get(id) ?? id);
       );
       const listed = [
         ...new Set(
@@ -623,16 +637,23 @@ function list(items: string[]): string {
  * editor that results cannot save both values.
  */
 function duplicateAliases(node: SchemaNode) {
-  const origins = new Map<string, Set<string>>();
+  // Alias to origin id to the Data Type, or editor, the property uses there.
+  const origins = new Map<string, Map<string, string>>();
   for (const property of propertiesOf(node)) {
-    const seen = origins.get(property.alias) ?? new Set<string>();
+    const seen = origins.get(property.alias) ?? new Map<string, string>();
     // Own properties have no composition to name, so they are their own origin.
-    seen.add(property.fromCompositionId ?? node.id);
+    seen.set(
+      property.fromCompositionId ?? node.id,
+      property.dataTypeName ?? property.editorAlias
+    );
     origins.set(property.alias, seen);
   }
   return [...origins]
     .filter(([, from]) => from.size > 1)
-    .map(([alias, from]) => ({ alias, origins: [...from] }))
+    .map(([alias, from]) => ({
+      alias,
+      origins: [...from].map(([id, editor]) => ({ id, editor })),
+    }))
     .sort((a, b) => a.alias.localeCompare(b.alias));
 }
 
