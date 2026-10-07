@@ -1,7 +1,14 @@
 // The Data Types view: every Data Type as a sortable table, and the chosen one as a
 // page beside it with what it offers, what uses it and the blocks content stores in
 // it. Below 760 px of room the page goes under the table instead.
-import { type RefObject, useId, useMemo, useRef, useState } from "react";
+import {
+  type RefObject,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   allowedBlocks,
@@ -87,6 +94,14 @@ export function DataTypes(props: DataTypesProps) {
     return out;
   }, [findings]);
   const chosen = rows.find((row) => row.id === selected);
+  // A link from elsewhere chooses a row that can be far down the list.
+  const list = useRef<HTMLTableElement>(null);
+  useEffect(() => {
+    if (selected)
+      list.current
+        ?.querySelector('[aria-current="true"]')
+        ?.scrollIntoView({ block: "center" });
+  }, [selected]);
 
   useAnnounceChange(`${shown.length} of ${rows.length} Data Types`);
   useAnnounceChange(chosen ? `${chosen.name} Data Type selected` : null);
@@ -115,7 +130,7 @@ export function DataTypes(props: DataTypesProps) {
       </div>
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] @min-[760px]:grid-cols-2 @min-[760px]:grid-rows-1">
         <Scroller label="Data Type list">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse" ref={list}>
             <caption className="sr-only">
               Every Data Type in the schema. Choosing a row shows it beside the
               list.
