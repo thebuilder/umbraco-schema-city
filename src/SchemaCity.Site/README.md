@@ -40,7 +40,9 @@ environment still writes a generated key into `appsettings.json`; revert that fi
 Types. It creates 86 Document Types: 17 Element Types, 7 compositions, and 62 structure types.
 They use 3 folders, 9 Data Types, 3 templates, 2 languages, and 193 content items. It also plants the findings
 listed in `SchemaSeeder.PlantedFindings`, which the export writes to `medium-planted.json` for the
-client findings test. Reset the demo database to seed again.
+client findings test. The first articles store blocks in their Block List, Block Grid and rich text
+properties, so the usage report has stored blocks to count; several offered Element Types, such
+as Element Card, are never stored. Reset the demo database to seed again.
 
 Every Development boot writes `medium.json` and `medium-usage.json` to
 `src/SchemaCity/Client/dev/fixtures/` for the dev harness, unless the database was seeded by an

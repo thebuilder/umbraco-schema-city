@@ -129,8 +129,10 @@ it with its related types. The drawer's header says when the schema was read and
 counted. Export CSV saves the filtered results as one header row and one row per finding, ready for
 an Excel or Jira import: the kind, the type with its key, folder, content counts and backoffice
 path, the detail, explanation and next step, related types by name, the filter used, and the schema
-and usage snapshot dates. For an unused type, the Unused branch root column names its topmost
-unused ancestor, so a branch of unused types can go in one ticket.
+and usage snapshot dates, then the Data Types the finding names. For an unused type, the Unused
+branch root column names its topmost unused ancestor, so a branch of unused types can go in one
+ticket. A finding about a Data Type alone leaves the type columns blank and gives the Data Type's
+backoffice path.
 
 Only a type an editor can create, at root or under another type, is reported as unused. A type
 nothing can create is a dead end, or a pure mixin when something composes it. The no template note
@@ -147,13 +149,24 @@ headless by design, and on a type already reported as unused.
   ones included.
 - Empty block: an Element Type offered as a content block that has no properties. It is a note,
   because a divider or spacer block is often empty on purpose.
+- Orphaned blocks: content stores blocks of an Element Type that no block editor lists any more.
+  It takes the place of the unused Element Type row once usage has loaded, names the Data Types
+  the blocks are stored in, and is a problem.
+- Unused Data Type: a Data Type no property on a Document, Media or Member Type uses, and no
+  collection view either. It is a note about the Data Type itself and opens its page.
+
+Once usage has loaded, an unused Element Type row says how many blocks of it content stores, and a
+broken block row says how many blocks of the missing Element Type content still holds. Rows that
+name a Data Type link to its page, and the CSV export gives its name and key in two columns at the
+end.
 
 ![Findings grouped by kind with broken blocks and duplicate aliases first, each row naming its own evidence.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png)
 
 A finding is a reason to investigate, not an instruction to delete. An unused Document Type has
 no counted content in the usage snapshot. An unused Element Type has no configured block-editor
-use in the schema snapshot. Custom code, migrations, external consumers, and stored block values
-can still depend on either.
+use in the schema snapshot and, once usage has loaded, no stored block counted either; a count that
+stopped early says so. Custom code, migrations, external consumers, and media or member values can
+still depend on either.
 
 ### Check content usage
 
@@ -179,8 +192,8 @@ The table works without the 3D canvas.
 
 ![The type list sorted by own property count, largest first.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png)
 
-The view switcher in the toolbar chooses between City, List, Tree, Matrix and Editor. The choice is
-kept in the URL, and every view except City works without the 3D canvas.
+The view switcher in the toolbar chooses between City, List, Tree, Matrix, Editor and Data Types.
+The choice is kept in the URL, and every view except City works without the 3D canvas.
 
 ### Follow the creation tree
 
@@ -220,6 +233,35 @@ property that lists a deleted Element Type, and the properties of a culture mism
 group with such a row carries a dot. Choose Editor layout in the inspector to open a type here.
 
 ![Home in the editor view, opened on the Content tab where its own properties are, with its checks above the tabs.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png)
+
+### Investigate a Data Type
+
+Data Types lists every Data Type in the site, the unused ones included, with its editor, how many
+properties use it, on how many types, and the blocks content stores in it. A dot marks one a check
+flagged. Sort by any column and filter by name, editor or key. Choose one to read its page beside
+the list, or under it when the room is narrow; the URL keeps it as `dataType=<key>`. Every Data
+Type name elsewhere in the app opens this page: the Matrix's Data Types column headings, the
+Editor view's property rows, the inspector's Properties tab and block and picker sections, Data
+Type changes in Compare, and findings that name a Data Type.
+
+The page shows the editor's UI alias, its editor alias and its key, and Open in editor opens the
+Data Type in the backoffice. A block editor lists the Element Types it offers as content and as
+settings, each with the blocks of it content stores, so you can see what a move or a removal would
+touch before you make it. An offered Element Type nothing stores has a dashed edge and says none
+stored, a key that no longer resolves says missing type, and an Element Type content still stores
+but the editor no longer offers gets its own row. A picker lists the Document Types it allows.
+Used by lists every type with a property on it, with the property aliases, the composition a
+composed one comes from and the type's content count; choose a type to open it in the inspector.
+The page ends with the stored block totals, a few configuration values such as a block list's
+limits, and the findings about the Data Type. Show in city switches to the City and lights the
+buildings that use the Data Type; Clear over the canvas, or choosing a lens, ends it.
+
+Stored blocks are counted with the usage snapshot, in the latest version of every document outside
+the recycle bin, published or draft, nested blocks included. The count reads the stored JSON
+directly and stops after 50,000 values or five seconds; the page then says the numbers are a lower
+bound. Media and member values are not counted.
+
+![SC Page Grid's page: its Element Types with what content stores of each, two offered but never stored, and the types that use it.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/datatypes.png)
 
 ## Compare schema snapshots
 

@@ -601,10 +601,20 @@ Each milestone ends with something runnable. Sizes are relative, not dates.
 - Perf pass, only if the seeded schema or a 300-node synthetic graph drops below 60 fps. The edge geometry is already merged, one draw call per layer, so what is left is the label budget.
 - Exit: `SchemaCity 1.0.0` packed from main at 550d92e (643 KB) and pushed 2026-09-04; CI green on GitHub for both majors. Publishing to NuGet and the marketplace listing are the remaining steps, in Daniel's hands.
 
+### M8, Data Types (medium)
+
+Done 2026-10-07 on `m8/data-types`, after two user tests named Data Types and stored blocks as the missing piece.
+
+- Contract: `SchemaGraph.dataTypes` lists every Data Type, unused ones included, with editor aliases, folder path, block and picker targets (missing keys kept), `otherUses` (Media and Member Type properties and collection views, which have no node) and a small configuration summary. Optional on the client, so older snapshots import; `parseSnapshot` validates it.
+- Usage: `UsageReport.blocks` counts stored block instances per Data Type and Element Type, as content and settings, with the content items involved. One streamed query over `umbracoPropertyData` for block editor values on the current version of every document outside the recycle bin, parsed by `BlockCounter` for the 14+ and older shapes, nested values credited to their own Data Type through a property lookup. Capped at 50,000 values and five seconds, after which `partial` is set; a failure leaves the rest of the report standing. 65 values in 7 ms on the seeded site.
+- Seed: the first articles store body blocks, a grid row with two area items and rich text blocks, only of Element Types without a mandatory property; seed version 2026-10-07.2.
+- Findings: `unusedDataType` (note, a finding with no `nodeId`, id `unusedDataType:<key>`), `orphanedBlocks` (problem, replaces `unusedElementType` once stored blocks exist), stored counts as evidence on `unusedElementType` and `brokenBlock`, and `dataTypeIds` on every finding that names a Data Type. On the seeded site with usage: 20 unused Data Types, no orphaned blocks.
+- View: `view=datatypes&dataType=<key>`, a sortable, filterable table beside a page per Data Type, Show in city through a binary lens scale, and links from the Matrix, Editor, inspector, Compare and findings. No shortcut key: D pans.
+
 ### Later, explicitly not v1
 
 - Content mode: instances of a type as a tree, entered from a building.
-- Instance-level block usage (parsing property JSON), which needs a background job and its own cache.
+- Block usage past the cap, for sites with more than 50,000 block values, which needs a background job and its own cache.
 - Pinning buildings and persisting layout overrides per user.
 - Export the city as PNG/SVG for documentation.
 - Extracting a shared spatial-explorer package with fsn, only if a third graph appears.
