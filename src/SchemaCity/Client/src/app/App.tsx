@@ -1,12 +1,4 @@
-import {
-  lazy,
-  type ReactNode,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -24,11 +16,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -60,6 +47,7 @@ import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { INSPECTOR_INSET, Inspector } from "./Inspector";
 import type { Grouping } from "./layout/city";
+import { Legend } from "./Legend";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   LENS_LABEL,
@@ -100,186 +88,6 @@ const withLayer = (on: Layer[], layer: Layer): Layer[] =>
   LAYERS.filter((name) =>
     name === layer ? !on.includes(name) : on.includes(name)
   );
-
-/** One edge style, drawn the way the scene draws it. */
-function EdgeMark({
-  className,
-  d,
-  dashed = false,
-}: {
-  className: string;
-  d: string;
-  dashed?: boolean;
-}) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      height="12"
-      viewBox="0 0 26 12"
-      width="26"
-    >
-      <path
-        d={d}
-        stroke="currentColor"
-        strokeDasharray={dashed ? "2 3" : undefined}
-        strokeWidth={1.25}
-      />
-    </svg>
-  );
-}
-
-function LegendRow({
-  mark,
-  children,
-}: {
-  mark: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <li className="flex items-center gap-2.5">
-      <span className="flex w-7 shrink-0 justify-center">{mark}</span>
-      {children}
-    </li>
-  );
-}
-
-function LegendTitle({ children }: { children: ReactNode }) {
-  return (
-    <p className="font-bold text-2xs text-phosphor-bright uppercase tracking-terminal-lg">
-      {children}
-    </p>
-  );
-}
-
-const Tint = ({ className }: { className: string }) => (
-  <span className={`size-3 ${className}`} />
-);
-
-function Legend() {
-  return (
-    <div className="space-y-3.5">
-      <section>
-        <LegendTitle>Buildings</LegendTitle>
-        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
-          <LegendRow mark={<Tint className="bg-phosphor" />}>
-            Own property group
-          </LegendRow>
-          <LegendRow
-            mark={<Tint className="border border-azure bg-azure/35" />}
-          >
-            Composed group; a building of only these is a composition
-          </LegendRow>
-          <LegendRow mark={<Tint className="bg-amber" />}>
-            Element Type, until a lens is on
-          </LegendRow>
-          <LegendRow
-            mark={
-              <Tint className="border border-phosphor bg-phosphor-bright" />
-            }
-          >
-            Lit lid: the type has a template
-          </LegendRow>
-          <LegendRow mark={<span className="size-1.5 bg-phosphor-bright" />}>
-            Roof dot: varies by culture, a second by segment
-          </LegendRow>
-          <LegendRow mark={<Tint className="bg-phosphor-dim" />}>
-            Root plaza
-          </LegendRow>
-          <LegendRow mark={<Tint className="border-2 border-signal" />}>
-            Selected
-          </LegendRow>
-        </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          One slab per property group, with a gap between groups and a thin
-          board where a new tab starts; windows represent properties. Pins on
-          the base count direct connections: allowed parents on the north edge,
-          allowed children on the south, links out on the east and links in on
-          the west. A wider footprint means more own properties. Height is not a
-          complexity score.
-        </p>
-      </section>
-
-      <section>
-        <LegendTitle>Boards</LegendTitle>
-        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
-          <LegendRow
-            mark={<span className="h-2 w-5 border border-phosphor-dim" />}
-          >
-            Courtyard round a type and its printed name
-          </LegendRow>
-          <LegendRow mark={<span className="h-3 w-1.5 bg-[#d9b24a]/70" />}>
-            Gold finger: a trace leaving for another board, one per lane
-          </LegendRow>
-          <LegendRow
-            mark={
-              <span className="size-2 rounded-full border-2 border-[#c8823a]/70" />
-            }
-          >
-            Via: a trace turning
-          </LegendRow>
-          <LegendRow mark={<Tint className="bg-phosphor-dim/40" />}>
-            Patch under a group: one block editor's Element Types, or a nested
-            folder
-          </LegendRow>
-        </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          Group by Structure puts each root and what it can create on its own
-          board, a parent with its children around it, with boards for
-          Compositions, Elements and anything no root reaches. Group by Folders
-          follows the schema's folders. Names print beside their types as far as
-          they fit without touching; the full name is in the inspector.
-        </p>
-      </section>
-
-      <section>
-        <LegendTitle>Layers</LegendTitle>
-        <ul className="mt-2 space-y-1.5 text-muted-foreground text-xs">
-          <LegendRow
-            mark={
-              <EdgeMark
-                className="text-phosphor-dim"
-                d="M1 6 H25 M13 3 L17 6 L13 9"
-              />
-            }
-          >
-            Allowed child, in the arrow's direction
-          </LegendRow>
-          <LegendRow
-            mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" />}
-          >
-            Composition
-          </LegendRow>
-          <LegendRow
-            mark={
-              <EdgeMark
-                className="text-[color-mix(in_srgb,var(--azure)_60%,#ffffff)]"
-                d="M1 11 Q13 -1 25 11"
-              />
-            }
-          >
-            Inheritance
-          </LegendRow>
-          <LegendRow
-            mark={<EdgeMark className="text-amber" d="M1 1 Q13 13 25 1" />}
-          >
-            Block target, dipping to the Element district
-          </LegendRow>
-          <LegendRow
-            mark={<EdgeMark className="text-violet" d="M1 6 H25" dashed />}
-          >
-            Picker reference
-          </LegendRow>
-        </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          Hover or select a building to brighten its connections. Structure
-          traces show allowed-child rules, not the content tree.
-        </p>
-      </section>
-    </div>
-  );
-}
 
 /** The legend's colour bar, the same two ends the scene mixes its buildings between. */
 const RAMP_BAR: Record<Ramp, string> = {
@@ -755,16 +563,7 @@ export function App({
               open={comparisonOpen}
             />
 
-            <Popover>
-              <PopoverTrigger
-                render={<Button data-trigger size="sm" variant="outline" />}
-              >
-                Legend
-              </PopoverTrigger>
-              <PopoverContent className="w-80 text-sm">
-                <Legend />
-              </PopoverContent>
-            </Popover>
+            <Legend />
 
             <Help onOpenChange={setHelpOpen} open={helpOpen} />
 
