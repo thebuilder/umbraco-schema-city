@@ -84,7 +84,7 @@ import {
   keydownAction,
   translateFlightEndpoints,
 } from "./scene/flight";
-import { framingDistance } from "./scene/framing";
+import { type Framed, revealShift, type Vec3, viewOf } from "./scene/framing";
 import { neighboursOf } from "./scene/graph-links";
 import { iconColour, rasteriseIcon } from "./scene/icons";
 import {
@@ -1610,17 +1610,6 @@ type View = {
   target: THREE.Vector3;
 };
 
-/** What a framing shows: the ground it has to fit, and the point it centres on. */
-type Framed = {
-  centre: { x: number; z: number };
-  grounds: readonly {
-    minX: number;
-    maxX: number;
-    minZ: number;
-    maxZ: number;
-  }[];
-};
-
 /** The orbit controls, as far as the camera code touches them. */
 type Rig = {
   target: THREE.Vector3;
@@ -1662,60 +1651,7 @@ const INTRO_SWING = 0.42;
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
-/**
- * The default view looks down the isometric diagonal, from the south-east at about
- * 35 degrees, so the city opens on the overview it always has, now with depth.
- */
-const FRAMING_DIRECTION = new THREE.Vector3(1, 1, 1).normalize();
-/** Screen-right on the ground from that direction. */
-const SCREEN_RIGHT = new THREE.Vector3(1, 0, -1).normalize();
 const UP = new THREE.Vector3(0, 1, 0);
-
-/**
- * Where the camera stands to frame `bounds` from the default direction: every corner
- * of every piece of ground, at the ground and at the height of the tallest building.
- *
- * `shift` is how many CSS pixels the framed centre moves left on screen, which is
- * half the inspector's width when it is open. The target moves that many pixels'
- * worth of ground along screen-right, measured at the target's own distance, and the
- * framed centre lands in the middle of the canvas the panel does not cover.
- */
-function viewOf(
-  bounds: Framed,
-  size: { width: number; height: number },
-  shift: number,
-  fill: number,
-  buildingHeight: number
-): View {
-  const corners = bounds.grounds.flatMap((ground) =>
-    [ground.minX, ground.maxX].flatMap((x) =>
-      [ground.minZ, ground.maxZ].flatMap((z) =>
-        [0, buildingHeight].map((y) => ({
-          x: x - bounds.centre.x,
-          y: y - buildingHeight / 2,
-          z: z - bounds.centre.z,
-        }))
-      )
-    )
-  );
-  const distance = framingDistance(
-    corners,
-    FRAMING_DIRECTION,
-    size,
-    shift * 2,
-    fill,
-    CAMERA_FOV
-  );
-  const target = new THREE.Vector3(
-    bounds.centre.x,
-    buildingHeight / 2,
-    bounds.centre.z
-  ).addScaledVector(SCREEN_RIGHT, shift / pixelsPerUnit(size.height, distance));
-  return {
-    position: target.clone().addScaledVector(FRAMING_DIRECTION, distance),
-    target,
-  };
-}
 
 /**
  * fsn's opening pose: wider, swung round and looking at the same point, so the
@@ -1770,10 +1706,13 @@ function CameraRig({
   reducedMotion,
   overview,
   flightRef,
+  selectedAt,
 }: {
   bounds: Framed;
   buildingHeight: number;
   inspectorOpen: boolean;
+  /** The selected building, which a new selection slides out from under the panel. */
+  selectedAt: { id: string; point: Vec3 } | null;
   /** Bumped by Home to ask for the same city to be framed again. */
   reframe: number;
   reducedMotion: boolean;
@@ -1790,21 +1729,23 @@ function CameraRig({
     controls: unknown;
     reframe: number;
   } | null>(null);
+  const revealed = useRef<string | null>(null);
+  // The canvas is as wide as the area the panel sizes itself to.
+  const covered = inspectorOpen ? inspectorWidthFor(size.width) : 0;
 
-  // Half the panel, because the middle of the uncovered canvas is that far left of
-  // the middle of the whole of it.
-  const view = useMemo(
-    () =>
-      viewOf(
-        bounds,
-        size,
-        // The canvas is as wide as the area the panel sizes itself to.
-        inspectorOpen ? inspectorWidthFor(size.width) / 2 : 0,
-        overview ? 0.94 : 0.9,
-        buildingHeight
-      ),
-    [bounds, buildingHeight, inspectorOpen, overview, size]
-  );
+  const view = useMemo((): View => {
+    const fit = viewOf(
+      bounds,
+      size,
+      covered,
+      overview ? 0.94 : 0.9,
+      buildingHeight
+    );
+    return {
+      position: new THREE.Vector3().copy(fit.position),
+      target: new THREE.Vector3().copy(fit.target),
+    };
+  }, [bounds, buildingHeight, covered, overview, size]);
 
   useEffect(() => {
     // Captured, so it runs before the controls' own listener on the same canvas:
@@ -1865,6 +1806,42 @@ function CameraRig({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, bounds, controls, reframe, reducedMotion]);
+
+  useEffect(() => {
+    // Only a new selection slides the camera. The panel resizing or the reader
+    // moving away from the building afterwards is theirs to keep, and a framing
+    // flight already places the city beside the panel.
+    const id = selectedAt?.id ?? null;
+    const fresh = id !== revealed.current;
+    revealed.current = id;
+    if (!(fresh && selectedAt && controls) || flight.current) return;
+    const slide = revealShift(
+      selectedAt.point,
+      { position: camera.position, target: controls.target },
+      size,
+      covered,
+      CAMERA_FOV
+    );
+    if (slide.x === 0 && slide.z === 0) return;
+    const to = {
+      position: camera.position.clone().add(slide),
+      target: controls.target.clone().add(slide),
+    };
+    if (reducedMotion) {
+      placeCamera(camera, controls, to);
+      return;
+    }
+    flight.current = {
+      from: {
+        position: camera.position.clone(),
+        target: controls.target.clone(),
+      },
+      to,
+      started: performance.now(),
+      ms: REFRAME_MS,
+      ease: smootherstep,
+    };
+  }, [selectedAt, camera, controls, covered, flight, reducedMotion, size]);
 
   useFrame(() => {
     const moving = flight.current;
@@ -2308,6 +2285,23 @@ export default function Scene({
           ];
     return { centre: ground.centre, grounds };
   }, [city, focusIsland, ground]);
+  // Where the selected building stands once any focus tween lands, for the camera
+  // to keep it out from under the panel.
+  const selectedAt = useMemo(() => {
+    const at = selected
+      ? target.find((placement) => placement.id === selected)
+      : undefined;
+    return at
+      ? {
+          id: at.id,
+          point: {
+            x: at.position.x,
+            y: (at.y ?? 0) + at.height / 2,
+            z: at.position.z,
+          },
+        }
+      : null;
+  }, [selected, target]);
   const nodesById = useMemo(
     () => new Map(graph.nodes.map((node) => [node.id, node])),
     [graph]
@@ -2643,6 +2637,7 @@ export default function Scene({
             overview={focus === null}
             reducedMotion={reducedMotion}
             reframe={reframe}
+            selectedAt={selectedAt}
           />
           <Controls span={span} />
         </Canvas>
