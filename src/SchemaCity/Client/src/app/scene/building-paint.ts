@@ -69,14 +69,14 @@ export function buildingColours(palette: BuildingPalette) {
 
 /**
  * The change layer's four steps. Added is azure and a type's own edit amber, the
- * colours the compare rings always had. A side effect is the same amber pushed two
- * thirds into the background, so it reads as the quieter echo of a cause, and an
- * unchanged type is phosphor-dim pushed further still, out of the way.
+ * colours the compare rings always had. A side effect is the same amber pushed most
+ * of the way into the background, so it reads as the quieter echo of a cause, and
+ * an unchanged type is phosphor-dim pushed as far, out of the way.
  */
 function changeColour(t: number, colours: BuildingColours): THREE.Color {
   if (t >= 1) return colours.azure.clone();
   if (t >= 0.75) return colours.amber.clone();
-  if (t >= 0.5) return colours.amber.clone().lerp(colours.background, 0.65);
+  if (t >= 0.5) return colours.amber.clone().lerp(colours.background, 0.72);
   return colours.dim.clone().lerp(colours.background, 0.7);
 }
 

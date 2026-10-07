@@ -308,13 +308,42 @@ breaks something: code, templates, and stored values outside the schema can depe
 
 ## Compare schema snapshots
 
-Open Compare and export the current schema before making a change. Later, import that JSON file
-as a baseline, or import a snapshot from another environment. The comparison lists added and
-removed types, property and group changes, compositions, and relationship changes.
+Open Compare and export the current schema before making a change. The file is named after the
+site and the day, as `schema-city-snapshot-example-com-2026-10-07.json`, and records the host it
+came from. Later, import that file as a baseline, or import a snapshot from another environment.
+
+The comparison is a list of causes. A cause is one type with edits of its own: added or removed,
+properties added, removed or changed, a new Data Type on a property, group and tab changes,
+compositions, allowed children, and block or picker targets. The types that only changed because
+of a cause are its side effects and sit under it:
+
+- every type that composes or inherits a composition whose properties changed,
+- every Element Type whose incoming block relationship changed because a host's block list did,
+- every type whose incoming picker or allowed-child relationship changed, and every parent that
+  gained or lost an allowed child because that child type was added or removed.
+
+A type with an edit of its own and a side effect too stays a cause, and says what else it is a
+side effect of. Nothing is dropped: every line of the comparison sits under exactly the causes
+that explain it, and a line nothing explains counts as its type's own edit. The summary reads
+"4 causes, 48 side effects, 1 unplanned", where the old flat list said "1 added, 51 changed".
+
+Mark each cause you planned with its Planned box, or Mark all as planned, or Paste a plan as a
+list of type aliases. Show unplanned only then leaves the changes nobody asked for. The plan lasts
+as long as the baseline does. Copy as Markdown gives a ticket-ready list, with both snapshots'
+hosts and dates, the totals, each cause ticked when planned, and its side effects nested under it.
+Export CSV gives one row per line, with the cause it belongs to, whether it is the cause's own edit
+or a side effect, and whether it was planned.
+
+While a baseline is loaded the city shows a change layer: added types azure, types changed by
+their own edit amber with a ring, side effects a quieter amber, removed types as outlines where
+they stood, and everything else dimmed. Choosing a lens replaces it until the lens is off again.
+The List view gets a Change column, sortable and filterable, with a row for each removed type.
 
 Matched buildings keep their baseline positions. New types appear on separate added boards.
 Comparison covers schema configuration only. It does not compare content usage or dependencies
 in custom code. Snapshot import is for review and does not apply changes to Umbraco.
+
+![Compare against a baseline from before four planned edits: four causes with three marked planned, and Press Release open on the Element Types, parents and pickers that changed only because it was added.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/compare.png)
 
 Outside comparison mode, layouts are deterministic for the same schema. The Group control in the
 toolbar chooses how the city is cut into districts, and the choice is kept in the URL:

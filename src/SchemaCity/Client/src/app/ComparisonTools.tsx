@@ -53,7 +53,7 @@ export function ComparisonTools({
 const KEY: { kind: ChangeKind | "none"; label: string; swatch: string }[] = [
   { kind: "added", label: "added", swatch: "bg-azure" },
   { kind: "changed", label: "changed", swatch: "bg-amber" },
-  { kind: "side effect", label: "side effect", swatch: "bg-amber/35" },
+  { kind: "side effect", label: "side effect", swatch: "bg-amber/30" },
   {
     kind: "removed",
     label: "removed, outline",

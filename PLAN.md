@@ -620,6 +620,17 @@ Done 2026-10-07 on `m9/impact`, planned feature 1 in `docs/product-direction.md`
 - Exports: `impactMarkdown` for a ticket, `impactCsv` with the findings export's escaping and formula protection, settings repeated on every row.
 - UI: an Impact tab in the inspector (totals and chips), `view=impact` with key I, toggles for the four relationships, depth 1, 2 or all, direction, the alias field, Show in city on the shared highlight (now a label and a set of ids), Copy as Markdown with a selected-text fallback, Export CSV, and an Impact action on every Editor view property row. Seo Composition on the seeded site: 37 types, 188 content items, Press Release through Article, a seoTitle collision on Dup Alias Page.
 
+### M9, Compare review (medium)
+
+Done 2026-10-07 on `m9/compare`, after a tech lead verifying staging got "1 added, 20 changed" for four planned edits, fifteen of them Element Types that changed only because Press Release pointed at them.
+
+- Model: each comparison line is a `ChangeDetail` that names the other type explaining it, `via` (the composition a composed property or group comes from, the source of an incoming edge) or `to` (the target of an outgoing edge or block target). `model/changes.ts` groups them: a type with any unexplained line is a cause, every explained line goes under the causes its explainer comes down to (walking through side effects of side effects, loop safe), and a line nothing explains counts as its type's own. An outgoing line only follows its target when that type was added or removed. Tests check that every original line is reachable and that the summary counts types.
+- Scenario (`dev/planned-baseline.ts`, the medium schema before four edits): flat "1 added, 51 changed" becomes "4 causes, 48 side effects".
+- Plan: Planned box per cause, Mark all as planned, Paste a plan by alias, Show unplanned only; kept with the baseline in the drawer, reset on import or Clear.
+- Change layer: a `change` lens ramp while no lens or Show in city is on, azure added, amber cause with a ring, side effect amber most of the way into the background, unchanged dimmed, removed types as signal outlines at their baseline spot (`comparisonCity().removed`). The List gets a Change column and filter, with rows for removed types.
+- Export: Copy as Markdown and Export CSV (`schema-city-changes-<host>-<day>.csv`), both with the plan; snapshots now record `host`, optional on import.
+- Later: a planned set that survives a reload, and grouping by Data Type when one Data Type edit changes several properties.
+
 ### Later, explicitly not v1
 
 - Content mode: instances of a type as a tree, entered from a building.

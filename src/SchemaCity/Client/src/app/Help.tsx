@@ -109,6 +109,10 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         does: "Traces what a change to a type or one of its properties reaches, with each path in words, and copies it as Markdown or saves it as CSV",
       },
       { keys: ["Lens"], does: "Recolours the city by usage" },
+      {
+        keys: ["Compare"],
+        does: "Exports this schema, or imports a snapshot as a baseline and lists what changed since",
+      },
     ],
   },
 ];
@@ -215,6 +219,16 @@ export function Help({
                 counts the content items of each type, published, drafts and
                 trashed items included, and the references between them. The
                 Findings drawer says when each snapshot was taken.
+              </p>
+              <p>
+                Compare lists causes: the types with an edit of their own. The
+                types that only changed because of one, such as every type
+                composing a composition that lost a property, are its side
+                effects and sit under it. Mark the causes you planned, then
+                Show unplanned only leaves the ones nobody asked for. While a
+                baseline is loaded the city colours buildings by change, side
+                effects quieter than causes, and the List gets a Change column.
+                Comparing never changes Umbraco.
               </p>
             </div>
           </section>

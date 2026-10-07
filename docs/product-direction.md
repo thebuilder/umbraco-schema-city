@@ -74,7 +74,8 @@ timestamp rather than describing a type as safe to delete.
 Export a snapshot before a schema change, then import it as a baseline later or in another
 environment. Review added and removed types, property and group changes, and changed relationships.
 Keep matched buildings at their baseline positions. Snapshot import must remain a comparison
-operation, with no schema changes applied to Umbraco.
+operation, with no schema changes applied to Umbraco. Group side effects under the edit that
+caused them, so a reviewer can mark the planned causes and see what nobody planned.
 
 ## Planned features
 
