@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type RefObject,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,6 +19,7 @@ import * as THREE from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { Button } from "@/components/ui/button";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
 import type { SchemaComparison } from "../model/snapshots";
@@ -27,7 +29,6 @@ import type {
   SchemaNode,
   UsageReport,
 } from "../model/types";
-import { Button } from "@/components/ui/button";
 import { inspectorWidthFor } from "./Inspector";
 import {
   type CityBounds,
@@ -2088,6 +2089,52 @@ function Flight({
   return null;
 }
 
+/**
+ * Lets go of every geometry, material and texture the city drew with when this
+ * canvas goes. Some outlive it: three keeps one lookup texture for its standard
+ * material's lighting for the life of the page, and the buildings' box, the
+ * district names and the roof icons are shared at module level. Each renderer that
+ * uploads one adds a dispose listener to it that holds the renderer's WebGL
+ * context, the context holds the canvas, and the canvas holds the whole old app
+ * around it, so every switch of sample or view leaked one app's DOM and
+ * listeners. Disposing runs those listeners, which drop the resource from every
+ * renderer and remove themselves; a live renderer uploads it again when it next
+ * draws with it.
+ *
+ * A layout effect, and the first child of the canvas, so the cleanup runs while the
+ * meshes and their compiled materials are still in the scene.
+ */
+function ReleaseResources() {
+  const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
+  useLayoutEffect(
+    () => () => {
+      const held = new Set<{ dispose: () => void }>();
+      const collect = (value: unknown) => {
+        if ((value as THREE.Texture | null)?.isTexture)
+          held.add(value as THREE.Texture);
+      };
+      scene.traverse((object) => {
+        const { geometry, material } = object as THREE.Mesh;
+        if (geometry) held.add(geometry);
+        for (const each of [material ?? []].flat()) {
+          held.add(each);
+          for (const value of Object.values(each)) collect(value);
+          // Uniforms three filled in itself, such as the lighting lookup.
+          const compiled = gl.properties.get(each) as {
+            uniforms?: Record<string, { value?: unknown } | undefined>;
+          };
+          for (const uniform of Object.values(compiled.uniforms ?? {}))
+            collect(uniform?.value);
+        }
+      });
+      for (const resource of held) resource.dispose();
+    },
+    [gl, scene]
+  );
+  return null;
+}
+
 /** Set once the reader has dismissed the first-visit hint or touched the city. */
 const HINT_SEEN_KEY = "schema-city:hint-seen";
 
@@ -2652,6 +2699,7 @@ export default function Scene({
           }}
           shadows="percentage"
         >
+          <ReleaseResources />
           <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
           <Stage
             districts={city.districts}
@@ -2823,9 +2871,9 @@ export default function Scene({
             bounds={bounds}
             buildingHeight={Math.max(1, ...heights.values())}
             flightRef={cameraFlight}
+            graph={graph}
             inspectorOpen={inspectorOpen}
             overview={focus === null}
-            graph={graph}
             reducedMotion={reducedMotion}
             reframe={reframe}
             selectedAt={selectedAt}
