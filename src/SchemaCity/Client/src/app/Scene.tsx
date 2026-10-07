@@ -28,6 +28,7 @@ import {
   cityDistricts,
   type District,
   type DistrictKind,
+  type Grouping,
   ISLAND_PAD,
   type Placement,
 } from "./layout/city";
@@ -2367,6 +2368,7 @@ const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
 export default function Scene({
   graph,
+  grouping = "structure",
   baseline,
   comparison,
   focusDepth = 1,
@@ -2381,6 +2383,8 @@ export default function Scene({
   onFocus,
 }: {
   graph: SchemaGraph;
+  /** How the city is cut into districts. */
+  grouping?: Grouping;
   baseline?: SchemaGraph | null;
   comparison?: SchemaComparison | null;
   focusDepth?: number;
@@ -2423,9 +2427,9 @@ export default function Scene({
   const city = useMemo(
     () =>
       baseline && comparison
-        ? comparisonCity(baseline, graph, comparison.matches)
-        : cityDistricts(graph),
-    [baseline, comparison, graph]
+        ? comparisonCity(baseline, graph, comparison.matches, grouping)
+        : cityDistricts(graph, grouping),
+    [baseline, comparison, graph, grouping]
   );
   // The ground a nested folder's members cover, which tints that patch of its island.
   // The city layout, not what is on screen, so the islands hold still through a focus.

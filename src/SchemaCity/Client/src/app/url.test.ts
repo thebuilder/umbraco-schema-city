@@ -12,6 +12,7 @@ describe("parseUrl", () => {
       layers: ["structure"],
       lens: "none",
       view: "city",
+      group: "structure",
     });
   });
 
@@ -24,6 +25,7 @@ describe("parseUrl", () => {
       layers: ["structure", "compositions"],
       lens: "none",
       view: "city",
+      group: "structure",
     });
   });
 
@@ -34,6 +36,7 @@ describe("parseUrl", () => {
       layers: ["structure"],
       lens: "none",
       view: "city",
+      group: "structure",
     });
   });
 
@@ -75,6 +78,7 @@ describe("serialiseUrl", () => {
       layers: ["structure"],
       lens: "none",
       view: "city",
+      group: "structure",
     });
   });
 
@@ -85,6 +89,7 @@ describe("serialiseUrl", () => {
       layers: [...LAYERS],
       lens: "cultures",
       view: "city",
+      group: "structure",
     });
   });
 
@@ -95,6 +100,7 @@ describe("serialiseUrl", () => {
       layers: [],
       lens: "unused",
       view: "city",
+      group: "structure",
     });
   });
 
@@ -106,6 +112,7 @@ describe("serialiseUrl", () => {
         layers: ["structure", "compositions"],
         lens: "count",
         view: "city",
+        group: "structure",
       })
     ).toBe("?type=article&focus=1&layers=structure,compositions&lens=count");
   });
@@ -118,6 +125,7 @@ describe("serialiseUrl", () => {
         layers: [],
         lens: "none",
         view: "city",
+        group: "structure",
       })
     ).toBe("?layers=");
   });
@@ -133,6 +141,7 @@ describe("urlToWrite", () => {
     layers: ["structure"],
     lens: "none",
     view: "city",
+    group: "structure",
   };
 
   it("writes the query onto the route the app was mounted under", () => {
@@ -143,6 +152,24 @@ describe("urlToWrite", () => {
 
   it("writes nothing once Open in editor has pushed the editor route", () => {
     expect(urlToWrite(state, workspace, editor)).toBeNull();
+  });
+});
+
+describe("the grouping", () => {
+  it("reads folders, reads anything else as structure, and writes only folders", () => {
+    expect(parseUrl("?group=folders", aliases).group).toBe("folders");
+    expect(parseUrl("?group=rings", aliases).group).toBe("structure");
+    expect(parseUrl("", aliases).group).toBe("structure");
+    expect(
+      serialiseUrl({
+        type: null,
+        focus: false,
+        layers: ["structure"],
+        lens: "none",
+        view: "city",
+        group: "folders",
+      })
+    ).toBe("?layers=structure&group=folders");
   });
 });
 
@@ -163,6 +190,7 @@ describe("the view", () => {
         layers: ["structure"],
         lens: "none",
         view: "list",
+        group: "structure",
       })
     ).toBe("?layers=structure&view=list");
   });

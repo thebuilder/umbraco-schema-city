@@ -1,11 +1,12 @@
 // What about the view is worth putting in a link: which type is open, whether it
-// is focused, which layers are on and which usage lens is running. Pure: no DOM,
-// no React.
+// is focused, which layers are on, which usage lens is running and how the city is
+// grouped. Pure: no DOM, no React.
 //
 // The host owns the address bar. The harness lets the app write its own query
 // string, and the workspace wrapper takes the same state through onStateChange
 // and mirrors it into the backoffice route instead.
 
+import type { Grouping } from "./layout/city";
 import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import { LENSES, type Lens } from "./scene/lens";
 
@@ -28,6 +29,8 @@ export type UrlState = {
   layers: Layer[];
   lens: Lens;
   view: View;
+  /** How the city is cut into districts. Structure is the default and is left out. */
+  group: Grouping;
 };
 
 /**
@@ -59,6 +62,8 @@ export function parseUrl(search: string, aliases: Iterable<string>): UrlState {
     // lens reads as no lens. That covers `top` and `explore`, the camera modes older
     // links carry, which were only ever other angles on the same city.
     view: VIEWS.find((candidate) => candidate === params.get("view")) ?? "city",
+    // Anything but folders, an old link with no group among them, is the default.
+    group: params.get("group") === "folders" ? "folders" : "structure",
   };
 }
 
@@ -87,5 +92,6 @@ export function serialiseUrl(state: UrlState): string {
   parts.push(`layers=${state.layers.join(",")}`);
   if (state.lens !== "none") parts.push(`lens=${state.lens}`);
   if (state.view !== "city") parts.push(`view=${state.view}`);
+  if (state.group !== "structure") parts.push(`group=${state.group}`);
   return `?${parts.join("&")}`;
 }
