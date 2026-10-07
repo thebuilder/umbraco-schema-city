@@ -1,9 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-  // The two Lit wrappers Umbraco loads, the fixture harness and its scripts, and the tests.
+  // The two Lit wrappers Umbraco loads and the element they share, whose lifecycle
+  // methods Lit calls, the fixture harness and its scripts, and the tests.
   "entry": [
     "src/entry-workspace.tsx",
     "src/entry-document-type-view.tsx",
+    "src/schema-city-element.tsx",
     "dev/main.tsx",
     "dev/*.mjs",
     "**/*.test.ts"
