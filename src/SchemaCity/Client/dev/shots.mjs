@@ -266,8 +266,8 @@ const shots = [
 ];
 
 await send("Page.enable");
-// The harness's fixture picker is scaffolding, not product, so it stays out of the
-// shots. Injected on every navigation, before the app mounts, so the scene measures
+// The harness's sample picker in the footer is scaffolding, not product, so it
+// stays out of the shots. Injected on every navigation, before the app mounts, so the scene measures
 // the viewport it is actually photographed at.
 await send("Page.addScriptToEvaluateOnNewDocument", {
   // The first-visit hint is for people, not for the README, so every shot is a
@@ -275,7 +275,7 @@ await send("Page.addScriptToEvaluateOnNewDocument", {
   source: `try { localStorage.setItem("schema-city:hint-seen", "1"); } catch {}
   document.addEventListener("DOMContentLoaded", () => {
     const style = document.createElement("style");
-    style.textContent = ".demo-footer { display: none }";
+    style.textContent = ".demo-picker { display: none }";
     document.head.append(style);
   });`,
 });

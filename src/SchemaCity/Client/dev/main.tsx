@@ -63,7 +63,6 @@ const demoDecisions: DecisionStore = {
   },
 };
 
-const picker = document.querySelector("select") as HTMLSelectElement;
 const root = createRoot(document.querySelector("#app") as HTMLElement);
 
 const fixtureLabel = (path: string) => {
@@ -74,18 +73,44 @@ const fixtureLabel = (path: string) => {
   return `${name.charAt(0).toUpperCase()}${name.slice(1)} schema`;
 };
 
-for (const path of Object.keys(fixtures).sort()) {
-  if (path.endsWith("-usage.json") || path.endsWith("-planted.json")) continue;
-  picker.add(new Option(fixtureLabel(path), path));
+const samples = Object.keys(fixtures)
+  .sort()
+  .filter(
+    (path) => !(path.endsWith("-usage.json") || path.endsWith("-planted.json"))
+  );
+
+/**
+ * The sample picker, in the app's own footer rather than a second bar under it.
+ * The app remounts on a new sample, and the picker with it, so it takes focus back
+ * when it was the control that changed.
+ */
+function SamplePicker({ path, refocus }: { path: string; refocus: boolean }) {
+  return (
+    <label className="demo-picker">
+      Sample schema
+      <select
+        autoFocus={refocus}
+        onChange={(event) => void show(event.target.value, true)}
+        value={path}
+      >
+        {samples.map((sample) => (
+          <option key={sample} value={sample}>
+            {fixtureLabel(sample)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 }
 
-async function show(path: string) {
+async function show(path: string, refocus = false) {
   const load = fixtures[path] as () => Promise<unknown>;
   const graph = (await load()) as SchemaGraph;
   const usage = usageOf(path);
   root.render(
     <App
       decisions={demoDecisions}
+      footer={<SamplePicker path={path} refocus={refocus} />}
       graph={graph}
       icons={icons}
       key={path}
@@ -96,5 +121,4 @@ async function show(path: string) {
   );
 }
 
-picker.addEventListener("change", () => void show(picker.value));
-void show(picker.value);
+void show(samples[0]);

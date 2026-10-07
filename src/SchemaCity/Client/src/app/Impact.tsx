@@ -79,12 +79,10 @@ export function ImpactSummary({
   impact,
   nodesById,
   onSelect,
-  onOpen,
 }: {
   impact: Impact;
   nodesById: Map<string, SchemaNode>;
   onSelect: (id: string) => void;
-  onOpen: () => void;
 }) {
   return (
     <>
@@ -93,16 +91,12 @@ export function ImpactSummary({
           A change reaches {totalsLine(impact.types, impact.content)}, along
           every relationship at any depth.
         </p>
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <Button
-            className={READING}
-            onClick={onOpen}
-            size="sm"
-            variant="outline"
-          >
-            Open impact
-          </Button>
-          <Muted>Paths in words, depth, a property alias and exports.</Muted>
+        {/* The full page opens from the Impact button above, the one way in. */}
+        <div className="mt-1.5">
+          <Muted>
+            Impact, above, opens the full trace: paths in words, depth, a
+            property alias and exports.
+          </Muted>
         </div>
       </Section>
       {impact.groups.map((group) => (

@@ -1,5 +1,12 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Command,
   CommandDialog,
@@ -8,26 +15,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { dataTypeNames, dataTypeUsers } from "../model/data-types";
 import { findFindings } from "../model/findings";
 import { impactOf } from "../model/impact";
@@ -36,13 +24,8 @@ import { reachableWithin } from "../model/reach";
 import { type DecisionStore, splitReviewed } from "../model/review";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
-import {
-  citySummary,
-  LiveRegion,
-  plural,
-  SEARCH_KEY,
-  useHandOff,
-} from "./a11y";
+import { citySummary, LiveRegion, plural, useHandOff } from "./a11y";
+import { AppFooter, AppHeader, LAYER_LABEL, PickFirst } from "./Chrome";
 import {
   ComparisonLegend,
   ComparisonTools,
@@ -52,7 +35,6 @@ import { Findings } from "./Findings";
 import { Help } from "./Help";
 import { Inspector } from "./Inspector";
 import { TextButton } from "./InspectorChips";
-import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
 import { PresentationLayer, PresentBar, usePresentation } from "./Presentation";
 import { FindingLinks, useReviewing } from "./Review";
@@ -60,7 +42,6 @@ import { DEFAULT_LAYERS, LAYERS, type Layer } from "./scene/layers";
 import {
   highlightScale,
   LENS_LABEL,
-  LENSES,
   type Lens,
   type LensScale,
   lensScale,
@@ -71,32 +52,22 @@ import { CompareContext } from "./TypeTable";
 import {
   FLAT_VIEWS,
   parseUrl,
+  TYPE_PAGES,
   type UrlState,
   urlToWrite,
   type View,
+  viewOf,
 } from "./url";
 import {
   Announcements,
   FlatView,
   focusScope,
+  PAGE_TABS,
   VIEW_TABS,
-  ViewSwitcher,
 } from "./Views";
 
 /** The tag names whose own keyboard handling wins over the shortcut keys. */
 const FIELD = /^(INPUT|TEXTAREA|SELECT)$/;
-
-const GROUPINGS: { value: Grouping; label: string }[] = [
-  { value: "structure", label: "Structure" },
-  { value: "folders", label: "Folders" },
-];
-
-const LAYER_LABEL: Record<Layer, string> = {
-  structure: "Structure",
-  compositions: "Compositions",
-  blocks: "Blocks",
-  references: "References",
-};
 
 /**
  * `layers` with one layer switched. Rebuilt from LAYERS rather than pushed onto, so
@@ -180,10 +151,16 @@ export function App({
   decisions,
   initial,
   onStateChange,
+  usagePending = false,
+  footer,
 }: {
   graph: SchemaGraph;
   /** The usage report, once it has arrived. The city never waits for it. */
   usage?: UsageReport;
+  /** Whether the usage report is still on its way, which the footer says. */
+  usagePending?: boolean;
+  /** The host's own controls for the footer, like the harness's sample picker. */
+  footer?: ReactNode;
   /**
    * Umbraco icon name to SVG string, for the roofs. The wrappers resolve these from
    * the backoffice icon registry; a name that is missing draws no icon.
@@ -227,7 +204,8 @@ export function App({
       focus: state.focus === true,
       layers: state.layers ?? [...DEFAULT_LAYERS],
       lens: state.lens ?? "none",
-      view: state.view ?? "city",
+      // A type page needs its type, and an old link may name one with none.
+      view: viewOf(state.view, found?.id ?? null),
       group: state.group ?? "structure",
       dataType: state.dataType ?? null,
       present: state.present === true,
@@ -243,6 +221,13 @@ export function App({
   const [layers, setLayers] = useState<Layer[]>(start.layers);
   const [lens, setLens] = useState<Lens>(start.lens);
   const [view, setView] = useState<View>(start.view);
+  // The schema-wide view a type page goes back to, the last one that was on.
+  const [back, setBack] = useState<View>(
+    TYPE_PAGES.includes(start.view) ? "city" : start.view
+  );
+  if (!(TYPE_PAGES.includes(view) || view === back)) setBack(view);
+  // Bumped when E or I is pressed with no type to open, which says so.
+  const [nudge, setNudge] = useState(0);
   const [group, setGroup] = useState<Grouping>(start.group);
   const [dataType, setDataType] = useState<string | null>(start.dataType);
   // What Show in city lights up, from a Data Type page or an impact trace, until
@@ -279,7 +264,7 @@ export function App({
     closeInspector,
   } = usePresentation(start.present, () => setReframe((count) => count + 1));
 
-  // Home, and the Reset view button over the city. Leaving focus already flies back
+  // Home, and the Reset view button in the footer. Leaving focus already flies back
   // to the whole city, so it only asks for a fresh framing with no focus to leave.
   const resetView = () => {
     if (focus) setFocus(null);
@@ -339,10 +324,13 @@ export function App({
         setLayers((on) => withLayer(on, layer));
         return;
       }
-      // A view key pressed again goes back to the city.
+      // A view key pressed again goes back to the city, a page key to the view
+      // the page was opened from.
       const key = event.key.toLowerCase();
       const tab = VIEW_TABS.find((candidate) => candidate.key === key);
       if (tab) setView((at) => (at === tab.value ? "city" : tab.value));
+      const page = PAGE_TABS.find((candidate) => candidate.key === key);
+      if (page) togglePage(page.value);
       if (key === "home") resetView();
       if (key === "?") setHelpOpen(true);
       if (key === "p") present(!presenting);
@@ -351,7 +339,17 @@ export function App({
     // both the backoffice and the harness.
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [paletteOpen, helpOpen, selected, focus, presenting, details]);
+  }, [
+    paletteOpen,
+    helpOpen,
+    selected,
+    focus,
+    presenting,
+    details,
+    view,
+    back,
+    impactStart,
+  ]);
 
   const { nodes } = graph;
   const nodesById = useMemo(
@@ -554,11 +552,27 @@ export function App({
         ?.focus({ preventScroll: true })
     );
   };
-  // Leaving the view lets go of the type it was opened for, so coming back with I
-  // or the switcher traces whatever is selected then.
+  // Leaving the view lets go of the type it was opened for.
   useEffect(() => {
     if (view !== "impact") setImpactStart(null);
   }, [view]);
+  // The type the page on screen is about. The trace keeps its own start while a
+  // click on one of its rows selects another type.
+  const pageAbout = view === "impact" ? (impactStart ?? selected) : selected;
+  // A type page whose type was put down goes back rather than standing empty.
+  if (TYPE_PAGES.includes(view) && !pageAbout) setView(back);
+
+  /**
+   * E and I, and the inspector's Editor and Impact: the page about the selected
+   * type, or, when that page is already on it, back to the view it came from. With
+   * nothing selected there is nothing to open, and the hint says so.
+   */
+  const togglePage = (page: View) => {
+    if (view === page && (!selected || pageAbout === selected)) setView(back);
+    else if (!selected) setNudge((count) => count + 1);
+    else if (page === "impact") openImpact(selected);
+    else setView(page);
+  };
   // The inspector's Impact tab: every relationship, any depth, for the selection.
   const selectedImpact = useMemo(
     () => impactOf(graph, selected ?? "", {}, usage),
@@ -594,190 +608,38 @@ export function App({
             selected={selected}
             view={view}
           />
-          {/* Wrapping, not a breakpoint: the toolbar folds when its own contents stop
-            fitting, which is 848 px with the lens picker reading None and earlier
-            once a longer lens name widens it. The backoffice is narrower than the
-            harness, and a media query would have to guess by how much. ml-auto still
-            holds the right group against the right edge on whichever row it lands.
-
-            shrink-0 so the column below can never trade the second row away, and
-            relative z-10 with a background of its own because the scene under it is
-            a positioned layer: a positioned box paints over a plain sibling's text
-            whatever the source order, so the toolbar has to be on a layer too. */}
-          {/* Hidden rather than unmounted while presenting, so its menus and
-            drawers keep their state for when the presenter comes back. */}
-          <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-line border-b bg-background px-4 py-2.5 in-data-present:hidden">
-            <h1 className="shrink-0 font-bold text-phosphor-bright text-sm uppercase tracking-terminal-lg">
-              Schema City
-            </h1>
-
-            {/* One button rather than four, because the backoffice is narrower than
-              the harness and four of them ran off the edge. The count is on the
-              label so the toolbar still says how much of the city is drawn.
-              ponytail: base-ui's Menu is 6.9 kB gzipped of vendor that nothing else
-              here uses. Four checkbox rows in the Popover already in the bundle
-              would be free, at the cost of writing the roving focus and the
-              typeahead this gets for nothing. Swap it if the bundle gets tight. */}
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button data-trigger size="sm" variant="outline" />}
-              >
-                Layers {layers.length}/{LAYERS.length}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {LAYERS.map((layer, index) => (
-                  <DropdownMenuCheckboxItem
-                    checked={layers.includes(layer)}
-                    key={layer}
-                    onCheckedChange={() =>
-                      setLayers((on) => withLayer(on, layer))
-                    }
-                  >
-                    {LAYER_LABEL[layer]}
-                    <DropdownMenuShortcut>{index + 1}</DropdownMenuShortcut>
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Structure follows what an editor can create where, Folders the
-              folders the schema files its types in. Only the city is grouped. */}
-            {/* biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads. */}
-            <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal">
-              Group
-              <Select
-                disabled={view !== "city"}
-                items={GROUPINGS}
-                onValueChange={(value) => {
-                  // The comparison's baseline positions and a focus both stand on the
-                  // city layout, so a new grouping starts from the whole city.
-                  setFocus(null);
-                  setGroup(value as Grouping);
-                }}
-                value={group}
-              >
-                <SelectTrigger
-                  aria-label="Group the city by"
-                  className="text-2xs uppercase tracking-terminal"
-                  size="sm"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GROUPINGS.map(({ value, label }) => (
-                    <SelectItem
-                      className="text-2xs uppercase tracking-terminal"
-                      key={value}
-                      value={value}
-                    >
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-
-            <ViewSwitcher onView={setView} view={view} />
-
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              {/* A disabled trigger swallows its own pointer events, and with them
-                the hover the tooltip needs, so the tooltip wraps the label. */}
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    // biome-ignore lint/a11y/noLabelWithoutControl: the Select this label names is its child, one JSX level below what the rule reads.
-                    <label className="flex shrink-0 items-center gap-1.5 font-bold text-2xs text-phosphor-dim uppercase tracking-terminal" />
-                  }
-                >
-                  Lens
-                  <Select
-                    disabled={!usage}
-                    items={LENSES.map((name) => ({
-                      label: LENS_LABEL[name],
-                      value: name,
-                    }))}
-                    onValueChange={(value) => {
-                      setHighlight(null);
-                      setLens(value as Lens);
-                    }}
-                    value={lens}
-                  >
-                    <SelectTrigger
-                      aria-label="Usage lens"
-                      className="text-2xs uppercase tracking-terminal"
-                      size="sm"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LENSES.map((name) => (
-                        <SelectItem
-                          className="text-2xs uppercase tracking-terminal"
-                          key={name}
-                          value={name}
-                        >
-                          {LENS_LABEL[name]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TooltipTrigger>
-                {usage ? null : (
-                  <TooltipContent>
-                    The usage endpoint did not answer, so the lens is off.
-                  </TooltipContent>
-                )}
-              </Tooltip>
-
-              <Findings
-                findings={findings}
-                graph={graph}
-                nodesById={nodesById}
-                onOpenChange={setFindingsOpen}
-                onSelect={followLink}
-                open={findingsOpen}
-                usage={usage}
-              />
-
-              <ComparisonTools
-                baseline={baseline}
-                changes={changes}
-                graph={graph}
-                onBaselineChange={(next) => {
-                  setBaseline(next);
-                  setFocus(null);
-                  if (next) setLens("none");
-                }}
-                onOpenChange={setComparisonOpen}
-                onSelect={(id) => {
-                  setComparisonOpen(false);
-                  followLink(id);
-                }}
-                open={comparisonOpen}
-              />
-
-              <Legend />
-
-              <Help onOpenChange={setHelpOpen} open={helpOpen} />
-
-              {/* No tooltip on a control that opens a dialog: the tooltip's exit
-                animation plays over the dialog opening, which reads as the label
-                flying away. The shortcut goes in the button instead. */}
-              <Button
-                aria-keyshortcuts="P"
-                onClick={() => present(true)}
-                size="sm"
-                variant="outline"
-              >
-                Present
-              </Button>
-
-              <Button data-trigger onClick={() => openPalette(true)} size="sm">
-                Search
-                <Kbd>{SEARCH_KEY}</Kbd>
-              </Button>
-            </div>
-          </div>
+          <AppHeader
+            onSearch={() => openPalette(true)}
+            onView={setView}
+            view={view}
+          >
+            <Findings
+              findings={findings}
+              graph={graph}
+              nodesById={nodesById}
+              onOpenChange={setFindingsOpen}
+              onSelect={followLink}
+              open={findingsOpen}
+              usage={usage}
+            />
+            <ComparisonTools
+              baseline={baseline}
+              changes={changes}
+              graph={graph}
+              onBaselineChange={(next) => {
+                setBaseline(next);
+                setFocus(null);
+                if (next) setLens("none");
+              }}
+              onOpenChange={setComparisonOpen}
+              onSelect={(id) => {
+                setComparisonOpen(false);
+                followLink(id);
+              }}
+              open={comparisonOpen}
+            />
+            <Help onOpenChange={setHelpOpen} open={helpOpen} />
+          </AppHeader>
 
           {/* A container, so the inspector sizes itself to the room the workspace has. */}
           <div className="@container relative min-h-0 flex-1">
@@ -825,6 +687,7 @@ export function App({
               >
                 <CompareContext value={compare}>
                   <FlatView
+                    back={{ view: back, onBack: () => setView(back) }}
                     dataTypes={{
                       selected: dataType,
                       onChoose: setDataType,
@@ -898,7 +761,6 @@ export function App({
                     )}
                     layers={layers}
                     onFocus={enterFocus}
-                    onReset={resetView}
                     onSelect={(id) =>
                       id === null ? putDown() : setSelected(id)
                     }
@@ -931,7 +793,7 @@ export function App({
                 <Inspector
                   canExpandFocus={canExpandFocus}
                   edges={graph.edges}
-                  editorLayoutOpen={view === "editor"}
+                  editorOpen={view === "editor"}
                   findings={findings.filter(
                     (finding) => finding.nodeId === selectedNode.id
                   )}
@@ -940,13 +802,16 @@ export function App({
                   focused={focus === selectedNode.id}
                   icons={icons}
                   impact={selectedImpact}
+                  impactOpen={
+                    view === "impact" && pageAbout === selectedNode.id
+                  }
                   neighbourhood={neighbourhood}
                   node={selectedNode}
                   nodesById={nodesById}
                   onClose={closeInspector(putDown)}
-                  onEditorLayout={() => setView("editor")}
+                  onEditor={() => togglePage("editor")}
                   onExpandFocus={() => setFocusDepth((depth) => depth + 1)}
-                  onOpenImpact={() => openImpact(selectedNode.id)}
+                  onImpact={() => togglePage("impact")}
                   onOpenType={onOpenType}
                   onSelect={followLink}
                   onToggleFocus={toggleFocus}
@@ -955,7 +820,40 @@ export function App({
                 />
               ) : null}
             </PresentationLayer>
+            <PickFirst count={nudge} />
           </div>
+
+          <AppFooter
+            graph={graph}
+            onPresent={() => present(true)}
+            tools={
+              view === "city"
+                ? {
+                    layers,
+                    onLayer: (layer) => setLayers((on) => withLayer(on, layer)),
+                    group,
+                    // The comparison's baseline positions and a focus both stand
+                    // on the city layout, so a new grouping starts from the whole
+                    // city.
+                    onGroup: (next) => {
+                      setFocus(null);
+                      setGroup(next);
+                    },
+                    lens,
+                    onLens: (next) => {
+                      setHighlight(null);
+                      setLens(next);
+                    },
+                    lensReady: Boolean(usage),
+                    onReset: resetView,
+                  }
+                : null
+            }
+            usage={usage}
+            usagePending={usagePending}
+          >
+            {footer}
+          </AppFooter>
 
           {/* One height whatever the query matches, so the panel never jumps while
             you type and the list scrolls inside it. */}

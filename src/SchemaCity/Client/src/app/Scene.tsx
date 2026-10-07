@@ -19,7 +19,6 @@ import * as THREE from "three";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
-import { Button } from "@/components/ui/button";
 import type { ChangeGroups, ChangeKind } from "../model/changes";
 import { neighbourhoods } from "../model/neighbourhood";
 import { reachableWithin } from "../model/reach";
@@ -2223,18 +2222,15 @@ function hintSeen(): boolean {
 }
 
 /**
- * The way back for a reader who is lost, over the bottom-left of the canvas: a
- * Reset view button that does what Home does, for the laptops that have no Home
- * key, and on the first visit a hint that says it is there. The hint goes with its
- * close button or the first press, scroll or key on the city.
+ * On the first visit, a hint over the bottom-left of the canvas that says how to
+ * move and where the way back is: Reset view in the footer under it, or Home. It
+ * goes with its close button or the first press, scroll or key on the city.
  */
-function CanvasOverlay({
+function FirstVisitHint({
   host,
-  onReset,
   raised,
 }: {
   host: RefObject<HTMLElement | null>;
-  onReset: () => void;
   /** Whether the comparison legend holds the corner, so this sits above it. */
   raised: boolean;
 }) {
@@ -2260,36 +2256,24 @@ function CanvasOverlay({
     };
   }, [hint, host]);
 
+  if (!hint) return null;
   return (
     <div
-      // Chrome, which presenting hides; Home still reframes.
-      className={`absolute left-3 z-10 flex flex-col items-start gap-2 in-data-present:hidden ${raised ? "bottom-14" : "bottom-3"}`}
+      // Chrome, which presenting hides.
+      className={`absolute left-3 z-10 flex max-w-72 items-start gap-2 border border-line bg-panel py-2 pr-1 pl-3 text-2xs text-phosphor leading-relaxed shadow-panel in-data-present:hidden ${raised ? "bottom-14" : "bottom-3"}`}
     >
-      {hint ? (
-        <div className="flex max-w-72 items-start gap-2 border border-line bg-panel py-2 pr-1 pl-3 text-2xs text-phosphor leading-relaxed shadow-panel">
-          <p>
-            Drag to orbit, scroll to zoom, click a building. Lost? Reset view.
-          </p>
-          <button
-            aria-label="Dismiss the hint"
-            className="shrink-0 px-1.5 text-phosphor-bright"
-            onClick={dismiss}
-            type="button"
-          >
-            ×
-          </button>
-        </div>
-      ) : null}
-      <Button
-        aria-keyshortcuts="Home"
-        aria-label="Reset view, framing the whole city again"
-        className="bg-panel"
-        onClick={onReset}
-        size="sm"
-        variant="outline"
+      <p>
+        Drag to orbit, scroll to zoom, click a building. Lost? Reset view, in
+        the bar below, or Home.
+      </p>
+      <button
+        aria-label="Dismiss the hint"
+        className="shrink-0 px-1.5 text-phosphor-bright"
+        onClick={dismiss}
+        type="button"
       >
-        Reset view
-      </Button>
+        ×
+      </button>
     </div>
   );
 }
@@ -2418,7 +2402,6 @@ export default function Scene({
   inspectorOpen = false,
   textScale = 1,
   reframe = 0,
-  onReset,
   onSelect,
   onFocus,
 }: {
@@ -2455,8 +2438,6 @@ export default function Scene({
    * the camera has to answer Home a second time from wherever the reader took it.
    */
   reframe?: number;
-  /** What Home does, for the Reset view button over the canvas. */
-  onReset?: () => void;
   onSelect: (id: string | null) => void;
   onFocus: (id: string) => void;
 }) {
@@ -3015,13 +2996,7 @@ export default function Scene({
           <Controls reducedMotion={reducedMotion} span={span} />
         </Canvas>
       ) : null}
-      {onReset ? (
-        <CanvasOverlay
-          host={host}
-          onReset={onReset}
-          raised={scale?.ramp === "change"}
-        />
-      ) : null}
+      <FirstVisitHint host={host} raised={scale?.ramp === "change"} />
     </section>
   );
 }

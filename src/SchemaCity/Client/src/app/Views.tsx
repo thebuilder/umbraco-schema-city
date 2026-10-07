@@ -15,21 +15,33 @@ import { ImpactView, type ImpactViewProps } from "./Impact";
 import { TextButton } from "./InspectorChips";
 import { Matrix } from "./Matrix";
 import { type ListProps, TypeTable } from "./TypeTable";
-import { FLAT_VIEWS, type View } from "./url";
+import { TYPE_PAGES, type View } from "./url";
 
 /**
- * The switcher's entries, and the single key that toggles each one. Data Types has
- * none: D pans the camera and no free letter says Data Types.
+ * The switcher's entries, the views over the whole schema, and the single key that
+ * toggles each one. Data Types has none: D pans the camera and no free letter says
+ * Data Types.
  */
 export const VIEW_TABS: { value: View; label: string; key?: string }[] = [
   { value: "city", label: "City" },
   { value: "list", label: "List", key: "l" },
   { value: "tree", label: "Tree", key: "t" },
   { value: "matrix", label: "Matrix", key: "m" },
-  { value: "editor", label: "Editor", key: "e" },
   { value: "datatypes", label: "Data Types" },
+];
+
+/**
+ * The pages about the selected type, which open from the inspector or their key
+ * rather than the switcher: without a type they would be empty.
+ */
+export const PAGE_TABS: { value: View; label: string; key: string }[] = [
+  { value: "editor", label: "Editor", key: "e" },
   { value: "impact", label: "Impact", key: "i" },
 ];
+
+const labelOf = (view: View) =>
+  [...VIEW_TABS, ...PAGE_TABS].find((tab) => tab.value === view)?.label ??
+  "City";
 
 const ITEM = `${toggleVariants({ size: "sm", variant: "outline" })} min-w-0 border-0 bg-secondary px-3 focus-visible:z-10 focus-visible:outline-offset-[-2px]`;
 
@@ -37,7 +49,7 @@ const ITEM = `${toggleVariants({ size: "sm", variant: "outline" })} min-w-0 bord
  * The canvas view and the 2D views that replace it, as a radio group: one choice,
  * arrow keys to move it, and the chosen view as the one tab stop. Built from
  * buttons with radio roles rather than base-ui's toggle group, whose roving focus
- * stayed on the item last pressed when L, T, M or E switched the view, and rather
+ * stayed on the item last pressed when L, T or M switched the view, and rather
  * than native radios, which would swallow those keys as typing in a field.
  */
 export function ViewSwitcher({
@@ -47,7 +59,8 @@ export function ViewSwitcher({
   view: View;
   onView: (view: View) => void;
 }) {
-  const current = FLAT_VIEWS.includes(view) ? view : "city";
+  // On a type page no radio is checked, and the first one is the tab stop.
+  const current = VIEW_TABS.some((tab) => tab.value === view) ? view : null;
   return (
     <div
       aria-label="View"
@@ -55,7 +68,7 @@ export function ViewSwitcher({
       onKeyDown={roving}
       role="radiogroup"
     >
-      {VIEW_TABS.map((tab) => {
+      {VIEW_TABS.map((tab, index) => {
         const on = tab.value === current;
         return (
           // biome-ignore lint/a11y/useSemanticElements: a native radio is a field, and the app's single-key shortcuts stand down inside fields.
@@ -67,7 +80,7 @@ export function ViewSwitcher({
             key={tab.value}
             onClick={() => onView(tab.value)}
             role="radio"
-            tabIndex={on ? 0 : -1}
+            tabIndex={on || (current === null && index === 0) ? 0 : -1}
             type="button"
           >
             {tab.label}
@@ -116,9 +129,7 @@ export function Announcements({
   useAnnounceChange(
     selected ? `${name(selected)} selected` : "Selection cleared"
   );
-  useAnnounceChange(
-    `${VIEW_TABS.find((tab) => tab.value === view)?.label ?? "City"} view`
-  );
+  useAnnounceChange(`${labelOf(view)} view`);
   useAnnounceChange(`Layers on: ${layers.join(", ") || "none"}`);
   useAnnounceChange(
     lit
@@ -188,6 +199,8 @@ type FlatViewProps = {
   scope?: FocusScope | null;
   /** Leaves focus, which is how the lists go back to every type. */
   onShowAll?: () => void;
+  /** The schema-wide view a type page goes back to, and the way there. */
+  back?: { view: View; onBack: () => void };
 };
 
 type PageProps = FlatViewProps & { roleFor: (node: SchemaNode) => Role };
@@ -233,12 +246,55 @@ const PAGES: Partial<Record<View, (props: PageProps) => ReactNode>> = {
 
 export function FlatView(props: FlatViewProps) {
   const page = PAGES[props.view];
-  if (page)
-    return page({
-      ...props,
-      roleFor: (node) => roleOf(node, props.neighbourhoodById.get(node.id)),
-    });
-  return <Lists {...props} />;
+  if (!page) return <Lists {...props} />;
+  const body = page({
+    ...props,
+    roleFor: (node) => roleOf(node, props.neighbourhoodById.get(node.id)),
+  });
+  if (!(props.back && TYPE_PAGES.includes(props.view))) return body;
+  const about = props.view === "impact" ? props.impact.start : props.selected;
+  return (
+    <div className="flex h-full flex-col bg-background">
+      <Crumb
+        back={props.back}
+        name={props.nodesById.get(about ?? "")?.name ?? ""}
+        page={props.view}
+      />
+      <div className="min-h-0 flex-1">{body}</div>
+    </div>
+  );
+}
+
+/**
+ * Where a type page sits, as "Home › Editor", and the way back to the schema-wide
+ * view it was opened from, with the selection kept.
+ */
+function Crumb({
+  back,
+  name,
+  page,
+}: {
+  back: NonNullable<FlatViewProps["back"]>;
+  name: string;
+  page: View;
+}) {
+  return (
+    <nav
+      aria-label="Breadcrumb"
+      className="flex flex-wrap items-baseline gap-x-2 border-line border-b bg-panel px-4 py-1.5 font-sans text-label text-xs"
+    >
+      <TextButton onClick={back.onBack}>
+        ← Back to {labelOf(back.view)}
+      </TextButton>
+      <ol className="flex min-w-0 items-baseline gap-1.5">
+        <li className="truncate text-prose">{name}</li>
+        <li aria-hidden>›</li>
+        <li aria-current="page" className="text-foreground">
+          {labelOf(page)}
+        </li>
+      </ol>
+    </nav>
+  );
 }
 
 function Lists({

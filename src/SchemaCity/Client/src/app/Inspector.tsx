@@ -133,8 +133,8 @@ export function Inspector({
   node,
   nodesById,
   onClose,
-  editorLayoutOpen,
-  onEditorLayout,
+  editorOpen = false,
+  onEditor,
   onOpenType,
   onSelect,
   onToggleFocus,
@@ -147,12 +147,15 @@ export function Inspector({
   onExpandFocus,
   canExpandFocus = false,
   impact,
-  onOpenImpact,
+  impactOpen = false,
+  onImpact,
 }: {
   /** What a change to the type reaches, along every relationship. */
   impact: Impact;
-  /** Shows the full impact page for this type. */
-  onOpenImpact: () => void;
+  /** Whether the Impact page is on, tracing this type. */
+  impactOpen?: boolean;
+  /** Opens the Impact page on this type, or closes it when it is on. */
+  onImpact: () => void;
   focused: boolean;
   /** Umbraco icon name to SVG, the same map the scene puts on the roofs. */
   icons?: Record<string, string>;
@@ -160,9 +163,9 @@ export function Inspector({
   node: SchemaNode;
   nodesById: Map<string, SchemaNode>;
   onClose: () => void;
-  /** Shows the type in the editor view, unless that view is already on. */
-  onEditorLayout?: () => void;
-  editorLayoutOpen?: boolean;
+  /** Opens the Editor page on this type, or closes it when it is on. */
+  onEditor?: () => void;
+  editorOpen?: boolean;
   onOpenType?: (id: string) => void;
   onSelect: (id: string) => void;
   onToggleFocus: () => void;
@@ -296,17 +299,31 @@ export function Inspector({
             focused={focused}
             onToggleFocus={onToggleFocus}
           />
-          {/* Hidden while the editor view is already showing this type. */}
-          {onEditorLayout && !editorLayoutOpen ? (
+          {/* The two pages about this type, which is why they open from here and
+            not from the header. Pressed while on, and pressing again goes back
+            to the view they were opened from, as E and I do. */}
+          {onEditor ? (
             <Button
-              className={READING}
-              onClick={onEditorLayout}
+              aria-keyshortcuts="E"
+              aria-pressed={editorOpen}
+              className={`${READING} aria-pressed:border-phosphor aria-pressed:text-phosphor-bright`}
+              onClick={onEditor}
               size="sm"
               variant="outline"
             >
-              Editor layout
+              Editor
             </Button>
           ) : null}
+          <Button
+            aria-keyshortcuts="I"
+            aria-pressed={impactOpen}
+            className={`${READING} aria-pressed:border-phosphor aria-pressed:text-phosphor-bright`}
+            onClick={onImpact}
+            size="sm"
+            variant="outline"
+          >
+            Impact
+          </Button>
           <Button
             className={`ml-auto ${READING} font-semibold`}
             onClick={() => onOpenType?.(node.id)}
@@ -383,7 +400,6 @@ export function Inspector({
             <ImpactSummary
               impact={impact}
               nodesById={nodesById}
-              onOpen={onOpenImpact}
               onSelect={onSelect}
             />
           ) : null}
