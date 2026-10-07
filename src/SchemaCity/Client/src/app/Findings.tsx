@@ -238,7 +238,9 @@ function Header({
           <span className={problems > 0 ? "text-signal" : ""}>
             {plural(problems, "open problem")}
           </span>
-          {shown === findings.length ? null : `, ${shown} shown`}
+          {shown === findings.length || shown === open.length
+            ? null
+            : `, ${shown} shown`}
         </p>
         <Button
           className={READING}

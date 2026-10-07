@@ -121,9 +121,9 @@ export const subjectName = (
     ? (nodesById.get(finding.nodeId)?.name ?? "a deleted type")
     : (links?.nameOf(finding.dataTypeIds?.[0] ?? "") ?? "a Data Type");
 
-/** "Kept for the old import, Ada, 2026-10-07". */
+/** “Kept for the old import”, Ada, 2026-10-07. The quotes set the reason apart. */
 const decisionText = ({ reason, decidedBy, decidedAt }: Decision) =>
-  [reason, decidedBy, dayOf(decidedAt)].filter(Boolean).join(", ");
+  [`“${reason}”`, decidedBy, dayOf(decidedAt)].filter(Boolean).join(", ");
 
 const LINK =
   "px-1 py-0.5 text-phosphor text-xs hover:text-phosphor-bright hover:underline";
