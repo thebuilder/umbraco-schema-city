@@ -1,0 +1,136 @@
+name: verify
+
+on:
+  workflow_call:
+    inputs:
+      package-version:
+        description: Version for the NuGet package and the Umbraco manifest. Empty keeps the committed one.
+        type: string
+        default: ''
+      release-tag:
+        description: GitHub release tag that the package's release notes link to.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        umbraco: [17.6.2, 18.1.1]
+    env:
+      PACKAGE_VERSION: ${{ inputs.package-version }}
+      RELEASE_TAG: ${{ inputs.release-tag }}
+    steps:
+      # Full history, because fallow's audit gate diffs the client against the base commit.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/SchemaCity/Client/package-lock.json
+
+      # Vite copies the manifest from public/ as it is, so a release writes its version in
+      # before the client build.
+      - name: stamp the release version on the manifest
+        if: inputs.package-version != ''
+        working-directory: src/SchemaCity/Client/public
+        run: |
+          jq --arg v "$PACKAGE_VERSION" '.version = $v' umbraco-package.json > manifest.tmp
+          mv manifest.tmp umbraco-package.json
+
+      - run: npm ci
+        working-directory: src/SchemaCity/Client
+
+      - run: npm run lint
+        working-directory: src/SchemaCity/Client
+
+      - run: npm test
+        working-directory: src/SchemaCity/Client
+
+      # Only on a pull request: the gate compares the changed files against the base,
+      # and a push has nothing to compare them to.
+      - name: audit the changed client code
+        if: github.event_name == 'pull_request'
+        working-directory: src/SchemaCity/Client
+        run: npm run fallow -- --base '${{ github.event.pull_request.base.sha }}' --format github-annotations
+
+      - run: npm run build
+        working-directory: src/SchemaCity/Client
+
+      - run: npm run build:demo
+        working-directory: src/SchemaCity/Client
+
+      # npm ran above, so the library's own client build target has nothing to do.
+      - run: >-
+          dotnet build SchemaCity.sln -c Release -p:UmbracoVersion=${{ matrix.umbraco }}
+          -p:SkipClientBuild=true -p:ContinuousIntegrationBuild=true
+          ${PACKAGE_VERSION:+-p:Version=$PACKAGE_VERSION}
+
+      - run: dotnet test SchemaCity.sln -c Release --no-build
+
+      # One package covers both majors, so packing once is enough. --no-build reuses the Release
+      # output above, static web assets included.
+      - name: pack and check the package
+        if: matrix.umbraco == '17.6.2'
+        run: |
+          args=(src/SchemaCity/SchemaCity.csproj -c Release --no-build -o pack -p:SkipClientBuild=true)
+          [ -n "$PACKAGE_VERSION" ] && args+=("-p:Version=$PACKAGE_VERSION")
+          [ -n "$RELEASE_TAG" ] && args+=("-p:PackageReleaseNotes=https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG")
+          dotnet pack "${args[@]}"
+
+          nupkg=$(echo pack/*.nupkg)
+          test -f "$nupkg"
+          list=$(unzip -Z1 "$nupkg")
+          grep -qx staticwebassets/App_Plugins/SchemaCity/workspace.js <<<"$list"
+          grep -qx README.md <<<"$list"
+          grep -qx icon.png <<<"$list"
+          test -z "$(grep '\.map$' <<<"$list")"
+          test "$(wc -c < "$nupkg")" -lt 1048576
+
+          # The backoffice Packages list shows the manifest's version, so it has to match NuGet's.
+          version=$(unzip -p "$nupkg" SchemaCity.nuspec | sed -n 's:.*<version>\(.*\)</version>.*:\1:p')
+          manifest=$(unzip -p "$nupkg" staticwebassets/App_Plugins/SchemaCity/umbraco-package.json | jq -r .version)
+          test "$manifest" = "$version"
+          if [ -n "$PACKAGE_VERSION" ]; then test "$version" = "$PACKAGE_VERSION"; fi
+
+      - name: upload the package
+        if: matrix.umbraco == '17.6.2'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SchemaCity-package
+          path: pack/*.nupkg
+          if-no-files-found: error
+
+      # Compiling against both majors is not enough. Umbraco discovers composers and controllers
+      # by scanning types at boot, so a missing base type only shows up when the site runs.
+      - name: boot the site and check it serves
+        working-directory: src/SchemaCity.Site
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:61801
+        run: |
+          dotnet run --no-build --no-launch-profile -c Release -p:UmbracoVersion=${{ matrix.umbraco }} &
+          code() { curl -so /dev/null -w '%{http_code}' "http://localhost:61801$1"; }
+          # /umbraco answers during the unattended install, but App_Plugins is only served once
+          # Umbraco reaches the Run level, so wait on the manifest rather than on the backoffice.
+          for _ in $(seq 60); do
+            [ "$(code /App_Plugins/SchemaCity/umbraco-package.json)" = 200 ] && break
+            sleep 2
+          done
+          test "$(code /App_Plugins/SchemaCity/umbraco-package.json)" = 200
+          test "$(code /umbraco)" = 200
+          test "$(code /umbraco/management/api/v1/schema-city/graph)" = 401
+          test "$(code /umbraco/management/api/v1/schema-city/usage)" = 401
+          pkill -f SchemaCity.Site || true

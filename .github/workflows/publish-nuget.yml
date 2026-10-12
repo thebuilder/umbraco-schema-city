@@ -1,0 +1,73 @@
+name: publish to NuGet
+
+# Publishing a GitHub release with a tag such as v1.0.1 publishes SchemaCity 1.0.1. The tag is
+# the version, so nothing has to be bumped in the repository first.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+    steps:
+      - name: read the version from the tag
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Expected a SemVer tag such as v1.0.1 or v1.1.0-beta.1, got '$TAG'." >&2
+            exit 1
+          fi
+          # NuGet decides stable or prerelease from the version alone, so the release has to agree.
+          if [[ "$PRERELEASE" == "true" && "$version" != *-* ]]; then
+            echo "A GitHub prerelease needs a prerelease version, got '$version'." >&2
+            exit 1
+          fi
+          if [[ "$PRERELEASE" != "true" && "$version" == *-* ]]; then
+            echo "A stable GitHub release needs a stable version, got '$version'." >&2
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: version
+    uses: ./.github/workflows/verify.yml
+    with:
+      package-version: ${{ needs.version.outputs.value }}
+      release-tag: ${{ github.event.release.tag_name }}
+
+  publish:
+    needs: [version, verify]
+    runs-on: ubuntu-latest
+    environment: nuget
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # The package verify built and checked, not a fresh pack.
+      - uses: actions/download-artifact@v4
+        with:
+          name: SchemaCity-package
+          path: pack
+
+      # Trusted publishing swaps GitHub's OIDC token for an API key that lasts an hour, so no
+      # long-lived key is stored anywhere.
+      - name: log in to nuget.org
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: push the package
+        run: >-
+          dotnet nuget push pack/*.nupkg
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
