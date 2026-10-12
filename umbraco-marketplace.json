@@ -10,38 +10,67 @@
     "Name": "Daniel Schmidt",
     "Url": "https://github.com/thebuilder"
   },
-  "DocumentationUrl": "https://github.com/thebuilder/umbraco-schema-city#readme",
+  "DocumentationUrl": "https://github.com/thebuilder/umbraco-schema-city/blob/main/docs/guide.md",
   "IssueTrackerUrl": "https://github.com/thebuilder/umbraco-schema-city/issues",
   "Screenshots": [
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png",
-      "Caption": "One building per Document Type, on an island per folder, with roads for allowed children, compositions, block targets and picker references."
+      "Caption": "One building per Document Type, on a board for each root beside boards for Compositions, Elements and Unreachable, with traces for allowed children, compositions, block targets and picker references."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png",
-      "Caption": "Focus mode rebuilds the layout around one type and its neighbours, and the inspector reads out its properties, compositions, parents, children and block targets."
+      "Caption": "Focus on one type and its neighbours, with the inspector open on its properties and connections."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/findings.png",
-      "Caption": "The findings drawer, grouped by kind with breakages first. Each row names its own evidence and opens the type it is about."
+      "Caption": "Findings grouped by kind, with breakages first. Each row names its evidence and opens the type it is about."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/review.png",
+      "Caption": "Mark a finding as intentional with a reason. It reopens if the type changes."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png",
-      "Caption": "The usage lens recolours the city by content count, published share, cultures, incoming references or unused."
+      "Caption": "Colour the city by content count, published share, cultures, incoming references or unused types."
     },
     {
-      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/free-camera.png",
-      "Caption": "The city from just above the ground, where it meets the horizon, with all four connection layers on."
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/impact.png",
+      "Caption": "Impact lists every type a change reaches, with paths, content counts and alias collisions."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/compare.png",
+      "Caption": "Compare two schema snapshots, grouped by cause, with planned changes ticked off."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/datatypes.png",
+      "Caption": "A block editor Data Type with the Element Types it offers and the blocks content stores of each."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/tree.png",
+      "Caption": "The creation tree shows what editors can create under each root, and the types they cannot reach."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/matrix.png",
+      "Caption": "Types crossed with compositions, or with Data Types."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/editor.png",
+      "Caption": "A Document Type laid out in tabs and groups, the way editors see it."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png",
-      "Caption": "The list view is the same schema as a sortable table, with no canvas in it."
+      "Caption": "Every type in a sortable table, with no 3D canvas."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/present.png",
+      "Caption": "Presentation mode for showing the schema to a room."
     }
   ],
   "Tags": [
     "document types",
     "content model",
     "visualisation",
+    "visualization",
     "backoffice"
   ]
 }

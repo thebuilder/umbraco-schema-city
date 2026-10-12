@@ -13,11 +13,14 @@
     <PackageId>SchemaCity</PackageId>
     <Product>SchemaCity</Product>
     <Title>Schema City</Title>
+    <!-- Keep in step with "version" in Client/public/umbraco-package.json. -->
+    <Version>1.0.0</Version>
     <Authors>Daniel Schmidt</Authors>
-    <Description>Renders the Umbraco content model as a 3D city in the backoffice.</Description>
+    <Description>See your Umbraco content model as a 3D city in the backoffice, with the relationships between Document Types, schema checks, content usage, change impact and snapshot comparison.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>umbraco umbraco-marketplace backoffice document-types visualisation three.js</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageTags>umbraco umbraco-marketplace backoffice document-types visualisation visualization three.js</PackageTags>
     <PackageProjectUrl>https://github.com/thebuilder/umbraco-schema-city</PackageProjectUrl>
     <RepositoryUrl>https://github.com/thebuilder/umbraco-schema-city</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -37,6 +40,7 @@
     <Content Remove="Client\**" />
     <None Include="Client\public\umbraco-package.json" Pack="false" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Update="icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>

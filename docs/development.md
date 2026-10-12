@@ -99,12 +99,14 @@ the Umbraco version that runs.
 
 ## API and data
 
-Both routes require a backoffice user with Settings access:
+Every route requires a backoffice user with Settings access:
 
 | Route | Response |
 | --- | --- |
 | `GET /umbraco/management/api/v1/schema-city/graph` | Document Types, properties and configured relationships |
 | `GET /umbraco/management/api/v1/schema-city/usage` | Content counts, cultures and observed references |
+| `GET /umbraco/management/api/v1/schema-city/decisions` | Recorded decisions on findings |
+| `PUT`, `DELETE /umbraco/management/api/v1/schema-city/decisions/{findingId}` | Record or undo one decision, stored in `umbracoKeyValue` |
 
 Usage is cached for one minute. Append `?refresh=true` to bypass that cache. The client calls the
 routes directly through `Client/src/api.ts`; there is no generated API client.
@@ -130,12 +132,35 @@ The package includes the compiled backoffice assets and the root README. Source 
 use the standalone dev server for client debugging. This command creates a local package and does
 not publish it.
 
+## Publish a release
+
+1. Set the same version in `<Version>` in `src/SchemaCity/SchemaCity.csproj` and in `version` in
+   `src/SchemaCity/Client/public/umbraco-package.json`. The backoffice Packages list shows the
+   second one.
+2. Merge to `main` and wait for CI to pass.
+3. Build the package from `main` as above.
+4. Push it to NuGet with an API key from nuget.org. Keep the key in an environment variable so it
+   stays out of your shell history:
+
+   ```bash
+   dotnet nuget push artifacts/SchemaCity.<version>.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+   ```
+
+5. Tag the commit `v<version>` and push the tag.
+
+The Umbraco Marketplace finds new packages through the `umbraco-marketplace` tag in a daily NuGet
+scan at 04:00 UTC, then refreshes known packages every two hours. The listing takes its name,
+icon, description and page text from the NuGet package, so the page text is the packed README.
+`umbraco-marketplace.json` at the repository root adds the category, screenshots and links. An
+`umbraco-marketplace-readme.md` beside it would replace the README on the listing; this repository
+has none, so the two pages stay the same.
+See [listing your package](https://docs.umbraco.com/umbraco-dxp/marketplace/listing-your-package).
+
 ## Continuous integration
 
 [The CI workflow](../.github/workflows/ci.yml) runs on pushes and pull requests. It lints and builds
 the extension and standalone demo, then builds and tests the .NET solution against Umbraco 17.6.2
-and 18.1.1. Pull requests also run the Fallow gate against their base commit. Run the client tests locally: the workflow does
-not currently invoke Vitest.
+and 18.1.1. It also runs the Vitest suite, and pull requests run the Fallow gate against their base commit.
 
 Each matrix job boots the demo site and checks the backoffice, static package manifest, and 401
 responses from both API routes for anonymous callers. The 17.6.2 job also packs the extension and
@@ -148,9 +173,6 @@ animation at a consistent viewport size. Omit the fixture selector from the imag
 the demo page, not the extension. Do not alter schema values for screenshots.
 
 Save images under `docs/screenshots/` and update the README captions to describe what they show.
-The current set is `city.png` (the structure overview), `focus.png` (Home in focus),
-`findings.png` (findings grouped by kind), `lens.png` (Article with the content-count lens),
-`list.png` (the list sorted by own property count), `tree.png` (the creation tree), `matrix.png`
-(the compositions matrix), `editor.png` (Home in the editor view) and `free-camera.png` (a low orbit
-toward the horizon, which the README does not show). The README uses absolute image URLs so
-images also work when it is included in a NuGet package.
+The README shows `city.png`, `focus.png`, `findings.png`, `lens.png`, `impact.png`, `compare.png`
+and `tree.png`. The [guide](guide.md) and `umbraco-marketplace.json` use most of the rest. The
+README uses absolute image URLs so images also work when it is included in a NuGet package.
