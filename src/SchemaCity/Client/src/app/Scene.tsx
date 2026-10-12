@@ -8,6 +8,7 @@ import {
 import {
   type ReactNode,
   type RefObject,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -2402,6 +2403,30 @@ function useLinkedFocus(
   return linked !== null && linked === asked && boot !== "done" ? null : asked;
 }
 
+/**
+ * How long the hover outlasts the pointer leaving a building. Crossing the bare board
+ * between two buildings takes about this long, and without it the whole city lit up
+ * for those frames and dimmed again, which read as a flash.
+ */
+const HOVER_GRACE_MS = 150;
+
+/**
+ * The hovered type, which changes at once from one building to the next and clears
+ * only after `HOVER_GRACE_MS` with no building under the pointer.
+ */
+function useHover() {
+  const [hovered, setNow] = useState<string | null>(null);
+  const clearing = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(clearing.current), []);
+  const onHover = useCallback((id: string | null) => {
+    window.clearTimeout(clearing.current);
+    if (id) setNow(id);
+    else
+      clearing.current = window.setTimeout(() => setNow(null), HOVER_GRACE_MS);
+  }, []);
+  return [hovered, onHover] as const;
+}
+
 export default function Scene({
   graph,
   grouping = "structure",
@@ -2460,7 +2485,7 @@ export default function Scene({
   const host = useRef<HTMLElement>(null);
   const cameraFlight = useRef<CameraFlight | null>(null);
   const [palette, setPalette] = useState<Palette | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [hovered, setHovered] = useHover();
 
   const reducedMotion = useSyncExternalStore(
     subscribeReducedMotion,

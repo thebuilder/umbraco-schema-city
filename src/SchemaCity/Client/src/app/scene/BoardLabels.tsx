@@ -14,6 +14,7 @@ import {
   COURTYARD_SEGMENTS,
   courtyard,
   type Edge,
+  easeLight,
   FADE_SECONDS,
   type Fades,
   fittedFontPx,
@@ -387,6 +388,8 @@ type Frame = {
   reveal: number;
   /** How far a fade moves this repaint, 1 for at once. */
   step: number;
+  /** Seconds since the last repaint for the eased hover light, 1 for at once. */
+  delta: number;
   fades: Fades;
 };
 
@@ -603,13 +606,19 @@ function strengthOf(
   inputs: Inputs,
   frame: Frame,
   floated: Set<string>,
-  one: Placement
+  slot: number
 ) {
+  const one = inputs.standing[slot] as Placement;
   const { hovered, selected } = inputs.interaction;
   const own = one.id === hovered || one.id === selected;
   return printStrength(
     own && floated.has(one.id),
-    labelLight(one.id, inputs.interaction),
+    easeLight(
+      frame.fades,
+      slot,
+      labelLight(one.id, inputs.interaction),
+      frame.delta
+    ),
     frame.reveal,
     one.flatten ?? 0,
     STRENGTH
@@ -646,7 +655,7 @@ function paintName(
   slot: number
 ): boolean {
   const one = inputs.standing[slot] as Placement;
-  const strength = strengthOf(inputs, frame, floated, one);
+  const strength = strengthOf(inputs, frame, floated, slot);
   const shown = writeName(inputs, frame, slot, strength.print);
   const spot = placedAt(inputs.solution, frame.flipped, shown, one.id);
   const presence = spot
@@ -681,7 +690,10 @@ function markWritten(inputs: Inputs) {
  * names printed legibly changed.
  */
 function repaint(inputs: Inputs, frame: Frame, floated: Set<string>): boolean {
-  if (frame.fades.fresh) frame.step = 1;
+  if (frame.fades.fresh) {
+    frame.step = 1;
+    frame.delta = 1;
+  }
   updateTiers(
     frame.fades,
     inputs.solution.boards,
@@ -842,7 +854,7 @@ function useRepaint(
   const forward = useMemo(() => new THREE.Vector3(), []);
 
   /** One frame's repaint, if anything moved; true while it needs another frame. */
-  const paint = (elapsed: number, step: number): boolean => {
+  const paint = (elapsed: number, step: number, delta: number): boolean => {
     camera.getWorldDirection(forward);
     flipped.current = labelsFlipped(forward.x, forward.z, flipped.current);
     const reveal = revealAt(elapsed, reducedMotion).links;
@@ -867,6 +879,7 @@ function useRepaint(
       flipped: flipped.current,
       reveal,
       step,
+      delta,
       fades,
     };
     // A new printed set changes what the floating labels leave out, and they read
@@ -883,7 +896,8 @@ function useRepaint(
     (state, delta) =>
       paint(
         state.clock.elapsedTime,
-        reducedMotion ? 1 : delta / FADE_SECONDS
+        reducedMotion ? 1 : delta / FADE_SECONDS,
+        reducedMotion ? 1 : delta
       ) || introPlaying(state.clock.elapsedTime, reducedMotion)
   );
 }
