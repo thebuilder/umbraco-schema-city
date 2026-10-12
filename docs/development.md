@@ -134,19 +134,25 @@ not publish it.
 
 ## Publish a release
 
-1. Set the same version in `<Version>` in `src/SchemaCity/SchemaCity.csproj` and in `version` in
-   `src/SchemaCity/Client/public/umbraco-package.json`. The backoffice Packages list shows the
-   second one.
-2. Merge to `main` and wait for CI to pass.
-3. Build the package from `main` as above.
-4. Push it to NuGet with an API key from nuget.org. Keep the key in an environment variable so it
-   stays out of your shell history:
+Publish a GitHub release from `main` with a tag such as `v1.0.1`. The
+[publish workflow](../.github/workflows/publish-nuget.yml) then:
 
-   ```bash
-   dotnet nuget push artifacts/SchemaCity.<version>.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
-   ```
+1. reads the version from the tag, and refuses a tag that is not SemVer or a stable version on a
+   GitHub prerelease,
+2. runs the whole verify workflow at that version, which writes it into the manifest and the
+   package and links the package's release notes to the release,
+3. pushes the package that verify built to nuget.org.
 
-5. Tag the commit `v<version>` and push the tag.
+The tag is the version, so nothing in the repository needs bumping first. The `<Version>` in the
+csproj and the `version` in `Client/public/umbraco-package.json` are only what local and CI
+builds use, and CI fails if they differ.
+
+The push uses NuGet trusted publishing, so no API key is stored. It needs, once:
+
+- a trusted publishing policy on nuget.org for `thebuilder/umbraco-schema-city` with the
+  workflow file `publish-nuget.yml`
+- a GitHub environment named `nuget` with a secret `NUGET_USER`, holding the nuget.org profile
+  name (not the email address)
 
 The Umbraco Marketplace finds new packages through the `umbraco-marketplace` tag in a daily NuGet
 scan at 04:00 UTC, then refreshes known packages every two hours. The listing takes its name,
@@ -158,13 +164,16 @@ See [listing your package](https://docs.umbraco.com/umbraco-dxp/marketplace/list
 
 ## Continuous integration
 
-[The CI workflow](../.github/workflows/ci.yml) runs on pushes and pull requests. It lints and builds
-the extension and standalone demo, then builds and tests the .NET solution against Umbraco 17.6.2
-and 18.1.1. It also runs the Vitest suite, and pull requests run the Fallow gate against their base commit.
+[The CI workflow](../.github/workflows/ci.yml) runs on pushes and pull requests and calls
+[verify](../.github/workflows/verify.yml), which the publish workflow runs too. It lints, tests and
+builds the extension and standalone demo, then builds and tests the .NET solution against Umbraco
+17.6.2 and 18.1.1. Pull requests also run the Fallow gate against their base commit.
 
 Each matrix job boots the demo site and checks the backoffice, static package manifest, and 401
-responses from both API routes for anonymous callers. The 17.6.2 job also packs the extension and
-checks that the package contains `workspace.js`, has no source maps, and is smaller than 1 MB.
+responses from both API routes for anonymous callers. The 17.6.2 job also packs the extension. It
+checks that the package contains `workspace.js`, the README and the icon, has no source maps, is
+smaller than 1 MB, and has the same version in the nuspec and the manifest. It uploads the package
+as the `SchemaCity-package` artifact.
 
 ## Refresh README screenshots
 
