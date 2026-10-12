@@ -145,9 +145,13 @@ not publish it.
 
 5. Tag the commit `v<version>` and push the tag.
 
-The Umbraco Marketplace picks the package up from NuGet through its `umbraco-marketplace` tag on
-its next sync. It reads the listing's category, screenshots and links from
-`umbraco-marketplace.json` at the repository root, and the page text from the packed README.
+The Umbraco Marketplace finds new packages through the `umbraco-marketplace` tag in a daily NuGet
+scan at 04:00 UTC, then refreshes known packages every two hours. The listing takes its name,
+icon, description and page text from the NuGet package, so the page text is the packed README.
+`umbraco-marketplace.json` at the repository root adds the category, screenshots and links. An
+`umbraco-marketplace-readme.md` beside it would replace the README on the listing; this repository
+has none, so the two pages stay the same.
+See [listing your package](https://docs.umbraco.com/umbraco-dxp/marketplace/listing-your-package).
 
 ## Continuous integration
 
