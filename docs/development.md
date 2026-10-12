@@ -99,12 +99,14 @@ the Umbraco version that runs.
 
 ## API and data
 
-Both routes require a backoffice user with Settings access:
+Every route requires a backoffice user with Settings access:
 
 | Route | Response |
 | --- | --- |
 | `GET /umbraco/management/api/v1/schema-city/graph` | Document Types, properties and configured relationships |
 | `GET /umbraco/management/api/v1/schema-city/usage` | Content counts, cultures and observed references |
+| `GET /umbraco/management/api/v1/schema-city/decisions` | Recorded decisions on findings |
+| `PUT`, `DELETE /umbraco/management/api/v1/schema-city/decisions/{findingId}` | Record or undo one decision, stored in `umbracoKeyValue` |
 
 Usage is cached for one minute. Append `?refresh=true` to bypass that cache. The client calls the
 routes directly through `Client/src/api.ts`; there is no generated API client.
@@ -137,10 +139,11 @@ not publish it.
    second one.
 2. Merge to `main` and wait for CI to pass.
 3. Build the package from `main` as above.
-4. Push it to NuGet, with an API key from nuget.org:
+4. Push it to NuGet with an API key from nuget.org. Keep the key in an environment variable so it
+   stays out of your shell history:
 
    ```bash
-   dotnet nuget push artifacts/SchemaCity.<version>.nupkg --api-key <key> --source https://api.nuget.org/v3/index.json
+   dotnet nuget push artifacts/SchemaCity.<version>.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
    ```
 
 5. Tag the commit `v<version>` and push the tag.

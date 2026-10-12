@@ -8,9 +8,10 @@ change it.
 **[Try the demo](https://umbraco-schema-city.vercel.app)** in your browser. It needs no Umbraco
 install.
 
-![The city overview: a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable, with type names printed beside their buildings.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png)
+![The city overview, with a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png)
 
-Schema City only reads. It never changes your Document Types, Data Types or content.
+Schema City never changes your Document Types, Data Types or content. The only thing it writes is
+the decisions you record on findings.
 
 ## Install
 
@@ -61,7 +62,7 @@ Impact lists every type a change reaches through compositions, blocks, allowed c
 pickers, with the path to each one and its content count. Check a new property alias against every
 type it would land on to catch collisions early. Copy the result as Markdown for a ticket.
 
-![Seo Composition's impact: 37 types and 188 content items, and an alias collision on one type.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/impact.png)
+![Seo Composition's impact reaches 37 types and 188 content items, with an alias collision on one type.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/impact.png)
 
 ### Compare environments
 
@@ -84,8 +85,8 @@ List, Tree, Matrix and Editor work without the city canvas and from the keyboard
 
 ### Show it to a room
 
-Press **P** for presentation mode. The city fills the screen, names get larger, and a caption card
-takes the place of the inspector.
+Press **P** for presentation mode. The city fills the screen with larger names, and a caption card
+replaces the inspector.
 
 ## Good to know
 
@@ -94,7 +95,7 @@ takes the place of the inspector.
 - Usage counts are a snapshot, cached for one minute. Block counting stops after 50,000 values or
   five seconds, and the app says when it did.
 - Decisions on findings are stored in Umbraco's `umbracoKeyValue` table, so the package needs no
-  migration. Everyone on the site sees the same decisions.
+  migration. Every user with Settings access sees the same decisions.
 - The screenshots come from the demo, which has 86 types with problems planted on purpose. They
   show the app without the backoffice around it.
 
