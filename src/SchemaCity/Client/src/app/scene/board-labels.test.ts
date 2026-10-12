@@ -24,6 +24,7 @@ import {
   courtyard,
   DIMMED,
   type Edge,
+  easeLight,
   type Fitted,
   fadeToward,
   fitName,
@@ -401,6 +402,26 @@ describe("labelLight", () => {
     const now = { ...rest, neighbours: new Set(["a"]) };
     expect(labelLight("a", now)).toBe(1);
     expect(labelLight("z", now)).toBe(DIMMED);
+  });
+});
+
+describe("easeLight", () => {
+  it("dims a name over several frames, not in one, and keeps the frames coming", () => {
+    const fades = newFades(1);
+    fades.moving = false;
+    const first = easeLight(fades, 0, DIMMED, 1 / 60);
+    expect(first).toBeLessThan(1);
+    expect(first).toBeGreaterThan(0.5);
+    expect(fades.moving).toBe(true);
+    let light = first;
+    for (let frame = 0; frame < 60; frame++)
+      light = easeLight(fades, 0, DIMMED, 1 / 60);
+    expect(light).toBe(DIMMED);
+  });
+
+  it("lands at once for a repaint that asks for it", () => {
+    const fades = newFades(1);
+    expect(easeLight(fades, 0, DIMMED, 1)).toBe(DIMMED);
   });
 });
 

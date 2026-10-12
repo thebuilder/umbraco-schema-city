@@ -3,6 +3,7 @@
 // outline around each component that frames its print. Pure: no three.js, no React,
 // no DOM. scene/BoardLabels.tsx rasterises and draws what this decides.
 import { clearOfEdge, type Finger, PRINT_MARGIN } from "./board";
+import { transitionToward } from "./reveal";
 import { pixelsPerUnit } from "./stage";
 
 /**
@@ -1415,6 +1416,8 @@ export type Fades = {
   presence: Float32Array;
   /** Per name, 1 when its whole name prints legibly at its board's size. */
   printed: Uint8Array;
+  /** Per name, how far it is lit under the hover and the selection, eased. */
+  light: Float32Array;
   /** True while a fade is under way, as `stepName` last found. */
   moving: boolean;
   /** True until the first repaint, which shows everything at once. */
@@ -1428,6 +1431,7 @@ export const newFades = (count: number): Fades => ({
   legible: new Uint8Array(count * LEVELS),
   presence: new Float32Array(count * LEVELS),
   printed: new Uint8Array(count),
+  light: new Float32Array(count).fill(1),
   moving: false,
   fresh: true,
 });
@@ -1503,6 +1507,23 @@ export function stepName(
     fadeAt(fades, k, show, view.step);
   }
   return shown;
+}
+
+/**
+ * The name in slot `slot` eased toward `target`, its `labelLight`, at the rate the
+ * traces fade at, so moving the pointer between buildings dims and lights names
+ * with their traces instead of in one frame. `delta` is in seconds; 1 lands it.
+ */
+export function easeLight(
+  fades: Fades,
+  slot: number,
+  target: number,
+  delta: number
+): number {
+  const light = transitionToward(fades.light[slot] as number, target, delta);
+  fades.light[slot] = light;
+  if (light !== target) fades.moving = true;
+  return light;
 }
 
 /** How solid a courtyard line is at rest: an outline, under everything it frames. */
