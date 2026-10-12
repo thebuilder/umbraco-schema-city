@@ -416,9 +416,9 @@ The trace follows four relationships, each with its own toggle:
 - **Pickers.** The types whose picker properties allow it, and the types that carry those
   properties.
 
-Depth stops the trace after one step or two, or follows it all the way. Direction turns the trace
-round to what the type depends on. That is its compositions, the blocks it offers, the types
-allowed under it and the types its pickers allow.
+Depth stops the trace after one step or two, or with All follows it all the way. Direction turns
+the trace round to what the type depends on. That is its compositions, the blocks it offers, the
+types allowed under it and the types its pickers allow.
 
 Each row writes out its paths in words, shortest first, up to three, such as "Press Release
 inherits Article, which composes Seo Composition". It also says whether the type is reached
