@@ -41,15 +41,6 @@ jobs:
           cache: npm
           cache-dependency-path: src/SchemaCity/Client/package-lock.json
 
-      # Vite copies the manifest from public/ as it is, so a release writes its version in
-      # before the client build.
-      - name: stamp the release version on the manifest
-        if: inputs.package-version != ''
-        working-directory: src/SchemaCity/Client/public
-        run: |
-          jq --arg v "$PACKAGE_VERSION" '.version = $v' umbraco-package.json > manifest.tmp
-          mv manifest.tmp umbraco-package.json
-
       - run: npm ci
         working-directory: src/SchemaCity/Client
 
@@ -65,6 +56,16 @@ jobs:
         if: github.event_name == 'pull_request'
         working-directory: src/SchemaCity/Client
         run: npm run fallow -- --base '${{ github.event.pull_request.base.sha }}' --format github-annotations
+
+      # Vite copies the manifest from public/ as it is, so a release writes its version in
+      # before the client build. It comes after lint, because jq lays the file out its own
+      # way and the format check would fail on the stamped copy.
+      - name: stamp the release version on the manifest
+        if: inputs.package-version != ''
+        working-directory: src/SchemaCity/Client/public
+        run: |
+          jq --arg v "$PACKAGE_VERSION" '.version = $v' umbraco-package.json > manifest.tmp
+          mv manifest.tmp umbraco-package.json
 
       - run: npm run build
         working-directory: src/SchemaCity/Client
