@@ -16,7 +16,7 @@ the decisions you record on findings.
 ## Install
 
 ```bash
-dotnet add package SchemaCity
+dotnet add package TheBuilder.SchemaCity
 ```
 
 Restart the site and open **Settings > Advanced > Schema City**. Every Document Type editor also

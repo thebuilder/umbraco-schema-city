@@ -55,7 +55,7 @@ jobs:
       # The package verify built and checked, not a fresh pack.
       - uses: actions/download-artifact@v4
         with:
-          name: SchemaCity-package
+          name: TheBuilder.SchemaCity-package
           path: pack
 
       # Trusted publishing swaps GitHub's OIDC token for an API key that lasts an hour, so no
