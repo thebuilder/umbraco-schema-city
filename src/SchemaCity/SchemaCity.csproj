@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageId>SchemaCity</PackageId>
+    <PackageId>TheBuilder.SchemaCity</PackageId>
     <Product>SchemaCity</Product>
     <Title>Schema City</Title>
     <!-- Local and CI builds only: a release takes its version from the tag. Keep in step with

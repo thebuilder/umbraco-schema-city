@@ -173,7 +173,7 @@ Each matrix job boots the demo site and checks the backoffice, static package ma
 responses from both API routes for anonymous callers. The 17.6.2 job also packs the extension. It
 checks that the package contains `workspace.js`, the README and the icon, has no source maps, is
 smaller than 1 MB, and has the same version in the nuspec and the manifest. It uploads the package
-as the `SchemaCity-package` artifact.
+as the `TheBuilder.SchemaCity-package` artifact.
 
 ## Refresh README screenshots
 

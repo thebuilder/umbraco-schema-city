@@ -123,7 +123,7 @@ dotnet new umbraco-extension -n SchemaCity -ex
 
 The `-ex` example gives a controller, a Swagger composer and a dashboard. Keep the controller shape, delete the Swagger and generated-client wiring (see section 5), replace the dashboard with the workspace. There is no controller base class until a second controller exists; `GraphController` carries the route and API attributes itself.
 
-Naming: NuGet id `SchemaCity`, namespace `SchemaCity`, route `schema-city`, custom element prefix `schema-city-`, extension alias prefix `SchemaCity.`.
+Naming: NuGet id `TheBuilder.SchemaCity` (renamed from `SchemaCity` before the first publish, to match `TheBuilder.BlurPlaceholder`), namespace `SchemaCity`, route `schema-city`, custom element prefix `schema-city-`, extension alias prefix `SchemaCity.`.
 
 ---
 
