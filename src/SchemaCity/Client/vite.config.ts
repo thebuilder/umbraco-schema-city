@@ -30,9 +30,7 @@ export default defineConfig({
       external: [/^@umbraco/],
       // Base UI marks its modules "use client", which means nothing in a browser-only
       // bundle, and the bundler warned once per module, 237 times a build.
-      onLog(level, log, handler) {
-        if (log.code !== "MODULE_LEVEL_DIRECTIVE") handler(level, log);
-      },
+      checks: { moduleLevelDirective: false },
       // The scene chunk imports React from the entry chunk, which under "strict" makes
       // the bundler emit workspace.js as a stub in front of the real code.
       preserveEntrySignatures: "allow-extension",
@@ -41,10 +39,13 @@ export default defineConfig({
       // stylesheet shipped twice, once in app.js and once in the element's chunk.
       optimization: { inlineConst: false },
       // Flat names, because chunks in ES output resolve relative to the module that
-      // imports them and the manifest only ever names workspace.js.
+      // imports them and the manifest only ever names workspace.js. The entries keep
+      // fixed names for the manifest; every other chunk carries a content hash, because
+      // the site sends no Cache-Control and Umbraco busts only the entry's URL, so after
+      // an upgrade a browser could pair the new entry with an old chunk it still holds.
       output: {
         entryFileNames: "[name].js",
-        chunkFileNames: "[name].js",
+        chunkFileNames: "[name]-[hash].js",
         assetFileNames: "[name][extname]",
         // Umbraco requests the entry as both "workspace.js" and "workspace.js?umb__rnd=…"
         // (its own cache-busting query on the manifest's element URL). Two URLs mean two
