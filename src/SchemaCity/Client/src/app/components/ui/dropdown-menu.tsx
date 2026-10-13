@@ -14,7 +14,11 @@ const PANEL =
   "min-w-32 origin-(--transform-origin) overflow-hidden rounded-none border border-line-strong bg-popover p-1 text-popover-foreground shadow-panel outline-none data-closed:animate-close data-open:animate-open";
 
 function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
-  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
+  // Not modal: Base UI's scroll lock resizes <body>, which in the backoffice
+  // reflows the whole workspace and the canvas with it.
+  return (
+    <MenuPrimitive.Root data-slot="dropdown-menu" modal={false} {...props} />
+  );
 }
 
 function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {

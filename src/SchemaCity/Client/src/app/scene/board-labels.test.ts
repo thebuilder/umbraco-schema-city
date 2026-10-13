@@ -21,7 +21,9 @@ import {
   boardTier,
   byPriority,
   COURTYARD_SEGMENTS,
+  type Crossing,
   courtyard,
+  crossingOf,
   DIMMED,
   type Edge,
   easeLight,
@@ -750,7 +752,7 @@ describe("traces under the prints", () => {
       [want("a", 0, [6])],
       [building("a", 0, 0)],
       false,
-      (rect) => at(rect).length > 0
+      (rect): Crossing => (at(rect).length > 0 ? "other" : "none")
     );
     expect(placed.get("a")).toEqual({
       print: 0,
@@ -764,12 +766,55 @@ describe("traces under the prints", () => {
       [want("a", 0, [6])],
       [building("a", 0, 0)],
       false,
-      () => true
+      (): Crossing => "other"
     );
     expect(placed.get("a")?.crosses).toBe(true);
     expect(placed.get("a")?.rect).toEqual(
       printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false)
     );
+  });
+
+  it("stays in front over its own road and steps aside for another's", () => {
+    const at = traceIndex([road]);
+    const solve = (id: string) =>
+      placeLabels(
+        [want(id, 0, [6])],
+        [building(id, 0, 0)],
+        false,
+        (rect, name) => crossingOf(at(rect), name)
+      ).get(id);
+    expect(solve("p")).toEqual({
+      print: 0,
+      rect: printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false),
+      crosses: true,
+    });
+    expect(solve("a")?.rect).toEqual(
+      printRect({ x: 0, z: 0 }, 4, 6, 2, "back", false)
+    );
+  });
+
+  it("does not widen over another's trace because its own runs under it", () => {
+    const own: Trace = { x0: 0, z0: 2, x1: 0, z1: 6, from: "a", to: "c" };
+    const other: Trace = { x0: 4.5, z0: 2, x1: 4.5, z1: 6, from: "p", to: "q" };
+    const at = traceIndex([own, other]);
+    // Back and both sides are taken, so the whole name could only go in front,
+    // across the other trace.
+    const placed = placeLabels(
+      [want("a", 0, [12, 3])],
+      [
+        building("a", 0, 0),
+        building("north", 0, -4),
+        building("west", -8.5, 0),
+        building("east", 8.5, 0),
+      ],
+      false,
+      (rect, id) => crossingOf(at(rect), id)
+    );
+    expect(placed.get("a")).toEqual({
+      print: 1,
+      rect: printRect({ x: 0, z: 0 }, 4, 3, 2, "front", false),
+      crosses: true,
+    });
   });
 
   it("puts a print beside its building when front and back are taken", () => {

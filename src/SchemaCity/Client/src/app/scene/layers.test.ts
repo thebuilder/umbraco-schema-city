@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SchemaEdge } from "../../model/types";
 import type { Placement } from "../layout/city";
+import { PRINT_DEPTH } from "./board-labels";
 import { type Anchor, buildLinkGeometry } from "./layers";
 import { planRoads } from "./roads";
 
@@ -193,10 +194,14 @@ describe("buildLinkGeometry", () => {
     );
     // The route drops off a's roof onto the street between the two rows, runs along
     // it to b's column, then rises, so the same corners the road turns show up here.
-    // Alone on the street, it takes the street's middle lane at z = 5.5.
+    // Alone on the street, it takes the street's middle lane, south of the names
+    // printed in front of the upper row.
     const street: number[] = [];
     for (let i = 0; i < positions.length; i += 3) {
-      if (Math.abs((positions[i + 2] as number) - 5.5) < 1e-6)
+      if (
+        Math.abs((positions[i + 2] as number) - (1 + PRINT_DEPTH + 10) / 2) <
+        1e-6
+      )
         street.push(positions[i] as number);
     }
     expect(Math.min(...street)).toBeCloseTo(0, 6);

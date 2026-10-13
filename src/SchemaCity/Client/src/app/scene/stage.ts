@@ -167,21 +167,7 @@ export const STAMP_MIN_CAP = 0.75;
  * At this inset on both axes the name also stays outside every hole's keep-out, so it
  * stops short of the corner holes however long it runs.
  */
-const STAMP_INSET = EDGE_PARTS + PRINT_MARGIN;
-
-/**
- * Ground between the name and the last row, which holds the outer street a road
- * takes out of that row: half of the layout's six-unit street plus half a unit.
- */
-const STAMP_CLEARANCE = 3.5;
-
-/**
- * Ground a district holds along its south edge for its name. South, because the
- * default camera looks from the south-east: a roof leans away from it, over the
- * ground north of the building, so the name needs no room for leaning roofs. On the
- * north edge it did, and that band was 14.5 units of empty plate on every island.
- */
-export const STAMP_BAND = STAMP_INSET + STAMP_CAP + STAMP_CLEARANCE;
+export const STAMP_INSET = EDGE_PARTS + PRINT_MARGIN;
 
 type Ground = { minX: number; maxX: number; minZ: number; maxZ: number };
 

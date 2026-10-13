@@ -2755,7 +2755,9 @@ export default function Scene({
     settled.current = { placements, placementsById, heights };
   const routed = settled.current;
   // A link leaves from the roof of the building it belongs to, so it stays visible
-  // over a tall neighbour.
+  // over a tall neighbour. Below the roof, a one-floor chip's link left through its
+  // side wall and read as drawn under the block; on it, the line z-fought the lid,
+  // so it starts just over the roof icon, which lies 0.02 up.
   const anchors = useMemo(() => {
     const map = new Map<string, Anchor>();
     for (const placement of routed.placements) {
@@ -2763,7 +2765,8 @@ export default function Scene({
         x: placement.position.x,
         y:
           (placement.y ?? 0) +
-          (routed.heights.get(placement.id) ?? placement.height) * 0.8,
+          (routed.heights.get(placement.id) ?? placement.height) +
+          0.05,
         z: placement.position.z,
       });
     }

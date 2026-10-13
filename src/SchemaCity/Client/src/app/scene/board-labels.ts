@@ -11,19 +11,20 @@ import { pixelsPerUnit } from "./stage";
  * building can carry, so a small type gets smaller print and a large one larger
  * print, and the board keeps the proportions a real one has.
  */
-const EM_PER_FOOTPRINT = 0.4;
+const EM_PER_FOOTPRINT = 0.32;
 /**
  * Smallest print at the full size. The framed overview of the seeded schema draws
  * a unit of print at about four and a half to seven pixels from the far boards to
- * the near ones, so print under 1.6 units falls below the 7 px a name needs to read
- * on the far side before the camera has moved at all.
+ * the near ones, so at 1.3 units the far side's names wait for the camera to come
+ * in a little before they read. 1.6 read everywhere from the start, and cut most
+ * names of three words or more to their first.
  */
-export const MIN_EM = 1.6;
+export const MIN_EM = 1.3;
 /**
  * Largest print. The strip the layout leaves in front of a row holds this with
  * board to spare, so a larger footprint widens the name's line but not its height.
  */
-export const MAX_EM = 2.2;
+export const MAX_EM = 1.8;
 /** Height of a printed line over its font size: the ascenders and descenders. */
 export const LINE_HEIGHT = 1.25;
 /**
@@ -43,19 +44,24 @@ export const MONO_ADVANCE = 0.6;
  * its neighbours, in world units. Past this a name is cut, however open the ground
  * beside it, so the print still reads as belonging to the one component.
  */
-const MAX_OVERHANG = 3;
+export const MAX_OVERHANG = 3;
 /** Bare board kept between two names, or a name and the next building, side by side. */
 const NAME_SPACING = 0.6;
 /** Bare board between the footprint's edge and the top of the print. */
 export const LABEL_INSET = 0.1;
 /**
+ * The deepest a name prints in front of its building: two lines at the largest
+ * print, from the footprint's edge. A trace that keeps this clear of a row never
+ * runs through one of its names.
+ */
+export const PRINT_DEPTH = LABEL_INSET + MAX_EM * (LINE_HEIGHT + LINE_STEP);
+/**
  * Extra ground the layout leaves between two rows of one block, on top of the
  * 1.5-unit gap a row already keeps, so a name on two lines at the smallest print
- * (0.1 + 1.6 x 2.35 units) has 0.64 of board between it and the next row's north
- * wall, and the largest print on one line (0.1 + 2.75) has 1.65. Larger print on
- * two lines takes the strip behind its building, or one line. Without that margin
- * the default camera, which looks over that row from the south-east, lost the name
- * behind any building more than a floor or two high.
+ * (0.1 + 1.3 x 2.35 units) has 1.35 of board between it and the next row's north
+ * wall, and the largest print on two lines (0.1 + 1.8 x 2.35) still fits. Without
+ * that margin the default camera, which looks over that row from the south-east,
+ * lost the name behind any building more than a floor or two high.
  */
 export const LABEL_STRIP = 3;
 
@@ -674,6 +680,11 @@ const overlapping = (a: Rect, b: Rect, gap: number) =>
  * the board leaves a choice. Where it does not, the print takes a place over a
  * trace and says so, and the scene draws bare board under it.
  *
+ * A building's own traces, `"own"` from `crossesTrace`, do not count against its
+ * name: a road leaves through the face the name prints in front of, and counting it
+ * pushed every parent's name behind its own stack. The name stays in front and the
+ * trace passes under it, and the second pass still keeps it off other traces.
+ *
  * One pass that took each name's best print first let the first long names take
  * the strips later short ones needed. The first pass tries more than the least
  * print because prints differ in height as well as width: a cut on one line can
@@ -694,7 +705,7 @@ export function placeLabels(
   wants: readonly Want[],
   buildings: readonly { id: string; rect: Rect }[],
   flipped: boolean,
-  crossesTrace: (rect: Rect) => boolean = () => false,
+  crossesTrace: (rect: Rect, id: string) => Crossing = () => "none",
   fits: (id: string, rect: Rect) => boolean = () => true
 ): Map<string, Placed> {
   const grid = new Map<string, Item[]>();
@@ -722,7 +733,9 @@ export function placeLabels(
     );
   for (const building of buildings) add({ ...building, gap: CLEAR });
 
-  const placed = new Map<string, Placed & { item: Item }>();
+  // `other` is whether the print runs over another connection's trace, which is
+  // what lets the second pass widen it over one.
+  const placed = new Map<string, Placed & { item: Item; other: boolean }>();
   /**
    * The first of `prints` that fits on any side, placed and returned; with `cross`
    * false, only on a side no trace runs through.
@@ -735,12 +748,18 @@ export function placeLabels(
       };
       for (const rect of placesFor(want, width, height, flipped, fits)) {
         if (blocked(want.id, rect)) continue;
-        const crosses = crossesTrace(rect);
-        if (crosses && !cross) continue;
+        const crossing = crossesTrace(rect, want.id);
+        if (crossing === "other" && !cross) continue;
         // Its own building no longer counts against it, so it gets another id.
         const item = { id: `print|${want.id}`, rect, gap: PRINT_GAP };
         add(item);
-        placed.set(want.id, { print, rect, crosses, item });
+        placed.set(want.id, {
+          print,
+          rect,
+          crosses: crossing !== "none",
+          item,
+          other: crossing === "other",
+        });
         return true;
       }
     }
@@ -760,7 +779,7 @@ export function placeLabels(
     // A better print may run over a trace where the one it replaces did, and to
     // print more than a cut: a whole name over bare board reads better than its
     // first word clear of the trace.
-    const over = held.crosses
+    const over = held.other
       ? wider
       : wider.filter(
           (i) => want.prints[held.print]?.cut && !want.prints[i]?.cut
@@ -777,6 +796,20 @@ export function placeLabels(
     ])
   );
 }
+
+/**
+ * What runs through a print's place: no trace, only traces of the building the name
+ * is for, or another connection's.
+ */
+export type Crossing = "none" | "own" | "other";
+
+/** What a print's place crosses, given the traces through it and whose name it is. */
+export const crossingOf = (traces: readonly Trace[], id: string): Crossing =>
+  traces.length === 0
+    ? "none"
+    : traces.every((trace) => trace.from === id || trace.to === id)
+      ? "own"
+      : "other";
 
 /** A drawn trace's run on the ground, and the types at the ends of its connection. */
 export type Trace = {
@@ -1328,7 +1361,7 @@ export function solveNames(
   standing: readonly Standing[],
   sizes: ReadonlyMap<string, Sizes>,
   usageOf: (id: string) => number,
-  crossesTrace?: (rect: Rect) => boolean,
+  crossesTrace?: (rect: Rect, id: string) => Crossing,
   edges?: ReadonlyMap<string, Edge>
 ): Solution {
   const upright = standing.filter((one) => (one.flatten ?? 0) < FLAT);

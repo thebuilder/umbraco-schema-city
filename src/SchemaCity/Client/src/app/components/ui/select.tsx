@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 import { usePortalContainer } from "@/portal";
 
 function Select({ ...props }: SelectPrimitive.Root.Props<string>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />;
+  // Not modal: Base UI's scroll lock resizes <body>, which in the backoffice
+  // reflows the whole workspace and the canvas with it.
+  return <SelectPrimitive.Root data-slot="select" modal={false} {...props} />;
 }
 
 function SelectGroup({ ...props }: SelectPrimitive.Group.Props) {

@@ -13,6 +13,7 @@ import {
   boardTextPx,
   COURTYARD_SEGMENTS,
   courtyard,
+  crossingOf,
   type Edge,
   easeLight,
   FADE_SECONDS,
@@ -928,7 +929,7 @@ function useSolution(
         settled,
         atlas.sizes,
         (id) => usage?.byType[id]?.total ?? 0,
-        (rect) => traceAt(rect).length > 0,
+        (rect, id) => crossingOf(traceAt(rect), id),
         edges
       ),
     [settled, atlas, usage, traceAt, edges]
