@@ -10,8 +10,7 @@
     /* Bundler mode */
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "baseUrl": ".",
-    "paths": { "@/*": ["src/app/*"] },
+    "paths": { "@/*": ["./src/app/*"] },
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
