@@ -3,6 +3,7 @@ import mediumFixture from "../../../dev/fixtures/medium.json";
 import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import type { SchemaEdge, SchemaGraph } from "../../model/types";
 import { cityDistricts, type Placement } from "../layout/city";
+import { PRINT_DEPTH } from "./board-labels";
 import {
   buildRoadGeometry,
   planRoads,
@@ -35,6 +36,8 @@ const placements = new Map([
   ["a", placement("a", 0, 0)],
   ["b", placement("b", 6, 11)],
 ]);
+/** The street between them, past the names printed in front of the upper row. */
+const STREET_Z = (1 + PRINT_DEPTH + 10) / 2;
 
 const road = (from: string, to: string): SchemaEdge => ({
   kind: "allowedChild",
@@ -155,8 +158,9 @@ describe("planRoads", () => {
     expect(vertical(drop)).toBe(true);
     expect(horizontal(run)).toBe(true);
     expect(vertical(rise)).toBe(true);
-    // The street between the two rows is the middle of the nine units between them.
-    expect(run.z0).toBeCloseTo(5.5, 6);
+    // Nine units between the rows is room for the names in front of the upper row,
+    // so the street runs in the middle of the ground past them.
+    expect(run.z0).toBeCloseTo(STREET_Z, 6);
     expect(drop.x0).toBeCloseTo(0, 6);
     expect(rise.x0).toBeCloseTo(6, 6);
     // The drop starts at the parent's south face and the rise ends at the child's
@@ -202,7 +206,7 @@ describe("planRoads", () => {
     // joins the same trunk as the parent's other roads.
     const runs = segments.filter(horizontal);
     expect(runs).toHaveLength(1);
-    expect((runs[0] as RoadSegment).z0).toBeCloseTo(5.5, 6);
+    expect((runs[0] as RoadSegment).z0).toBeCloseTo(STREET_Z, 6);
     // Then straight down the child's column, past the rank in between at the street
     // that crosses it, rather than cutting the corner diagonally.
     const descent = segments.filter(
@@ -210,7 +214,7 @@ describe("planRoads", () => {
     );
     expect(descent).toHaveLength(1);
     const [{ z0, z1 }] = descent as [RoadSegment];
-    expect(Math.min(z0, z1)).toBeCloseTo(5.5, 6);
+    expect(Math.min(z0, z1)).toBeCloseTo(STREET_Z, 6);
     expect(Math.max(z0, z1)).toBeCloseTo(21, 6);
     // Every run is north-south or east-west, whatever the road skips.
     expect(
@@ -721,6 +725,9 @@ it("joins side-by-side islands inside their gap using local arrival streets", ()
   expect(bridge).toBeDefined();
   expect(bridge?.x0).toBeCloseTo(50);
   expect(
-    segments.every((segment) => Math.max(segment.z0, segment.z1) <= 12)
+    segments.every(
+      (segment) =>
+        Math.max(segment.z0, segment.z1) <= (1 + PRINT_DEPTH + 21) / 2 + 1e-6
+    )
   ).toBe(true);
 });

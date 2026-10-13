@@ -6,7 +6,14 @@
 // layer shares its lane, which is what collapses a hub's fan into one trunk that
 // forks at each target's column. Pure: no three.js, no React.
 import type { EdgeKind, SchemaEdge } from "../../model/types";
-import { cityBounds, ISLAND_PAD, type Placement, STREET } from "../layout/city";
+import {
+  cityBounds,
+  ISLAND_PAD,
+  NAME_MARGIN,
+  type Placement,
+  STREET,
+} from "../layout/city";
+import { MAX_OVERHANG, PRINT_DEPTH } from "./board-labels";
 import { FOLDER_TINT_HEIGHT } from "./stage";
 
 export type RoadRange = { edges: SchemaEdge[]; start: number; count: number };
@@ -690,12 +697,15 @@ function portStreet(grid: RoadGrid, at: Placement, toward: Placement): number {
   return grid.rowAt(at.position.z) + Number(toward.position.z >= at.position.z);
 }
 
-/** Keep the corridor outside padded boards, with room for each ribbon edge. */
+/**
+ * Keep the corridor outside padded boards, with room for each ribbon edge. A board
+ * reaches its padding and the names' margin past its outermost building.
+ */
 function bridgeHalf(gap: { low: number; high: number }): number {
   const half = (gap.high - gap.low) / 2;
   return Math.max(
     ROAD_WIDTH / 2,
-    half - Math.min(ISLAND_PAD + ROAD_WIDTH, half / 2)
+    half - Math.min(ISLAND_PAD + NAME_MARGIN + ROAD_WIDTH, half / 2)
   );
 }
 
@@ -734,13 +744,21 @@ function roadGrid(placements: Iterable<Placement>): RoadGrid {
     const below = rows[i];
     // The outermost two streets have open ground on one side, so they are half a
     // street out from the city rather than half way to a row that is not there.
-    const gap = above && below ? below[0] - above[1] : STREET;
+    // Names print in front of a row, so a street wide enough to give up their depth
+    // runs south of it, the southernmost always, and the names stand in front of
+    // their buildings rather than being pushed behind them by the traces. A
+    // narrower street, a table's or focus mode's, keeps its middle.
+    const print =
+      above && below && below[0] - above[1] >= PRINT_DEPTH + STREET / 2
+        ? PRINT_DEPTH
+        : 0;
+    const gap = above && below ? below[0] - above[1] - print : STREET;
     streets.push(
       above && below
-        ? (above[1] + below[0]) / 2
+        ? (above[1] + print + below[0]) / 2
         : below
           ? below[0] - STREET / 2
-          : (above as [number, number])[1] + STREET / 2
+          : (above as [number, number])[1] + PRINT_DEPTH + STREET / 2
     );
     halves.push(Math.max(0, gap / 2 - ROAD_WIDTH));
   }
@@ -758,9 +776,20 @@ function roadGrid(placements: Iterable<Placement>): RoadGrid {
 }
 
 /**
+ * How far past a building's side a run keeps clear of its name: the most a name
+ * overhangs, less half a road, so a run fits the middle of a gap twice this wide.
+ */
+const NAME_REACH = MAX_OVERHANG - 0.25;
+
+/**
  * The x nearest `targetX` where a north-south run from `z0` to `z1` touches no
- * building but the target. Every placement counts, whichever island it stands on,
- * because a run between two islands can cross a third.
+ * building but the target, and no building's printed name either when the street
+ * leaves room: a name hangs up to `MAX_OVERHANG` past its building's sides, in front
+ * of it, and a run through there pushed the name off to one side. Two names side by
+ * side keep spacing between them, so a run down the middle of the gap between two
+ * buildings twice `NAME_REACH` apart still clears both. Every placement counts,
+ * whichever island it stands on, because a run between two islands can cross a
+ * third.
  */
 function clearColumn(
   placements: Placement[],
@@ -771,30 +800,46 @@ function clearColumn(
 ): number {
   const low = Math.min(z0, z1);
   const high = Math.max(z0, z1);
-  const blockers = placements.filter(
+  const south = (placement: Placement) =>
+    placement.position.z + placement.footprint / 2;
+  // Every building the run passes or whose names it passes, and of those the ones
+  // it passes the walls of.
+  const named = placements.filter(
     (placement) =>
       placement.id !== targetId &&
       placement.position.z - placement.footprint / 2 < high &&
-      placement.position.z + placement.footprint / 2 > low
+      south(placement) + PRINT_DEPTH > low
   );
+  const walled = named.filter((placement) => south(placement) > low);
+  return (
+    columnClearOf(named, targetX, NAME_REACH) ??
+    columnClearOf(walled, targetX, 0.25) ??
+    walled.reduce(
+      (edge, placement) =>
+        Math.max(edge, placement.position.x + placement.footprint / 2 + 0.25),
+      targetX
+    )
+  );
+}
+
+/** The x nearest `targetX` at least `reach` clear of every blocker's sides. */
+function columnClearOf(
+  blockers: Placement[],
+  targetX: number,
+  reach: number
+): number | undefined {
+  const keep = (placement: Placement) => placement.footprint / 2 + reach;
   const candidates = [
     targetX,
     ...blockers.flatMap((placement) => [
-      placement.position.x - placement.footprint / 2 - 0.25,
-      placement.position.x + placement.footprint / 2 + 0.25,
+      placement.position.x - keep(placement),
+      placement.position.x + keep(placement),
     ]),
   ].sort((a, b) => Math.abs(a - targetX) - Math.abs(b - targetX) || a - b);
-  const clear = candidates.find((x) =>
+  return candidates.find((x) =>
     blockers.every(
-      (placement) =>
-        Math.abs(x - placement.position.x) >= placement.footprint / 2 + 0.2
+      (placement) => Math.abs(x - placement.position.x) >= keep(placement)
     )
-  );
-  if (clear !== undefined) return clear;
-  return blockers.reduce(
-    (edge, placement) =>
-      Math.max(edge, placement.position.x + placement.footprint / 2 + 0.25),
-    targetX
   );
 }
 

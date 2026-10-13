@@ -9,7 +9,6 @@ import {
   LINE_HEIGHT,
   MAX_EM,
 } from "../scene/board-labels";
-import { STAMP_BAND } from "../scene/stage";
 import {
   cityBounds,
   cityDistricts as cityOf,
@@ -20,6 +19,7 @@ import {
   type Placement,
   ROW_LIMIT,
   SPARSE_RANK,
+  STAMP_BAND,
   STREET,
 } from "./city";
 

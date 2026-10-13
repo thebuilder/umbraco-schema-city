@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { STAMP_BAND } from "../layout/city";
 import {
   clearOfEdge,
   FINGER_REACH,
@@ -6,13 +7,13 @@ import {
   PRINT_MARGIN,
   RING_RADIUS,
 } from "./board";
+import { PRINT_DEPTH } from "./board-labels";
 import {
   atmosphere,
   districtStamp,
   framingAction,
   framingStep,
   pixelsPerUnit,
-  STAMP_BAND,
   STAMP_CAP,
   STAMP_MIN_CAP,
   settlingResize,
@@ -141,11 +142,11 @@ test("a district's name stays clear of every hole, every finger and the edge", (
   }
 });
 
-test("the band leaves half a street and a unit between the last row and the name", () => {
+test("the band leaves the last row's names, half a street and a unit before the name", () => {
   const island = { minX: 0, maxX: 60, minZ: 0, maxZ: 40 };
   const stamp = stampOf(island, 7);
   const lastRowEdge = island.maxZ - STAMP_BAND;
-  expect(stamp.minZ - lastRowEdge).toBeCloseTo(3.5);
+  expect(stamp.minZ - lastRowEdge).toBeCloseTo(PRINT_DEPTH + 3.5);
 });
 
 test("a name too wide for its island shrinks instead of running over a hole", () => {

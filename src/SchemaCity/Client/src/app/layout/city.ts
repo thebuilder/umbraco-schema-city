@@ -13,10 +13,11 @@ import type {
   SchemaGraph,
   SchemaNode,
 } from "../../model/types";
-import { LABEL_STRIP } from "../scene/board-labels";
+import { PRINT_MARGIN } from "../scene/board";
+import { LABEL_STRIP, MAX_OVERHANG, PRINT_DEPTH } from "../scene/board-labels";
 import { FLOOR_HEIGHT } from "../scene/buildings";
-import { STAMP_BAND } from "../scene/stage";
-import { layoutNeighbourhoods } from "./neighbourhoods";
+import { STAMP_CAP, STAMP_INSET } from "../scene/stage";
+import { layoutNeighbourhoods, type Spacing } from "./neighbourhoods";
 import { type IdCluster, structureGroups } from "./structure";
 
 /**
@@ -121,13 +122,59 @@ export const DISTRICT_GAP = STREET * 2;
  */
 export const ISLAND_PAD = 2;
 /**
+ * Ground between the district's name and the last row, which holds that row's
+ * printed names and then the outer street a road takes out of it: the names' depth,
+ * half a street and half a unit. Without the names' depth, a last-row name on two
+ * lines touched the district's name and was pushed aside.
+ */
+const STAMP_CLEARANCE = PRINT_DEPTH + STREET / 2 + 0.5;
+/**
+ * Ground a district holds along its south edge for its name. South, because the
+ * default camera looks from the south-east: a roof leans away from it, over the
+ * ground north of the building, so the name needs no room for leaning roofs. On the
+ * north edge it did, and that band was 14.5 units of empty plate on every island.
+ */
+export const STAMP_BAND = STAMP_INSET + STAMP_CAP + STAMP_CLEARANCE;
+/**
  * Ground a district holds empty south of its last row, on top of the island's own
  * padding, so its name has somewhere to stand. The name is printed on the ground and
  * writes no depth, so a row standing on it would eat the letters.
  */
 const STAMP_MARGIN = Math.max(0, STAMP_BAND - ISLAND_PAD);
+/**
+ * Ground a district holds east and west of its outermost buildings, on top of the
+ * island's padding, so a name there hangs past its building as far as any other and
+ * stays centred under it rather than sliding in off the edge.
+ */
+export const NAME_MARGIN = Math.max(
+  0,
+  MAX_OVERHANG + PRINT_MARGIN - ISLAND_PAD
+);
+/** The void between two islands side by side, measured between their buildings. */
+const ISLAND_SPAN_GAP = DISTRICT_GAP + NAME_MARGIN * 2;
 /** Buildings in one row, everywhere. A wider rank folds onto more rows. */
 export const ROW_LIMIT = 8;
+/** Spacing for a table of types with no parent among them, such as one block editor's. */
+const TABLE_SPACING: Spacing = {
+  gap: GAP,
+  familyGap: FAMILY_GAP,
+  rowGap: ROW_GAP,
+  laneGap: LANE_GAP,
+  street: STREET,
+  rowLimit: ROW_LIMIT,
+};
+/**
+ * Spacing for a board of page families. Their stacks stand tall and their traces run
+ * between every row, so at the table's spacing the names squeezed in between both.
+ */
+const FAMILY_SPACING: Spacing = {
+  ...TABLE_SPACING,
+  gap: 6,
+  familyGap: 8,
+  rowGap: 9,
+  laneGap: 8,
+  street: 9,
+};
 /**
  * The most buildings a rank can hold and still share its band with the rank below.
  * Two is where a rank stops paying for the street under it: a fuller rank reads as a
@@ -258,10 +305,10 @@ export function layoutCity(
 }
 
 /**
- * The box the camera has to frame, including each building's own footprint and `pad`
- * units of ground around the lot. The islands are the districts padded by the same
- * number, and the outermost district touches the outermost building, so padding the
- * whole box is the same box as the union of the padded islands.
+ * The buildings' box, each building's own footprint included, with `pad` units of
+ * ground around it. The islands reach further: `NAME_MARGIN` more east and west and
+ * the name's band south, so the scene frames the city from the districts and this
+ * is for a lot with no district round it.
  */
 export function cityBounds(placements: Placement[], pad = 0): CityBounds {
   const box = boxOf(placements);
@@ -453,14 +500,7 @@ function layoutClustered(
         : [...cluster.families].sort((a, b) => rank(a) - rank(b))
       ).map((family) => family.map(item)),
     })),
-    {
-      gap: GAP,
-      familyGap: FAMILY_GAP,
-      rowGap: ROW_GAP,
-      laneGap: LANE_GAP,
-      street: STREET,
-      rowLimit: ROW_LIMIT,
-    }
+    clusters.some((cluster) => cluster.head) ? FAMILY_SPACING : TABLE_SPACING
   );
   const placements = group.members.map((node) => {
     const spot = spots.get(node.id) as { x: number; z: number; row: number };
@@ -576,7 +616,7 @@ function arrange(laid: Laid[], edges: SchemaEdge[], stack: boolean) {
         left,
         band === "north" ? -DISTRICT_GAP - depth : middleDepth + DISTRICT_GAP
       );
-      cursor = left + width + DISTRICT_GAP;
+      cursor = left + width + ISLAND_SPAN_GAP;
     }
     for (const { district } of wanted) placed.add(district);
   };
@@ -586,7 +626,7 @@ function arrange(laid: Laid[], edges: SchemaEdge[], stack: boolean) {
   // East of every row, so a wide row can never grow into this column.
   let eastX = 0;
   for (const district of placed)
-    eastX = Math.max(eastX, boxOf(district.placements).maxX + DISTRICT_GAP);
+    eastX = Math.max(eastX, boxOf(district.placements).maxX + ISLAND_SPAN_GAP);
   let eastZ = 0;
   for (const district of laid.filter((d) => bandOf(d) === "east").sort(bySize))
     eastZ += moveTo(district, eastX, eastZ).depth + DISTRICT_GAP;
@@ -617,7 +657,7 @@ function placeRow(row: readonly Laid[], stack: boolean): number {
       column.z + box.maxZ - box.minZ + STAMP_MARGIN <= depth + 1e-9;
     if (!fits)
       column = {
-        x: column.width > 0 ? column.x + column.width + DISTRICT_GAP : 0,
+        x: column.width > 0 ? column.x + column.width + ISLAND_SPAN_GAP : 0,
         z: 0,
         width: 0,
       };
@@ -693,8 +733,8 @@ function districtOf(island: Laid): District {
     id: island.id,
     name: island.name,
     kind: island.kind,
-    minX: box.minX,
-    maxX: box.maxX,
+    minX: box.minX - NAME_MARGIN,
+    maxX: box.maxX + NAME_MARGIN,
     minZ: box.minZ,
     maxZ,
     centre: { x: (box.minX + box.maxX) / 2, z: (box.minZ + maxZ) / 2 },

@@ -51,9 +51,12 @@ export function comparisonCity(
     },
     grouping
   );
+  // From the added districts' own west edge, which a name's margin puts west of
+  // their first building.
   const shift =
     Math.max(0, ...before.districts.map((district) => district.maxX)) +
-    DISTRICT_GAP;
+    DISTRICT_GAP -
+    Math.min(0, ...added.districts.map((district) => district.minX));
   return {
     removed,
     placements: [
