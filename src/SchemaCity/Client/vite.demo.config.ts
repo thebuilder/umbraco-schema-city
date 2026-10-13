@@ -13,5 +13,11 @@ export default defineConfig({
     outDir: "../dist",
     emptyOutDir: true,
     sourcemap: false,
+    // As in vite.config.ts: Base UI's "use client" means nothing in the browser.
+    rolldownOptions: {
+      onLog(level, log, handler) {
+        if (log.code !== "MODULE_LEVEL_DIRECTIVE") handler(level, log);
+      },
+    },
   },
 });
