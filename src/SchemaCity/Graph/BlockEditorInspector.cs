@@ -133,8 +133,7 @@ public static class BlockEditorInspector
 
     /// <summary>
     /// The Multi Node Tree Picker keeps its allowed Document Types in Filter as a comma separated
-    /// list of keys. PLAN.md section 4 says aliases; it is keys, and an entry that is not a Guid
-    /// is ignored rather than guessed at.
+    /// list of keys, not aliases, and an entry that is not a Guid is ignored rather than guessed at.
     /// </summary>
     private static IEnumerable<SchemaTarget> Picked(string? filter) =>
         (filter ?? string.Empty)

@@ -232,8 +232,8 @@ public sealed class SchemaGraphBuilder :
             groups.Add(NoGroup(null, ownNoGroup, dataTypesByKey, targetsByDataTypeKey, hostId, edges));
         }
 
-        // Composed properties and their origin. PLAN.md section 4 reads as a single, direct-level
-        // walk of ContentTypeComposition, but a type that inherits from another type which itself
+        // Composed properties and their origin. A single, direct-level walk of
+        // ContentTypeComposition is not enough: a type that inherits from another type which itself
         // has compositions (pressRelease inherits article, article composes seoComposition) needs
         // those properties to land somewhere too, or ownPropertyCount and composedPropertyCount
         // stop matching what the groups actually contain. This walks the whole composition chain

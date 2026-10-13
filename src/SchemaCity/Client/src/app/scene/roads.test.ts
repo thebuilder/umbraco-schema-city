@@ -389,8 +389,8 @@ function straightCrossings(
 
 describe("crossings on the fixtures", () => {
   // The reason roads follow the streets at all: straight centre-to-centre ribbons
-  // read as wiring rather than as a city. This is the measurement PLAN section 6
-  // quotes, run over both fixtures rather than over a hand-built grid.
+  // read as wiring rather than as a city. Measured over both fixtures rather than
+  // over a hand-built grid.
   for (const [name, graph] of [
     ["medium", medium],
     ["pathological", pathological],

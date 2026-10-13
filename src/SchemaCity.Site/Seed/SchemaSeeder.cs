@@ -350,9 +350,9 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             ],
         };
 
-        // The Filter is a comma separated list of Document Type keys, not aliases. PLAN.md
-        // section 4 says aliases; write those and Umbraco 17 throws "Unrecognized Guid format"
-        // from the picker's validator on the first publish.
+        // The Filter is a comma separated list of Document Type keys, not aliases. Write aliases
+        // and Umbraco 17 throws "Unrecognized Guid format" from the picker's validator on the
+        // first publish.
         var relatedContent = new MultiNodePickerConfiguration
         {
             MaxNumber = 5,
