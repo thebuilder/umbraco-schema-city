@@ -731,6 +731,32 @@ function rowsOf(placements: Placement[]): [number, number][] {
   return rows;
 }
 
+/**
+ * The mid-line of the street between two rows, and how far a lane may sit off it.
+ *
+ * The outermost two streets have open ground on one side, so they are half a street
+ * out from the city rather than half way to a row that is not there. Names print in
+ * front of a row, so a street wide enough to give up their depth runs south of it,
+ * the southernmost always, and the names stand in front of their buildings rather
+ * than being pushed behind them by the traces. A narrower street, a table's or focus
+ * mode's, keeps its middle.
+ */
+function streetBetween(
+  above: [number, number] | undefined,
+  below: [number, number] | undefined
+): { at: number; half: number } {
+  const outer = STREET / 2 - ROAD_WIDTH;
+  if (!above)
+    return { at: (below as [number, number])[0] - STREET / 2, half: outer };
+  if (!below) return { at: above[1] + PRINT_DEPTH + STREET / 2, half: outer };
+  const open = below[0] - above[1];
+  const print = open >= PRINT_DEPTH + STREET / 2 ? PRINT_DEPTH : 0;
+  return {
+    at: (above[1] + print + below[0]) / 2,
+    half: Math.max(0, (open - print) / 2 - ROAD_WIDTH),
+  };
+}
+
 function roadGrid(placements: Iterable<Placement>): RoadGrid {
   const allPlacements = [...placements];
   const rows = rowsOf(allPlacements);
@@ -740,27 +766,9 @@ function roadGrid(placements: Iterable<Placement>): RoadGrid {
   const streets: number[] = [];
   const halves: number[] = [];
   for (let i = 0; i <= rows.length; i++) {
-    const above = rows[i - 1];
-    const below = rows[i];
-    // The outermost two streets have open ground on one side, so they are half a
-    // street out from the city rather than half way to a row that is not there.
-    // Names print in front of a row, so a street wide enough to give up their depth
-    // runs south of it, the southernmost always, and the names stand in front of
-    // their buildings rather than being pushed behind them by the traces. A
-    // narrower street, a table's or focus mode's, keeps its middle.
-    const print =
-      above && below && below[0] - above[1] >= PRINT_DEPTH + STREET / 2
-        ? PRINT_DEPTH
-        : 0;
-    const gap = above && below ? below[0] - above[1] - print : STREET;
-    streets.push(
-      above && below
-        ? (above[1] + print + below[0]) / 2
-        : below
-          ? below[0] - STREET / 2
-          : (above as [number, number])[1] + PRINT_DEPTH + STREET / 2
-    );
-    halves.push(Math.max(0, gap / 2 - ROAD_WIDTH));
+    const street = streetBetween(rows[i - 1], rows[i]);
+    streets.push(street.at);
+    halves.push(street.half);
   }
 
   // ponytail: a linear scan per lookup, called twice per edge over about thirty
