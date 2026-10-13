@@ -4,6 +4,9 @@ export function saveFile(text: string, name: string, type: string) {
   const link = document.createElement("a");
   link.href = url;
   link.download = name;
+  // The backoffice router turns every same-origin anchor click into a pushState, and
+  // a blob URL counts as same-origin, so without this nothing downloads there.
+  link.dataset.routerSlot = "disabled";
   document.body.append(link);
   link.click();
   link.remove();

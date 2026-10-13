@@ -8,7 +8,11 @@ import { cn } from "@/lib/utils";
 import { usePortalContainer } from "@/portal";
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+  // Focus is trapped but the page is not scroll locked: Base UI's lock resizes
+  // <body>, which in the backoffice reflows the whole workspace and the canvas.
+  return (
+    <DialogPrimitive.Root data-slot="dialog" modal="trap-focus" {...props} />
+  );
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
