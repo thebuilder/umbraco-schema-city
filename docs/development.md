@@ -116,6 +116,43 @@ exports `medium.json` and `medium-usage.json` from the seeded installation. Ever
 them is pinned to 2026-09-01 12:00 UTC for reproducible diffs, so that date in demo screenshots is
 fixture data.
 
+## Architecture notes
+
+These are the reasons behind code that looks odd at first. Each one was a bug once.
+
+- **One React app, two Lit hosts.** `Client/src/app/` is the whole application and imports
+  nothing from `@umbraco-cms/backoffice`. The two Lit wrappers, `entry-workspace.tsx` and
+  `entry-document-type-view.tsx` on the shared `schema-city-element.tsx`, are the only
+  Umbraco-aware code. Each creates its React root once and never re-creates it, because an R3F
+  canvas that unmounts loses its WebGL context and its camera. The element registration is
+  guarded with `customElements.get`, because the entry can be evaluated twice.
+- **Styles live in the shadow root.** The wrapper adopts `styles.css?inline` as one stylesheet,
+  and the theme's tokens sit on `:host, :root`. A shadow root ignores `@property`, so the element
+  copies Tailwind's `@property` rules into the document once.
+- **Portals stay inside it too.** base-ui portals to `document.body` by default, where the
+  stylesheet does not reach. `portal.ts` provides a container that `App` renders last, and the
+  copied dialog, dropdown menu, popover, select, sheet and tooltip pass it as `container`. A
+  primitive copied in from the registry later needs the same patch.
+- **No scroll lock.** Select and Menu are not modal and Dialog only traps focus, because base-ui's
+  scroll lock resizes `<body>`, which reflows the whole backoffice workspace and the canvas.
+- **Downloads opt out of the router.** The backoffice router turns every same-origin link click
+  into a `pushState`, and a blob URL counts as same-origin, so `saveFile` sets
+  `data-router-slot="disabled"`.
+- **URL state waits for its route.** The app writes its URL with `replaceState` only while the
+  location is still the route it mounted under (`app/url.ts`), because the backoffice router
+  cancels an in-flight navigation on any `replaceState`.
+- **The entry loads twice.** Umbraco requests the manifest's `element` URL with and without its
+  cache-busting query, which makes two module instances, so no chunk imports an entry back. Every
+  chunk but the entries carries a content hash, because the site sends no `Cache-Control` and
+  Umbraco busts only the entry's URL. `vite.config.ts` explains the chunk groups.
+- **Overlays never resize the canvas.** Anything conditional over the canvas, such as the lens
+  legend, overlays it, because a resize makes the camera re-fit and the scene jump. The label
+  layer sits inside the scene's stacking context (`z-0`), so the panels beside it (`z-10`) win.
+- **No Swagger and no generated client.** Umbraco 18 replaced Swashbuckle's document generation,
+  and a composer deriving from the 17 extension types stops the whole assembly loading on 18.
+  `api.ts` calls the endpoints by hand, and its `security` entry is required, or the backoffice
+  client sends no token.
+
 ## Build a local package
 
 Build the client first so existing output cannot make the package stale:

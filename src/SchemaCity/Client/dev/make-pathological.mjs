@@ -1,6 +1,5 @@
 // Writes dev/fixtures/pathological.json and pathological-usage.json, the stress
-// fixture PLAN section 5 has owed since M0: about 300 types carrying every shape the
-// city has to survive at once. Run it with `node dev/make-pathological.mjs` from
+// fixture: about 300 types carrying every shape the city has to survive at once. Run it with `node dev/make-pathological.mjs` from
 // Client/; it rewrites both files byte for byte, so a clean tree stays clean unless
 // the plan below changed.
 //

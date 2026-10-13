@@ -350,9 +350,9 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             ],
         };
 
-        // The Filter is a comma separated list of Document Type keys, not aliases. PLAN.md
-        // section 4 says aliases; write those and Umbraco 17 throws "Unrecognized Guid format"
-        // from the picker's validator on the first publish.
+        // The Filter is a comma separated list of Document Type keys, not aliases. Write aliases
+        // and Umbraco 17 throws "Unrecognized Guid format" from the picker's validator on the
+        // first publish.
         var relatedContent = new MultiNodePickerConfiguration
         {
             MaxNumber = 5,
@@ -747,12 +747,12 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     }
 
     private IContent Create(string name, int parentId, string typeAlias) =>
-        _contentService.Create(name, parentId, _types[typeAlias], UmbracoConstants.Security.SuperUserId);
+        _contentService.Create(name, parentId, _types[typeAlias]);
 
     private IContent Publish(IContent content)
     {
         _contentService.Save(content);
-        PublishResult result = _contentService.Publish(content, ["*"], UmbracoConstants.Security.SuperUserId);
+        PublishResult result = _contentService.Publish(content, ["*"]);
 
         // Publishing validates every stored block, and a silent failure would leave a draft where
         // the fixture test expects a published item.
@@ -885,7 +885,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
         content.SetCultureName(englishName, DefaultCulture);
         content.SetCultureName(danishName, SecondCulture);
         _contentService.Save(content);
-        _contentService.Publish(content, [DefaultCulture, SecondCulture], UmbracoConstants.Security.SuperUserId);
+        _contentService.Publish(content, [DefaultCulture, SecondCulture]);
         _published++;
     }
 
