@@ -11,8 +11,10 @@ import { PRINT_DEPTH } from "./board-labels";
 import {
   atmosphere,
   districtStamp,
+  fitClipPlanes,
   framingAction,
   framingStep,
+  MIN_NEAR,
   pixelsPerUnit,
   STAMP_CAP,
   STAMP_MIN_CAP,
@@ -29,6 +31,37 @@ test("no part of the city is in fog, wherever the camera orbits over it", () => 
       );
     }
   }
+});
+
+/** A camera's clip planes, counting how often the projection is rebuilt. */
+function clipCamera() {
+  return {
+    near: MIN_NEAR,
+    far: 1000,
+    projections: 0,
+    updateProjectionMatrix() {
+      this.projections++;
+    },
+  };
+}
+
+test("the near plane holds at street level and steps back with the camera", () => {
+  const camera = clipCamera();
+  fitClipPlanes(camera, 20, 300);
+  expect(camera.near).toBe(MIN_NEAR);
+  expect(camera.far).toBe(360);
+  // At the furthest dolly over a big city, the depth buffer's step at the city,
+  // distance squared over near in 24 bits, stays well under a board's 0.1 mask.
+  fitClipPlanes(camera, 2400, 9000);
+  expect(2400 ** 2 / (camera.near * 2 ** 24)).toBeLessThan(0.05);
+});
+
+test("a still camera leaves its projection alone", () => {
+  const camera = clipCamera();
+  fitClipPlanes(camera, 900, 3000);
+  fitClipPlanes(camera, 900, 3000);
+  fitClipPlanes(camera, 901, 3001);
+  expect(camera.projections).toBe(1);
 });
 
 test("no part of the city is in fog with the orbit point raised over it", () => {

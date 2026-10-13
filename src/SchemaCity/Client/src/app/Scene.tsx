@@ -142,10 +142,12 @@ import {
 import {
   atmosphere,
   CAMERA_FOV,
+  fitClipPlanes,
   framingAction,
   framingStep,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
+  MIN_NEAR,
   pixelsPerUnit,
   SKY_FRAGMENT_SHADER,
   SKY_VERTEX_SHADER,
@@ -1471,11 +1473,7 @@ function World({ palette, span }: { palette: Palette; span: number }) {
     }
     // Past the fog's far end everything is the horizon colour, which is what the sky
     // below the horizon already is, so nothing further out needs drawing.
-    const cut = far * 1.2;
-    if (Math.abs(camera.far - cut) > cut * 0.01) {
-      camera.far = cut;
-      camera.updateProjectionMatrix();
-    }
+    fitClipPlanes(camera, distance, far);
     // The plane's half width clears the fog's end even along its own axes.
     grid.current?.position.set(camera.position.x, GRID_Y, camera.position.z);
     grid.current?.scale.setScalar(far * 2.2);
@@ -2840,8 +2838,8 @@ export default function Scene({
     >
       {palette ? (
         <Canvas
-          // The far plane is the world's to set, from where the fog ends.
-          camera={{ fov: CAMERA_FOV, near: 0.5, far: 1000 }}
+          // The world sets both planes, from the camera's distance and where the fog ends.
+          camera={{ fov: CAMERA_FOV, near: MIN_NEAR, far: 1000 }}
           // Only when something changes: a city left open in the backoffice would
           // otherwise redraw sixty times a second to show the same picture.
           frameloop="demand"
