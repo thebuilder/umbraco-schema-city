@@ -11,8 +11,6 @@
     "**/*.test.ts"
   ],
   "ignoreDependencies": [
-    // Vite ships rollup, and vite.config.ts imports one type from it.
-    "rollup",
     // The host serves the backoffice at runtime; the build marks it external.
     "@umbraco-cms/backoffice"
   ],
