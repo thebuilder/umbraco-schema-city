@@ -1,14 +1,13 @@
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
-import type { GetModuleInfo } from "rollup";
-import { defineConfig } from "vite";
+import { defineConfig, type Rollup } from "vite";
 
 const sceneOnlyCache = new Map<string, boolean>();
 
 /** True when every path back from `id` to an entry point passes through Scene.tsx. */
 function isSceneOnly(
   id: string,
-  getModuleInfo: GetModuleInfo,
+  getModuleInfo: Rollup.GetModuleInfo,
   stack = new Set<string>()
 ): boolean {
   if (sceneOnlyCache.has(id)) return sceneOnlyCache.get(id) as boolean;
