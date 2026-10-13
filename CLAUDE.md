@@ -9,11 +9,6 @@ wrappers, the build config or anything portalled.
 
 These apply to every commit, every file and every generated sentence.
 
-- **Ponytail governs the code.** Climb the ladder before writing anything: does it need to exist,
-  is it already in the repo, does the stdlib or the platform do it, does an installed dependency
-  do it, can it be one line. No interface with one implementation, no config for a value that
-  never changes, no scaffolding for later. A deliberate corner gets a `ponytail:` comment naming
-  the ceiling and the upgrade path. Non-trivial logic leaves one runnable check behind.
 - **Unslop governs the words.** Code comments, README, UI copy, error messages and commit
   messages. No em dashes, no "not just X but Y", no rule of three, no colons as connectors, no
   puffery, no filler. Say what the thing does, in plain words, with the number when there is one.
