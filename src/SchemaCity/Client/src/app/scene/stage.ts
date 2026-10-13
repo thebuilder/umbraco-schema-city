@@ -47,6 +47,39 @@ export function atmosphere(
   return { near, far: near * 3 };
 }
 
+/** The camera's near plane at street level, where it comes closest to anything. */
+export const MIN_NEAR = 0.5;
+/**
+ * The near plane as a share of the camera's distance to its target, once that is
+ * further than the street-level one. Nothing stands that close to a camera so far out.
+ */
+const NEAR_SHARE = 1 / 200;
+
+/**
+ * Sets the camera's clip planes for a camera `distance` from its target, with the fog
+ * gone at `fogFar`.
+ *
+ * The far plane stops a little past the fog, where everything is already the horizon
+ * colour. The near plane steps back with the camera too: held at its closest, the
+ * depth buffer's steps at the city grow with the square of the distance, and at the
+ * furthest dolly they pass a board's mask, so the copper under it shows through in
+ * flickering triangles. A change under a hundredth leaves the projection alone, so a
+ * still camera does not rebuild it every frame.
+ */
+export function fitClipPlanes(
+  camera: { near: number; far: number; updateProjectionMatrix: () => void },
+  distance: number,
+  fogFar: number
+): void {
+  const near = Math.max(MIN_NEAR, distance * NEAR_SHARE);
+  const far = fogFar * 1.2;
+  const moved = (from: number, to: number) => Math.abs(from - to) > to * 0.01;
+  if (!(moved(camera.near, near) || moved(camera.far, far))) return;
+  camera.near = near;
+  camera.far = far;
+  camera.updateProjectionMatrix();
+}
+
 /**
  * How many CSS pixels one world unit covers at `distance` from the camera. Everything
  * that culls by on-screen size goes through here.

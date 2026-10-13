@@ -142,10 +142,12 @@ import {
 import {
   atmosphere,
   CAMERA_FOV,
+  fitClipPlanes,
   framingAction,
   framingStep,
   GRID_FRAGMENT_SHADER,
   GRID_VERTEX_SHADER,
+  MIN_NEAR,
   pixelsPerUnit,
   SKY_FRAGMENT_SHADER,
   SKY_VERTEX_SHADER,
@@ -1364,13 +1366,6 @@ const SHADOW_MAP = 2048;
  * across open ground, rather than behind the buildings or under them.
  */
 const KEY_DIRECTION = new THREE.Vector3(-0.8, 0.9, 0.3).normalize();
-/** The near plane at street level, where the camera comes closest to anything. */
-const MIN_NEAR = 0.5;
-/**
- * The near plane as a share of the camera's distance to its target, once that is
- * further than the street-level one. Nothing stands that close to a camera so far out.
- */
-const NEAR_SHARE = 1 / 200;
 /** Stands in for the orbit target in the frame before the controls exist. */
 const ORIGIN = new THREE.Vector3();
 
@@ -1478,20 +1473,7 @@ function World({ palette, span }: { palette: Palette; span: number }) {
     }
     // Past the fog's far end everything is the horizon colour, which is what the sky
     // below the horizon already is, so nothing further out needs drawing.
-    const cut = far * 1.2;
-    // The near plane steps back with the camera too. Held at its closest, the depth
-    // buffer's steps at the city grow with the square of the distance, and at the
-    // furthest dolly they pass the mask's thickness, so the copper under it shows
-    // through in flickering triangles.
-    const close = Math.max(MIN_NEAR, distance * NEAR_SHARE);
-    if (
-      Math.abs(camera.far - cut) > cut * 0.01 ||
-      Math.abs(camera.near - close) > close * 0.01
-    ) {
-      camera.far = cut;
-      camera.near = close;
-      camera.updateProjectionMatrix();
-    }
+    fitClipPlanes(camera, distance, far);
     // The plane's half width clears the fog's end even along its own axes.
     grid.current?.position.set(camera.position.x, GRID_Y, camera.position.z);
     grid.current?.scale.setScalar(far * 2.2);
