@@ -44,6 +44,7 @@ function DropdownMenuContent({
       <MenuPrimitive.Positioner
         align={align}
         className="isolate z-50"
+        positionMethod="fixed"
         side={side}
         sideOffset={sideOffset}
       >
@@ -215,6 +216,7 @@ function DropdownMenuSubContent({
       <MenuPrimitive.Positioner
         align="start"
         className="isolate z-50"
+        positionMethod="fixed"
         side="inline-end"
         sideOffset={4}
       >
