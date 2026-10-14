@@ -469,10 +469,13 @@ function useBuildingMaterials(reducedMotion: boolean) {
         transparent: true,
         opacity: 0,
       }),
+      // Writes no depth, or its top, level with the roads, fights them and hides
+      // the print under it.
       plaza: new THREE.MeshStandardMaterial({
         roughness: 0.9,
         metalness: 0,
         transparent: true,
+        depthWrite: false,
         opacity: 0,
       }),
     }),
@@ -574,6 +577,8 @@ export function Buildings({
         geometry={shapes.disc}
         held={held}
         material={plain.plaza}
+        // Over the boards, under the courtyards, the roads and the print.
+        renderOrder={-0.75}
         slot="plaza"
       />
       <HitTargets

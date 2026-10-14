@@ -346,25 +346,22 @@ function routeAll(
 ): { routes: Route[]; segments: RoadSegment[] } {
   const legs = planLegs(placementsById, edges).map((leg) => ({
     leg,
-    // Every street and corridor takes one lane per source and kind, so everything
-    // a type connects to on one layer leaves it as one trunk and forks at each
-    // target's column. Owning the arrival runs by target instead laid a hub's fan
-    // into another island as one parallel lane per child, 22 of them for Home on
-    // the seeded schema.
-    owner: `${leg.edge.kind}|${leg.edge.from}`,
+    owners: ownersOf(leg),
     channels: channelsOf(leg),
   }));
   const lanes = allocateLanes(
-    legs.flatMap(({ owner, channels }) =>
-      channels.flatMap((channel) => (channel ? [{ ...channel, owner }] : []))
+    legs.flatMap(({ owners, channels }) =>
+      channels.flatMap((channel, i) =>
+        channel ? [{ ...channel, owner: owners[i] as string }] : []
+      )
     )
   );
 
   const routes: Route[] = [];
   const runs = new Map<EdgeKind, RoadSegment[]>();
-  for (const { leg, owner, channels } of legs) {
-    const found = channels.map((channel) =>
-      channel ? (lanes.get(`${channel.channel}|${owner}`) as Lane) : null
+  for (const { leg, owners, channels } of legs) {
+    const found = channels.map((channel, i) =>
+      channel ? (lanes.get(`${channel.channel}|${owners[i]}`) as Lane) : null
     );
     const [leave, arrive, corridor] = found;
     const points = legPoints(
@@ -390,6 +387,27 @@ function routeAll(
     routes,
     segments: GROUND.flatMap((kind) => mergeRuns(runs.get(kind) ?? [])),
   };
+}
+
+/**
+ * Who owns each of a leg's lanes, in `channelsOf` order. Every street and corridor
+ * takes one lane per source and kind, so everything a type connects to on one layer
+ * leaves it as one trunk and forks at each target's column. Owning the arrival runs
+ * by target instead laid a hub's fan into another island as one parallel lane per
+ * child, 22 of them for Home on the seeded schema.
+ *
+ * A block or reference link into another island crosses the corridor on one lane
+ * per source island instead, and arrives on one lane per source island and column,
+ * or the Element Types' streets carried a lane for each of 24 hosts, a hair apart,
+ * and fused into a gold band when zoomed out. The column stays in the arrival's
+ * owner so two columns never share a run that would read as one joining the other.
+ */
+function ownersOf(leg: Leg): string[] {
+  const own = `${leg.edge.kind}|${leg.edge.from}`;
+  if (leg.edge.kind === "allowedChild" || leg.from.district === leg.to.district)
+    return [own, own, own];
+  const island = `${leg.edge.kind}|island:${leg.from.district}`;
+  return [own, `${island}|${leg.column?.toFixed(3) ?? "corridor"}`, island];
 }
 
 /** A lane-free stretch of one leg: the channel it runs in and the span it covers. */
@@ -596,16 +614,12 @@ function legOf(
   all: Placement[]
 ): Leg {
   const gap = bridgeGap(source, target);
-  if (gap)
-    return {
-      edge,
-      from,
-      to,
-      leave: streetOf(source, portStreet(source, from, to)),
-      arrive: streetOf(target, portStreet(target, to, from)),
-      column: null,
-      corridor: gap,
-    };
+  if (gap) {
+    const leave = streetOf(source, portStreet(source, from, to));
+    const arrive = streetOf(target, portStreet(target, to, from));
+    if (!gapBlocked(gap, from, to, leave, arrive, all))
+      return { edge, from, to, leave, arrive, column: null, corridor: gap };
+  }
   const streets =
     source === target
       ? streetsBetween(source, from, to)
@@ -691,6 +705,49 @@ function bridgeGap(
   if (b.centre.x + b.width / 2 + 1 < a.centre.x - a.width / 2)
     return { low: b.centre.x + b.width / 2, high: a.centre.x - a.width / 2 };
   return null;
+}
+
+/** Each pair of islands' third-island buildings in the gap between them. */
+const inGaps = new WeakMap<Placement[], Map<string, Placement[]>>();
+
+/**
+ * A third island can fill the gap between two others, its buildings standing between
+ * them in the corridor's x band. The column path clears those, the corridor does not.
+ * The corridor runs from the leave street to the arrive street, as `channelsOf`
+ * spans it.
+ */
+function gapBlocked(
+  gap: { low: number; high: number },
+  from: Placement,
+  to: Placement,
+  leave: Street,
+  arrive: Street,
+  all: Placement[]
+): boolean {
+  let byPair = inGaps.get(all);
+  if (!byPair) {
+    byPair = new Map();
+    inGaps.set(all, byPair);
+  }
+  const pair = `${from.district}|${to.district}`;
+  let inGap = byPair.get(pair);
+  if (!inGap) {
+    inGap = all.filter(
+      (placement) =>
+        placement.district !== from.district &&
+        placement.district !== to.district &&
+        placement.position.x + placement.footprint / 2 > gap.low &&
+        placement.position.x - placement.footprint / 2 < gap.high
+    );
+    byPair.set(pair, inGap);
+  }
+  const low = Math.min(leave.z, arrive.z) - leave.half;
+  const high = Math.max(leave.z, arrive.z) + leave.half;
+  return inGap.some(
+    (placement) =>
+      placement.position.z + placement.footprint / 2 > low &&
+      placement.position.z - placement.footprint / 2 < high
+  );
 }
 
 function portStreet(grid: RoadGrid, at: Placement, toward: Placement): number {
@@ -846,7 +903,8 @@ function columnClearOf(
   ].sort((a, b) => Math.abs(a - targetX) - Math.abs(b - targetX) || a - b);
   return candidates.find((x) =>
     blockers.every(
-      (placement) => Math.abs(x - placement.position.x) >= keep(placement)
+      // A candidate is one blocker's side, which a rounding error must not reject.
+      (placement) => Math.abs(x - placement.position.x) >= keep(placement) - EPS
     )
   );
 }
