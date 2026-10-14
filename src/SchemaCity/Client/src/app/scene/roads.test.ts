@@ -399,19 +399,25 @@ describe("ground traces on the fixtures", () => {
     it(`never runs ${name}'s traces through a building they do not end at`, () => {
       const { placements } = cityDistricts(graph);
       const byId = new Map(placements.map((p) => [p.id, p] as const));
-      const through = planRoutes(byId, graph.edges).segments.flatMap((s) => {
-        const ends = new Set(s.edges.flatMap((edge) => [edge.from, edge.to]));
-        return placements
-          .filter(
-            (p) =>
-              !ends.has(p.id) &&
-              Math.min(s.x0, s.x1) < p.position.x + p.footprint / 2 &&
-              Math.max(s.x0, s.x1) > p.position.x - p.footprint / 2 &&
-              Math.min(s.z0, s.z1) < p.position.z + p.footprint / 2 &&
-              Math.max(s.z0, s.z1) > p.position.z - p.footprint / 2
-          )
-          .map((p) => `${s.edges[0]?.kind} through ${p.id}`);
-      });
+      // Per edge rather than per merged run, so a trunk is never let through one
+      // building because another edge it carries ends there.
+      const through = planRoutes(byId, graph.edges).routes.flatMap(
+        ({ edge, points }) =>
+          points.slice(1).flatMap((b, i) => {
+            const a = points[i] as { x: number; z: number };
+            return placements
+              .filter(
+                (p) =>
+                  p.id !== edge.from &&
+                  p.id !== edge.to &&
+                  Math.min(a.x, b.x) < p.position.x + p.footprint / 2 &&
+                  Math.max(a.x, b.x) > p.position.x - p.footprint / 2 &&
+                  Math.min(a.z, b.z) < p.position.z + p.footprint / 2 &&
+                  Math.max(a.z, b.z) > p.position.z - p.footprint / 2
+              )
+              .map((p) => `${edge.kind} ${edge.from} through ${p.id}`);
+          })
+      );
       expect(through).toEqual([]);
     });
   }
@@ -420,7 +426,7 @@ describe("ground traces on the fixtures", () => {
 describe("block links between islands", () => {
   // One lane per host laid 24 traces a hair apart along each street of the Element
   // Types' island, which fused into a gold band when zoomed out.
-  it("arrives from one source island on one lane per target", () => {
+  it("arrives from one source island down one column on one lane", () => {
     const { placements } = cityDistricts(medium);
     const byId = new Map(placements.map((p) => [p.id, p] as const));
     const lanes = new Map<string, Set<string>>();
@@ -429,7 +435,9 @@ describe("block links between islands", () => {
       const to = byId.get(edge.to)?.district;
       // Six corners: the route turns along a street of the target's island.
       if (edge.kind !== "block" || from === to || points.length !== 6) continue;
-      const key = `${from}|${edge.to}`;
+      // A different column keeps its own lane, so it never reads as joining this one,
+      // and a target in another row arrives along another street.
+      const key = `${from}|${points[2]?.x}|${byId.get(edge.to)?.position.z}`;
       const set = lanes.get(key) ?? new Set();
       set.add(String(points[3]?.z));
       lanes.set(key, set);

@@ -500,6 +500,10 @@ function squashOf(flatten: number, height: number): number {
   return 1 + (PLATE_HEIGHT / height - 1) * Math.min(flatten, 1);
 }
 
+/** A root type that is not an Element Type stands on a plaza disc. */
+export const standsOnPlaza = (node: SchemaNode | undefined) =>
+  Boolean(node?.allowedAsRoot && !node.isElement);
+
 /** A flat plaza disc under every root building that is not an Element Type. */
 export function buildPlazaCells(
   nodesById: Map<string, SchemaNode>,
@@ -508,7 +512,7 @@ export function buildPlazaCells(
   const plazas: PlazaCell[] = [];
   for (const placement of placements) {
     const node = nodesById.get(placement.id);
-    if (!node?.allowedAsRoot || node.isElement) continue;
+    if (!(node && standsOnPlaza(node))) continue;
     plazas.push({
       buildingId: placement.id,
       cx: placement.position.x,

@@ -396,18 +396,18 @@ function routeAll(
  * by target instead laid a hub's fan into another island as one parallel lane per
  * child, 22 of them for Home on the seeded schema.
  *
- * A block or reference link into another island arrives, and crosses the corridor,
- * on one lane per source island instead, or the Element Types' streets carried a
- * lane for each of 24 hosts, a hair apart, and fused into a gold band when zoomed
- * out. They fork at each target's column as a source's own trunk does.
+ * A block or reference link into another island crosses the corridor on one lane
+ * per source island instead, and arrives on one lane per source island and column,
+ * or the Element Types' streets carried a lane for each of 24 hosts, a hair apart,
+ * and fused into a gold band when zoomed out. The column stays in the arrival's
+ * owner so two columns never share a run that would read as one joining the other.
  */
 function ownersOf(leg: Leg): string[] {
   const own = `${leg.edge.kind}|${leg.edge.from}`;
-  const shared =
-    leg.edge.kind !== "allowedChild" && leg.from.district !== leg.to.district
-      ? `${leg.edge.kind}|island:${leg.from.district}`
-      : own;
-  return [own, shared, shared];
+  if (leg.edge.kind === "allowedChild" || leg.from.district === leg.to.district)
+    return [own, own, own];
+  const island = `${leg.edge.kind}|island:${leg.from.district}`;
+  return [own, `${island}|${leg.column?.toFixed(3) ?? "corridor"}`, island];
 }
 
 /** A lane-free stretch of one leg: the channel it runs in and the span it covers. */
@@ -614,16 +614,12 @@ function legOf(
   all: Placement[]
 ): Leg {
   const gap = bridgeGap(source, target);
-  if (gap && !gapBlocked(gap, from, to, all))
-    return {
-      edge,
-      from,
-      to,
-      leave: streetOf(source, portStreet(source, from, to)),
-      arrive: streetOf(target, portStreet(target, to, from)),
-      column: null,
-      corridor: gap,
-    };
+  if (gap) {
+    const leave = streetOf(source, portStreet(source, from, to));
+    const arrive = streetOf(target, portStreet(target, to, from));
+    if (!gapBlocked(gap, from, to, leave, arrive, all))
+      return { edge, from, to, leave, arrive, column: null, corridor: gap };
+  }
   const streets =
     source === target
       ? streetsBetween(source, from, to)
@@ -711,24 +707,44 @@ function bridgeGap(
   return null;
 }
 
+/** Each pair of islands' third-island buildings in the gap between them. */
+const inGaps = new WeakMap<Placement[], Map<string, Placement[]>>();
+
 /**
  * A third island can fill the gap between two others, its buildings standing between
  * them in the corridor's x band. The column path clears those, the corridor does not.
+ * The corridor runs from the leave street to the arrive street, as `channelsOf`
+ * spans it.
  */
 function gapBlocked(
   gap: { low: number; high: number },
   from: Placement,
   to: Placement,
+  leave: Street,
+  arrive: Street,
   all: Placement[]
 ): boolean {
-  const low = Math.min(from.position.z, to.position.z);
-  const high = Math.max(from.position.z, to.position.z);
-  return all.some(
+  let byPair = inGaps.get(all);
+  if (!byPair) {
+    byPair = new Map();
+    inGaps.set(all, byPair);
+  }
+  const pair = `${from.district}|${to.district}`;
+  let inGap = byPair.get(pair);
+  if (!inGap) {
+    inGap = all.filter(
+      (placement) =>
+        placement.district !== from.district &&
+        placement.district !== to.district &&
+        placement.position.x + placement.footprint / 2 > gap.low &&
+        placement.position.x - placement.footprint / 2 < gap.high
+    );
+    byPair.set(pair, inGap);
+  }
+  const low = Math.min(leave.z, arrive.z) - leave.half;
+  const high = Math.max(leave.z, arrive.z) + leave.half;
+  return inGap.some(
     (placement) =>
-      placement.district !== from.district &&
-      placement.district !== to.district &&
-      placement.position.x + placement.footprint / 2 > gap.low &&
-      placement.position.x - placement.footprint / 2 < gap.high &&
       placement.position.z + placement.footprint / 2 > low &&
       placement.position.z - placement.footprint / 2 < high
   );

@@ -46,6 +46,7 @@ import {
   traceIndex,
   updateTiers,
 } from "./board-labels";
+import { standsOnPlaza } from "./buildings";
 import { introPlaying } from "./connection-visibility";
 import { useAnimationFrame } from "./frames";
 import { revealAt } from "./reveal";
@@ -408,6 +409,11 @@ type Inputs = {
   settled: Placement[];
   solution: Solution;
   interaction: Interaction;
+  /**
+   * The types on a plaza disc. Their print takes no knockout: the disc draws under
+   * the traces, so a board-coloured patch over a trace would cut a hole in it.
+   */
+  onPlaza: Set<string>;
 };
 
 const LEVELS = PRINT_LEVELS.length;
@@ -583,7 +589,9 @@ function writeKnockout(
   const one = inputs.standing[slot] as Placement;
   const positions = positionsOf(inputs.knockouts);
   const colours = coloursOf(inputs.knockouts);
-  const shown = knockoutAlpha(spot, alpha, inputs.traceAt, inputs.interaction);
+  const shown = inputs.onPlaza.has(one.id)
+    ? 0
+    : knockoutAlpha(spot, alpha, inputs.traceAt, inputs.interaction);
   // A hidden knockout keeps whatever corners the last one left; it draws nothing.
   if (spot && shown > 0)
     knockout(
@@ -1015,6 +1023,11 @@ export function BoardLabels({
       settled,
       solution,
       interaction,
+      onPlaza: new Set(
+        cityPlacements
+          .filter((placement) => standsOnPlaza(nodesById.get(placement.id)))
+          .map((placement) => placement.id)
+      ),
     }),
     [
       atlas,
@@ -1027,6 +1040,7 @@ export function BoardLabels({
       settled,
       solution,
       interaction,
+      nodesById,
     ]
   );
   useRepaint(inputs, floated, reducedMotion, textScale);
