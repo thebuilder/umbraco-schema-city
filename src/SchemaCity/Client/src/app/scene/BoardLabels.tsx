@@ -575,6 +575,17 @@ function writeCourtyard(
   }
 }
 
+/** The knockout's opacity: none on a plaza disc, which it would cut a hole in. */
+function shownKnockout(
+  inputs: Inputs,
+  one: Placement,
+  spot: Placed | undefined,
+  alpha: number
+): number {
+  if (inputs.onPlaza.has(one.id)) return 0;
+  return knockoutAlpha(spot, alpha, inputs.traceAt, inputs.interaction);
+}
+
 /**
  * Writes the knockout in slot `slot`: under the print when it lies over a trace, at
  * `alpha`, and gone otherwise. A trace the hover or the selection lights keeps its
@@ -589,9 +600,7 @@ function writeKnockout(
   const one = inputs.standing[slot] as Placement;
   const positions = positionsOf(inputs.knockouts);
   const colours = coloursOf(inputs.knockouts);
-  const shown = inputs.onPlaza.has(one.id)
-    ? 0
-    : knockoutAlpha(spot, alpha, inputs.traceAt, inputs.interaction);
+  const shown = shownKnockout(inputs, one, spot, alpha);
   // A hidden knockout keeps whatever corners the last one left; it draws nothing.
   if (spot && shown > 0)
     knockout(

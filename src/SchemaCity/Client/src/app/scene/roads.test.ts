@@ -429,18 +429,21 @@ describe("block links between islands", () => {
   it("arrives from one source island down one column on one lane", () => {
     const { placements } = cityDistricts(medium);
     const byId = new Map(placements.map((p) => [p.id, p] as const));
-    const lanes = new Map<string, Set<string>>();
-    for (const { edge, points } of planRoutes(byId, medium.edges).routes) {
-      const from = byId.get(edge.from)?.district;
-      const to = byId.get(edge.to)?.district;
-      // Six corners: the route turns along a street of the target's island.
-      if (edge.kind !== "block" || from === to || points.length !== 6) continue;
+    const at = (id: string) => byId.get(id) as Placement;
+    // Six corners: the route turns along a street of the target's island.
+    const arriving = planRoutes(byId, medium.edges).routes.filter(
+      ({ edge, points }) =>
+        edge.kind === "block" &&
+        points.length === 6 &&
+        at(edge.from).district !== at(edge.to).district
+    );
+    const lanes = new Map<string, Set<number>>();
+    for (const { edge, points } of arriving) {
+      const [, , column, street] = points as { x: number; z: number }[];
       // A different column keeps its own lane, so it never reads as joining this one,
       // and a target in another row arrives along another street.
-      const key = `${from}|${points[2]?.x}|${byId.get(edge.to)?.position.z}`;
-      const set = lanes.get(key) ?? new Set();
-      set.add(String(points[3]?.z));
-      lanes.set(key, set);
+      const key = `${at(edge.from).district}|${column?.x}|${at(edge.to).position.z}`;
+      lanes.set(key, (lanes.get(key) ?? new Set()).add(street?.z as number));
     }
     const shared = [...lanes.values()];
     expect(shared.some((set) => set.size > 0)).toBe(true);
