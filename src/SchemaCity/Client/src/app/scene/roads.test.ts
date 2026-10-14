@@ -7,6 +7,7 @@ import { PRINT_DEPTH } from "./board-labels";
 import {
   buildRoadGeometry,
   planRoads,
+  planRoutes,
   type RoadSegment,
   roadFan,
   roadTracePositions,
@@ -386,6 +387,58 @@ function straightCrossings(
   }
   return count;
 }
+
+describe("ground traces on the fixtures", () => {
+  // A block run once cut through two Settings buildings: a column was rejected
+  // against the very building it was measured from, by a rounding error, and a
+  // corridor ran through the island standing in the gap between two others.
+  for (const [name, graph] of [
+    ["medium", medium],
+    ["pathological", pathological],
+  ] as const) {
+    it(`never runs ${name}'s traces through a building they do not end at`, () => {
+      const { placements } = cityDistricts(graph);
+      const byId = new Map(placements.map((p) => [p.id, p] as const));
+      const through = planRoutes(byId, graph.edges).segments.flatMap((s) => {
+        const ends = new Set(s.edges.flatMap((edge) => [edge.from, edge.to]));
+        return placements
+          .filter(
+            (p) =>
+              !ends.has(p.id) &&
+              Math.min(s.x0, s.x1) < p.position.x + p.footprint / 2 &&
+              Math.max(s.x0, s.x1) > p.position.x - p.footprint / 2 &&
+              Math.min(s.z0, s.z1) < p.position.z + p.footprint / 2 &&
+              Math.max(s.z0, s.z1) > p.position.z - p.footprint / 2
+          )
+          .map((p) => `${s.edges[0]?.kind} through ${p.id}`);
+      });
+      expect(through).toEqual([]);
+    });
+  }
+});
+
+describe("block links between islands", () => {
+  // One lane per host laid 24 traces a hair apart along each street of the Element
+  // Types' island, which fused into a gold band when zoomed out.
+  it("arrives from one source island on one lane per target", () => {
+    const { placements } = cityDistricts(medium);
+    const byId = new Map(placements.map((p) => [p.id, p] as const));
+    const lanes = new Map<string, Set<string>>();
+    for (const { edge, points } of planRoutes(byId, medium.edges).routes) {
+      const from = byId.get(edge.from)?.district;
+      const to = byId.get(edge.to)?.district;
+      // Six corners: the route turns along a street of the target's island.
+      if (edge.kind !== "block" || from === to || points.length !== 6) continue;
+      const key = `${from}|${edge.to}`;
+      const set = lanes.get(key) ?? new Set();
+      set.add(String(points[3]?.z));
+      lanes.set(key, set);
+    }
+    const shared = [...lanes.values()];
+    expect(shared.some((set) => set.size > 0)).toBe(true);
+    expect(shared.filter((set) => set.size > 1)).toEqual([]);
+  });
+});
 
 describe("crossings on the fixtures", () => {
   // The reason roads follow the streets at all: straight centre-to-centre ribbons
