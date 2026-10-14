@@ -44,6 +44,7 @@ function TooltipContent({
       <TooltipPrimitive.Positioner
         align={align}
         className="isolate z-50"
+        positionMethod="fixed"
         side={side}
         sideOffset={sideOffset}
       >
