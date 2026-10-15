@@ -1,0 +1,25 @@
+/* The block cursor steps on and off like a tube cursor rather than fading, and
+ * holds lit for anyone who asked for less motion. */
+
+.cursor {
+  display: inline-block;
+  width: 0.6em;
+  height: 1.1em;
+  margin-inline-start: 0.1em;
+  vertical-align: -0.18em;
+  background: var(--primary);
+  box-shadow: var(--slide-halo);
+  animation: blink 1.1s steps(1, end) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    animation: none;
+  }
+}
