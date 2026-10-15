@@ -563,6 +563,10 @@ function RoofIcons({
           args={[undefined, undefined, caps]}
           frustumCulled={false}
           ref={capRef}
+          // After the buildings, which are transparent for the intro fade. In the same
+          // order they are sorted by depth, so turning the camera flipped which drew
+          // last, and a roof drawn after its cap painted over it.
+          renderOrder={0.5}
         >
           <planeGeometry />
           <meshBasicMaterial
