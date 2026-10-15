@@ -16,7 +16,7 @@
       "weight": 50,
       "meta": {
         "label": "Schema City",
-        "icon": "icon-map-alt",
+        "icon": "icon-company",
         "entityType": "schema-city",
         "menus": ["Umb.Menu.AdvancedSettings"]
       },
@@ -36,7 +36,7 @@
       "meta": {
         "label": "Relationships",
         "pathname": "relationships",
-        "icon": "icon-map-alt"
+        "icon": "icon-company"
       },
       "conditions": [
         {
