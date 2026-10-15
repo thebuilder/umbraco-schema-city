@@ -31,7 +31,12 @@ import { labelsFlipped } from "./board-labels";
 import { introPlaying } from "./connection-visibility";
 import { useAnimationFrame } from "./frames";
 import { revealAt } from "./reveal";
-import { districtStamp, FOLDER_TINT_HEIGHT } from "./stage";
+import {
+  districtStamp,
+  FOLDER_TINT_HEIGHT,
+  SOCKET_TRACKING,
+  socketStamp,
+} from "./stage";
 
 export type BoardPalette = {
   land: string;
@@ -140,6 +145,17 @@ const STAMP_OPACITY = 0.8;
 const STAMP_Y = 0.01;
 /** Ground around a nested folder's or a socket's members that its patch covers. */
 export const FOLDER_PAD = 1;
+/**
+ * How far a socket's name stands off the board: over its patch and under the type
+ * names and the traces, so both run over it.
+ */
+const SOCKET_NAME_Y = FOLDER_TINT_HEIGHT + 0.005;
+
+/** Where a name prints on the ground, and how big, in world units. */
+type Stamp = { x: number; z: number; width: number; height: number };
+
+/** A patch on a board, and for a socket the name of the block editor it is. */
+export type Patch = CityBounds & { id: string; name?: string };
 
 /** One texture per name and font, kept for the life of the page. */
 const stamps = new Map<string, THREE.CanvasTexture>();
@@ -149,8 +165,12 @@ const stamps = new Map<string, THREE.CanvasTexture>();
  * tracked-out name and as tall as its cap height, so the caller places the quad by
  * cap height alone, with no per-font fudge for the space around the letters.
  */
-function stampTexture(name: string, font: string): THREE.CanvasTexture {
-  const key = `${name}|${font}`;
+function stampTexture(
+  name: string,
+  font: string,
+  tracking = STAMP_TRACKING
+): THREE.CanvasTexture {
+  const key = `${name}|${font}|${tracking}`;
   const found = stamps.get(key);
   if (found) return found;
 
@@ -161,7 +181,7 @@ function stampTexture(name: string, font: string): THREE.CanvasTexture {
     context.font = `${STAMP_WEIGHT} ${STAMP_FONT_PX}px ${font}`;
     // letterSpacing is Chrome 99 and Safari 17.4. Older than that prints the name
     // without the tracking rather than not at all.
-    context.letterSpacing = STAMP_TRACKING;
+    context.letterSpacing = tracking;
     // White ink, because the material's colour is what tints it to the theme.
     context.fillStyle = "#ffffff";
     context.textBaseline = "alphabetic";
@@ -521,7 +541,7 @@ function Patches({
   colour,
   materials,
 }: {
-  folders: (CityBounds & { id: string })[];
+  folders: Patch[];
   colour: THREE.Color;
   materials: Materials;
 }) {
@@ -546,6 +566,54 @@ function Patches({
       />
     </mesh>
   ));
+}
+
+/**
+ * Each socket's block editor named in silkscreen along its patch's south edge, in
+ * the row the layout held under the socket's types. Smaller and tighter than a
+ * district's name, and it fades and turns with them.
+ */
+function SocketNames({
+  folders,
+  palette,
+  materials,
+}: {
+  folders: Patch[];
+  palette: BoardPalette;
+  materials: Materials;
+}) {
+  const tracking = `${SOCKET_TRACKING}em`;
+  const names = useMemo(
+    () =>
+      folders.flatMap(({ id, name, centre, width, depth }) => {
+        if (!name) return [];
+        const texture = stampTexture(
+          name.toUpperCase(),
+          palette.mono,
+          tracking
+        );
+        const stamp = socketStamp(
+          {
+            minX: centre.x - width / 2,
+            maxX: centre.x + width / 2,
+            minZ: centre.z - depth / 2,
+            maxZ: centre.z + depth / 2,
+          },
+          texture.image.width / texture.image.height,
+          FOLDER_PAD
+        );
+        return stamp ? [{ id, texture, stamp }] : [];
+      }),
+    [folders, palette.mono, tracking]
+  );
+  return (
+    <Prints
+      materials={materials}
+      palette={palette}
+      prints={names}
+      y={SOCKET_NAME_Y}
+    />
+  );
 }
 
 /** The gold fingers and the vias, one instanced mesh each. */
@@ -629,8 +697,6 @@ function Stamps({
   palette: BoardPalette;
   materials: Materials;
 }) {
-  const meshes = useRef(new Map<string, THREE.Mesh>());
-  useFlippedStamps(meshes.current);
   // One rasterised name per district, with the quad it prints on. The name is fixed
   // to its board, so the search for its spot runs once rather than every frame.
   const names = useMemo(
@@ -646,10 +712,37 @@ function Stamps({
       }),
     [districts, palette.mono]
   );
-  return names.map(({ id, stamp, texture }) => (
+  return (
+    <Prints
+      materials={materials}
+      palette={palette}
+      prints={names}
+      y={STAMP_Y}
+    />
+  );
+}
+
+/**
+ * Names printed flat on the boards, `y` off them. They write no depth, fade in with
+ * the traces and turn in place when the camera is behind them, as the type names do.
+ */
+function Prints({
+  prints,
+  y,
+  palette,
+  materials,
+}: {
+  prints: { id: string; texture: THREE.CanvasTexture; stamp: Stamp }[];
+  y: number;
+  palette: BoardPalette;
+  materials: Materials;
+}) {
+  const meshes = useRef(new Map<string, THREE.Mesh>());
+  useFlippedStamps(meshes.current);
+  return prints.map(({ id, stamp, texture }) => (
     <mesh
       key={id}
-      position={[stamp.x, STAMP_Y, stamp.z]}
+      position={[stamp.x, y, stamp.z]}
       ref={trackMaterial(meshes.current, id)}
       renderOrder={1}
       rotation={[-Math.PI / 2, 0, 0]}
@@ -677,7 +770,7 @@ export function Boards({
 }: {
   districts: District[];
   /** The ground a nested folder's or a socket's members cover, for its patch. */
-  folders: (CityBounds & { id: string })[];
+  folders: Patch[];
   /** Where lanes leave their boards. Empty in focus mode, where the city is a map. */
   fingers: Finger[];
   /** Where the drawn traces turn. */
@@ -741,6 +834,7 @@ export function Boards({
         vias={vias}
       />
       <Stamps districts={districts} materials={held} palette={palette} />
+      <SocketNames folders={folders} materials={held} palette={palette} />
     </>
   );
 }

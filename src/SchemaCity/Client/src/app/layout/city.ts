@@ -16,7 +16,12 @@ import type {
 import { PRINT_MARGIN } from "../scene/board";
 import { LABEL_STRIP, MAX_OVERHANG, PRINT_DEPTH } from "../scene/board-labels";
 import { FLOOR_HEIGHT } from "../scene/buildings";
-import { STAMP_CAP, STAMP_INSET } from "../scene/stage";
+import {
+  SOCKET_CAP,
+  STAMP_CAP,
+  STAMP_INSET,
+  socketNameWidth,
+} from "../scene/stage";
 import { layoutNeighbourhoods, type Spacing } from "./neighbourhoods";
 import { type IdCluster, structureGroups } from "./structure";
 
@@ -206,6 +211,8 @@ type Group = {
   clusters?: IdCluster[];
   /** Structure grouping only: the block editor an Element Type is grouped under. */
   sockets?: Map<string, string>;
+  /** Structure grouping only: each block editor's name, printed under its table. */
+  socketNames?: Map<string, string>;
 };
 const rankCache = new WeakMap<Group, Placement[]>();
 type Laid = Group & {
@@ -316,6 +323,29 @@ export function cityBounds(placements: Placement[], pad = 0): CityBounds {
     width: box.maxX - box.minX + pad * 2,
     depth: box.maxZ - box.minZ + pad * 2,
     centre: { x: (box.minX + box.maxX) / 2, z: (box.minZ + box.maxZ) / 2 },
+  };
+}
+
+/** What a socket's id starts with, as a placement's `folder`, beside folder ids. */
+export const SOCKET = "socket/";
+
+/**
+ * The patch a block editor's socket covers: its types with `pad` of ground round
+ * them, and south past their printed names to the row the layout held for the
+ * editor's name, at least as wide as that name prints.
+ */
+export function socketPatch(
+  members: Placement[],
+  name: string,
+  pad: number
+): CityBounds {
+  const box = boxOf(members);
+  const north = box.minZ - pad;
+  const south = box.maxZ + ROW_GAP + SOCKET_CAP + pad;
+  return {
+    width: Math.max(box.maxX - box.minX, socketNameWidth(name)) + pad * 2,
+    depth: south - north,
+    centre: { x: (box.minX + box.maxX) / 2, z: (north + south) / 2 },
   };
 }
 
@@ -491,8 +521,27 @@ function layoutClustered(
     size: footprintOf(byId.get(id) as SchemaNode),
   });
   const rank = (family: string[]) => order?.get(family[0] as string) ?? 0;
+  // A block editor's table holds a row under it for the editor's name, as wide as
+  // the name prints, so a socket of one type is still wide enough to say what it is.
+  const footOf = (cluster: IdCluster) => {
+    const socket = cluster.head
+      ? undefined
+      : group.sockets?.get(cluster.families[0]?.[0] as string);
+    const name =
+      socket === undefined ? undefined : group.socketNames?.get(socket);
+    return name
+      ? {
+          foot: {
+            id: `${SOCKET}${socket}`,
+            width: socketNameWidth(name),
+            depth: SOCKET_CAP,
+          },
+        }
+      : {};
+  };
   const spots = layoutNeighbourhoods(
     clusters.map((cluster) => ({
+      ...footOf(cluster),
       head: cluster.head ? item(cluster.head) : null,
       // A stable sort, so without an order the table keeps its alias order.
       families: (cluster.head
@@ -513,7 +562,7 @@ function layoutClustered(
       kind,
       spot.row,
       // A schema folder means nothing on a structure board; only a socket tints.
-      socket === undefined ? null : `socket/${socket}`
+      socket === undefined ? null : `${SOCKET}${socket}`
     );
   });
   const at = new Map(placements.map((placement) => [placement.id, placement]));
