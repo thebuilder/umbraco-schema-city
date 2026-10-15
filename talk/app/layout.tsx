@@ -1,0 +1,40 @@
+import {
+  deckSiteUrl,
+  isPdfExport,
+  pdfExportColorMode,
+} from "@thebuilder/deckard-core"
+import { ColorModeProvider } from "@thebuilder/deckard-core/components"
+import { cn } from "@thebuilder/deckard-core/utils"
+import type { Metadata } from "next"
+import type { ReactNode } from "react"
+import { deck } from "@/deck/deck"
+
+import "./globals.css"
+
+export const metadata: Metadata = {
+  description: deck.description,
+  metadataBase: new URL(deckSiteUrl()),
+  title: {
+    default: deck.title,
+    template: `%s · ${deck.title}`,
+  },
+}
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  const pdfColorMode = pdfExportColorMode()
+
+  return (
+    <html
+      className={cn(pdfColorMode)}
+      data-pdf-export={isPdfExport() ? "true" : undefined}
+      lang="en"
+      suppressHydrationWarning
+    >
+      <body>
+        <ColorModeProvider forcedColorMode={pdfColorMode} theme={deck.theme}>
+          {children}
+        </ColorModeProvider>
+      </body>
+    </html>
+  )
+}

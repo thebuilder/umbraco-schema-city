@@ -1,0 +1,38 @@
+{
+  "name": "schema-city-talk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "deck:check-overflow": "deckard check-overflow",
+    "deck:contact-sheet": "deckard contact-sheet",
+    "deck:doctor": "deckard doctor",
+    "deck:screenshots": "deckard screenshots",
+    "deck:validate": "deckard validate",
+    "dev": "next dev --turbopack",
+    "export:pdf": "deckard export pdf",
+    "start": "next start",
+    "typecheck": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "@thebuilder/deckard-core": "^0.2.0",
+    "@thebuilder/deckard-themes": "^0.2.0",
+    "next": "16.3.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@thebuilder/deckard-cli": "^0.2.0",
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "pdf-lib": "^1.17.1",
+    "playwright": "^1.62.1",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
+  }
+}
