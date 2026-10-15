@@ -20,3 +20,12 @@ window with the speaker notes.
 
 Before handing a change back, run `npx deckard validate`,
 `npx deckard check-overflow` and `npx deckard contact-sheet`.
+
+## Importing Schema City's own code
+
+Slides import the client's scene, layout and model modules directly, as
+`@schema-city/app/scene/...`, so the city on a slide is the city in the
+package. `next.config.ts` widens Turbopack's root to the repository and pins
+React, three and the other shared packages to this app's `node_modules`, so a
+module from `src/SchemaCity/Client` never pulls a second copy. Keep the
+versions here equal to the client's `package.json`.

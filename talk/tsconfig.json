@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,7 +23,33 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ],
+      "@schema-city/*": [
+        "../src/SchemaCity/Client/src/*"
+      ],
+      "three": [
+        "./node_modules/@types/three"
+      ],
+      "three/*": [
+        "./node_modules/@types/three/*"
+      ],
+      "@react-three/fiber": [
+        "./node_modules/@react-three/fiber"
+      ],
+      "@react-three/drei": [
+        "./node_modules/@react-three/drei"
+      ],
+      "@dagrejs/dagre": [
+        "./node_modules/@dagrejs/dagre"
+      ],
+      "react": [
+        "./node_modules/@types/react"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ]
     }
   },
   "include": [
@@ -29,5 +59,7 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }
