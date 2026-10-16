@@ -425,6 +425,9 @@ inherits Article, which composes Seo Composition". It also says whether the type
 directly. A path never visits a type twice, so cycles end. The totals at the top count each type
 once.
 
+Templates that render them lists the templates allowed on the type and on every type a change
+reaches, with how many of those types use each, so you know which Razor views to open.
+
 ### Check a property alias
 
 Planned or existing alias checks a property alias.
@@ -441,10 +444,10 @@ filled in.
 ### Share the trace
 
 - Copy as Markdown copies a ticket-ready summary. It has the start type, the relationships and
-  depth, the snapshot dates, the totals, a table per group with each path and content count, and
-  the collisions. Where the clipboard is blocked, the text is shown selected instead.
-- Export CSV writes one row per type per group and one per collision. It uses the same escaping and
-  spreadsheet formula protection as the findings export.
+  depth, the snapshot dates, the totals, a table per group with each path and content count, the
+  templates and the collisions. Where the clipboard is blocked, the text is shown selected instead.
+- Export CSV writes one row per type per group, one per type per template and one per collision.
+  It uses the same escaping and spreadsheet formula protection as the findings export.
 - Show in city lights the type and everything the trace reaches.
 
 A trace lists configured relationships to review. It does not tell you a change is harmless, or
