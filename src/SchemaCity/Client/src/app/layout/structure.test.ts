@@ -7,8 +7,15 @@ import type {
   SchemaNode,
   SchemaProperty,
 } from "../../model/types";
-import { cityDistricts, DISTRICT_GAP, type Placement } from "./city";
-import { socketsOf, structureGroups } from "./structure";
+import { socketNameWidth } from "../scene/stage";
+import {
+  cityDistricts,
+  DISTRICT_GAP,
+  type Placement,
+  SOCKET,
+  socketPatch,
+} from "./city";
+import { editorNames, socketsOf, structureGroups } from "./structure";
 
 const medium = mediumFixture as unknown as SchemaGraph;
 const pathological = pathologicalFixture as unknown as SchemaGraph;
@@ -205,6 +212,93 @@ describe("socketsOf", () => {
     );
 
     expect(sockets.get("card")).toBe("beta");
+  });
+});
+
+describe("editorNames", () => {
+  it("names every block editor that offers an Element Type, and no other", () => {
+    const unnamed = host("c", "plain", [["card", "content"]]);
+    const property = unnamed.groups[0]?.properties[0] as SchemaProperty;
+    property.dataTypeName = null;
+    const names = editorNames([
+      host("a", "grid", [["card", "content"]]),
+      host("b", "list", [["page", "content"]]),
+      unnamed,
+      node("card", { isElement: true }),
+      node("page"),
+    ]);
+
+    expect([...names]).toEqual([["grid", "grid"]]);
+  });
+});
+
+describe("socket patches", () => {
+  /** Each socket's patch on a fixture, as a box, with the ids of its types. */
+  function patchesOf(graph: SchemaGraph) {
+    const { placements } = cityDistricts(graph);
+    const names = editorNames(graph.nodes);
+    const bySocket = new Map<string, Placement[]>();
+    for (const placement of placements) {
+      if (!placement.folder?.startsWith(SOCKET)) continue;
+      const held = bySocket.get(placement.folder) ?? [];
+      held.push(placement);
+      bySocket.set(placement.folder, held);
+    }
+    return {
+      placements,
+      patches: [...bySocket].map(([id, held]) => {
+        const name = names.get(id.slice(SOCKET.length)) as string;
+        const { centre, width, depth } = socketPatch(held, name, 1);
+        return {
+          id,
+          name,
+          members: new Set(held.map((placement) => placement.id)),
+          minX: centre.x - width / 2,
+          maxX: centre.x + width / 2,
+          minZ: centre.z - depth / 2,
+          maxZ: centre.z + depth / 2,
+        };
+      }),
+    };
+  }
+
+  type Box = { minX: number; maxX: number; minZ: number; maxZ: number };
+  const apart = (a: Box, b: Box) =>
+    a.maxX <= b.minX ||
+    a.minX >= b.maxX ||
+    a.maxZ <= b.minZ ||
+    a.minZ >= b.maxZ;
+  const ground = ({ position, footprint }: Placement): Box => ({
+    minX: position.x - footprint / 2,
+    maxX: position.x + footprint / 2,
+    minZ: position.z - footprint / 2,
+    maxZ: position.z + footprint / 2,
+  });
+
+  it("covers only its own types, never another socket's patch, on every fixture", () => {
+    for (const graph of [medium, pathological]) {
+      const { placements, patches } = patchesOf(graph);
+      expect(patches.length).toBeGreaterThan(1);
+      for (const patch of patches) {
+        expect(patch.maxX - patch.minX).toBeGreaterThanOrEqual(
+          socketNameWidth(patch.name)
+        );
+        const others = placements.filter((one) => !patch.members.has(one.id));
+        expect(others.every((one) => apart(ground(one), patch))).toBe(true);
+        const rest = patches.filter((other) => other !== patch);
+        expect(rest.every((other) => apart(other, patch))).toBe(true);
+      }
+    }
+  });
+
+  it("gives a socket of one type a patch wide enough for the editor's name", () => {
+    const { patches } = patchesOf(medium);
+    const single = patches.find((patch) => patch.members.size === 1);
+
+    expect(single?.name).toBeDefined();
+    expect((single?.maxX ?? 0) - (single?.minX ?? 0)).toBeGreaterThan(
+      socketNameWidth(single?.name ?? "")
+    );
   });
 });
 

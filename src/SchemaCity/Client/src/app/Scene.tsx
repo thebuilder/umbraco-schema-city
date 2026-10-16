@@ -40,6 +40,8 @@ import {
   type Grouping,
   ISLAND_PAD,
   type Placement,
+  SOCKET,
+  socketPatch,
 } from "./layout/city";
 import { comparisonCity } from "./layout/comparison";
 import { expandFocusLayout } from "./layout/expanded-focus";
@@ -49,12 +51,14 @@ import {
   focusBounds,
   layoutFocus,
 } from "./layout/focus";
+import { editorNames } from "./layout/structure";
 import { describeRelationship, uniqueConnections } from "./relationship";
 import { BoardLabels, type Floated } from "./scene/BoardLabels";
 import {
   Boards,
   cityBoards,
   FOLDER_PAD,
+  type Patch,
   rimColour,
   SLAB_HEIGHT,
   slabColour,
@@ -1612,7 +1616,7 @@ function Stage({
 }: {
   districts: District[];
   /** The ground a nested folder's or a socket's members cover, for its patch. */
-  folders: (CityBounds & { id: string })[];
+  folders: Patch[];
   fingers: Finger[];
   vias: { x: number; z: number }[];
   span: number;
@@ -2517,11 +2521,17 @@ export default function Scene({
       if (held) held.push(placement);
       else members.set(placement.folder, [placement]);
     }
-    return [...members].map(([id, held]) => ({
-      id,
-      ...cityBounds(held, FOLDER_PAD),
-    }));
-  }, [city]);
+    const names = editorNames(graph.nodes);
+    return [...members].map(([id, held]): Patch => {
+      // A socket's patch reaches down over the row the layout held for its name.
+      const name = id.startsWith(SOCKET)
+        ? names.get(id.slice(SOCKET.length))
+        : undefined;
+      return name
+        ? { id, name, ...socketPatch(held, name, FOLDER_PAD) }
+        : { id, ...cityBounds(held, FOLDER_PAD) };
+    });
+  }, [city, graph]);
   const neighbourhoodById = useMemo(() => neighbourhoods(graph), [graph]);
   const focusNeighbours = useMemo(
     () => (focus ? reachableWithin(graph, focus, focusDepth) : null),

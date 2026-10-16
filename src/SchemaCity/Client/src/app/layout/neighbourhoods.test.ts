@@ -151,3 +151,37 @@ describe("layoutNeighbourhoods", () => {
     );
   });
 });
+
+describe("a cluster's foot", () => {
+  const foot = { id: "foot", width: 30, depth: 1 };
+
+  it("stands under the last row, a row gap below it, centred on the cluster", () => {
+    const spots = layoutNeighbourhoods(
+      [{ head: null, families: [family("a"), family("b")], foot }],
+      SPACING
+    );
+    const a = spots.get("a") as Spot;
+    const under = spots.get("foot") as Spot;
+
+    expect(under.z - foot.depth / 2).toBeCloseTo(a.z + 2 + SPACING.rowGap);
+    expect(under.x).toBeCloseTo(0);
+    expect(under.row).toBe(a.row + 1);
+  });
+
+  it("widens its cluster, so no neighbour stands on it", () => {
+    const clusters: Cluster[] = [
+      { head: null, families: [family("a")], foot },
+      ...parents(4, 3),
+    ];
+    const spots = layoutNeighbourhoods(clusters, SPACING);
+    const under = spots.get("foot") as Spot;
+
+    for (const [id, spot] of spots) {
+      if (id === "foot" || id === "a") continue;
+      const clear =
+        Math.abs(spot.x - under.x) >= foot.width / 2 + 2 ||
+        Math.abs(spot.z - under.z) >= foot.depth / 2 + 2;
+      expect(clear, id).toBe(true);
+    }
+  });
+});

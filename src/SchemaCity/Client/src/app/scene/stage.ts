@@ -251,6 +251,60 @@ export function districtStamp(
   };
 }
 
+/**
+ * Cap height of a block editor's name printed on its socket. A little under the
+ * smallest type name's, so the name reads as the patch's caption and not as one more
+ * building's.
+ */
+export const SOCKET_CAP = 0.8;
+/** Ems of extra gap between two letters of a socket's name: tracked, but tighter. */
+export const SOCKET_TRACKING = 0.16;
+/**
+ * A mono face's cap height over its font size. Every face the theme falls back to is
+ * 0.7 or a little over, so this errs on the wide side.
+ */
+const CAP_OVER_EM = 0.7;
+/** A mono face's advance over its font size, as `MONO_ADVANCE` in board-labels. */
+const ADVANCE_OVER_EM = 0.6;
+
+/**
+ * How wide a socket's name prints at `SOCKET_CAP`, uppercase and tracked. The
+ * layout holds this much ground before any font is known, so it guesses from the
+ * mono advance, and the scene shrinks a name the real face sets wider.
+ */
+export function socketNameWidth(name: string): number {
+  return (
+    (name.length * SOCKET_CAP * (ADVANCE_OVER_EM + SOCKET_TRACKING)) /
+    CAP_OVER_EM
+  );
+}
+
+/**
+ * Where a block editor's name lies on its socket's patch, in world units: flat
+ * along the patch's south edge, at its west end, `pad` in from both edges, as a
+ * district's name lies on its board. `aspect` is the rasterised name's width over
+ * its cap height. A name wider than the patch shrinks to fit, and one that would
+ * shrink under three quarters of `SOCKET_CAP` is left off.
+ */
+export function socketStamp(
+  patch: Ground,
+  aspect: number,
+  pad: number
+): { x: number; z: number; width: number; height: number } | null {
+  const height = Math.min(
+    SOCKET_CAP,
+    (patch.maxX - patch.minX - pad * 2) / aspect
+  );
+  if (height < SOCKET_CAP * 0.75) return null;
+  const width = height * aspect;
+  return {
+    x: patch.minX + pad + width / 2,
+    z: patch.maxZ - pad - height / 2,
+    width,
+    height,
+  };
+}
+
 export const GRID_VERTEX_SHADER = /* glsl */ `
   varying vec3 vWorld;
   void main() {

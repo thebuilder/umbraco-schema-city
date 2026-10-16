@@ -14,8 +14,16 @@ export type Item = { id: string; size: number };
  * over the rest. Each family is a child followed by its own children, laid side by
  * side in one row, so a child's road to its children runs a few units along the
  * street under them. A cluster with no head is a table of families of one.
+ *
+ * `foot` is ground the cluster holds under its last row, a row of its own after the
+ * gap that row's names print in, and at least `width` wide. A block editor's table
+ * prints the editor's name there. It gets a spot under its id like a building.
  */
-export type Cluster = { head: Item | null; families: Item[][] };
+export type Cluster = {
+  head: Item | null;
+  families: Item[][];
+  foot?: { id: string; width: number; depth: number };
+};
 
 export type Spacing = {
   /** Ground between two buildings of one family, side by side. */
@@ -101,9 +109,19 @@ function layCluster(cluster: Cluster, spacing: Spacing): Laid {
   });
 
   const head = cluster.head ? [[{ item: cluster.head, x: 0 }]] : [];
+  const { foot } = cluster;
+  // The foot stands in as a building as deep as it is, so the shelf's rows make room
+  // for it, and its width is the cluster's.
+  const under = foot
+    ? [[{ item: { id: foot.id, size: foot.depth }, x: 0 }]]
+    : [];
   return {
-    width: Math.max(cluster.head?.size ?? 0, ...laid.map((row) => row.width)),
-    rows: [...head, ...laid.map((row) => row.placed)],
+    width: Math.max(
+      cluster.head?.size ?? 0,
+      foot?.width ?? 0,
+      ...laid.map((row) => row.width)
+    ),
+    rows: [...head, ...laid.map((row) => row.placed), ...under],
   };
 }
 
