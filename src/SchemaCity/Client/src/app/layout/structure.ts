@@ -16,6 +16,8 @@ export type StructureGroup = {
   clusters: IdCluster[];
   /** The block editor each Element Type is grouped under, for the socket outlines. */
   sockets: Map<string, string>;
+  /** Elements only: each block editor's Data Type name, printed on its socket. */
+  socketNames?: Map<string, string>;
 };
 
 /**
@@ -104,6 +106,7 @@ export function structureGroups(
     members: elements,
     clusters: socketClusters(elements, sockets),
     sockets,
+    socketNames: editorNames(nodes),
   });
 
   // Whatever no root reaches: its own forest, headed by the types with no parent in
@@ -291,6 +294,22 @@ export function socketsOf(
       element,
       ([...byEditor.values()].sort(byOffers)[0] as Tally).editor,
     ])
+  );
+}
+
+/**
+ * Each block editor's Data Type name, by Data Type id, for every editor that offers
+ * an Element Type. An editor the schema gives no name has no entry, so its socket
+ * goes unprinted rather than printing an empty name.
+ */
+export function editorNames(nodes: readonly SchemaNode[]): Map<string, string> {
+  const elements = new Set(
+    nodes.filter((node) => node.isElement).map((node) => node.id)
+  );
+  return new Map(
+    offersOf(nodes, elements)
+      .filter((offer) => offer.name !== "")
+      .map((offer) => [offer.editor, offer.name])
   );
 }
 

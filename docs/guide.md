@@ -525,7 +525,9 @@ the URL.
   - A type that several roots or parents allow sits with the one that a breadth-first walk from the
     roots reaches it from first. The traces show the rest.
   - Element Types share one board, in one group per block editor that offers them. A type offered
-    by several editors goes with the one that offers it as content most often.
+    by several editors goes with the one that offers it as content most often. Each group stands
+    on a lighter patch with the block editor's Data Type name printed along its south edge, even
+    when the editor offers only one type. A type no block editor offers stands on bare board.
   - Compositions have their own board, and the types no root can reach go on Unreachable.
 - **Folders** gives each top-level folder a district, as earlier versions did.
 

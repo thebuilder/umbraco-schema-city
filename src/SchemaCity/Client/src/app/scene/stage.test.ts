@@ -16,9 +16,11 @@ import {
   framingStep,
   MIN_NEAR,
   pixelsPerUnit,
+  SOCKET_CAP,
   STAMP_CAP,
   STAMP_MIN_CAP,
   settlingResize,
+  socketStamp,
 } from "./stage";
 
 test("no part of the city is in fog, wherever the camera orbits over it", () => {
@@ -245,4 +247,21 @@ test("the establishing shot is only marked seen when it would play", () => {
   expect(asked).toBe(0);
   framingStep({ ...state, action: "snap", first: true });
   expect(asked).toBe(1);
+});
+
+test("a socket's name prints at the west end of its patch's south edge, or shrinks to fit", () => {
+  const patch = { minX: 0, maxX: 20, minZ: 0, maxZ: 10 };
+
+  expect(socketStamp(patch, 10, 1)).toEqual({
+    x: 1 + (SOCKET_CAP * 10) / 2,
+    z: 10 - 1 - SOCKET_CAP / 2,
+    width: SOCKET_CAP * 10,
+    height: SOCKET_CAP,
+  });
+  // Set wider than the layout guessed: it shrinks to the patch, inside its pads.
+  const wide = socketStamp(patch, 24, 1);
+  expect(wide?.width).toBeCloseTo(18);
+  expect(wide?.height).toBeLessThan(SOCKET_CAP);
+  // Too wide to read at any size the patch allows: left off.
+  expect(socketStamp(patch, 60, 1)).toBeNull();
 });
