@@ -676,7 +676,8 @@ const overlapping = (a: Rect, b: Rect, gap: number) =>
  * prints that fits, trying the rest only when that one does not, in front of its
  * building, behind it, or beside it, so as many names as possible get a place. The
  * second moves each placed name, in the same order, to its best print that fits the
- * board the first pass left. A name no print of which fits is left off.
+ * board the first pass left, on the side it already took or a better one. A name no
+ * print of which fits is left off.
  *
  * Both passes take a place clear of the drawn traces, which `crossesTrace` tests,
  * over one a trace runs through, so a print and a trace never share board where
