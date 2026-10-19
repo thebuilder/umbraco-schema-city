@@ -7,10 +7,20 @@ seo:
 
 Most questions about a type start the same way: find it, see what it connects to, then focus on its neighbourhood.
 
-1. **Find it.** Press `⌘K` / `Ctrl+K`, or use **Search**, and type a name, alias or property alias.
-2. **Hover it.** The building shows its direct connections, and the names of unrelated types dim.
-3. **Select it.** Click the building to keep its connections visible and open the inspector.
-4. **Focus on it.** Double-click the building, or press Enter, to bring its neighbours together. See [Focus on a neighbourhood](#focus-on-a-neighbourhood).
+<Steps>
+  <Step title="Find it">
+    Press <kbd>⌘</kbd> <kbd>K</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd>, or use **Search**, and type a name, alias or property alias.
+  </Step>
+  <Step title="Hover it">
+    The building shows its direct connections, and the names of unrelated types dim.
+  </Step>
+  <Step title="Select it">
+    Click the building to keep its connections visible and open the inspector.
+  </Step>
+  <Step title="Focus on it">
+    Double-click the building, or press <kbd>Enter</kbd>, to bring its neighbours together. See [Focus on a neighbourhood](#focus-on-a-neighbourhood).
+  </Step>
+</Steps>
 
 ## Read the inspector
 
@@ -61,22 +71,22 @@ Each type's name is printed on the board beside its building. From the overview,
 
 ## Switch connection layers
 
-**Layers** in the footer, or the keys 1 to 4, choose which connections the city draws. Hovering or selecting a type always shows its direct connections, including those on layers you have switched off.
+**Layers** in the footer, or the keys <kbd>1</kbd> to <kbd>4</kbd>, choose which connections the city draws. Hovering or selecting a type always shows its direct connections, including those on layers you have switched off.
 
 | Layer | Key | Relationship |
 | --- | --- | --- |
-| Structure | 1 | Which Document Types can be created below another type |
-| Compositions | 2 | Shared compositions and inheritance |
-| Blocks | 3 | Element Types configured as block content or settings |
-| References | 4 | Document Types allowed by configured pickers |
+| Structure | <kbd>1</kbd> | Which Document Types can be created below another type |
+| Compositions | <kbd>2</kbd> | Shared compositions and inheritance |
+| Blocks | <kbd>3</kbd> | Element Types configured as block content or settings |
+| References | <kbd>4</kbd> | Document Types allowed by configured pickers |
 
 ## Focus on a neighbourhood
 
-Focus gathers the selected type and its neighbours in one place. To focus, double-click a building, press Enter with a type selected, or choose **Focus** in the inspector.
+Focus gathers the selected type and its neighbours in one place. To focus, double-click a building, press <kbd>Enter</kbd> with a type selected, or choose **Focus** in the inspector.
 
 - **Expand one step** adds the next ring of connected types, and leaves the ones already there in place.
 - Closing the inspector, or clicking bare ground, clears the selection but keeps the neighbourhood on screen.
-- **Leave focus** in the inspector, Escape, Home or **Show all** leave focus. With a type selected, the first Escape leaves focus and the second clears the selection.
+- **Leave focus** in the inspector, <kbd>Esc</kbd>, <kbd>Home</kbd> or **Show all** leave focus. With a type selected, the first <kbd>Esc</kbd> leaves focus and the second clears the selection.
 - While focus is on, List, Tree and Matrix show only the focused types, with a line above them offering **Show all**.
 
 ![Home in focus mode with its neighbouring types, direct connections and the inspector.](../../../docs/screenshots/focus.png)

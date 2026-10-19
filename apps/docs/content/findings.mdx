@@ -39,11 +39,15 @@ Results are grouped by kind, in the order of the table below, so what is definit
 
 Rows that name a Data Type link to [its page](/data-types).
 
-Treat a finding as a reason to look, not as permission to delete. An unused Document Type has no content in the usage snapshot, and an unused Element Type has no block editor that lists it and, once usage has loaded, no stored blocks. A count that stopped early says so. Custom code, migrations, external consumers, and media or member values can still depend on either.
+:::caution[A finding is a reason to look]
+It is not permission to delete. An unused Document Type has no content in the usage snapshot, and an unused Element Type has no block editor that lists it and, once usage has loaded, no stored blocks. A count that stopped early says so. Custom code, migrations, external consumers, and media or member values can still depend on either.
+:::
 
 ## Export findings as CSV
 
-**Export CSV** saves the filtered results as one header row and one row per finding, ready for an Excel or Jira import. The columns are, in order:
+**Export CSV** saves the filtered results as one header row and one row per finding, ready for an Excel or Jira import.
+
+<Expandable title="The columns, in order">
 
 - the kind
 - the type, with its key, folder, content counts and backoffice path
@@ -53,6 +57,8 @@ Treat a finding as a reason to look, not as permission to delete. An unused Docu
 - the filter used, and the schema and usage snapshot dates
 - the Data Types the finding names, with names and keys in two columns
 - the review status, reason, who decided, when, and whether it reopened
+
+</Expandable>
 
 A finding about a Data Type alone leaves the type columns blank and gives the Data Type's backoffice path.
 

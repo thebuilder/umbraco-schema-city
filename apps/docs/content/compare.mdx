@@ -7,11 +7,21 @@ seo:
 
 **Compare** shows what changed between the current schema and a saved snapshot. Use it to check that a change did what you planned and nothing else, or to see how two environments differ.
 
-1. Open **Compare** and export the current schema before you make a change. The file is named after the site and the day, such as `schema-city-snapshot-example-com-2026-10-07.json`, and records the host it came from.
-2. Make your change.
-3. Import the file as a baseline. To compare environments instead, export on one and import on the other.
+<Steps>
+  <Step title="Export a snapshot">
+    Open **Compare** and export the current schema before you make a change. The file is named after the site and the day, such as `schema-city-snapshot-example-com-2026-10-07.json`, and records the host it came from.
+  </Step>
+  <Step title="Make your change">
+    Edit the schema in Umbraco as usual.
+  </Step>
+  <Step title="Import it as a baseline">
+    Import the file in **Compare**. To compare environments instead, export on one and import on the other.
+  </Step>
+</Steps>
 
+:::note
 Importing a snapshot never changes Umbraco. The comparison covers schema configuration only, not content usage or dependencies in custom code.
+:::
 
 ## Causes and side effects
 

@@ -5,29 +5,29 @@ seo:
   image: /og/navigation.png
 ---
 
-The city opens on a raised three-quarter view of the whole schema. From there you can orbit, pan, move toward any point and come down to street level. Press **?** at any time for every control.
+The city opens on a raised three-quarter view of the whole schema. From there you can orbit, pan, move toward any point and come down to street level. Press <kbd>?</kbd> at any time for every control.
 
-If you lose the city, press Home or choose **Reset view** in the footer to frame it again. Focusing a type, leaving focus and Home fly the camera to the new framing.
+If you lose the city, press <kbd>Home</kbd> or choose **Reset view** in the footer to frame it again. Focusing a type, leaving focus and Home fly the camera to the new framing.
 
 ## Controls
 
 | Action | Control |
 | --- | --- |
-| Orbit | Drag, or [ and ] |
-| Tilt | Drag, or Page Up and Page Down |
+| Orbit | Drag, or <kbd>[</kbd> and <kbd>]</kbd> |
+| Tilt | Drag, or <kbd>Page Up</kbd> and <kbd>Page Down</kbd> |
 | Move toward the cursor, or away | Mouse wheel |
-| Pan along the ground | Right-drag, Shift-drag (works on a trackpad), W, A, S, D or arrow keys |
-| Rise and descend | R, F |
-| Move faster | Hold Shift with a movement key |
-| Focus selected type | Enter |
-| Leave focus, then clear selection | Escape |
-| Reframe the city or leave focus | Home, or Reset view in the footer |
-| Toggle connection layers | 1, 2, 3, 4 |
-| Switch to List, Tree or Matrix, or back to the city | L, T, M |
-| Open the selected type's Editor or Impact page, or go back | E, I |
-| Search | ⌘K / Ctrl+K |
-| Present full screen, or leave | P, or Escape to leave |
-| Show controls | ? |
+| Pan along the ground | Right-drag, Shift-drag (works on a trackpad), <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys |
+| Rise and descend | <kbd>R</kbd>, <kbd>F</kbd> |
+| Move faster | Hold <kbd>Shift</kbd> with a movement key |
+| Focus selected type | <kbd>Enter</kbd> |
+| Leave focus, then clear selection | <kbd>Esc</kbd> |
+| Reframe the city or leave focus | <kbd>Home</kbd>, or **Reset view** in the footer |
+| Toggle connection layers | <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> |
+| Switch to List, Tree or Matrix, or back to the city | <kbd>L</kbd>, <kbd>T</kbd>, <kbd>M</kbd> |
+| Open the selected type's Editor or Impact page, or go back | <kbd>E</kbd>, <kbd>I</kbd> |
+| Search | <kbd>⌘</kbd> <kbd>K</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd> |
+| Present full screen, or leave | <kbd>P</kbd>, or <kbd>Esc</kbd> to leave |
+| Show controls | <kbd>?</kbd> |
 
 The first time you open the city in a browser, the camera flies in and a short hint shows over the canvas. That flight, the dialogs and the drawers respect your reduced-motion setting.
 

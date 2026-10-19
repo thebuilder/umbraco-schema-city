@@ -7,7 +7,7 @@ seo:
 
 Impact answers "if I change this type, what else changes?" It lists every type a change to the selected type reaches, with the path to each one and its content count.
 
-The inspector's **Impact** tab lists them by group. **Impact** at the top of the inspector, or I, opens the full trace in place of the view.
+The inspector's **Impact** tab lists them by group. **Impact** at the top of the inspector, or <kbd>I</kbd>, opens the full trace in place of the view.
 
 The trace follows four relationships, each with its own toggle:
 
@@ -37,6 +37,8 @@ Either way, a type that already has the alias from another source is a collision
 - **Export CSV** writes one row per type per group, one per type per template and one per collision. It uses the same escaping and spreadsheet formula protection as the findings export.
 - **Show in city** lights the type and everything the trace reaches.
 
+:::note
 A trace lists configured relationships to review. It does not tell you a change is harmless, or that it breaks something. Code, templates and stored values outside the schema can depend on a type too.
+:::
 
 ![Seo Composition's impact: 37 types and 188 content items, each with its path, and a seoTitle collision on Dup Alias Page.](../../../docs/screenshots/impact.png)

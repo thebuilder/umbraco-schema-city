@@ -10,14 +10,14 @@ Schema City shows the same schema in several views. Every view except City works
 | View | What it shows | Key |
 | --- | --- | --- |
 | City | The schema as a 3D city. See [Investigate a type](/investigate-a-type). | |
-| [List](#use-the-list-view) | Every type in a sortable table | L |
-| [Tree](#follow-the-creation-tree) | What an editor can create under each root | T |
-| [Matrix](#compare-types-in-a-matrix) | Which types use which compositions and Data Types | M |
+| [List](#use-the-list-view) | Every type in a sortable table | <kbd>L</kbd> |
+| [Tree](#follow-the-creation-tree) | What an editor can create under each root | <kbd>T</kbd> |
+| [Matrix](#compare-types-in-a-matrix) | Which types use which compositions and Data Types | <kbd>M</kbd> |
 | [Data Types](/data-types) | Every Data Type, with what uses it | |
 
 L, T and M toggle back to the city when pressed again.
 
-Two more pages are about one type rather than the whole schema. Select a type and press E for its [Editor](#read-a-type-as-an-editor-sees-it) page or I for its [Impact](/impact) page, or use **Editor view** and **Impact** in the inspector. A line above the page names the type and leads back to the view you came from, with the selection kept. With nothing selected, E and I say "Pick a type first". A link to one of these pages opens it on the same type.
+Two more pages are about one type rather than the whole schema. Select a type and press <kbd>E</kbd> for its [Editor](#read-a-type-as-an-editor-sees-it) page or <kbd>I</kbd> for its [Impact](/impact) page, or use **Editor view** and **Impact** in the inspector. A line above the page names the type and leads back to the view you came from, with the selection kept. With nothing selected, E and I say "Pick a type first". A link to one of these pages opens it on the same type.
 
 ## Where things are
 
@@ -59,7 +59,7 @@ Matrix has two grids.
 
 ## Read a type as an editor sees it
 
-Editor draws the selected type as tabs and groups, the way editors see it. Choose Editor view in the inspector, or press E, to open the selected type here.
+Editor draws the selected type as tabs and groups, the way editors see it. Choose Editor view in the inspector, or press <kbd>E</kbd>, to open the selected type here.
 
 - Tabs and groups come in the order the schema lists them.
 - Each property shows its name, alias, Data Type, mandatory marker and culture variance. The property editor alias shows on hover, and a screen reader reads it after the Data Type.
