@@ -101,7 +101,11 @@ const views = [
       <div class="shell">
         <figure class="screenshot reveal" style="--i: 6">
           <div class="screenshot__bar" aria-hidden="true"><span></span><span></span><span></span></div>
-          <img src={cityShot.src} width={cityShot.width} height={cityShot.height} alt="The city overview, with a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable" loading="eager" decoding="async" />
+          {/* The live demo loads only when asked, so the page doesn't start a 3D app or take the keyboard on arrival. */}
+          <div class="demo" data-demo={demoUrl}>
+            <img src={cityShot.src} width={cityShot.width} height={cityShot.height} alt="The city overview, with a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable" loading="eager" decoding="async" />
+            <button class="button button--primary demo__load" type="button">Explore the live demo</button>
+          </div>
         </figure>
       </div>
     </LandingHero>
@@ -180,3 +184,17 @@ const views = [
     </div>
   </footer>
 </PageLayout>
+
+<script>
+  for (const demo of document.querySelectorAll<HTMLElement>(".demo[data-demo]")) {
+    demo.querySelector("button")?.addEventListener("click", () => {
+      const frame = document.createElement("iframe");
+      frame.src = demo.dataset.demo!;
+      frame.title = "Schema City demo with a sample schema";
+      frame.allow = "fullscreen; clipboard-write";
+      demo.replaceChildren(frame);
+      demo.classList.add("demo--live");
+      frame.focus();
+    });
+  }
+</script>
