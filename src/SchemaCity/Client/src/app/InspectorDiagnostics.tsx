@@ -1,4 +1,4 @@
-import { use } from "react";
+import { use, useId, useState } from "react";
 import {
   FINDING_LABEL,
   type Finding,
@@ -57,7 +57,11 @@ export function InspectorChecks({
   );
 }
 
-/** One check: its kind, what it means, what to do, and its review. */
+/**
+ * One check: its kind as a title, its summary, what it means and what to do
+ * behind Why?, and its review. Only the links that go somewhere are green, so the
+ * card has one colour of action.
+ */
 function Check({
   finding,
   nodesById,
@@ -72,19 +76,20 @@ function Check({
   const reviewed = isReviewed(use(Reviews)?.reviewOf(finding));
   const subject = subjectName(finding, nodesById, use(DataTypeLinks));
   const problem = finding.severity === "problem";
-  // A reviewed check drops its pink and its bright summary for the quiet grey its
-  // dot in the List takes, so the open checks are what the eye lands on.
-  let tone = { border: "border-label", text: "text-label" };
-  if (reviewed) tone = { border: "border-line", text: "text-label" };
-  else if (problem) tone = { border: "border-signal", text: "text-signal" };
+  const [why, setWhy] = useState(false);
+  const whyId = useId();
   return (
-    <li className={`border-l-2 bg-muted px-3 py-2.5 ${tone.border}`}>
-      <p
-        className={`font-semibold text-2xs uppercase tracking-terminal-xs ${tone.text}`}
-      >
-        {problem ? "Problem" : "Note"} · {FINDING_LABEL[finding.kind]}
-        {reviewed ? " · Reviewed" : ""}
-      </p>
+    <li
+      className={`border-l-2 bg-muted px-3 py-2.5 ${ruleOf(reviewed, problem)}`}
+    >
+      <CheckTitle
+        label={FINDING_LABEL[finding.kind]}
+        onWhy={() => setWhy(!why)}
+        problem={problem}
+        reviewed={reviewed}
+        why={why}
+        whyId={whyId}
+      />
       {subjects && finding.nodeId ? (
         <p className="mt-0.5 text-label text-xs">
           On{" "}
@@ -97,15 +102,13 @@ function Check({
           </button>
         </p>
       ) : null}
-      <p className={`mt-0.5 ${reviewed ? "text-label" : "text-prose"}`}>
-        {finding.summary}
-      </p>
-      <p className="mt-1.5 text-faint text-xs">
-        {KIND_EXPLANATION[finding.kind]}
-      </p>
-      <p className="mt-1 text-faint text-xs">
-        What to do: {KIND_NEXT_STEP[finding.kind]}
-      </p>
+      <p className="mt-0.5 text-label text-xs">{finding.summary}</p>
+      {why ? (
+        <div className="mt-1.5 space-y-1 text-faint text-xs" id={whyId}>
+          <p>{KIND_EXPLANATION[finding.kind]}</p>
+          <p>What to do: {KIND_NEXT_STEP[finding.kind]}</p>
+        </div>
+      ) : null}
       <FindingRelations
         finding={finding}
         nodesById={nodesById}
@@ -114,6 +117,57 @@ function Check({
       />
       <ReviewControl finding={finding} subject={subject} />
     </li>
+  );
+}
+
+/**
+ * The left rule carries the severity: pink for a problem, grey for a note, and a
+ * fainter grey once reviewed, so the open problems are what the eye lands on.
+ */
+function ruleOf(reviewed: boolean, problem: boolean): string {
+  if (reviewed) return "border-line";
+  return problem ? "border-signal" : "border-label";
+}
+
+/** The kind as a plain title, with the Why? toggle at its end. */
+function CheckTitle({
+  label,
+  problem,
+  reviewed,
+  why,
+  whyId,
+  onWhy,
+}: {
+  label: string;
+  problem: boolean;
+  reviewed: boolean;
+  why: boolean;
+  whyId: string;
+  onWhy: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <p
+        className={`min-w-0 flex-1 font-medium text-sm ${reviewed ? "text-label" : "text-prose"}`}
+      >
+        <span className="sr-only">{problem ? "Problem" : "Note"}: </span>
+        {label}
+        {reviewed ? (
+          <span className="font-normal text-faint"> · Reviewed</span>
+        ) : null}
+      </p>
+      {/* What the kind means and what to do wait behind Why?, so the card shows
+          only what is particular to this type until asked. */}
+      <button
+        aria-controls={whyId}
+        aria-expanded={why}
+        className="shrink-0 text-faint text-xs hover:text-prose"
+        onClick={onWhy}
+        type="button"
+      >
+        {why ? "Hide" : "Why?"}
+      </button>
+    </div>
   );
 }
 

@@ -140,7 +140,9 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
   unusedDataType:
     "No property on a Document, Media or Member Type uses these Data Types, and no collection view does. The Data Types Umbraco installs itself are left out. Custom code and packages can still refer to one by its key.",
   noProperties: "These types have no own and no composed properties.",
-  complexity: `In the highest of ${COMPLEXITY_TIERS} complexity tiers in this schema. The score is own and composed properties, plus twice the compositions, plus distinct block targets.`,
+  // "Within a fifth" is the top of COMPLEXITY_TIERS.
+  complexity:
+    "The score adds own and composed properties, twice the compositions, and block targets. Listed when it comes within a fifth of the busiest type.",
   pureMixin:
     "Used only as compositions and never created on their own. Usually intended; listed so the mixins are easy to find.",
   noTemplate:
@@ -177,8 +179,7 @@ export const KIND_NEXT_STEP: Record<FindingKind, string> = {
     "Search custom code and packages for its key, then remove it or give a property the Data Type.",
   noProperties:
     "Add properties, or check whether code relies on it as a folder or marker type.",
-  complexity:
-    "Check whether some properties belong in a composition or a block, so the type stays readable.",
+  complexity: "Move some properties into a composition or a block.",
   pureMixin:
     "Nothing, if it is meant as a mixin. With one or two users, consider moving its properties onto them.",
   noTemplate:
@@ -358,6 +359,13 @@ export function findFindings(
     ])
   );
   const topScore = Math.max(0, ...scores.values());
+  // A bare score means nothing to an editor, so each row places the type among
+  // the others: its rank, and what the median type scores. The counts behind the
+  // score are already on the inspector, so the row leaves them out.
+  const sorted = [...scores.values()].sort((a, b) => b - a);
+  const medianScore = median(sorted);
+  const rankOf = (score: number) =>
+    sorted.filter((other) => other > score).length + 1;
   // Tiers are cut from the graph's own busiest type, because "complex" only means
   // anything next to the rest of this schema.
   const topTier = (topScore * (COMPLEXITY_TIERS - 1)) / COMPLEXITY_TIERS;
@@ -705,7 +713,7 @@ export function findFindings(
       add(
         "complexity",
         node,
-        `Score ${score}: ${node.ownPropertyCount} own and ${node.composedPropertyCount} composed properties, ${plural(at(outComposition, node.id), "composition")}, ${plural(blockTargets.get(node.id)?.size ?? 0, "block target")}`,
+        `${busiest(rankOf(score), sorted.length)}, scoring ${score} where the median is ${medianScore}`,
         undefined,
         score
       );
@@ -769,6 +777,26 @@ const EMPTY_BRANCH = (parents: number) =>
 
 const plural = (count: number, one: string, many = `${one}s`) =>
   `${count} ${count === 1 ? one : many}`;
+
+/** The middle value of scores sorted high to low, rounded to a whole number. */
+function median(sorted: number[]): number {
+  if (sorted.length === 0) return 0;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[middle]
+    : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+}
+
+/** "Busiest of 64 types", "3rd busiest of 64 types". */
+function busiest(rank: number, total: number): string {
+  if (rank === 1) return `Busiest of ${plural(total, "type")}`;
+  const tens = rank % 100;
+  const suffix =
+    tens >= 11 && tens <= 13
+      ? "th"
+      : ({ 1: "st", 2: "nd", 3: "rd" }[rank % 10] ?? "th");
+  return `${rank}${suffix} busiest of ${plural(total, "type")}`;
+}
 
 /** The first three, then how many more, so one row stays one or two lines. */
 function list(items: string[]): string {
