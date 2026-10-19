@@ -37,6 +37,7 @@ import {
   cityDistricts,
   type District,
   type DistrictKind,
+  FOLDER_PAD,
   type Grouping,
   ISLAND_PAD,
   type Placement,
@@ -57,7 +58,6 @@ import { BoardLabels, type Floated } from "./scene/BoardLabels";
 import {
   Boards,
   cityBoards,
-  FOLDER_PAD,
   type Patch,
   rimColour,
   SLAB_HEIGHT,

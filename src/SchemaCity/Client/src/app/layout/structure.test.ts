@@ -11,6 +11,8 @@ import { socketNameWidth } from "../scene/stage";
 import {
   cityDistricts,
   DISTRICT_GAP,
+  type District,
+  ISLAND_PAD,
   type Placement,
   SOCKET,
   socketPatch,
@@ -287,6 +289,23 @@ describe("socket patches", () => {
         expect(others.every((one) => apart(ground(one), patch))).toBe(true);
         const rest = patches.filter((other) => other !== patch);
         expect(rest.every((other) => apart(other, patch))).toBe(true);
+      }
+    }
+  });
+
+  it("keeps every patch on its board, on every fixture", () => {
+    for (const graph of [medium, pathological]) {
+      const { districts } = cityDistricts(graph);
+      const { placements, patches } = patchesOf(graph);
+      for (const patch of patches) {
+        const member = placements.find((one) => patch.members.has(one.id));
+        const board = districts.find(
+          (district) => district.id === member?.district
+        ) as District;
+        expect(patch.minX).toBeGreaterThanOrEqual(board.minX - ISLAND_PAD);
+        expect(patch.maxX).toBeLessThanOrEqual(board.maxX + ISLAND_PAD);
+        expect(patch.minZ).toBeGreaterThanOrEqual(board.minZ - ISLAND_PAD);
+        expect(patch.maxZ).toBeLessThanOrEqual(board.maxZ + ISLAND_PAD);
       }
     }
   });
