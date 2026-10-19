@@ -22,9 +22,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Corepack provides pnpm in the next step, so setup-node mustn't look for it to cache.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          package-manager-cache: false
 
       - run: corepack enable
 
