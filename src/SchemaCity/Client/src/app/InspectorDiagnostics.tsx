@@ -76,37 +76,20 @@ function Check({
   const reviewed = isReviewed(use(Reviews)?.reviewOf(finding));
   const subject = subjectName(finding, nodesById, use(DataTypeLinks));
   const problem = finding.severity === "problem";
-  // The left rule carries the severity: pink for a problem, grey for a note, and a
-  // fainter grey once reviewed, so the open problems are what the eye lands on.
-  let border = "border-label";
-  if (reviewed) border = "border-line";
-  else if (problem) border = "border-signal";
   const [why, setWhy] = useState(false);
   const whyId = useId();
   return (
-    <li className={`border-l-2 bg-muted px-3 py-2.5 ${border}`}>
-      <div className="flex items-center gap-2">
-        <p
-          className={`min-w-0 flex-1 font-medium text-sm ${reviewed ? "text-label" : "text-prose"}`}
-        >
-          <span className="sr-only">{problem ? "Problem" : "Note"}: </span>
-          {FINDING_LABEL[finding.kind]}
-          {reviewed ? (
-            <span className="font-normal text-faint"> · Reviewed</span>
-          ) : null}
-        </p>
-        {/* What the kind means and what to do wait behind Why?, so the card shows
-            only what is particular to this type until asked. */}
-        <button
-          aria-controls={whyId}
-          aria-expanded={why}
-          className="shrink-0 text-faint text-xs hover:text-prose"
-          onClick={() => setWhy(!why)}
-          type="button"
-        >
-          {why ? "Hide" : "Why?"}
-        </button>
-      </div>
+    <li
+      className={`border-l-2 bg-muted px-3 py-2.5 ${ruleOf(reviewed, problem)}`}
+    >
+      <CheckTitle
+        label={FINDING_LABEL[finding.kind]}
+        onWhy={() => setWhy(!why)}
+        problem={problem}
+        reviewed={reviewed}
+        why={why}
+        whyId={whyId}
+      />
       {subjects && finding.nodeId ? (
         <p className="mt-0.5 text-label text-xs">
           On{" "}
@@ -134,6 +117,57 @@ function Check({
       />
       <ReviewControl finding={finding} subject={subject} />
     </li>
+  );
+}
+
+/**
+ * The left rule carries the severity: pink for a problem, grey for a note, and a
+ * fainter grey once reviewed, so the open problems are what the eye lands on.
+ */
+function ruleOf(reviewed: boolean, problem: boolean): string {
+  if (reviewed) return "border-line";
+  return problem ? "border-signal" : "border-label";
+}
+
+/** The kind as a plain title, with the Why? toggle at its end. */
+function CheckTitle({
+  label,
+  problem,
+  reviewed,
+  why,
+  whyId,
+  onWhy,
+}: {
+  label: string;
+  problem: boolean;
+  reviewed: boolean;
+  why: boolean;
+  whyId: string;
+  onWhy: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <p
+        className={`min-w-0 flex-1 font-medium text-sm ${reviewed ? "text-label" : "text-prose"}`}
+      >
+        <span className="sr-only">{problem ? "Problem" : "Note"}: </span>
+        {label}
+        {reviewed ? (
+          <span className="font-normal text-faint"> · Reviewed</span>
+        ) : null}
+      </p>
+      {/* What the kind means and what to do wait behind Why?, so the card shows
+          only what is particular to this type until asked. */}
+      <button
+        aria-controls={whyId}
+        aria-expanded={why}
+        className="shrink-0 text-faint text-xs hover:text-prose"
+        onClick={onWhy}
+        type="button"
+      >
+        {why ? "Hide" : "Why?"}
+      </button>
+    </div>
   );
 }
 
