@@ -101,7 +101,7 @@ const views = [
       <div class="shell">
         <figure class="screenshot reveal" style="--i: 6">
           <div class="screenshot__bar" aria-hidden="true"><span></span><span></span><span></span></div>
-          {/* The live demo loads only when asked, so the page doesn't start a 3D app or take the keyboard on arrival. */}
+          {/* The live demo loads only when asked, so the page doesn't start a 3D app on arrival. It isn't focused either, since it takes the arrow keys and Escape. */}
           <div class="demo" data-demo={demoUrl}>
             <img src={cityShot.src} width={cityShot.width} height={cityShot.height} alt="The city overview, with a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable" loading="eager" decoding="async" />
             <button class="button button--primary demo__load" type="button">Explore the live demo</button>
@@ -194,7 +194,6 @@ const views = [
       frame.allow = "fullscreen; clipboard-write";
       demo.replaceChildren(frame);
       demo.classList.add("demo--live");
-      frame.focus();
     });
   }
 </script>
