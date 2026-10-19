@@ -140,7 +140,9 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
   unusedDataType:
     "No property on a Document, Media or Member Type uses these Data Types, and no collection view does. The Data Types Umbraco installs itself are left out. Custom code and packages can still refer to one by its key.",
   noProperties: "These types have no own and no composed properties.",
-  complexity: `Among the busiest types in this schema: the highest of ${COMPLEXITY_TIERS} tiers, measured against the busiest type. The score is own and composed properties, plus twice the compositions, plus distinct block targets, and each row compares it with the median type.`,
+  // "Within a fifth" is the top of COMPLEXITY_TIERS.
+  complexity:
+    "The score adds own and composed properties, twice the compositions, and block targets. Listed when it comes within a fifth of the busiest type.",
   pureMixin:
     "Used only as compositions and never created on their own. Usually intended; listed so the mixins are easy to find.",
   noTemplate:
@@ -177,8 +179,7 @@ export const KIND_NEXT_STEP: Record<FindingKind, string> = {
     "Search custom code and packages for its key, then remove it or give a property the Data Type.",
   noProperties:
     "Add properties, or check whether code relies on it as a folder or marker type.",
-  complexity:
-    "Check whether some properties belong in a composition or a block, so the type stays readable.",
+  complexity: "Move some properties into a composition or a block.",
   pureMixin:
     "Nothing, if it is meant as a mixin. With one or two users, consider moving its properties onto them.",
   noTemplate:
@@ -359,7 +360,8 @@ export function findFindings(
   );
   const topScore = Math.max(0, ...scores.values());
   // A bare score means nothing to an editor, so each row places the type among
-  // the others: its rank, and what the median type scores.
+  // the others: its rank, and what the median type scores. The counts behind the
+  // score are already on the inspector, so the row leaves them out.
   const sorted = [...scores.values()].sort((a, b) => b - a);
   const medianScore = median(sorted);
   const rankOf = (score: number) =>
@@ -711,7 +713,7 @@ export function findFindings(
       add(
         "complexity",
         node,
-        `${busiest(rankOf(score), sorted.length)}: ${node.ownPropertyCount} own and ${node.composedPropertyCount} composed properties, ${plural(at(outComposition, node.id), "composition")}, ${plural(blockTargets.get(node.id)?.size ?? 0, "block target")}. Score ${score}, where the median type scores ${medianScore}`,
+        `${busiest(rankOf(score), sorted.length)}, scoring ${score} where the median is ${medianScore}`,
         undefined,
         score
       );

@@ -426,7 +426,7 @@ describe("findFindings, one rule at a time", () => {
       (candidate) =>
         candidate.kind === "complexity" && candidate.nodeId === "page"
     );
-    expect(finding?.summary).toContain("Score 6");
+    expect(finding?.summary).toContain("scoring 6 ");
   });
 
   it("places a complex type among the others instead of a bare score", () => {
@@ -440,8 +440,8 @@ describe("findFindings, one rule at a time", () => {
       .filter((candidate) => candidate.kind === "complexity")
       .map((candidate) => candidate.summary);
     expect(summaries).toEqual([
-      "Busiest of 4 types: 45 own and 0 composed properties, 0 compositions, 0 block targets. Score 45, where the median type scores 21",
-      "2nd busiest of 4 types: 40 own and 0 composed properties, 0 compositions, 0 block targets. Score 40, where the median type scores 21",
+      "Busiest of 4 types, scoring 45 where the median is 21",
+      "2nd busiest of 4 types, scoring 40 where the median is 21",
     ]);
   });
 
