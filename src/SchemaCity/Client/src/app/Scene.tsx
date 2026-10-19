@@ -49,8 +49,8 @@ import { expandFocusLayout } from "./layout/expanded-focus";
 import {
   type FocusBounds,
   focusAnchor,
-  focusBounds,
   layoutFocus,
+  standFocus,
 } from "./layout/focus";
 import { editorNames } from "./layout/structure";
 import { describeRelationship, uniqueConnections } from "./relationship";
@@ -1278,16 +1278,26 @@ const RIM_OVERHANG = 0.9;
 const GRID_Y = -(SLAB_HEIGHT + RIM_HEIGHT + 0.05);
 
 /**
- * How high the focus island's top face sits. Above the district slabs at 0 and the
- * names printed on them at 0.01, so neither z-fights it, and under the roads at
- * 0.015, so the focused node's roads still run over the island it stands on.
- *
- * ponytail: that leaves it under the sunk city plates as well, which stand 0.1 up,
- * so the flattened city still reads through the island as ghost footprints. Hiding
- * them means the buildings pass would have to know about the island; sinking the
- * plates under it is the upgrade if that ever reads as debris rather than as a map.
+ * How high the focus island's top face sits: over everything printed or tinted on
+ * the boards under it, the districts' names, folder and socket patches, vias and
+ * socket names, so none of them z-fights it or shows through, and under the roads,
+ * so the focused node's roads still run over the island it stands on. The
+ * neighbourhood stands on it, raised by as much.
  */
-const FOCUS_ISLAND_Y = 0.012;
+const FOCUS_ISLAND_Y = 0.04;
+/**
+ * Where a flattened plate the focus island covers sinks to: inside the slab under
+ * it, so the city does not read through the island as ghost footprints.
+ */
+const SUNK_Y = -SLAB_HEIGHT / 2;
+/**
+ * How far the island's top is lifted toward phosphor. It sits on a board of its own
+ * kind more often than not, and in the board's own colour it does not read as
+ * ground of its own.
+ */
+const ISLAND_LIFT = 0.1;
+/** Just over the island's top, where its phosphor edge is drawn. */
+const ISLAND_EDGE_Y = 0.002;
 
 /**
  * The island under a focused neighbourhood: the slab and rim a district stands on, in
@@ -1331,32 +1341,79 @@ function FocusIsland({
   });
 
   if (!at) return null;
-  const width = at.maxX - at.minX;
-  const depth = at.maxZ - at.minZ;
-  const rim = RIM_OVERHANG * 2;
   return (
     <group position={[at.anchor.x, FOCUS_ISLAND_Y, at.anchor.z]} ref={group}>
       <group
         position={[at.centre.x - at.anchor.x, 0, at.centre.z - at.anchor.z]}
       >
-        <mesh position={[0, -SLAB_HEIGHT / 2, 0]} receiveShadow>
-          <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
-          <meshStandardMaterial
-            color={slabColour(at.kind, palette)}
-            metalness={0}
-            roughness={1}
-          />
-        </mesh>
-        <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
-          <boxGeometry args={[width + rim, RIM_HEIGHT, depth + rim]} />
-          <meshStandardMaterial
-            color={rimColour(palette)}
-            metalness={0}
-            roughness={1}
-          />
-        </mesh>
+        <IslandSlab
+          depth={at.maxZ - at.minZ}
+          kind={at.kind}
+          palette={palette}
+          width={at.maxX - at.minX}
+        />
       </group>
     </group>
+  );
+}
+
+/**
+ * The focus island itself about its centre: the slab, lifted toward phosphor so it
+ * reads as ground of its own on a board of its own kind, a phosphor edge round its
+ * top, and the darker lip under it.
+ */
+function IslandSlab({
+  width,
+  depth,
+  kind,
+  palette,
+}: {
+  width: number;
+  depth: number;
+  kind: DistrictKind;
+  palette: Palette;
+}) {
+  const edge = useMemo(
+    () =>
+      new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-width / 2, ISLAND_EDGE_Y, -depth / 2),
+        new THREE.Vector3(width / 2, ISLAND_EDGE_Y, -depth / 2),
+        new THREE.Vector3(width / 2, ISLAND_EDGE_Y, depth / 2),
+        new THREE.Vector3(-width / 2, ISLAND_EDGE_Y, depth / 2),
+      ]),
+    [width, depth]
+  );
+  useEffect(() => () => edge.dispose(), [edge]);
+  const rim = RIM_OVERHANG * 2;
+  return (
+    <>
+      <mesh position={[0, -SLAB_HEIGHT / 2, 0]} receiveShadow>
+        <boxGeometry args={[width, SLAB_HEIGHT, depth]} />
+        <meshStandardMaterial
+          color={slabColour(kind, palette).lerp(
+            new THREE.Color(palette.phosphor),
+            ISLAND_LIFT
+          )}
+          metalness={0}
+          roughness={1}
+        />
+      </mesh>
+      <lineLoop geometry={edge}>
+        <lineBasicMaterial
+          color={palette.phosphor}
+          opacity={0.55}
+          transparent
+        />
+      </lineLoop>
+      <mesh position={[0, -SLAB_HEIGHT - RIM_HEIGHT / 2, 0]}>
+        <boxGeometry args={[width + rim, RIM_HEIGHT, depth + rim]} />
+        <meshStandardMaterial
+          color={rimColour(palette)}
+          metalness={0}
+          roughness={1}
+        />
+      </mesh>
+    </>
   );
 }
 
@@ -2553,32 +2610,19 @@ export default function Scene({
     // stands it back on the focused node's own ground: that node holds still and
     // everything it is joined to gathers around it.
     const anchor = focusAnchor(city.placements, focus);
-    const inFocus = focusNeighbours ?? new Set<string>();
-    const moved: Placement[] = [];
     // Everything the focused node has nothing to do with becomes ground: the
     // neighbourhood is laid out over the city it came from, and a city still standing
-    // at full height under it reads as two layouts on top of each other. A placement
-    // the layout returned unchanged is one it did not place.
-    const placements = laid.map((placement, index) => {
-      if (placement === city.placements[index]) {
-        return inFocus.has(placement.id)
-          ? placement
-          : { ...placement, flatten: 1 };
-      }
-      const at = {
-        ...placement,
-        position: {
-          x: placement.position.x + anchor.x,
-          z: placement.position.z + anchor.z,
-        },
-      };
-      moved.push(at);
-      return at;
+    // at full height under it reads as two layouts on top of each other.
+    const stood = standFocus(city.placements, laid, {
+      anchor,
+      inFocus: focusNeighbours ?? new Set<string>(),
+      lift: FOCUS_ISLAND_Y,
+      sunk: SUNK_Y,
     });
     const kind = city.placements.find(
       (placement) => placement.id === focus
     )?.districtKind;
-    return { anchor, kind: kind ?? "mixed", moved, placements };
+    return { anchor, kind: kind ?? "mixed", ...stood };
   }, [focus, focusDepth, focusNeighbours, graph, neighbourhoodById, city]);
   const target = focusLayout?.placements ?? city.placements;
   // The ground the neighbourhood covers, which the island is drawn on and the camera
@@ -2587,7 +2631,7 @@ export default function Scene({
   const focusIsland = useMemo(
     () =>
       focusLayout && {
-        ...focusBounds(focusLayout.moved),
+        ...focusLayout.island,
         anchor: focusLayout.anchor,
         kind: focusLayout.kind,
       },

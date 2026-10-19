@@ -9,6 +9,7 @@ import {
   focusBounds,
   layoutFocus,
   FOCUS_STREET as STREET,
+  standFocus,
 } from "./focus";
 
 const medium = mediumFixture as unknown as SchemaGraph;
@@ -358,5 +359,51 @@ describe("layoutFocus", () => {
 
     expect(at("blockTarget").footprint).toBe(before.footprint);
     expect(at("blockTarget").district).toBe("elements");
+  });
+});
+
+describe("standFocus", () => {
+  const lot = (id: string, x: number, z: number): Placement =>
+    ({ id, position: { x, z }, footprint: 2, height: 4 }) as Placement;
+
+  it("raises the moved onto the island, flattens the rest and sinks what it covers", () => {
+    const city = [
+      lot("hub", 0, 0),
+      lot("near", 50, 0),
+      lot("far", 200, 0),
+      lot("kept", 300, 0),
+    ];
+    // The layout moves "near" next to the hub, over where the hub's own lot was.
+    const laid = [
+      { ...city[0] },
+      { ...city[1], position: { x: 4, z: 0 } },
+      city[2],
+      city[3],
+    ];
+    const { moved, island, placements } = standFocus(city, laid, {
+      anchor: { x: 100, z: 0 },
+      inFocus: new Set(["hub", "near", "kept"]),
+      lift: 0.04,
+      sunk: -0.2,
+    });
+    const at = (id: string) => placements.find((p) => p.id === id) as Placement;
+
+    expect(moved.map((p) => p.id)).toEqual(["hub", "near"]);
+    expect(at("near").position).toEqual({ x: 104, z: 0 });
+    expect(at("near").y).toBe(0.04);
+    expect(island.minX).toBeLessThan(100);
+    expect(island.maxX).toBeGreaterThan(104);
+    // Unplaced but in the neighbourhood: left standing where it was.
+    expect(at("kept")).toBe(city[3]);
+    // Outside the neighbourhood: pressed flat, and sunk only under the island.
+    expect(at("far")).toMatchObject({ flatten: 1 });
+    expect(at("far").y).toBeUndefined();
+    const under = standFocus(city, laid, {
+      anchor: { x: 200, z: 0 },
+      inFocus: new Set(["hub", "near"]),
+      lift: 0.04,
+      sunk: -0.2,
+    }).placements.find((p) => p.id === "far");
+    expect(under).toMatchObject({ flatten: 1, y: -0.2 });
   });
 });
