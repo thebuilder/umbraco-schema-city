@@ -13,7 +13,7 @@
     "ImageUrl": "https://github.com/thebuilder.png",
     "SyncContributorsFromRepository": true
   },
-  "DocumentationUrl": "https://github.com/thebuilder/umbraco-schema-city/blob/main/docs/guide.md",
+  "DocumentationUrl": "https://schema-city.thebuilder.dk/",
   "IssueTrackerUrl": "https://github.com/thebuilder/umbraco-schema-city/issues",
   "Screenshots": [
     {

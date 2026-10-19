@@ -12,6 +12,7 @@ Run commands from the repository root unless a different directory is shown.
 | `src/SchemaCity/Client/dev` | Standalone app with schema and usage fixtures |
 | `src/SchemaCity.Site` | Seeded Umbraco integration site |
 | `tests/SchemaCity.Tests` | .NET tests |
+| `apps/docs` | Docs site at schema-city.thebuilder.dk, built with Blume |
 
 ## Work on the client
 
@@ -65,6 +66,25 @@ For Vercel, set the project Root Directory to `src/SchemaCity/Client` and use No
 The checked-in `vercel.json` selects `npm ci`, `npm run build:demo`, and output directory `dist`.
 Leave the ordinary `npm run build` command for the Umbraco extension. Changing only Vercel's output
 directory to `wwwroot` would deploy JavaScript modules without an HTML page.
+
+## Work on the docs site
+
+The docs site in `apps/docs` is built with [Blume](https://blume.dev) and the shared
+`@thebuilder/umbraco-docs` package, so it looks like the other TheBuilder package sites. Its pages
+are in `apps/docs/content`, and the landing page is `apps/docs/pages/index.astro`. It uses pnpm from
+the repository root; the client keeps npm.
+
+```bash
+pnpm install
+pnpm docs:dev
+pnpm docs:build
+```
+
+The pages show the screenshots in `docs/screenshots/`, so a refreshed screenshot reaches the README,
+the Marketplace listing and the docs at once.
+
+For Vercel, set the project Root Directory to `apps/docs`, keep the default pnpm install, and
+point the `schema-city.thebuilder.dk` domain at it.
 
 ## Run checks
 
@@ -183,5 +203,5 @@ the demo page, not the extension. Do not alter schema values for screenshots.
 
 Save images under `docs/screenshots/` and update the README captions to describe what they show.
 The README shows `city.png`, `focus.png`, `findings.png`, `lens.png`, `impact.png`, `compare.png`
-and `tree.png`. The [guide](guide.md) and `umbraco-marketplace.json` use most of the rest. The
+and `tree.png`. The docs site in `apps/docs` and `umbraco-marketplace.json` use most of the rest. The
 README uses absolute image URLs so images also work when it is included in a NuGet package.

@@ -1,0 +1,21 @@
+{
+  "name": "@thebuilder/schema-city-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "blume dev",
+    "build": "pnpm run generate:brand && pnpm run generate:og && blume build",
+    "generate:brand": "node scripts/generate-brand.mjs",
+    "generate:og": "umbraco-docs-og",
+    "check:og": "umbraco-docs-og --check"
+  },
+  "dependencies": {
+    "@thebuilder/umbraco-docs": "^1.6.0",
+    "blume": "^2.2.3",
+    "vgpu": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "sharp": "^0.35.5"
+  }
+}
