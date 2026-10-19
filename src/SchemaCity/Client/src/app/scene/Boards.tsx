@@ -15,6 +15,7 @@ import {
   type CityBounds,
   type District,
   type DistrictKind,
+  FOLDER_PAD,
   ISLAND_PAD,
 } from "../layout/city";
 import {
@@ -143,8 +144,6 @@ const STAMP_OPACITY = 0.8;
  * way a trace runs over a board's silkscreen.
  */
 const STAMP_Y = 0.01;
-/** Ground around a nested folder's or a socket's members that its patch covers. */
-export const FOLDER_PAD = 1;
 /**
  * How far a socket's name stands off the board: over its patch and under the type
  * names and the traces, so both run over it.

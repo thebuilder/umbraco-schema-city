@@ -631,17 +631,18 @@ describe("placeLabels", () => {
     expect(placed.has("a")).toBe(false);
   });
 
-  it("prints two close neighbours whole on opposite sides", () => {
-    // Two buildings 5.5 apart: their whole names would meet in front.
+  it("keeps two close neighbours in front on shorter prints rather than sending one behind", () => {
+    // Two buildings 5.5 apart: their whole names would meet in front. Whole names
+    // on opposite sides read as names thrown about a row at random.
     const placed = placeLabels(
       [want("a", 0, 0, [8, 4]), want("b", 5.5, 0, [8, 4])],
       [building("a", 0, 0), building("b", 5.5, 0)],
       false
     );
-    expect(placed.get("a")?.print).toBe(0);
-    expect(placed.get("b")?.print).toBe(0);
     const behind = (id: string) => (placed.get(id)?.rect.maxZ ?? 0) < 0;
-    expect(behind("a")).not.toBe(behind("b"));
+    expect(placed.size).toBe(2);
+    expect(behind("a")).toBe(false);
+    expect(behind("b")).toBe(false);
   });
 
   it("gives every name a place before any name a longer print", () => {

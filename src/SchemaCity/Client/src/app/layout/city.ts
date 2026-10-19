@@ -126,6 +126,8 @@ export const DISTRICT_GAP = STREET * 2;
  * name's band the padding already covers.
  */
 export const ISLAND_PAD = 2;
+/** Ground around a nested folder's or a socket's members that its patch covers. */
+export const FOLDER_PAD = 1;
 /**
  * Ground between the district's name and the last row, which holds that row's
  * printed names and then the outer street a road takes out of it: the names' depth,
@@ -655,7 +657,7 @@ function arrange(laid: Laid[], edges: SchemaEdge[], stack: boolean) {
       );
     let cursor = Number.NEGATIVE_INFINITY;
     for (const { district, centre } of wanted) {
-      const box = boxOf(district.placements);
+      const box = groundOf(district);
       const width = box.maxX - box.minX;
       const depth = box.maxZ - box.minZ + STAMP_MARGIN;
       const own = centre === null ? 0 : centre - width / 2;
@@ -675,7 +677,7 @@ function arrange(laid: Laid[], edges: SchemaEdge[], stack: boolean) {
   // East of every row, so a wide row can never grow into this column.
   let eastX = 0;
   for (const district of placed)
-    eastX = Math.max(eastX, boxOf(district.placements).maxX + ISLAND_SPAN_GAP);
+    eastX = Math.max(eastX, groundOf(district).maxX + ISLAND_SPAN_GAP);
   let eastZ = 0;
   for (const district of laid.filter((d) => bandOf(d) === "east").sort(bySize))
     eastZ += moveTo(district, eastX, eastZ).depth + DISTRICT_GAP;
@@ -699,7 +701,7 @@ function placeRow(row: readonly Laid[], stack: boolean): number {
   let depth = 0;
   let column = { x: 0, z: 0, width: 0 };
   for (const district of row) {
-    const box = boxOf(district.placements);
+    const box = groundOf(district);
     const fits =
       stack &&
       column.z > 0 &&
@@ -764,7 +766,7 @@ function middleRow(
  * it covers, which includes the name's band south of its last row.
  */
 function moveTo(island: Laid, toX: number, toZ: number) {
-  const box = boxOf(island.placements);
+  const box = groundOf(island);
   for (const placement of island.placements) {
     placement.position.x += toX - box.minX;
     placement.position.z += toZ - box.minZ;
@@ -776,7 +778,7 @@ function moveTo(island: Laid, toX: number, toZ: number) {
 }
 
 function districtOf(island: Laid): District {
-  const box = boxOf(island.placements);
+  const box = groundOf(island);
   const maxZ = box.maxZ + STAMP_MARGIN;
   return {
     id: island.id,
@@ -1142,6 +1144,36 @@ function place(
     ...(folder ? { folder } : {}),
     introDelay: step * INTRO_STAGGER,
   };
+}
+
+/**
+ * The ground a district's own things cover: its buildings, and each named socket's
+ * patch, which reaches past its types to hold the block editor's name. Measured from
+ * the buildings alone, a socket of one type at a board's edge printed its patch off
+ * the board.
+ */
+function groundOf(island: Laid) {
+  // A copy, because an empty district's box is the shared EMPTY_BOX.
+  const box = { ...boxOf(island.placements) };
+  const names = island.socketNames;
+  if (!names) return box;
+  const sockets = new Map<string, Placement[]>();
+  for (const placement of island.placements) {
+    if (!placement.folder?.startsWith(SOCKET)) continue;
+    const held = sockets.get(placement.folder);
+    if (held) held.push(placement);
+    else sockets.set(placement.folder, [placement]);
+  }
+  for (const [id, held] of sockets) {
+    const name = names.get(id.slice(SOCKET.length));
+    if (!name) continue;
+    const { centre, width, depth } = socketPatch(held, name, FOLDER_PAD);
+    box.minX = Math.min(box.minX, centre.x - width / 2);
+    box.maxX = Math.max(box.maxX, centre.x + width / 2);
+    box.minZ = Math.min(box.minZ, centre.z - depth / 2);
+    box.maxZ = Math.max(box.maxZ, centre.z + depth / 2);
+  }
+  return box;
 }
 
 function boxOf(placements: Placement[]) {

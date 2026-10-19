@@ -7,8 +7,10 @@ import { ISLAND_PAD, layoutCity, type Placement, ROW_LIMIT } from "./city";
 import {
   focusAnchor,
   focusBounds,
+  islandReaching,
   layoutFocus,
   FOCUS_STREET as STREET,
+  standFocus,
 } from "./focus";
 
 const medium = mediumFixture as unknown as SchemaGraph;
@@ -358,5 +360,99 @@ describe("layoutFocus", () => {
 
     expect(at("blockTarget").footprint).toBe(before.footprint);
     expect(at("blockTarget").district).toBe("elements");
+  });
+});
+
+describe("standFocus", () => {
+  const lot = (id: string, x: number, z: number): Placement =>
+    ({ id, position: { x, z }, footprint: 2, height: 4 }) as Placement;
+
+  it("raises the moved onto the island, flattens the rest and sinks what it covers", () => {
+    const city = [
+      lot("hub", 0, 0),
+      lot("near", 50, 0),
+      lot("far", 200, 0),
+      lot("kept", 300, 0),
+    ];
+    // The layout moves "near" next to the hub, over where the hub's own lot was.
+    const laid = [
+      { ...city[0] },
+      { ...city[1], position: { x: 4, z: 0 } },
+      city[2],
+      city[3],
+    ];
+    const { moved, island, placements } = standFocus(city, laid, {
+      anchor: { x: 100, z: 0 },
+      inFocus: new Set(["hub", "near", "kept"]),
+      lift: 0.04,
+      sunk: -0.2,
+    });
+    const at = (id: string) => placements.find((p) => p.id === id) as Placement;
+
+    expect(moved.map((p) => p.id)).toEqual(["hub", "near"]);
+    expect(at("near").position).toEqual({ x: 104, z: 0 });
+    expect(at("near").y).toBe(0.04);
+    expect(island.minX).toBeLessThan(100);
+    expect(island.maxX).toBeGreaterThan(104);
+    // Unplaced but in the neighbourhood: left standing where it was.
+    expect(at("kept")).toBe(city[3]);
+    // Outside the neighbourhood: pressed flat, and sunk only under the island.
+    expect(at("far")).toMatchObject({ flatten: 1 });
+    expect(at("far").y).toBeUndefined();
+    const under = standFocus(city, laid, {
+      anchor: { x: 200, z: 0 },
+      inFocus: new Set(["hub", "near"]),
+      lift: 0.04,
+      sunk: -0.2,
+    }).placements.find((p) => p.id === "far");
+    expect(under).toMatchObject({ flatten: 1, y: -0.2 });
+  });
+
+  it("sinks what a widened island covers, as well as what its buildings need", () => {
+    const city = [lot("hub", 0, 0), lot("beside", 20, 0)];
+    const laid = [{ ...city[0] }, city[1]];
+    const stand = (reach: number) =>
+      standFocus(city, laid, {
+        anchor: { x: 0, z: 0 },
+        inFocus: new Set(["hub"]),
+        lift: 0,
+        sunk: -0.2,
+        widen: (island, standing) => {
+          expect(standing.map((p) => p.id)).toEqual(["hub", "beside"]);
+          return islandReaching(island, [{ x: reach, z: 0 }], 1);
+        },
+      }).placements.find((p) => p.id === "beside");
+
+    expect(stand(5)?.y).toBeUndefined();
+    expect(stand(19.5)).toMatchObject({ flatten: 1, y: -0.2 });
+  });
+});
+
+describe("islandReaching", () => {
+  it("grows the island round every point, with the pad to spare", () => {
+    const island = focusBounds([
+      {
+        id: "a",
+        position: { x: 0, z: 0 },
+        footprint: 2,
+        height: 1,
+      } as Placement,
+    ]);
+    const grown = islandReaching(
+      island,
+      [
+        { x: 10, z: -1 },
+        { x: 0, z: 0 },
+      ],
+      1
+    );
+
+    expect(grown.maxX).toBe(11);
+    expect(grown.minX).toBe(island.minX);
+    expect(grown.minZ).toBe(island.minZ);
+    expect(grown.centre).toEqual({
+      x: (island.minX + 11) / 2,
+      z: (island.minZ + island.maxZ) / 2,
+    });
   });
 });

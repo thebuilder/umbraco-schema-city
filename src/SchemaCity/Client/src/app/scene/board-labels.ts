@@ -564,10 +564,11 @@ function placesFor(
   width: number,
   height: number,
   flipped: boolean,
-  fits: (id: string, rect: Rect) => boolean
-): Rect[] {
+  fits: (id: string, rect: Rect) => boolean,
+  sides: readonly PrintSide[] = SIDES
+): { side: PrintSide; rect: Rect }[] {
   const slack = Math.max(0, (width - want.footprint) / 2);
-  return SIDES.flatMap((side) => {
+  return sides.flatMap((side) => {
     const rect = printRect(
       want.centre,
       want.footprint,
@@ -585,7 +586,9 @@ function placesFor(
             minX: rect.minX + by,
             maxX: rect.maxX + by,
           }));
-    return tries.filter((one) => fits(want.id, one));
+    return tries
+      .filter((one) => fits(want.id, one))
+      .map((one) => ({ side, rect: one }));
   });
 }
 
@@ -673,7 +676,8 @@ const overlapping = (a: Rect, b: Rect, gap: number) =>
  * prints that fits, trying the rest only when that one does not, in front of its
  * building, behind it, or beside it, so as many names as possible get a place. The
  * second moves each placed name, in the same order, to its best print that fits the
- * board the first pass left. A name no print of which fits is left off.
+ * board the first pass left, on the side it already took or a better one. A name no
+ * print of which fits is left off.
  *
  * Both passes take a place clear of the drawn traces, which `crossesTrace` tests,
  * over one a trace runs through, so a print and a trace never share board where
@@ -735,18 +739,33 @@ export function placeLabels(
 
   // `other` is whether the print runs over another connection's trace, which is
   // what lets the second pass widen it over one.
-  const placed = new Map<string, Placed & { item: Item; other: boolean }>();
+  const placed = new Map<
+    string,
+    Placed & { item: Item; other: boolean; side: PrintSide }
+  >();
   /**
-   * The first of `prints` that fits on any side, placed and returned; with `cross`
-   * false, only on a side no trace runs through.
+   * The first of `prints` that fits on any of `sides`, placed and returned; with
+   * `cross` false, only on a side no trace runs through.
    */
-  const place = (want: Want, prints: readonly number[], cross: boolean) => {
+  const place = (
+    want: Want,
+    prints: readonly number[],
+    cross: boolean,
+    sides: readonly PrintSide[] = SIDES
+  ) => {
     for (const print of prints) {
       const { width, height } = want.prints[print] as {
         width: number;
         height: number;
       };
-      for (const rect of placesFor(want, width, height, flipped, fits)) {
+      for (const { side, rect } of placesFor(
+        want,
+        width,
+        height,
+        flipped,
+        fits,
+        sides
+      )) {
         if (blocked(want.id, rect)) continue;
         const crossing = crossesTrace(rect, want.id);
         if (crossing === "other" && !cross) continue;
@@ -759,6 +778,7 @@ export function placeLabels(
           crosses: crossing !== "none",
           item,
           other: crossing === "other",
+          side,
         });
         return true;
       }
@@ -784,7 +804,11 @@ export function placeLabels(
       : wider.filter(
           (i) => want.prints[held.print]?.cut && !want.prints[i]?.cut
         );
-    if (!(place(want, wider, false) || place(want, over, true))) {
+    // Only where it stands now or a better side: a whole name behind its building
+    // reads worse than a shorter print in front of it, and swapping sides for a
+    // wider print sent every other name in a row behind its building.
+    const sides = SIDES.slice(0, SIDES.indexOf(held.side) + 1);
+    if (!(place(want, wider, false, sides) || place(want, over, true, sides))) {
       add(held.item);
       placed.set(want.id, held);
     }
