@@ -49,6 +49,7 @@ import { expandFocusLayout } from "./layout/expanded-focus";
 import {
   type FocusBounds,
   focusAnchor,
+  islandReaching,
   layoutFocus,
   standFocus,
 } from "./layout/focus";
@@ -1298,6 +1299,8 @@ const SUNK_Y = -SLAB_HEIGHT / 2;
 const ISLAND_LIFT = 0.1;
 /** Just over the island's top, where its phosphor edge is drawn. */
 const ISLAND_EDGE_Y = 0.002;
+/** Ground the focus island keeps beyond the outermost lane of its links. */
+const LANE_PAD = 1;
 
 /**
  * The island under a focused neighbourhood: the slab and rim a district stands on, in
@@ -2594,6 +2597,11 @@ export default function Scene({
     () => (focus ? reachableWithin(graph, focus, focusDepth) : null),
     [graph, focus, focusDepth]
   );
+  // Keep the overview graph stable; interaction changes its emphasis, not its routes.
+  const drawnEdges = useMemo(
+    () => visibleConnections(graph.edges ?? [], focusNeighbours),
+    [graph.edges, focusNeighbours]
+  );
   const focusLayout = useMemo(() => {
     const neighbourhood = focus ? neighbourhoodById.get(focus) : undefined;
     if (!(focus && neighbourhood)) return null;
@@ -2618,12 +2626,30 @@ export default function Scene({
       inFocus: focusNeighbours ?? new Set<string>(),
       lift: FOCUS_ISLAND_Y,
       sunk: SUNK_Y,
+      // The island carries the lanes its links run along as well as its buildings.
+      widen: (island, standing) =>
+        islandReaching(
+          island,
+          planRoutes(
+            new Map(standing.map((placement) => [placement.id, placement])),
+            drawnEdges
+          ).routes.flatMap((route) => route.points),
+          LANE_PAD
+        ),
     });
     const kind = city.placements.find(
       (placement) => placement.id === focus
     )?.districtKind;
     return { anchor, kind: kind ?? "mixed", ...stood };
-  }, [focus, focusDepth, focusNeighbours, graph, neighbourhoodById, city]);
+  }, [
+    focus,
+    focusDepth,
+    focusNeighbours,
+    graph,
+    neighbourhoodById,
+    city,
+    drawnEdges,
+  ]);
   const target = focusLayout?.placements ?? city.placements;
   // The ground the neighbourhood covers, which the island is drawn on and the camera
   // frames. The moved placements only: the flattened city around them is not part of
@@ -2790,11 +2816,6 @@ export default function Scene({
   );
   const iconGroups = useIconGroups(icons, nodesById, palette?.phosphor ?? "");
 
-  // Keep the overview graph stable; interaction changes its emphasis, not its routes.
-  const drawnEdges = useMemo(
-    () => visibleConnections(graph.edges ?? [], focusNeighbours),
-    [graph.edges, focusNeighbours]
-  );
   const active = useMemo(() => new Set<Layer>(layers), [layers]);
   const interactionActive = selected !== null || hovered !== null;
   const pickConnection: PickConnection = (pick) => setConnectionPick(pick);

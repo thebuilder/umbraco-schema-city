@@ -363,8 +363,10 @@ export function focusAnchor(
  * The whole city as focus mode stands it: what the layout `laid` placed moved onto
  * the focused node's ground at `anchor` and raised by `lift` onto the island, the
  * rest of the neighbourhood (`inFocus`) left standing, and everything else pressed
- * flat into ground. A flattened plate the island covers sinks to `sunk`, under the
- * island's top, so the city does not read through it as ghost footprints.
+ * flat into ground. `widen`, when given, grows the island to whatever else must
+ * stand on it, from the city as it stands before anything is pressed flat. A
+ * flattened plate the island covers sinks to `sunk`, under the island's top, so the
+ * city does not read through it as ghost footprints.
  */
 export function standFocus(
   cityPlacements: Placement[],
@@ -374,11 +376,13 @@ export function standFocus(
     inFocus,
     lift,
     sunk,
+    widen,
   }: {
     anchor: { x: number; z: number };
     inFocus: Set<string>;
     lift: number;
     sunk: number;
+    widen?: (island: FocusBounds, standing: Placement[]) => FocusBounds;
   }
 ): { moved: Placement[]; island: FocusBounds; placements: Placement[] } {
   // A placement the layout returned unchanged is one it did not place.
@@ -396,12 +400,13 @@ export function standFocus(
           },
         ]
   );
-  const island = focusBounds(moved);
   const byId = new Map(moved.map((placement) => [placement.id, placement]));
-  const placements = laid.map((placement) => {
-    const at = byId.get(placement.id);
-    if (at) return at;
-    if (inFocus.has(placement.id)) return placement;
+  const standing = laid.map((placement) => byId.get(placement.id) ?? placement);
+  const island = widen
+    ? widen(focusBounds(moved), standing)
+    : focusBounds(moved);
+  const placements = standing.map((placement) => {
+    if (byId.has(placement.id) || inFocus.has(placement.id)) return placement;
     return covers(island, placement)
       ? { ...placement, flatten: 1, y: sunk }
       : { ...placement, flatten: 1 };
@@ -419,4 +424,30 @@ function covers(island: FocusBounds, placement: Placement): boolean {
     z + half > island.minZ &&
     z - half < island.maxZ
   );
+}
+
+/**
+ * The island grown to take in `points` with `pad` to spare: the lanes the
+ * neighbourhood's links run along, which can take a street out past its outermost
+ * buildings.
+ */
+export function islandReaching(
+  island: FocusBounds,
+  points: { x: number; z: number }[],
+  pad: number
+): FocusBounds {
+  let { minX, maxX, minZ, maxZ } = island;
+  for (const { x, z } of points) {
+    minX = Math.min(minX, x - pad);
+    maxX = Math.max(maxX, x + pad);
+    minZ = Math.min(minZ, z - pad);
+    maxZ = Math.max(maxZ, z + pad);
+  }
+  return {
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    centre: { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 },
+  };
 }
