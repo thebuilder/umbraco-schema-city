@@ -57,7 +57,7 @@ export function InspectorChecks({
   );
 }
 
-/** One check: its kind, what it means, what to do, and its review. */
+/** One check: its kind and summary, what it means and what to do behind Why?, and its review. */
 function Check({
   finding,
   nodesById,
@@ -100,12 +100,19 @@ function Check({
       <p className={`mt-0.5 ${reviewed ? "text-label" : "text-prose"}`}>
         {finding.summary}
       </p>
-      <p className="mt-1.5 text-faint text-xs">
-        {KIND_EXPLANATION[finding.kind]}
-      </p>
-      <p className="mt-1 text-faint text-xs">
-        What to do: {KIND_NEXT_STEP[finding.kind]}
-      </p>
+      {/* The panel is busy enough, so what the kind means and what to do wait
+          behind a toggle. The summary is the part particular to this type. */}
+      <details className="mt-1.5">
+        <summary className="cursor-pointer text-phosphor text-xs hover:text-phosphor-bright">
+          Why?
+        </summary>
+        <p className="mt-1 text-faint text-xs">
+          {KIND_EXPLANATION[finding.kind]}
+        </p>
+        <p className="mt-1 text-faint text-xs">
+          What to do: {KIND_NEXT_STEP[finding.kind]}
+        </p>
+      </details>
       <FindingRelations
         finding={finding}
         nodesById={nodesById}
