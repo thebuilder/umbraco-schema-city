@@ -31,8 +31,8 @@ Every Document Type editor also gets a **Relationships** tab. It opens the city 
 
 1. Press `⌘K` / `Ctrl+K` and search for a type by name, alias or property alias.
 2. Click its building to open the inspector, then double-click it to focus on its neighbourhood.
-3. Open **Findings** in the header to see what the checks flag across the schema.
-4. Press **I** with a type selected to see every type a change to it reaches.
-5. Press **?** for every control.
+3. Open **Findings** in the header to see what the checks flag across the schema. See [Review findings](/findings).
+4. Press I with a type selected to see every type a change to it reaches. See [Trace the impact of a change](/impact).
+5. Press ? for every control, or read [Navigate the city](/navigation).
 
 To look around before you install, [try the demo](https://schema-city-demo.thebuilder.dk). It runs in the browser with a sample schema and needs no Umbraco install.

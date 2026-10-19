@@ -5,16 +5,16 @@ export default defineMeta({
   pages: [
     "overview",
     "quickstart",
+    "navigation",
     "investigate-a-type",
+    "views",
     "findings",
     "content-usage",
-    "views",
     "data-types",
     "impact",
     "compare",
     "layout",
     "present",
-    "navigation",
     "license",
   ],
 });

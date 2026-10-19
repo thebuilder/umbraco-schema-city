@@ -5,35 +5,45 @@ seo:
   image: /og/findings.png
 ---
 
-Findings runs configuration checks on the schema and lists what they find, such as unused types, duplicate aliases, missing block targets and empty types. Filter by category, select a result, and inspect it with its related types. The drawer's header says when the schema was read and when the usage was counted.
+**Findings** in the header checks the schema and lists what it finds, from blocks that point at a deleted Element Type to types no editor can reach. Filter by kind, select a row to inspect the type with its related types, and record a decision on the ones that are deliberate. The drawer's header says when the schema was read and when the usage was counted.
 
-Results are grouped by kind in a fixed order, with definite breakages such as broken blocks and duplicate aliases first. Each group explains its kind once and says what to do next. Each row shows the type and what is particular to it, such as where an unused type is allowed.
+Each finding is either a problem or a note.
 
-Problems are open and notes are collapsed. Within a group the strongest cases come first, for example an unused type whose allowed parents have no content either.
+- **Problems** are open in the drawer and marked with a pink dot across the app. Something is broken, or an editor cannot use the type as intended.
+- **Notes** are collapsed. They are worth knowing, and often deliberate.
 
-## What the checks flag
-
-Only a type an editor can create, at root or under another type, is reported as unused. A type nothing can create is a dead end, or a pure mixin when something composes it.
-
-The no template note is left out on a type already reported as unused. It is also left out when more than half of the creatable types have no template, since that schema is headless by design.
-
-- **Unreachable chain.** A type with allowed parents, none of which a root can reach.
-- **Culture mismatch.** An invariant type with a property that varies by culture, or with a block editor that lists an Element Type that varies by culture.
-- **Near-duplicate Data Type.** Data Types whose names match once case, spaces, hyphens and underscores are ignored. Each set is one note, on a type that uses the least-used of them. The note lists every other type that uses any of them.
-- **Overloaded tab.** A tab with more than 20 properties, composed ones included. On a type without tabs, a group with more than 20.
-- **Empty block.** An Element Type offered as a content block that has no properties. It is a note, because a divider or spacer block is often empty on purpose.
-- **Orphaned blocks.** Content stores blocks of an Element Type that no block editor lists any more. This is a problem. It takes the place of the unused Element Type row once usage has loaded, and names the Data Types the blocks are stored in.
-- **Unused Data Type.** A Data Type that no property on a Document, Media or Member Type uses, and no collection view either. It is a note about the Data Type itself and opens its page. The Data Types Umbraco installs itself are left out, since every site has a dozen it never uses.
-
-Once usage has loaded, an unused Element Type row says how many blocks of it content stores. A broken block row says how many blocks of the missing Element Type content still holds. Rows that name a Data Type link to its page.
+Results are grouped by kind, in the order of the table below, so what is definitely broken comes first. Each group explains its kind once and says what to do next. Within a group the strongest cases come first, for example an unused type whose allowed parents have no content either.
 
 ![Findings grouped by kind, broken blocks and duplicate aliases first, each row naming its own evidence.](../../../docs/screenshots/findings.png)
 
-Treat a finding as a reason to investigate before you delete anything. An unused Document Type has no counted content in the usage snapshot. An unused Element Type has no configured block editor use in the schema snapshot and, once usage has loaded, no stored block counted either. A count that stopped early says so. Custom code, migrations, external consumers, and media or member values can still depend on either.
+## What the checks flag
+
+| Check | Kind | What it means |
+| --- | --- | --- |
+| Broken block | Problem | A block editor lists an Element Type that no longer exists. Once usage has loaded, the row says how many blocks of it content still holds. |
+| Orphaned blocks | Problem | Content stores blocks of an Element Type that no block editor lists any more. It takes the place of the Unused Element Type row once usage has loaded, and names the Data Types the blocks are stored in. |
+| Duplicate alias | Problem | A property alias arrives from more than one place, the type's own properties or its compositions. |
+| Culture mismatch | Problem | An invariant type has a property that varies by culture, or a block editor that lists an Element Type that varies by culture. |
+| Unreachable chain | Problem | A type is allowed under other types, but no root leads to any of them. |
+| Dead end | Problem | A type is not allowed at root or under any type, is not an Element Type, and nothing composes it. |
+| Unused Element Type | Problem | No block editor lists the Element Type. Once usage has loaded, the row says how many blocks of it content stores. |
+| Unused type | Problem | An editor can create the type, but the usage snapshot counts no content of it. Needs usage to have loaded. |
+| Empty block | Note | An Element Type offered as a content block has no properties. A divider or spacer block is often empty on purpose. |
+| Overloaded tab | Note | A tab holds more than 20 properties, composed ones included. On a type without tabs, a group does. |
+| Near-duplicate Data Type | Note | Data Types whose names match once case, spaces, hyphens, underscores and a copy number such as (1) are ignored. Each set is one note, on a type that uses the least-used of them. |
+| Unused Data Type | Note | No property on a Document, Media or Member Type uses the Data Type, and no collection view either. The Data Types Umbraco installs itself are left out. |
+| No properties | Note | The type has no properties of its own or from compositions. |
+| Complexity | Note | The type's score, from its properties, compositions and block targets, is within a fifth of the busiest type. |
+| Pure mixin | Note | The type is only used as a composition and never created on its own. |
+| No template | Note | An editor can create the type, but no template is allowed. Left out on a type already reported as unused, and when more than half the creatable types have no template, since that schema is headless by design. |
+
+Rows that name a Data Type link to [its page](/data-types).
+
+Treat a finding as a reason to look, not as permission to delete. An unused Document Type has no content in the usage snapshot, and an unused Element Type has no block editor that lists it and, once usage has loaded, no stored blocks. A count that stopped early says so. Custom code, migrations, external consumers, and media or member values can still depend on either.
 
 ## Export findings as CSV
 
-Export CSV saves the filtered results as one header row and one row per finding, ready for an Excel or Jira import. The columns are, in order:
+**Export CSV** saves the filtered results as one header row and one row per finding, ready for an Excel or Jira import. The columns are, in order:
 
 - the kind
 - the type, with its key, folder, content counts and backoffice path
@@ -50,9 +60,9 @@ A finding about a Data Type alone leaves the type columns blank and gives the Da
 
 Mark a deliberate finding as intentional so it stops asking for attention. Examples are a spacer block with no properties, a mixin kept for one type, or a type an import still reads.
 
-Mark as intentional is on each row, in the inspector's checks and on a Data Type's page. It asks for a reason of up to 500 characters and records it with your name and the date. The row then reads "Intentional:" with the reason, and Undo removes the decision.
+**Mark as intentional** is on each row, in the inspector's checks and on a Data Type's page. It asks for a reason of up to 500 characters and records it with your name and the date. The row then reads "Intentional:" with the reason, and **Undo** removes the decision.
 
-Hide reviewed is on by default. It takes decided rows out of the drawer, so the list shrinks to what still needs attention. The header counts both, for example "67 findings, 12 reviewed, 55 open". A row you decide stays in view until the drawer closes.
+**Hide reviewed** is on by default. It takes decided rows out of the drawer, so the list shrinks to what still needs attention. The header counts both, for example "67 findings, 12 reviewed, 55 open". A row you decide stays in view until the drawer closes.
 
 A reviewed finding goes quiet in the rest of the app too:
 
@@ -69,7 +79,7 @@ A reopened finding counts as open again in all of these.
 
 A decision holds only for the schema as it was when it was made. When the type or Data Type the finding is about changes, the finding is open again. It shows the old decision and "Reopened: the type changed since this was decided."
 
-Each decision stores a fingerprint of that type or Data Type. The fingerprint covers its record, its groups and properties, its templates, and every connection in or out of it, allowed children, compositions and block targets included. Renaming the type, or a Data Type it uses, reopens the finding too, since the check errs towards asking again. Saving checks the fingerprint on the server, so a decision is never recorded against a type that changed after the page loaded.
+Each decision stores a fingerprint of that type or Data Type. The fingerprint covers its own settings, its groups and properties, its templates, and every connection in or out of it, allowed children, compositions and block targets included. Renaming the type, or a Data Type it uses, reopens the finding too, since the check errs towards asking again. Saving checks the fingerprint on the server, so a decision is never recorded against a type that changed after the page loaded.
 
 ## Where decisions are stored
 
