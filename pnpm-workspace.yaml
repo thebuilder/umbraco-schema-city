@@ -1,0 +1,10 @@
+# The extension client in src/SchemaCity/Client uses npm, so only the docs site is a pnpm package.
+packages:
+  - apps/docs
+allowBuilds:
+  # Node's WebGPU backend for vgpu. The hero particles run in the browser, so it isn't needed.
+  '@vgpu/adapter-node': false
+  webgpu: false
+minimumReleaseAgeExclude:
+  # Our own packages are trusted, so new releases install right away.
+  - '@thebuilder/*'

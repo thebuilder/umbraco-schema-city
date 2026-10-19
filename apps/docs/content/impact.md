@@ -1,0 +1,40 @@
+---
+title: Trace the impact of a change
+description: List every type a change reaches, check a property alias for collisions, and share the trace.
+seo:
+  image: /og/impact.png
+---
+
+Impact lists every type a change to the selected type reaches, with its content count. The inspector's Impact tab lists them by group. Impact at the top of the inspector, or I, shows the full trace in place of the view.
+
+The trace follows four relationships, each with its own toggle:
+
+- **Compositions and inheritance.** Every type that gets the type's properties, directly or through a type that inherits or composes it. Press Release reaches Seo Composition through Article.
+- **Blocks.** For an Element Type, every type whose properties offer it, with the property and its Data Type. Then the types that inherit those properties, and the blocks that nest it. The header says how many blocks of it content stores, per Data Type.
+- **Allowed children.** The types that allow it as a child and would lose a creation option. Also the allowed children that only it leads to from a root, which nobody could create if it were removed.
+- **Pickers.** The types whose picker properties allow it, and the types that carry those properties.
+
+Depth stops the trace after one step or two, or with All follows it all the way. Direction turns the trace round to what the type depends on. That is its compositions, the blocks it offers, the types allowed under it and the types its pickers allow.
+
+Each row writes out its paths in words, shortest first, up to three, such as "Press Release inherits Article, which composes Seo Composition". It also says whether the type is reached directly. A path never visits a type twice, so cycles end. The totals at the top count each type once.
+
+Templates that render them lists the templates allowed on the type and on every type a change reaches, with how many of those types use each, so you know which Razor views to open.
+
+## Check a property alias
+
+Planned or existing alias checks a property alias.
+
+- An alias the type has is traced from the type that declares it, and lists every type it lands on.
+- A new alias is checked against every type it would land on if added here.
+
+Either way, a type that already has the alias from another source is a collision. This is the trap in adding a property to a composition. Umbraco compares aliases without case, and a type cannot hold one twice. On the Editor page, each property row's Impact opens the trace with its alias filled in.
+
+## Share the trace
+
+- Copy as Markdown copies a ticket-ready summary. It has the start type, the relationships and depth, the snapshot dates, the totals, a table per group with each path and content count, the templates and the collisions. Where the clipboard is blocked, the text is shown selected instead.
+- Export CSV writes one row per type per group, one per type per template and one per collision. It uses the same escaping and spreadsheet formula protection as the findings export.
+- Show in city lights the type and everything the trace reaches.
+
+A trace lists configured relationships to review. It does not tell you a change is harmless, or that it breaks something. Code, templates and stored values outside the schema can depend on a type too.
+
+![Seo Composition's impact: 37 types and 188 content items, each with its path, and a seoTitle collision on Dup Alias Page.](../../../docs/screenshots/impact.png)

@@ -1,0 +1,182 @@
+---
+// @ts-nocheck - Blume's React island types flag valid Astro attributes.
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import data from "blume:data";
+import { loadUmbracoPackages } from "@thebuilder/umbraco-docs";
+import { EcosystemSection, InstallCommand, LandingHero, LandingRoot } from "@thebuilder/umbraco-docs/astro";
+import HeroParticles from "@thebuilder/umbraco-docs/components/HeroParticles";
+
+import "./_home/home.css";
+
+import cityShot from "../../../docs/screenshots/city.png";
+import findingsShot from "../../../docs/screenshots/findings.png";
+import { schemaCityPackage } from "../umbraco-package";
+
+// The other packages come from the hub at umbraco.thebuilder.dk, so this list never needs editing here.
+const ecosystemPackages = await loadUmbracoPackages();
+
+const { config } = data;
+const installCommand = "dotnet add package TheBuilder.SchemaCity";
+const demoUrl = "https://umbraco-schema-city.vercel.app";
+const repoUrl = schemaCityPackage.links.github;
+const nugetUrl = schemaCityPackage.links.nuget;
+const marketplaceUrl = schemaCityPackage.links.marketplace;
+
+const features = [
+  {
+    title: "Find your way around",
+    body: "Search by name, alias or property alias. Hover a building to see what it connects to, and focus on a type and its neighbours.",
+    href: "/investigate-a-type",
+  },
+  {
+    title: "See what content uses",
+    body: "Colour the city by content count, published share, cultures, incoming references or unused types.",
+    href: "/content-usage",
+  },
+  {
+    title: "Know what a change touches",
+    body: "Impact lists every type a change reaches, with the path to each one, and checks a new alias for collisions.",
+    href: "/impact",
+  },
+  {
+    title: "Compare environments",
+    body: "Compare against a saved snapshot, grouped by cause, and tick off what you planned to see what nobody asked for.",
+    href: "/compare",
+  },
+  {
+    title: "Read it without the 3D",
+    body: "List, Tree, Matrix, Editor and Data Types work without the city canvas and from the keyboard.",
+    href: "/views",
+  },
+  {
+    title: "Show it to a room",
+    body: "Presentation mode fills the screen with larger names, and a caption card replaces the inspector.",
+    href: "/present",
+  },
+];
+
+const views = [
+  { key: "City", body: "Every Document Type as a building, on a board for each root" },
+  { key: "List", body: "Every type in a sortable table" },
+  { key: "Tree", body: "What editors can create under each root" },
+  { key: "Matrix", body: "Types crossed with compositions or Data Types" },
+  { key: "Data Types", body: "Which types use each Data Type, and the blocks it stores" },
+];
+---
+
+<PageLayout
+  site={{ title: config.title, description: config.description }}
+  logo={config.logo}
+  favicon={config.favicon}
+  banner={config.banner}
+  analytics={config.analytics}
+  navigation={data.navigation}
+  fontCssVars={data.fontCssVars}
+  themeMode={config.theme.mode}
+  searchEnabled={config.search.enabled}
+  siteUrl={config.site}
+  ogEnabled={config.og.enabled}
+  ogImage="/og/index.png"
+  page={{
+    title: "Schema City for Umbraco",
+    description: config.description,
+    route: "/",
+  }}
+>
+  <LandingRoot class="home">
+    <LandingHero
+      layout="split"
+      eyebrow="Content model visualisation for Umbraco"
+      title="See your content model"
+      accent="as a city."
+      description="Each Document Type is a building and each property group a floor. Traces show allowed children, compositions, block targets and picker references, and Findings flags schema problems before they ship."
+      compatibility="Umbraco CMS 17 and 18 · .NET 10"
+    >
+      <HeroParticles slot="background" logo="/logo-mark.svg" />
+      <Fragment slot="actions">
+        <a class="button button--primary" href="/quickstart">Get started</a>
+        <a class="button button--secondary" href={demoUrl} rel="noopener">Try the demo</a>
+      </Fragment>
+      <InstallCommand slot="install" command={installCommand} />
+      <div class="shell">
+        <figure class="screenshot reveal" style="--i: 6">
+          <div class="screenshot__bar" aria-hidden="true"><span></span><span></span><span></span></div>
+          <img src={cityShot.src} width={cityShot.width} height={cityShot.height} alt="The city overview, with a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable" loading="eager" decoding="async" />
+        </figure>
+      </div>
+    </LandingHero>
+
+    <section class="shell trust reveal">
+      <p>Schema City never changes your Document Types, Data Types or content. The only thing it writes is the decisions you record on findings.</p>
+    </section>
+
+    <section class="shell section" aria-labelledby="features-title">
+      <div class="section-heading reveal">
+        <span class="rule" aria-hidden="true"></span>
+        <h2 id="features-title">Understand a schema before you change it</h2>
+        <p>Open it under Settings, or from the Relationships tab on any Document Type, to start on that type and its neighbours.</p>
+      </div>
+      <div class="feature-grid">
+        {features.map((feature, index) => (
+          <a class="feature-card reveal" href={feature.href} style={`--i: ${index + 1}`}>
+            <span aria-hidden="true">0{index + 1}</span>
+            <h3>{feature.title}</h3>
+            <p>{feature.body}</p>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <section class="shell findings" aria-labelledby="findings-title">
+      <div class="findings__copy reveal">
+        <span class="rule" aria-hidden="true"></span>
+        <h2 id="findings-title">Catch problems before they ship</h2>
+        <p>Findings checks for blocks that point at deleted Element Types, duplicate aliases, unused types and Data Types, types no editor can reach, culture mismatches and overloaded tabs. Mark a deliberate one as intentional, and it reopens by itself if the type changes.</p>
+        <a class="text-link" href="/findings">Read about findings <span aria-hidden="true">→</span></a>
+      </div>
+      <figure class="screenshot screenshot--inline reveal" style="--i: 1">
+        <img src={findingsShot.src} width={findingsShot.width} height={findingsShot.height} alt="Findings grouped by kind, broken blocks and duplicate aliases first" loading="lazy" decoding="async" />
+      </figure>
+    </section>
+
+    <section class="shell views" aria-labelledby="views-title">
+      <div class="views__copy reveal">
+        <span class="rule" aria-hidden="true"></span>
+        <h2 id="views-title">One schema, five views</h2>
+        <p>The chosen view is kept in the URL, so a link opens the same view. Every view except City works without the 3D canvas.</p>
+        <a class="text-link" href="/views">Move between views <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="status-list reveal" style="--i: 1">
+        {views.map((view) => (
+          <div><strong>{view.key}</strong><span>{view.body}</span></div>
+        ))}
+      </div>
+    </section>
+
+    <section class="shell closing reveal">
+      <h2>Try it on a sample schema</h2>
+      <p>The demo runs in your browser with 86 types and problems planted on purpose. It needs no Umbraco install.</p>
+      <a class="button button--primary" href={demoUrl} rel="noopener">Open the demo</a>
+    </section>
+
+    <EcosystemSection
+      packages={ecosystemPackages}
+      currentPackageId={schemaCityPackage.id}
+    />
+  </LandingRoot>
+
+  <footer class="home-footer" slot="footer">
+    <div class="shell home-footer__inner">
+      <div>
+        <strong>Schema City</strong>
+        <span>MIT licensed · built by <a href="https://github.com/thebuilder" rel="noopener">thebuilder</a></span>
+      </div>
+      <nav aria-label="Footer">
+        <a href="/overview">Docs</a>
+        <a href={repoUrl} rel="noopener">GitHub</a>
+        <a href={nugetUrl} rel="noopener">NuGet</a>
+        <a href={marketplaceUrl} rel="noopener">Marketplace</a>
+      </nav>
+    </div>
+  </footer>
+</PageLayout>

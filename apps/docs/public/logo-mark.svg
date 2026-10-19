@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="24 24 208 208" aria-hidden="true">
+  <!-- The Schema City icon in the family's blue, violet and pink. -->
+  <polygon points="128.0,93.0 227.6,150.5 128.0,208.0 28.4,150.5" fill="#1d1a2e"/>
+  <polygon points="28.4,150.5 128.0,208.0 128.0,216.1 28.4,158.6" fill="#3d3660"/>
+  <polygon points="227.6,150.5 128.0,208.0 128.0,216.1 227.6,158.6" fill="#2f2a48"/>
+  <polyline points="115.1,137.3 107.1,141.9 125.0,152.2 112.1,159.7 122.0,165.4" fill="none" stroke="#c4b5fd" stroke-opacity="0.9" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="140.9,137.3 155.9,145.9" fill="none" stroke="#c4b5fd" stroke-opacity="0.9" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="157.9,156.2 138.0,167.8" fill="none" stroke="#c4b5fd" stroke-opacity="0.9" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="78.2,144.8 68.2,139.0 52.3,148.2 108.1,180.4 121.0,172.9" fill="none" stroke="#f9a8d4" stroke-opacity="0.9" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="135.0,172.9 149.9,181.6 169.8,170.1" fill="none" stroke="#f9a8d4" stroke-opacity="0.9" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="52.3" cy="148.2" r="3.2" fill="#f9a8d4"/>
+  <circle cx="169.8" cy="170.1" r="3.2" fill="#f9a8d4"/>
+  <circle cx="125.0" cy="152.2" r="3.2" fill="#c4b5fd"/>
+  <polygon points="128.0,40.1 152.9,54.5 128.0,68.9 103.1,54.5" fill="#b9a8f2"/>
+  <polygon points="103.1,54.5 128.0,68.9 128.0,144.8 103.1,130.4" fill="#9b83ec"/>
+  <polygon points="152.9,54.5 128.0,68.9 128.0,144.8 152.9,130.4" fill="#7966b8"/>
+  <polyline points="103.1,91.3 128.0,105.7 152.9,91.3" fill="none" stroke="#1d1a2e" stroke-opacity=".35" stroke-width="2.4"/>
+  <polygon points="167.8,99.9 187.8,111.4 167.8,122.9 147.9,111.4" fill="#f292c6"/>
+  <polygon points="147.9,111.4 167.8,122.9 167.8,162.0 147.9,150.5" fill="#ed63ad"/>
+  <polygon points="187.8,111.4 167.8,122.9 167.8,162.0 187.8,150.5" fill="#b94d87"/>
+  <polygon points="88.2,79.2 108.1,90.7 88.2,102.2 68.2,90.7" fill="#90c0fc"/>
+  <polygon points="68.2,90.7 88.2,102.2 88.2,150.5 68.2,139.0" fill="#60a5fa"/>
+  <polygon points="108.1,90.7 88.2,102.2 88.2,150.5 108.1,139.0" fill="#4b81c3"/>
+  <polygon points="128.0,147.1 140.9,154.5 128.0,162.0 115.1,154.5" fill="#fdf2f8"/>
+  <polygon points="115.1,154.5 128.0,162.0 128.0,176.9 115.1,169.5" fill="#f9a8d4"/>
+  <polygon points="140.9,154.5 128.0,162.0 128.0,176.9 140.9,169.5" fill="#f472b6"/>
+</svg>

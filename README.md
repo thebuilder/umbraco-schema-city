@@ -114,8 +114,7 @@ replaces the inspector.
 
 ## More
 
-- The [guide](https://github.com/thebuilder/umbraco-schema-city/blob/main/docs/guide.md) covers
-  every view, check and control in detail.
+- The [docs](https://schema-city.thebuilder.dk) cover every view, check and control in detail.
 - The [development guide](https://github.com/thebuilder/umbraco-schema-city/blob/main/docs/development.md)
   covers building, the demo site, tests and packaging.
 - Report a problem or suggest an improvement in
