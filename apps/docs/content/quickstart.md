@@ -35,4 +35,4 @@ Every Document Type editor also gets a **Relationships** tab. It opens the city 
 4. Press **I** with a type selected to see every type a change to it reaches.
 5. Press **?** for every control.
 
-To look around before you install, [try the demo](https://umbraco-schema-city.vercel.app). It runs in the browser with a sample schema and needs no Umbraco install.
+To look around before you install, [try the demo](https://schema-city-demo.thebuilder.dk). It runs in the browser with a sample schema and needs no Umbraco install.

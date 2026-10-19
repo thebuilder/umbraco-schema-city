@@ -5,7 +5,7 @@ building and each property group a floor. Traces between buildings show allowed 
 compositions, block targets and picker references. Use it to understand a schema before you
 change it.
 
-**[Try the demo](https://umbraco-schema-city.vercel.app)** in your browser. It needs no Umbraco
+**[Try the demo](https://schema-city-demo.thebuilder.dk)** in your browser. It needs no Umbraco
 install.
 
 ![The city overview, with a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png)
