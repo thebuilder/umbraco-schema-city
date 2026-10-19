@@ -44,6 +44,7 @@ const node = (
     isElement: false,
     allowedAsRoot: false,
     groups: [{ properties }],
+    templates: [],
     ...extra,
   }) as unknown as SchemaNode;
 
@@ -258,6 +259,60 @@ describe("impactOf", () => {
       (row) => row.alias === "pressRelease"
     );
     expect(press?.direct).toBe(false);
+  });
+});
+
+describe("templates", () => {
+  const template = (id: string) => ({
+    id,
+    alias: id,
+    name: id.charAt(0).toUpperCase() + id.slice(1),
+    isDefault: false,
+  });
+  const rendered = {
+    ...graph,
+    nodes: [
+      node("seo", { templates: [template("meta")] }),
+      node("article", { templates: [template("page"), template("story")] }),
+      node("press", { templates: [template("page")] }),
+      node("quote", { isElement: true }),
+    ],
+    edges: [
+      edge("composition", "article", "seo"),
+      edge("composition", "press", "article"),
+      edge("inherits", "press", "article"),
+      edge("block", "article", "quote", "body"),
+    ],
+  } as SchemaGraph;
+
+  it("lists the start type's templates and the reached types', once each with its types", () => {
+    expect(impactOf(rendered, "seo").templates).toEqual([
+      { id: "page", alias: "page", name: "Page", types: ["article", "press"] },
+      { id: "meta", alias: "meta", name: "Meta", types: ["seo"] },
+      { id: "story", alias: "story", name: "Story", types: ["article"] },
+    ]);
+  });
+
+  it("takes none from an Element Type", () => {
+    expect(
+      impactOf(rendered, "quote").templates.map((one) => one.types)
+    ).toEqual([["article", "press"], ["article"]]);
+  });
+
+  it("lists none for dependencies", () => {
+    const impact = impactOf(rendered, "press", { direction: "dependencies" });
+    expect(impact.types).toBe(2);
+    expect(impact.templates).toEqual([]);
+  });
+
+  it("goes into both exports", () => {
+    const impact = impactOf(rendered, "seo");
+    expect(impactMarkdown(impact, rendered)).toContain(
+      "| Page | page | Article, Press |"
+    );
+    expect(impactCsv(impact, rendered)).toContain(
+      "Templates that render them,Press,press,press,,,,Rendered by Page (page),"
+    );
   });
 });
 

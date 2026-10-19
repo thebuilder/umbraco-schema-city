@@ -21,6 +21,7 @@ import {
   RELATIONS,
   type Relation,
   storedLine,
+  TEMPLATES_LABEL,
   totalsLine,
 } from "../model/impact";
 import type { Trace } from "../model/inspector";
@@ -70,6 +71,13 @@ const throughOf = (row: ImpactRow) => {
   const path = row.paths[0] ?? [];
   return path.length > 1 ? path[path.length - 2]?.id : undefined;
 };
+
+/** Template names, the first `limit` of them, as the chips cut a long list. */
+const templateNames = (templates: Impact["templates"], limit: number) =>
+  [
+    ...templates.slice(0, limit).map((template) => template.name),
+    ...(templates.length > limit ? [`+ ${templates.length - limit} more`] : []),
+  ].join(", ");
 
 /**
  * The inspector's Impact tab: the totals and each group as chips, with the way to
@@ -121,6 +129,14 @@ export function ImpactSummary({
           />
         </Section>
       ))}
+      {impact.templates.length > 0 ? (
+        <Section>
+          <Heading count={impact.templates.length}>{TEMPLATES_LABEL}</Heading>
+          <p className="text-prose text-xs">
+            {templateNames(impact.templates, 8)}
+          </p>
+        </Section>
+      ) : null}
       <p className="pt-3 text-faint text-xs">{EVIDENCE}</p>
     </>
   );
@@ -309,6 +325,36 @@ function GroupTable({
         </tbody>
       </table>
     </section>
+  );
+}
+
+/** Each template with how many of the traced types use it, their names on hover. */
+function TemplateList({
+  impact,
+  nameOf,
+}: {
+  impact: Impact;
+  nameOf: (id: string) => string;
+}) {
+  if (impact.templates.length === 0) return null;
+  return (
+    <Section>
+      <Heading count={impact.templates.length}>{TEMPLATES_LABEL}</Heading>
+      <ul className="space-y-0.5 text-xs">
+        {impact.templates.map((template) => (
+          <li key={template.id} title={template.types.map(nameOf).join(", ")}>
+            <span className="text-prose">{template.name}</span>{" "}
+            <span className="font-mono text-2xs text-faint">
+              {template.alias}
+            </span>
+            <span className="text-label">
+              {" "}
+              used by {plural(template.types.length, "type")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }
 
@@ -547,7 +593,10 @@ function Actions({
   );
 }
 
-/** The groups, or why there are none, and the note on what a trace can say. */
+/**
+ * The groups, or why there are none, their templates and the note on what a trace
+ * can say.
+ */
 function Results({
   impact,
   graph,
@@ -581,6 +630,7 @@ function Results({
           onSelect={onSelect}
         />
       ))}
+      <TemplateList impact={impact} nameOf={nameOf} />
       <p className="pt-3 text-faint text-xs">
         {EVIDENCE} Schema read {dayOf(graph.generatedAt) ?? "undated"},{" "}
         {counted}

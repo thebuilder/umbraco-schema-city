@@ -127,6 +127,11 @@ export type Impact = {
   own?: number;
   /** Blocks of the start type stored per Data Type, when it is an Element Type. */
   stored: { dataTypeId: string; name: string; blocks: number }[];
+  /**
+   * The templates that render the start type and the types it reaches, with the ids
+   * of the types that use each. Empty for dependencies.
+   */
+  templates: { id: string; alias: string; name: string; types: string[] }[];
   /** The block count stopped early, so its numbers are lower bounds. */
   partial: boolean;
 };
@@ -317,6 +322,34 @@ function rowsOf(
     );
 }
 
+export const TEMPLATES_LABEL = "Templates that render them";
+
+/**
+ * The Razor views to open: the schema cannot see code, but it knows which templates
+ * each type allows, and a view rendering a changed type may read what changed. The
+ * template shared by the most types comes first.
+ */
+function templatesOf(
+  ids: string[],
+  nodes: ReadonlyMap<string, SchemaNode>
+): Impact["templates"] {
+  const found = new Map<string, Impact["templates"][number]>();
+  for (const id of ids)
+    for (const template of nodes.get(id)?.templates ?? []) {
+      const entry = found.get(template.id) ?? {
+        id: template.id,
+        alias: template.alias,
+        name: template.name,
+        types: [],
+      };
+      entry.types.push(id);
+      found.set(template.id, entry);
+    }
+  return [...found.values()].sort(
+    (a, b) => b.types.length - a.types.length || a.name.localeCompare(b.name)
+  );
+}
+
 /** Every type a change to `start` reaches, by group, along the relations that are on. */
 export function impactOf(
   graph: SchemaGraph,
@@ -396,6 +429,11 @@ export function impactOf(
             : [];
         })
       : [],
+    // What the start relies on renders nothing the change touches.
+    templates:
+      direction === "dependents"
+        ? templatesOf([start, ...distinct.keys()], nodes)
+        : [],
     partial: usage?.blocks?.partial === true,
   };
 }
@@ -635,10 +673,31 @@ function aliasMarkdown(
   ];
 }
 
+/** The templates a trace reaches, with the names of the types that use each. */
+function templatesMarkdown(
+  impact: Impact,
+  nameOf: (id: string) => string
+): string[] {
+  if (impact.templates.length === 0) return [];
+  return [
+    "",
+    `### ${TEMPLATES_LABEL} (${impact.templates.length})`,
+    "",
+    table(
+      ["Template", "Alias", "Types"],
+      impact.templates.map((template) => [
+        template.name,
+        template.alias,
+        template.types.map(nameOf).join(", "),
+      ])
+    ),
+  ];
+}
+
 /**
- * A ticket-ready summary: what was traced, the totals, a table per group and the
- * alias collisions. Paths beyond the first are listed after it, so a reviewer sees
- * every reason a type is there.
+ * A ticket-ready summary: what was traced, the totals, a table per group, the
+ * templates that render them and the alias collisions. Paths beyond the first are
+ * listed after it, so a reviewer sees every reason a type is there.
  */
 export function impactMarkdown(
   impact: Impact,
@@ -667,6 +726,7 @@ export function impactMarkdown(
   const lines = [
     ...markdownHeader(impact, graph, usage),
     ...groups,
+    ...templatesMarkdown(impact, nameOf),
     ...(alias ? aliasMarkdown(alias, nameOf) : []),
   ];
   return `${lines.join("\n")}\n`;
@@ -692,9 +752,9 @@ const HEADER = [
 ];
 
 /**
- * One header row, then one row per type per group, then one per alias collision,
- * with the trace's settings repeated on every row as the findings export does, so
- * an import never takes a preamble for data.
+ * One header row, then one row per type per group, one per type per template and
+ * one per alias collision, with the trace's settings repeated on every row as the
+ * findings export does, so an import never takes a preamble for data.
  */
 export function impactCsv(
   impact: Impact,
@@ -729,6 +789,21 @@ export function impactCsv(
       ...settings,
     ])
   );
+  const templates = impact.templates.flatMap((template) =>
+    template.types.map((id) => [
+      TEMPLATES_LABEL,
+      nameOf(id),
+      nodes.get(id)?.alias ?? "",
+      id,
+      "",
+      "",
+      "",
+      `Rendered by ${template.name} (${template.alias})`,
+      "",
+      `${DOCUMENT_TYPE_PATH}${id}`,
+      ...settings,
+    ])
+  );
   const collisions = (alias?.collisions ?? []).map((collision) => [
     `Alias collision: ${alias?.alias ?? ""}`,
     collision.name,
@@ -742,5 +817,5 @@ export function impactCsv(
     `${DOCUMENT_TYPE_PATH}${collision.id}`,
     ...settings,
   ]);
-  return `${[HEADER, ...rows, ...collisions].map((row) => row.map(csv).join(",")).join("\n")}\n`;
+  return `${[HEADER, ...rows, ...templates, ...collisions].map((row) => row.map(csv).join(",")).join("\n")}\n`;
 }
