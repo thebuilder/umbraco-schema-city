@@ -1,6 +1,8 @@
 ---
 title: Schema City for Umbraco
 description: See your Umbraco content model as a city in the backoffice, and catch schema problems before they ship.
+sidebar:
+  label: Overview
 seo:
   image: /og/overview.png
 ---
@@ -11,7 +13,18 @@ Schema City shows your Umbraco content model as a city, right in the backoffice.
 
 ![The city overview, with a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable.](../../../docs/screenshots/city.png)
 
+## How the city maps to your schema
+
+| In the city | In your schema |
+| --- | --- |
+| Board | A type allowed at root and everything it can create. Element Types, compositions and unreachable types get a board each. |
+| Building | A Document Type or Element Type. Bigger buildings have more properties. |
+| Floor | A property group |
+| Trace | An allowed child, a composition, a block target or a picker reference |
+
+:::note[Read-only]
 Schema City never changes your Document Types, Data Types or content. The only thing it writes is the decisions you record on findings.
+:::
 
 ## What you can do with it
 

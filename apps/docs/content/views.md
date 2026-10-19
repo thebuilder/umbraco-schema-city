@@ -5,22 +5,29 @@ seo:
   image: /og/views.png
 ---
 
-The header holds what works on the whole schema:
+Schema City shows the same schema in several views. Every view except City works without the 3D canvas, and the chosen view is kept in the URL, so a link opens where you left off.
 
-- the view switcher, with City, List, Tree, Matrix and Data Types
-- Search, Findings, Compare and the control reference
+| View | What it shows | Key |
+| --- | --- | --- |
+| City | The schema as a 3D city. See [Investigate a type](/investigate-a-type). | |
+| [List](#use-the-list-view) | Every type in a sortable table | <kbd>L</kbd> |
+| [Tree](#follow-the-creation-tree) | What an editor can create under each root | <kbd>T</kbd> |
+| [Matrix](#compare-types-in-a-matrix) | Which types use which compositions and Data Types | <kbd>M</kbd> |
+| [Data Types](/data-types) | Every Data Type, with what uses it | |
 
-The chosen view is kept in the URL. Every view except City works without the 3D canvas.
+L, T and M toggle back to the city when pressed again.
 
-Editor and Impact are the two pages about one type. Open them from the selected type's inspector with Editor view and Impact, or press E and I. A line over the page names the type and leads back to the view you came from, with the selection kept. With nothing selected, E and I open nothing and say "Pick a type first" instead. A link with `view=editor` or `view=impact` and a type still opens that page. Without a type it opens the city.
+Two more pages are about one type rather than the whole schema. Select a type and press <kbd>E</kbd> for its [Editor](#read-a-type-as-an-editor-sees-it) page or <kbd>I</kbd> for its [Impact](/impact) page, or use **Editor view** and **Impact** in the inspector. A line above the page names the type and leads back to the view you came from, with the selection kept. With nothing selected, E and I say "Pick a type first". A link to one of these pages opens it on the same type.
 
-The footer says how many types the city has and when the schema and the usage were read. It gives the time if that was today and the date otherwise, in your own time zone. It says "usage loading" while that request is still out.
+## Where things are
 
-In the City the footer also holds the City's own tools, Layers, Group, Lens, Legend and Reset view. Present is there in every view. Where the workspace is narrower than about 960 px, the City's tools fold into one City tools menu.
+- **The header** holds the view switcher, then **Search**, **Findings**, **Compare** and the control reference.
+- **The footer** says how many types the city has, and when the schema and the usage were read. It says "usage loading" while that request is still out. In the City it also holds the City's own tools, **Layers**, **Group**, **Lens**, **Legend** and **Reset view**. Where the workspace is narrower than about 960 px, those fold into one **City tools** menu.
+- **Present** is in the footer in every view. See [Present the city](/present).
 
 ## Use the List view
 
-List shows the same types in a searchable, sortable table, and works without the 3D canvas. Click a column heading to sort by it, or click a type to open the inspector.
+List shows every type in a searchable, sortable table. Click a column heading to sort by it, or click a type to open the inspector.
 
 Each type's role is shown in the city's colours, and a pink dot marks a type with a problem finding. Content counts are blank for Element Types and for compositions nothing creates, as on the inspector's chips, since neither holds content of its own.
 
@@ -52,7 +59,7 @@ Matrix has two grids.
 
 ## Read a type as an editor sees it
 
-Editor draws the selected type as tabs and groups, the way editors see it. Choose Editor view in the inspector, or press E, to open the selected type here.
+Editor draws the selected type as tabs and groups, the way editors see it. Choose Editor view in the inspector, or press <kbd>E</kbd>, to open the selected type here.
 
 - Tabs and groups come in the order the schema lists them.
 - Each property shows its name, alias, Data Type, mandatory marker and culture variance. The property editor alias shows on hover, and a screen reader reads it after the Data Type.
