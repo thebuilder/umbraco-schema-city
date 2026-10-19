@@ -135,8 +135,9 @@ export const subjectName = (
 const decisionText = ({ reason, decidedBy, decidedAt }: Decision) =>
   [`“${reason}”`, decidedBy, dayOf(decidedAt)].filter(Boolean).join(", ");
 
-const LINK =
-  "px-1 py-0.5 text-phosphor text-xs hover:text-phosphor-bright hover:underline";
+// Quiet until hovered: the review is a secondary action next to the links that
+// go somewhere, which keep the green.
+const LINK = "px-1 py-0.5 text-faint text-xs hover:text-prose hover:underline";
 
 /**
  * A finding's review status and the one action it allows: mark as intentional with
