@@ -429,6 +429,22 @@ describe("findFindings, one rule at a time", () => {
     expect(finding?.summary).toContain("Score 6");
   });
 
+  it("places a complex type among the others instead of a bare score", () => {
+    const graph = graphOf([
+      node("big", { allowedAsRoot: true, ownPropertyCount: 40 }),
+      node("bigger", { allowedAsRoot: true, ownPropertyCount: 45 }),
+      node("small", { allowedAsRoot: true, ownPropertyCount: 2 }),
+      node("tiny", { allowedAsRoot: true, ownPropertyCount: 1 }),
+    ]);
+    const summaries = findFindings(graph)
+      .filter((candidate) => candidate.kind === "complexity")
+      .map((candidate) => candidate.summary);
+    expect(summaries).toEqual([
+      "Busiest of 4 types: 45 own and 0 composed properties, 0 compositions, 0 block targets. Score 45, where the median type scores 21",
+      "2nd busiest of 4 types: 40 own and 0 composed properties, 0 compositions, 0 block targets. Score 40, where the median type scores 21",
+    ]);
+  });
+
   it("gives every finding a stable id and keeps the order between runs", () => {
     const first = findFindings(medium);
     const second = findFindings(medium);
