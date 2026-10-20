@@ -421,8 +421,10 @@ export function Findings({
         render={<Button data-trigger size="sm" variant="outline" />}
       >
         Findings
+        {/* The badge counts open problems, the findings that need a fix. Notes
+            only show in it, quietly, once no problem is left. */}
         <Badge variant={problems > 0 ? "signal" : "outline"}>
-          <span aria-hidden>{open.length}</span>
+          <span aria-hidden>{problems > 0 ? problems : open.length}</span>
           <span className="sr-only">
             {plural(open.length, "open finding")},{" "}
             {plural(problems, "open problem")}
