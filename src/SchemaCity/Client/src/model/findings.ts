@@ -78,8 +78,8 @@ export const FINDING_KINDS: readonly FindingKind[] = [
   "unreachableChain",
   "deadEnd",
   "unusedElementType",
-  "unusedType",
   "emptyBlock",
+  "unusedType",
   "overloadedTab",
   "nearDuplicateDataType",
   "unusedDataType",
@@ -133,7 +133,7 @@ export const KIND_EXPLANATION: Record<FindingKind, string> = {
   unusedElementType:
     "No block editor configuration lists these Element Types. Once usage has loaded, each row says whether stored block values use them; custom code can still use them either way.",
   unusedType:
-    "An editor can create these Document Types, but the usage snapshot counts no content of them. Custom code, migrations and external consumers can still depend on a type.",
+    "The usage snapshot counts no content of these Document Types, though an editor can create them. Often the content is not written yet; a type left over from earlier work is the case worth cleaning up. Custom code, migrations and external consumers can still depend on a type.",
   overloadedTab: `One tab, or one group on a type without tabs, holds more than ${TAB_LIMIT} properties. Composed properties count, merged the way the Editor view shows them.`,
   nearDuplicateDataType:
     "Data Types whose names match once case, spaces, hyphens, underscores and a copy number such as (1) are ignored. They can differ in configuration. Each set is one row, on a type that uses the least-used of them, and the related types are every other type that uses any of them. Only own properties count, so a composed property counts on its composition.",
@@ -170,7 +170,7 @@ export const KIND_NEXT_STEP: Record<FindingKind, string> = {
   unusedElementType:
     "Check the stored block count and custom code, then add it to a block editor or remove it.",
   unusedType:
-    "Check custom code and imports, then remove it or allow it where editors need it.",
+    "Nothing, if content is on its way. If it is left over, check custom code and imports, then remove it.",
   overloadedTab:
     "Split the tab into groups or more tabs, so editors find the fields they need.",
   nearDuplicateDataType:
@@ -195,7 +195,9 @@ const SEVERITY: Record<FindingKind, FindingSeverity> = {
   unreachableChain: "problem",
   deadEnd: "problem",
   unusedElementType: "problem",
-  unusedType: "problem",
+  // No content is a fact about the site, not a fault in the schema: a new type or
+  // a site still being filled in reads the same way, so it is a note.
+  unusedType: "note",
   overloadedTab: "note",
   nearDuplicateDataType: "note",
   unusedDataType: "note",
@@ -454,7 +456,7 @@ export function findFindings(
       add(
         "unusedType",
         node,
-        `Allowed ${where}${emptyBranch ? EMPTY_BRANCH(parents.length) : ""}`,
+        `No content yet, though editors can create it ${where}${emptyBranch ? EMPTY_BRANCH(parents.length) : ""}`,
         parents,
         emptyBranch ? 1 : 0
       );
