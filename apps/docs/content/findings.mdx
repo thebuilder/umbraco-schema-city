@@ -27,8 +27,8 @@ Results are grouped by kind, in the order of the table below, so what is definit
 | Unreachable chain | Problem | A type is allowed under other types, but no root leads to any of them. |
 | Dead end | Problem | A type is not allowed at root or under any type, is not an Element Type, and nothing composes it. |
 | Unused Element Type | Problem | No block editor lists the Element Type. Once usage has loaded, the row says how many blocks of it content stores. |
-| Unused type | Problem | An editor can create the type, but the usage snapshot counts no content of it. Needs usage to have loaded. |
 | Empty block | Note | An Element Type offered as a content block has no properties. A divider or spacer block is often empty on purpose. |
+| Unused type | Note | The usage snapshot counts no content of the type, though an editor can create it. Often the content is not written yet. Needs usage to have loaded. |
 | Overloaded tab | Note | A tab holds more than 20 properties, composed ones included. On a type without tabs, a group does. |
 | Near-duplicate Data Type | Note | Data Types whose names match once case, spaces, hyphens, underscores and a copy number such as (1) are ignored. Each set is one note, on a type that uses the least-used of them. |
 | Unused Data Type | Note | No property on a Document, Media or Member Type uses the Data Type, and no collection view either. The Data Types Umbraco installs itself are left out. |
