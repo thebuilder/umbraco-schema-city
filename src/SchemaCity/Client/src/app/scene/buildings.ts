@@ -430,8 +430,8 @@ export function buildFloorCells(
     // Every part of a flattened building is squashed by the same factor, so the
     // stack keeps its proportions on the way down to a plate.
     const squash = squashOf(placement.flatten ?? 0, parts.height);
-    // The focus layout stands compositions on a platform, so a building starts at
-    // its own ground rather than at zero.
+    // Focus stands its neighbourhood on an island a hair above the city, so a
+    // building starts at its own ground rather than at zero.
     const base = placement.y ?? 0;
 
     for (const cell of parts.cells)

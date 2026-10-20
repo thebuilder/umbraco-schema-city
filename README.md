@@ -21,6 +21,7 @@ dotnet add package TheBuilder.SchemaCity
 
 Restart the site and open **Settings > Advanced > Schema City**. Every Document Type editor also
 gets a **Relationships** tab that opens the city focused on that type.
+Set `"SchemaCity": { "RelationshipsTab": false }` in `appsettings.json` to leave that tab out.
 
 | Requirement | Version |
 | --- | --- |

@@ -11,7 +11,7 @@ export type ConnectionTrace = {
  * connections' boot ends last: the boards, the buildings and the names are all in
  * by then.
  */
-const BOOT_END = 2.65;
+export const BOOT_END = 2.65;
 
 /** Whether the opening is still drawing, so the canvas keeps rendering through it. */
 export const introPlaying = (elapsed: number, reducedMotion: boolean) =>

@@ -25,6 +25,9 @@ class SchemaCityDocumentTypeViewElement extends SchemaCityElement {
     return {
       ready: Boolean(this.#unique),
       initial: { type: this.#unique, focus: true },
+      // The tab opens every time a type does, so it starts on the city already
+      // built and goes straight to gathering the type's neighbourhood.
+      skipOpening: true,
     };
   }
 }

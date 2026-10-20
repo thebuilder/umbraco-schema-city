@@ -1,11 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using SchemaCity.Graph;
+using SchemaCity.Manifest;
 using SchemaCity.Review;
 using SchemaCity.Usage;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Events;
 using Umbraco.Cms.Core.Notifications;
+using Umbraco.Cms.Infrastructure.Manifest;
 
 namespace SchemaCity.Composers;
 
@@ -28,5 +30,11 @@ public class SchemaCityComposer : IComposer
 
         // Holds nothing but the key-value service, so one instance serves every request.
         builder.Services.AddSingleton<DecisionStore>();
+
+        builder.Services.Configure<SchemaCityOptions>(
+            builder.Config.GetSection(SchemaCityOptions.SectionName));
+        // Umbraco reads every registered reader, so this adds to the package's static
+        // manifest rather than replacing it.
+        builder.Services.AddSingleton<IPackageManifestReader, RelationshipsTabManifestReader>();
     }
 }
