@@ -194,14 +194,16 @@ export function roleOf(
 }
 
 /**
- * The windows on one floor: one per property in the group, walked around the four
- * walls from the middle of the front one. Two properties put one window on the front
- * wall and one on the back, which is what a row of them wrapping looks like.
+ * The windows on one floor: one per property in the group, dealt around the four
+ * walls anticlockwise from the front one. Each wall spaces its share evenly along
+ * itself, so a window never straddles a corner. Two properties put one window on
+ * the front wall and one on the back, which is what a row of them wrapping looks
+ * like.
  *
- * ponytail: past `width * 4 / WINDOW_PITCH` windows the row would draw on top of
- * itself, so it stops there. That is 27 properties in one group on the smallest
- * building, against 8 in the busiest group of the seeded schema. Two rows of windows
- * per floor is the fix if a schema ever passes it.
+ * ponytail: a wall holds `width / WINDOW_PITCH` windows and the row stops at four
+ * of those. That is 20 properties in one group on the smallest building, against 8
+ * in the busiest group of the seeded schema. Two rows of windows per floor is the
+ * fix if a schema ever passes it.
  */
 function pushWindows(
   out: WindowCell[],
@@ -211,17 +213,16 @@ function pushWindows(
   width: number,
   y: number
 ) {
-  const perimeter = width * 4;
-  const count = Math.min(
-    group.properties?.length ?? 0,
-    Math.floor(perimeter / WINDOW_PITCH)
-  );
+  const perWall = Math.max(1, Math.floor(width / WINDOW_PITCH));
+  const count = Math.min(group.properties?.length ?? 0, perWall * 4);
   const half = width / 2 + WINDOW_STANDOFF;
+  // The first window on each wall, so wall `w` holds `first(w + 1) - first(w)`.
+  const first = (wall: number) => Math.ceil((wall * count) / 4);
 
   for (let i = 0; i < count; i++) {
-    const at = ((i + 0.5) / count) * perimeter;
-    const wall = Math.floor(at / width);
-    const along = (at % width) - width / 2;
+    const wall = Math.floor((i * 4) / count);
+    const onWall = first(wall + 1) - first(wall);
+    const along = ((i - first(wall) + 0.5) / onWall - 0.5) * width;
     // Anticlockwise from the front wall, which faces +z, the way a plane does.
     const [cx, cz, rotY] = (
       [

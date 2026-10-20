@@ -125,8 +125,26 @@ describe("property windows", () => {
     ]);
     const { windows } = buildFloorCells(nodes, [placement("a")]);
 
-    // A 1.6-unit slab has 6.4 units of wall, and windows sit 0.28 apart.
-    expect(windows).toHaveLength(22);
+    // A 1.6-unit wall holds five windows 0.28 apart, and there are four walls.
+    expect(windows).toHaveLength(20);
+  });
+
+  it("keeps every window off the corners of its slab", () => {
+    for (const length of [1, 2, 3, 5, 7, 8, 13, 20]) {
+      const properties = Array.from({ length }, (_, i) => property(`p${i}`));
+      const nodes = new Map([
+        ["a", node("a", { groups: [group({ properties })] })],
+      ]);
+      const { windows } = buildFloorCells(nodes, [placement("a")]);
+
+      expect(windows).toHaveLength(length);
+      // How far each window's centre sits along its wall from the middle. A
+      // pane is 0.16 wide, so its edge stays inside a 0.8-unit half wall.
+      for (const w of windows) {
+        const along = Math.min(Math.abs(w.cx), Math.abs(w.cz));
+        expect(along + 0.08).toBeLessThan(0.8);
+      }
+    }
   });
 
   it("gives an Element Type no windows, because it has no floors", () => {
