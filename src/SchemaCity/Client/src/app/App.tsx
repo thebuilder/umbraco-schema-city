@@ -32,6 +32,7 @@ import {
   useComparison,
 } from "./ComparisonTools";
 import { Findings } from "./Findings";
+import { FocusCard, focusCardNode } from "./FocusCard";
 import { Help } from "./Help";
 import { Inspector } from "./Inspector";
 import { TextButton } from "./InspectorChips";
@@ -651,6 +652,11 @@ export function App({
               {changeLegendShown ? (
                 <ComparisonLegend changes={changes} scale={scale} />
               ) : null}
+              <FocusCard
+                node={focusCardNode(focus, selected, flat, nodesById)}
+                onFocus={setFocus}
+                onSelect={setSelected}
+              />
             </div>
             {/* The scene and the label layer over it get a stacking context of
               their own, so the inspector sits above both on a plain z-10. */}

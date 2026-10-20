@@ -27,6 +27,20 @@ Open **Settings > Advanced > Schema City**. The city opens on a raised view of t
 
 Every Document Type editor also gets a **Relationships** tab. It opens the city focused on that type and its neighbours.
 
+## Turn off the Relationships tab
+
+The tab is on by default. To leave it out of the Document Type editor, set `RelationshipsTab` to `false` in `appsettings.json` and restart the site:
+
+```json appsettings.json
+{
+  "SchemaCity": {
+    "RelationshipsTab": false
+  }
+}
+```
+
+The city under **Settings > Advanced** stays either way. As with any appsettings value, an environment variable can set it too: `SchemaCity__RelationshipsTab=false`.
+
 ## First steps
 
 <Steps>

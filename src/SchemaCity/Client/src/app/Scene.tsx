@@ -8,6 +8,7 @@ import {
 import {
   type ReactNode,
   type RefObject,
+  use,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -83,6 +84,7 @@ import {
   smootherstep,
 } from "./scene/buildings";
 import {
+  BOOT_END,
   type BootPhase,
   connectionBootAt,
   connectionEmphasis,
@@ -130,6 +132,7 @@ import {
   type Layer,
 } from "./scene/layers";
 import type { LensScale } from "./scene/lens";
+import { OpeningSkipped } from "./scene/opening";
 import {
   buildBoardOutlinePositions,
   buildBuildingOutlinePositions,
@@ -199,6 +202,22 @@ function useLayerReveal(
       opacity.current !== target
     );
   });
+}
+
+/**
+ * Starts the canvas's clock where the opening ends, so every part of it that reads
+ * the clock draws as it stands once built: the boards, the buildings, the names and
+ * the connections. A layout effect, so the first frame already reads the moved clock.
+ */
+function SkipOpening() {
+  const skip = use(OpeningSkipped);
+  const clock = useThree((state) => state.clock);
+  useLayoutEffect(() => {
+    if (!skip || clock.elapsedTime >= BOOT_END) return;
+    clock.start();
+    clock.elapsedTime = BOOT_END;
+  }, [clock, skip]);
+  return null;
 }
 
 function BootProgress({
@@ -814,6 +833,9 @@ function RoadIntroTrace({
   );
 }
 
+/** Above the highest render order a building, roof icon or board print draws at. */
+const LINK_RENDER_ORDER = 2;
+
 /** Screen-space line material with the same per-segment alpha as the schema geometry. */
 function createLinkMaterial(): LineMaterial {
   const next = new LineMaterial({
@@ -964,10 +986,15 @@ function LinkStrokes({
     return next;
   }, [positions]);
   const material = useMemo(createLinkMaterial, []);
-  const lines = useMemo(
-    () => new LineSegments2(geometry, material),
-    [geometry, material]
-  );
+  const lines = useMemo(() => {
+    const next = new LineSegments2(geometry, material);
+    // After every transparent building, roof and print. The lines write no depth, so
+    // a glass floor or a plate's icon sorted after them painted over a link that runs
+    // above it, and the link read as cut. Drawn last, they are still hidden behind
+    // whatever solid stands in front of them.
+    next.renderOrder = LINK_RENDER_ORDER;
+    return next;
+  }, [geometry, material]);
   const materialRef = useRef<LineMaterial>(material);
   const linesRef = useRef<LineSegments2>(null);
   useLayerReveal(
@@ -1765,6 +1792,9 @@ function introSeen(): boolean {
   }
   return false;
 }
+/** Stands in for `introSeen` when the opening is skipped, and marks nothing seen. */
+const alreadySeen = () => true;
+const introSeenFor = (skipped: boolean) => (skipped ? alreadySeen : introSeen);
 /** How much further out the establishing shot opens than it lands, and how far round. */
 const INTRO_PULL_BACK = 1.75;
 const INTRO_SWING = 0.42;
@@ -1932,6 +1962,7 @@ function CameraRig({
   const framing = useMemo(() => JSON.stringify(bounds), [bounds]);
   // The canvas is as wide as the area the panel sizes itself to.
   const covered = inspectorOpen ? inspectorWidthFor(size.width) : 0;
+  const seen = introSeenFor(use(OpeningSkipped));
 
   const view = useMemo((): View => {
     const fit = viewOf(
@@ -1991,7 +2022,7 @@ function CameraRig({
       flying: flight.current !== null,
       reducedMotion,
       restorable: back?.framing === framing,
-      introSeen,
+      introSeen: seen,
     });
     if (step === "none") return;
     if (step === "restore" && back) {
@@ -2932,6 +2963,7 @@ export default function Scene({
         >
           <ReleaseResources />
           <RedrawOnRender />
+          <SkipOpening />
           <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
           <Stage
             districts={city.districts}

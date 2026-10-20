@@ -16,6 +16,7 @@ import {
   serverDecisions,
 } from "./api.js";
 import { App } from "./app/App.js";
+import { OpeningSkipped } from "./app/scene/opening.js";
 import appStyles from "./app/styles.css?inline";
 import type { SchemaGraph, UsageReport } from "./model/types.js";
 
@@ -67,7 +68,11 @@ export class SchemaCityElement extends UmbElementMixin(LitElement) {
    * Where the app opens. With no `initial` it reads its own query string, which is
    * the workspace's way. Not ready waits rather than opening on the wrong thing.
    */
-  protected opening(): { ready: boolean; initial?: Initial } {
+  protected opening(): {
+    ready: boolean;
+    initial?: Initial;
+    skipOpening?: boolean;
+  } {
     return { ready: true };
   }
 
@@ -130,19 +135,21 @@ export class SchemaCityElement extends UmbElementMixin(LitElement) {
   /** Renders the app again with what has arrived, or the loading line until then. */
   protected draw() {
     if (!this.#root) return;
-    const { ready, initial } = this.opening();
+    const { ready, initial, skipOpening } = this.opening();
     this.#root.render(
       this.#graph && ready ? (
-        <App
-          decisions={this.#decisions}
-          graph={this.#graph}
-          icons={this.#icons}
-          initial={initial}
-          onOpenDataType={openDataTypeInEditor}
-          onOpenType={openTypeInEditor}
-          usage={this.#usage}
-          usagePending={this.#usagePending}
-        />
+        <OpeningSkipped value={skipOpening === true}>
+          <App
+            decisions={this.#decisions}
+            graph={this.#graph}
+            icons={this.#icons}
+            initial={initial}
+            onOpenDataType={openDataTypeInEditor}
+            onOpenType={openTypeInEditor}
+            usage={this.#usage}
+            usagePending={this.#usagePending}
+          />
+        </OpeningSkipped>
       ) : (
         <p className="p-4 font-mono text-sm text-phosphor-dim">
           {this.#status}

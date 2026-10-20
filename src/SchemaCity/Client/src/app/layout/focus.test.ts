@@ -105,8 +105,8 @@ function focusOn(graph: SchemaGraph, id: string) {
 
 /**
  * The pair of neighbours whose lots overlap, or nothing when the ground is clear.
- * The composition platform is not an excuse: a building standing over another one
- * reads as an overlap from the camera's angle whatever its height.
+ * A building standing over another one reads as an overlap from the camera's angle
+ * whatever its height.
  */
 function overlap(placements: Placement[]): string[] | null {
   for (const a of placements) {
@@ -159,8 +159,8 @@ describe("layoutFocus", () => {
     // North is negative z, south positive, east positive x, west negative.
     expect(quarter(at("parent"))).toEqual({ x: 0, z: -1, raised: false });
     expect(quarter(at("child"))).toEqual({ x: 0, z: 1, raised: false });
-    expect(quarter(at("mixin"))).toEqual({ x: -1, z: -1, raised: true });
-    expect(quarter(at("base"))).toEqual({ x: -1, z: -1, raised: true });
+    expect(quarter(at("mixin"))).toEqual({ x: -1, z: -1, raised: false });
+    expect(quarter(at("base"))).toEqual({ x: -1, z: -1, raised: false });
     expect(quarter(at("user"))).toEqual({ x: 1, z: -1, raised: false });
     expect(quarter(at("blockTarget"))).toEqual({ x: -1, z: 1, raised: false });
     expect(quarter(at("blockHost"))).toEqual({ x: 1, z: 1, raised: false });

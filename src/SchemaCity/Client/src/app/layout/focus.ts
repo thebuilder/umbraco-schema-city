@@ -32,8 +32,6 @@ const GAP = 3;
  * inner row fell behind the next row's buildings.
  */
 const ROW_GAP = GAP + LABEL_STRIP;
-/** How high the composition platform sits above the ground. */
-const PLATFORM = 3;
 /** Half the angle a ring of parents spans, so an arc covers 120 degrees. */
 const ARC_HALF = Math.PI / 3;
 /** Footprint of an id the city never placed, which only a stale edge can be. */
@@ -64,8 +62,8 @@ type Block = {
  * placement the city gave it, as the same object, so the scene can tell what moved.
  *
  * Compass: parents to the north and children to the south, both one street off the
- * focused node's own footprint; compositions north-west on a platform and the types
- * composing this one north-east; block targets south-west and block hosts south-east;
+ * focused node's own footprint; compositions north-west and the types composing
+ * this one north-east, all on the same ground as the rest; block targets south-west and block hosts south-east;
  * references on the two flanks, out to the east and in from the west.
  *
  * Groups stack outward in bands. A corner group stands beside the parents or the
@@ -178,12 +176,11 @@ export function layoutFocus(
     block: Block,
     sign: number,
     centreX: number,
-    y: number,
     nearZ?: number
   ) => {
     const at = Math.max(near, nearZ ?? stack[sign < 0 ? "-1" : "1"]);
     for (const [id, spot] of block.spots) {
-      spots.set(id, { x: centreX + spot.x, z: sign * (at + spot.z), y });
+      spots.set(id, { x: centreX + spot.x, z: sign * (at + spot.z), y: 0 });
     }
     const side = sign < 0 ? "-1" : "1";
     stack[side] = Math.max(stack[side], at + block.depth + ROW_GAP);
@@ -246,7 +243,6 @@ export function layoutFocus(
     ids: string[],
     sideX: number,
     sign: number,
-    y: number,
     beside: Box | null
   ) => {
     if (ids.length === 0) return;
@@ -259,7 +255,6 @@ export function layoutFocus(
           block,
           sign,
           (inner + outer) / 2,
-          y,
           sign < 0 ? -beside.maxZ : beside.minZ
         );
         return;
@@ -271,7 +266,7 @@ export function layoutFocus(
       : sideX < 0
         ? box.minX
         : box.maxX;
-    band(block, sign, edge - (sideX * block.width) / 2, y);
+    band(block, sign, edge - (sideX * block.width) / 2);
   };
 
   /**
@@ -306,13 +301,15 @@ export function layoutFocus(
       ? null
       : parents.length > ROW_LIMIT
         ? arc(parents)
-        : band(pack(parents), -1, 0, 0);
-  const southBand =
-    children.length === 0 ? null : band(pack(children), 1, 0, 0);
-  corner(compositions, -1, -1, PLATFORM, northBand);
-  corner(composers, 1, -1, 0, northBand);
-  corner(blockTargets, -1, 1, 0, southBand);
-  corner(blockHosts, 1, 1, 0, southBand);
+        : band(pack(parents), -1, 0);
+  const southBand = children.length === 0 ? null : band(pack(children), 1, 0);
+  // Compositions used to stand on a platform three units up. Nothing was drawn under
+  // it, so they read as floating, and their links set off from above the ground every
+  // other link leaves from.
+  corner(compositions, -1, -1, northBand);
+  corner(composers, 1, -1, northBand);
+  corner(blockTargets, -1, 1, southBand);
+  corner(blockHosts, 1, 1, southBand);
   // Last, so a flank steps past every band it runs alongside rather than only the
   // ones that happened to be placed before it.
   flank(referencesOut, 1);
