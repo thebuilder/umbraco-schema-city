@@ -282,6 +282,13 @@ await send("Page.addScriptToEvaluateOnNewDocument", {
 // Times in the app are shown in the viewer's zone, so the shots fix it to UTC and
 // come out the same on every machine.
 await send("Emulation.setTimezoneOverride", { timezoneId: "UTC" });
+// The search key is shown as the platform's, so the shots say ⌘K wherever they are
+// taken, as they always did from a Mac.
+const { userAgent } = (await send("Browser.getVersion")) ?? {};
+await send("Emulation.setUserAgentOverride", {
+  userAgent,
+  platform: "MacIntel",
+});
 await send("Emulation.setDeviceMetricsOverride", {
   width: 1600,
   height: 1000,

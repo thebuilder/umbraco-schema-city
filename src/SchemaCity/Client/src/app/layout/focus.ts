@@ -7,11 +7,13 @@ import {
   type PropertyTargets,
 } from "../../model/neighbourhood";
 import type { SchemaGraph } from "../../model/types";
-import { LABEL_STRIP } from "../scene/board-labels";
+import { PRINT_MARGIN } from "../scene/board";
+import { LABEL_STRIP, PRINT_DEPTH } from "../scene/board-labels";
 import {
   cityBounds,
   ISLAND_PAD,
   MIN_FOOTPRINT,
+  NAME_MARGIN,
   type Placement,
   ROW_LIMIT,
 } from "./city";
@@ -324,18 +326,30 @@ export function layoutFocus(
 }
 
 /**
- * The ground the neighbourhood covers, with an island's padding around it, so the
- * scene can draw a slab under it and frame the camera on the same box. Pass the
- * placements the focus layout moved: the focused node and its neighbours.
+ * Ground the island holds south of its last row, past its padding, for the names
+ * that row prints in front of its buildings. Without it a name on two lines ran off
+ * the island's edge onto the flattened city.
+ */
+const PRINT_ROOM = Math.max(0, PRINT_DEPTH + PRINT_MARGIN - ISLAND_PAD);
+
+/**
+ * The ground the neighbourhood covers, with an island's padding around it and room
+ * for the names its outer buildings print, so the scene can draw a slab under it and
+ * frame the camera on the same box. Pass the placements the focus layout moved: the
+ * focused node and its neighbours.
  */
 export function focusBounds(placements: Placement[]): FocusBounds {
   const { width, depth, centre } = cityBounds(placements, ISLAND_PAD);
+  const minX = centre.x - width / 2 - NAME_MARGIN;
+  const maxX = centre.x + width / 2 + NAME_MARGIN;
+  const minZ = centre.z - depth / 2;
+  const maxZ = centre.z + depth / 2 + PRINT_ROOM;
   return {
-    minX: centre.x - width / 2,
-    maxX: centre.x + width / 2,
-    minZ: centre.z - depth / 2,
-    maxZ: centre.z + depth / 2,
-    centre,
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    centre: { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2 },
   };
 }
 

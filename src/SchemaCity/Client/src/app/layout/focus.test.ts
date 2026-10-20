@@ -3,6 +3,8 @@ import mediumFixture from "../../../dev/fixtures/medium.json";
 import pathologicalFixture from "../../../dev/fixtures/pathological.json";
 import { type Neighbourhood, neighbourhoods } from "../../model/neighbourhood";
 import type { SchemaEdge, SchemaGraph, SchemaNode } from "../../model/types";
+import { PRINT_MARGIN } from "../scene/board";
+import { MAX_OVERHANG, PRINT_DEPTH } from "../scene/board-labels";
 import { ISLAND_PAD, layoutCity, type Placement, ROW_LIMIT } from "./city";
 import {
   focusAnchor,
@@ -306,22 +308,26 @@ describe("layoutFocus", () => {
     expect(bounds.maxZ - bounds.minZ - ISLAND_PAD * 2).toBeLessThan(84);
   });
 
-  it("gives a node with no neighbours its own footprint plus padding", () => {
+  it("gives a node with no neighbours its own footprint, padding and room for its name", () => {
     const graph = graphOf([
       node("lonely", { allowedAsRoot: true }),
       node("stranger"),
     ]);
     const { moved, at, bounds } = focusOn(graph, "lonely");
+    const half = at("lonely").footprint / 2;
 
     expect(moved.map((p) => p.id)).toEqual(["lonely"]);
     expect(at("lonely").position).toEqual({ x: 0, z: 0 });
-    expect(bounds).toEqual({
-      minX: -at("lonely").footprint / 2 - ISLAND_PAD,
-      maxX: at("lonely").footprint / 2 + ISLAND_PAD,
-      minZ: -at("lonely").footprint / 2 - ISLAND_PAD,
-      maxZ: at("lonely").footprint / 2 + ISLAND_PAD,
-      centre: { x: 0, z: 0 },
-    });
+    // The name prints south of the building and may hang past either side of it.
+    expect(bounds.minZ).toBe(-half - ISLAND_PAD);
+    expect(bounds.maxZ).toBeGreaterThanOrEqual(
+      half + PRINT_DEPTH + PRINT_MARGIN
+    );
+    expect(bounds.maxX).toBeGreaterThanOrEqual(
+      half + MAX_OVERHANG + PRINT_MARGIN
+    );
+    expect(bounds.minX).toBe(-bounds.maxX);
+    expect(bounds.centre).toEqual({ x: 0, z: (bounds.minZ + bounds.maxZ) / 2 });
   });
 
   it("anchors the neighbourhood on the focused node's city position", () => {
