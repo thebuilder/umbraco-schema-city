@@ -208,7 +208,7 @@ Findings are derived in `model/findings.ts`:
 
 | Finding | Rule |
 | --- | --- |
-| Unused type | not element, zero instances. Needs usage |
+| Unused type | not element, zero instances. Needs usage. Note, since no content can just mean the site is still being filled in |
 | Unused element type | element, no incoming `block` edge |
 | Structural dead end | not `allowedAsRoot`, no incoming `allowedChild`, not element, and nothing composes it. This absorbs the unused-composition kind, which is dropped |
 | Duplicate property alias | two compositions, or a composition and the type's own properties, contribute the same property alias. This is the composition bug that breaks editing |

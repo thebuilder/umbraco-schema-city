@@ -479,9 +479,12 @@ describe("findFindings, one rule at a time", () => {
     ).filter((finding) => finding.kind === "unusedType");
     // press sits under an empty landing, so it comes before the alphabet would put it.
     expect(rows.map((row) => [row.nodeId, row.summary])).toEqual([
-      ["press", "Allowed under landing, which has no content either"],
-      ["landing", "Allowed at root"],
-      ["news", "Allowed under home"],
+      [
+        "press",
+        "No content yet, though editors can create it under landing, which has no content either",
+      ],
+      ["landing", "No content yet, though editors can create it at root"],
+      ["news", "No content yet, though editors can create it under home"],
     ]);
     expect(rows[0]?.related).toEqual(["landing"]);
   });
@@ -883,8 +886,8 @@ describe("findFindings, one rule at a time", () => {
       "unreachableChain",
       "deadEnd",
       "unusedElementType",
-      "unusedType",
       "emptyBlock",
+      "unusedType",
     ]);
   });
 
