@@ -255,7 +255,7 @@ function Grid<Cell>({
                 {/* The corner is sticky both ways so the row names never slide
                     under it. */}
                 <th
-                  className={`${CELL} sticky top-0 left-0 bg-panel px-2 text-left align-bottom ${LABEL}`}
+                  className={`${CELL} sticky top-0 left-0 bg-panel pr-2 pl-4 text-left align-bottom ${LABEL}`}
                   scope="col"
                   style={{ zIndex: 30 + columns.length }}
                 >
@@ -263,35 +263,36 @@ function Grid<Cell>({
                 </th>
                 {columns.map((column, index) => {
                   const marked = tag(column);
-                  const lines = (
+                  const name = (
                     <>
-                      <span className="block truncate text-prose text-xs group-hover:text-phosphor group-hover:underline">
-                        {column.label}
-                        {marked ? (
-                          <span className="text-azure"> · {marked}</span>
-                        ) : null}
-                      </span>
-                      {/* The key in the detail line keeps two same-named Data
-                          Types apart for the eye only. */}
-                      {/* The total keeps its place when a long alias is cut. */}
-                      <span className="flex font-mono text-2xs text-faint">
-                        <span className="truncate">{column.detail}</span>
-                        <span className="shrink-0 whitespace-pre">
-                          {" "}
-                          · {column.total}
-                        </span>
-                      </span>
+                      {column.label}
+                      {marked ? (
+                        <span className="text-azure"> · {marked}</span>
+                      ) : null}
                     </>
                   );
                   const header = (
                     <>
                       <span className="sr-only">{columnName(column)}</span>
                       {flat ? (
+                        // Centred over the marks below it, and nothing cut: the
+                        // detail wraps rather than ending in an ellipsis, and the
+                        // total gets a line of its own so it lines up across the
+                        // row. The key in the detail keeps two same-named Data
+                        // Types apart for the eye only.
                         <span
                           aria-hidden
-                          className="block w-28 text-left [&>span:first-child]:line-clamp-2 [&>span:first-child]:whitespace-normal"
+                          className="flex w-32 flex-col items-center gap-0.5 text-center"
                         >
-                          {lines}
+                          <span className="line-clamp-2 text-prose text-xs group-hover:text-phosphor group-hover:underline">
+                            {name}
+                          </span>
+                          <span className="font-mono text-2xs text-faint wrap-anywhere">
+                            {column.detail}
+                          </span>
+                          <span className="font-mono text-2xs text-label">
+                            {column.total}
+                          </span>
                         </span>
                       ) : (
                         // One line, since a second line slants off to the left of
@@ -301,10 +302,7 @@ function Grid<Cell>({
                           className="absolute bottom-2 left-1/2 block w-44 origin-bottom-left -rotate-45 truncate text-left text-prose text-xs group-hover:text-phosphor group-hover:underline"
                           title={`${column.detail} · ${column.total}`}
                         >
-                          {column.label}
-                          {marked ? (
-                            <span className="text-azure"> · {marked}</span>
-                          ) : null}
+                          {name}
                           <span className="font-mono text-2xs text-faint">
                             {" "}
                             · {column.total}
@@ -358,7 +356,7 @@ function Grid<Cell>({
                     onClick={() => onSelect(row.id)}
                   >
                     <th
-                      className={`${CELL} sticky left-0 z-10 max-w-64 px-2 py-1 text-left font-normal ${
+                      className={`${CELL} sticky left-0 z-10 max-w-64 py-1 pr-2 pl-4 text-left font-normal ${
                         on ? "bg-accent" : "bg-background"
                       }`}
                       scope="row"
