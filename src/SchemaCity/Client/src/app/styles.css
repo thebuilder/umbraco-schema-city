@@ -695,6 +695,55 @@
   --scene-dim: #717a78;
 }
 
+[data-schema-city][data-phosphor="blue"] {
+  --phosphor: #78a9ff;
+  --phosphor-bright: #d7e5ff;
+  --phosphor-dim: #587db8;
+  --info: #67e8f9;
+  --scene-dim: #5478b1;
+}
+
+[data-schema-city][data-phosphor="magenta"] {
+  --phosphor: #f09be7;
+  --phosphor-bright: #ffd5fa;
+  --phosphor-dim: #cf8ac8;
+  --scene-dim: #976391;
+}
+
+/* Not an Afterglow preset: Umbraco's own blue, #3544b1, lifted until it glows on
+   black, with a dim and a near-white of the same hue. */
+[data-schema-city][data-phosphor="umbraco"] {
+  --phosphor: #7d8bff;
+  --phosphor-bright: #dfe6ff;
+  --phosphor-dim: #737fce;
+  --scene-dim: #6973ad;
+}
+
+/* Each relation keeps a colour of its own, so a preset that lands on one moves
+   that relation to Afterglow's green, as the warm ones do with amber. A blue
+   screen moves compositions off azure. */
+[data-schema-city]:is([data-phosphor="blue"], [data-phosphor="umbraco"]) {
+  --azure: #86fadd;
+  --chart-4: #86fadd;
+}
+
+/* Umbraco's indigo sits on the pickers' violet, so they take Umbraco's pink. */
+[data-schema-city][data-phosphor="umbraco"] {
+  --violet: #f5c1bc;
+  --chart-5: #f5c1bc;
+}
+
+/* A pink screen moves the pickers off violet, and problems off the signal pink
+   to Afterglow's ember red, which still reads as wrong. Afterglow itself uses
+   cyan here, but in the city that would sit beside the compositions' azure. */
+[data-schema-city][data-phosphor="magenta"] {
+  --violet: #86fadd;
+  --chart-5: #86fadd;
+  --signal: #ff5a65;
+  --signal-soft: #e04850;
+  --chart-2: #ff5a65;
+}
+
 /* An amber screen has no room for an amber accent: Element Types, block links and
    changes would sit in the colour of the pages. The warm presets trade it for
    Afterglow's green, so the two colours swap places rather than merge. */

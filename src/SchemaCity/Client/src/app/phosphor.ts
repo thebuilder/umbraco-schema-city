@@ -4,15 +4,20 @@
 import { type RefObject, useCallback, useEffect, useState } from "react";
 
 /**
- * Afterglow's own names and swatches. Green is the default and the only one drawn
- * from the base tokens. Cyan, blue, magenta and red are left out: each lands on a
- * colour the city already uses for a relation (azure compositions, violet pickers,
- * the signal pink of a problem), so a building and a link would read the same.
+ * Afterglow's own names and swatches, and Umbraco's blue. Green is the default and
+ * the only one drawn from the base tokens. Where a preset lands on a colour the city
+ * gives a relation (amber blocks, azure compositions, violet pickers, the signal pink
+ * of a problem), styles.css moves that relation to another colour for it. Cyan and
+ * red are left out, as two more of Afterglow's presets would only repeat blue and
+ * magenta with more swaps.
  */
 export const PHOSPHORS = [
   { value: "green", label: "Green", color: "#86fadd" },
   { value: "orange", label: "Orange", color: "#ff9d4d" },
   { value: "yellow", label: "Yellow", color: "#f4e66d" },
+  { value: "blue", label: "Blue", color: "#78a9ff" },
+  { value: "umbraco", label: "Umbraco", color: "#7d8bff" },
+  { value: "magenta", label: "Magenta", color: "#f09be7" },
   { value: "grey", label: "Grey", color: "#c5cbc9" },
 ] as const;
 
