@@ -8,6 +8,7 @@ import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import type { DistrictKind, Placement } from "../layout/city";
+import type { Interaction } from "./board-labels";
 import {
   type BuildingColours,
   type BuildingPalette,
@@ -21,6 +22,7 @@ import {
   buildingBox,
   type FloorCell,
   type FloorCellKind,
+  outlines,
   type PlazaCell,
   WINDOW_HEIGHT,
   WINDOW_WIDTH,
@@ -411,17 +413,8 @@ function usePaintedParts(
   meshes: Meshes,
   parts: Parts,
   palette: BuildingPalette,
-  {
-    selected,
-    hovered,
-    neighbours,
-    scale,
-  }: {
-    selected: string | null;
-    hovered: string | null;
-    neighbours: Set<string> | null;
-    scale: LensScale | null;
-  }
+  { selected, hovered, neighbours, hoveredNeighbours }: Interaction,
+  scale: LensScale | null
 ) {
   const colours = useMemo(() => buildingColours(palette), [palette]);
   useEffect(() => {
@@ -429,12 +422,22 @@ function usePaintedParts(
       selected,
       hovered,
       neighbours,
+      hoveredNeighbours,
       lens: lensColours(scale, colours),
       lensOn: scale !== null,
       district: parts.district,
       flatten: parts.flatten,
     });
-  }, [meshes, parts, colours, selected, hovered, neighbours, scale]);
+  }, [
+    meshes,
+    parts,
+    colours,
+    selected,
+    hovered,
+    neighbours,
+    hoveredNeighbours,
+    scale,
+  ]);
 }
 
 /** Places the parts whenever they change, and again each frame the intro rises. */
@@ -514,9 +517,7 @@ export function Buildings({
   plazas,
   heights,
   placements,
-  selected,
-  hovered,
-  neighbours,
+  interaction,
   reducedMotion,
   palette,
   scale,
@@ -529,9 +530,8 @@ export function Buildings({
   plazas: PlazaCell[];
   heights: Map<string, number>;
   placements: Placement[];
-  selected: string | null;
-  hovered: string | null;
-  neighbours: Set<string> | null;
+  /** The selection, the hover and the buildings each one lights. */
+  interaction: Interaction;
   reducedMotion: boolean;
   palette: BuildingPalette;
   /** The lens colouring, or null when no lens is on. */
@@ -549,12 +549,7 @@ export function Buildings({
 
   useRisingParts(meshes.current, parts, reducedMotion);
 
-  usePaintedParts(meshes.current, parts, palette, {
-    selected,
-    hovered,
-    neighbours,
-    scale,
-  });
+  usePaintedParts(meshes.current, parts, palette, interaction, scale);
 
   const held = meshes.current;
   return (
@@ -734,10 +729,84 @@ function BuildingFrame({
   return <primitive frustumCulled={false} object={lines} />;
 }
 
-/** The selected building's frame in the signal colour, and a quieter one on hover. */
+/** How far the frames round a hover's connected buildings stand off them. */
+const REACHED_GROW = 0.1;
+
+/**
+ * Thin frames round every building the hovered one's lines reach, in one line
+ * geometry, so the far end of each line reads as a building rather than a guess.
+ * The outlines are rewritten only when the set, the layout or the intro's rise
+ * changes, not every frame.
+ */
+function ReachedFrames({
+  ids,
+  colour,
+  placementsById,
+  heights,
+  reducedMotion,
+}: {
+  ids: readonly string[];
+  colour: string;
+  placementsById: Map<string, Placement>;
+  heights: Map<string, number>;
+  reducedMotion: boolean;
+}) {
+  const lines = useMemo(
+    () =>
+      new LineSegments2(
+        new LineSegmentsGeometry(),
+        new LineMaterial({
+          color: colour,
+          linewidth: 1,
+          worldUnits: false,
+          transparent: true,
+          opacity: 0.6,
+          depthWrite: false,
+          toneMapped: false,
+        })
+      ),
+    [colour]
+  );
+  useEffect(
+    () => () => {
+      lines.geometry.dispose();
+      lines.material.dispose();
+    },
+    [lines]
+  );
+  const drawn = useRef<unknown[]>([]);
+
+  useAnimationFrame((state) => {
+    const rise = buildingRiseAt(state.clock.elapsedTime, reducedMotion);
+    const key = [ids, placementsById, heights, rise];
+    if (key.every((part, i) => part === drawn.current[i]))
+      return introPlaying(state.clock.elapsedTime, reducedMotion);
+    drawn.current = key;
+    const positions = outlines(
+      ids.map((id) => {
+        const placement = placementsById.get(id);
+        return placement
+          ? buildingBox(placement, heights, rise, REACHED_GROW, 0.5)
+          : null;
+      }),
+      OUTLINE_POSITIONS
+    );
+    lines.visible = positions.length > 0;
+    if (lines.visible) lines.geometry.setPositions(positions);
+    return introPlaying(state.clock.elapsedTime, reducedMotion);
+  });
+
+  return <primitive frustumCulled={false} object={lines} />;
+}
+
+/**
+ * The selected building's frame in the signal colour, a quieter one on hover, and
+ * the faintest round each building the hover's lines reach.
+ */
 export function BuildingFrames({
   selected,
   hovered,
+  hoveredNeighbours,
   palette,
   placementsById,
   heights,
@@ -745,14 +814,23 @@ export function BuildingFrames({
 }: {
   selected: string | null;
   hovered: string | null;
+  hoveredNeighbours: Set<string> | null;
   palette: BuildingPalette;
   placementsById: Map<string, Placement>;
   heights: Map<string, number>;
   reducedMotion: boolean;
 }) {
   const shared = { placementsById, heights, reducedMotion };
+  const reached = useMemo(
+    () =>
+      [...(hoveredNeighbours ?? [])].filter(
+        (id) => id !== hovered && id !== selected
+      ),
+    [hoveredNeighbours, hovered, selected]
+  );
   return (
     <>
+      <ReachedFrames colour={palette.phosphor} ids={reached} {...shared} />
       <BuildingFrame
         colour={palette.signal}
         grow={0.08}

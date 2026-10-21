@@ -923,20 +923,25 @@ export function traceIndex(traces: readonly Trace[]): (rect: Rect) => Trace[] {
 
 /**
  * How solid the bare board under a print is: `alpha` when the print lies over a
- * trace and no trace under it is lit by the hover or the selection, so a lit path
- * shows the whole way, and 0 otherwise.
+ * drawn trace, and 0 otherwise. A trace is drawn when its layer is on, which the
+ * placement already knows as `crosses`, or when it belongs to a layer that is off
+ * and touches the hovered or selected type, which draws it anyway. A focus lights
+ * nearly every trace on its island, and a name a lit line runs through could not
+ * be read, so the line passes under the name the way a road does under a street
+ * name on a map.
  */
 export function knockoutAlpha(
   spot: { rect: Rect; crosses: boolean } | undefined,
   alpha: number,
-  traceAt: (rect: Rect) => readonly Trace[],
+  offTraceAt: (rect: Rect) => readonly Trace[],
   now: { hovered: string | null; selected: string | null }
 ): number {
-  if (!spot?.crosses) return 0;
+  if (!spot) return 0;
+  if (spot.crosses) return alpha;
   const lit = (id: string) => id === now.hovered || id === now.selected;
-  return traceAt(spot.rect).some((trace) => lit(trace.from) || lit(trace.to))
-    ? 0
-    : alpha;
+  return offTraceAt(spot.rect).some((trace) => lit(trace.from) || lit(trace.to))
+    ? alpha
+    : 0;
 }
 
 /** The knockout's corner radius, and how far it reaches past the text's ends. */

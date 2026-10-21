@@ -1,12 +1,23 @@
 // The app's own chrome: the header over the view and the footer under it. The header
 // holds what works on the whole schema; the footer says how fresh the snapshot is and
 // holds the City's own tools, which mean nothing over a list.
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -30,9 +41,10 @@ import {
 } from "@/components/ui/tooltip";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { plural, SEARCH_KEY, useAnnounce } from "./a11y";
-import { snapshotDate } from "./Findings";
+import { snapshotTimes } from "./Findings";
 import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
+import { appRoot, PHOSPHORS, type Phosphor, usePhosphor } from "./phosphor";
 import { LAYERS, type Layer } from "./scene/layers";
 import { LENS_LABEL, LENSES, type Lens } from "./scene/lens";
 import type { View } from "./url";
@@ -97,40 +109,83 @@ export function AppHeader({
   );
 }
 
-/**
- * "08:41" on the day the snapshot was taken, which in the backoffice is nearly
- * always, since it is read when the workspace opens, and "2026-09-01" on any other.
- * The Findings drawer has both halves when the exact minute matters.
- */
-const stamp = (iso: string | undefined, today: string) => {
-  const at = snapshotDate(iso);
-  if (!at) return null;
-  return at.startsWith(today) ? at.slice(11) : at.slice(0, 10);
-};
+/** A square of the phosphor's own colour, glowing a little, as Afterglow draws it. */
+const Swatch = ({ color }: { color: string }) => (
+  <span
+    aria-hidden
+    className="size-3 shrink-0 bg-(--swatch) shadow-[0_0_8px_var(--swatch)]"
+    style={{ "--swatch": color } as CSSProperties}
+  />
+);
 
 /**
- * What the footer says about the snapshot the city is drawn from, as "86 types",
- * "schema read 09:12" and "usage 09:13". A date a snapshot does not really have is
- * left out, and usage says when it is still on its way or never came.
+ * The phosphor the screen glows in, as a swatch in the header. Afterglow's presets,
+ * with the current one named for a screen reader on the trigger. It sets the choice
+ * on the app's root itself, before paint, so App only has to place it; the city
+ * watches that attribute for the colours its canvas cannot take from CSS.
+ */
+export function PhosphorMenu() {
+  const { value, onChange } = usePhosphor();
+  const anchor = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    appRoot(anchor.current)?.setAttribute("data-phosphor", value);
+  }, [value]);
+  const active =
+    PHOSPHORS.find((phosphor) => phosphor.value === value) ?? PHOSPHORS[0];
+  return (
+    <span className="contents" ref={anchor}>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Phosphor: ${active.label}`}
+          render={<Button data-trigger size="sm" variant="outline" />}
+        >
+          <Swatch color={active.color} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          {/* A group label sits inside its Group, or Base UI throws at open time. */}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Phosphor</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              onValueChange={(next) => onChange(next as Phosphor)}
+              value={value}
+            >
+              {PHOSPHORS.map((phosphor) => (
+                <DropdownMenuRadioItem
+                  key={phosphor.value}
+                  value={phosphor.value}
+                >
+                  <Swatch color={phosphor.color} />
+                  {phosphor.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </span>
+  );
+}
+
+/**
+ * What the footer says about the snapshot the city is drawn from: "86 types", and
+ * usage only while it is on its way or when it never came. The times are left out:
+ * the schema is cached until a type or Data Type changes, so its date read as stale
+ * when it meant unchanged, and usage is at most a minute old. Both stay on hover
+ * here, and in full in the Findings drawer and every export.
  */
 export function snapshotParts(
   graph: SchemaGraph,
   usage: UsageReport | undefined,
-  pending: boolean,
-  today = snapshotDate(new Date().toISOString())?.slice(0, 10) ?? ""
+  pending: boolean
 ) {
-  const read = stamp(graph.generatedAt, today);
-  const counted = stamp(usage?.generatedAt, today);
   const usageText = usage
-    ? counted && `usage ${counted}`
+    ? null
     : pending
       ? "usage loading"
       : "usage unavailable";
-  return [
-    plural(graph.nodes.length, "type"),
-    read && `schema read ${read}`,
-    usageText,
-  ].filter(Boolean);
+  return [plural(graph.nodes.length, "type"), usageText].filter(
+    (part): part is string => part !== null
+  );
 }
 
 function SnapshotStatus({
@@ -143,7 +198,10 @@ function SnapshotStatus({
   usagePending?: boolean;
 }) {
   return (
-    <p className="flex min-w-0 flex-wrap items-center gap-x-2 text-2xs text-label">
+    <p
+      className="flex min-w-0 flex-wrap items-center gap-x-2 text-2xs text-label"
+      title={snapshotTimes(graph, usage) || undefined}
+    >
       {snapshotParts(graph, usage, usagePending).join(" · ")}
       {usage?.blocks?.partial ? (
         <span className="text-amber">

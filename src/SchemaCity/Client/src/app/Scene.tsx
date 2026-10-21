@@ -55,6 +55,7 @@ import {
   standFocus,
 } from "./layout/focus";
 import { editorNames } from "./layout/structure";
+import { usePhosphorOf } from "./phosphor";
 import { describeRelationship, uniqueConnections } from "./relationship";
 import { BoardLabels, type Floated } from "./scene/BoardLabels";
 import {
@@ -281,7 +282,75 @@ type Palette = {
   land: string;
   /** The theme's mono stack, for the names printed on the ground. */
   mono: string;
+  /** The hemisphere light's sky, the rim light and the light at the camera. */
+  sky: string;
+  rim: string;
+  head: string;
 };
+
+/**
+ * The scene colours are the theme's own tokens, read from an element inside the
+ * shadow root, so the city and the chrome can never drift apart. They are read
+ * again when the phosphor changes, which is the only time they do. Null until the
+ * element is in place.
+ */
+function useScenePalette(host: RefObject<HTMLElement | null>) {
+  const [palette, setPalette] = useState<Palette | null>(null);
+  const phosphor = usePhosphorOf(host);
+  useEffect(() => {
+    if (host.current) setPalette(readPalette(host.current));
+  }, [host, phosphor]);
+  return palette;
+}
+
+/** The scene's colours and type, from the theme tokens in force at `element`. */
+function readPalette(element: HTMLElement): Palette {
+  const style = getComputedStyle(element);
+  const colour = colourReader(element);
+  const token = (name: string) => colour(style.getPropertyValue(name).trim());
+  return {
+    amber: token("--amber"),
+    azure: token("--azure"),
+    background: token("--background"),
+    bright: token("--phosphor-bright"),
+    dim: token("--scene-dim"),
+    land: token("--panel"),
+    mono:
+      style.getPropertyValue("--font-mono").trim() || "ui-monospace, monospace",
+    phosphor: token("--phosphor"),
+    separator: token("--panel-sunken"),
+    signal: token("--signal"),
+    violet: token("--violet"),
+    sky: token("--scene-sky"),
+    rim: token("--scene-rim"),
+    head: token("--scene-head"),
+  };
+}
+
+/**
+ * Turns a token into "#rrggbb" for three.js, which cannot parse the color-mix() the
+ * phosphor presets derive their panels with. The browser resolves it on a probe
+ * span, and a one-pixel canvas turns whatever colour syntax that gives back into
+ * bytes. A hex token is returned as it is, so green never goes through the canvas.
+ */
+function colourReader(host: HTMLElement) {
+  const context = document
+    .createElement("canvas")
+    .getContext("2d", { willReadFrequently: true });
+  return (value: string) => {
+    if (value.startsWith("#") || !context) return value;
+    const probe = document.createElement("span");
+    probe.style.color = value;
+    host.append(probe);
+    const computed = getComputedStyle(probe).color;
+    probe.remove();
+    context.clearRect(0, 0, 1, 1);
+    context.fillStyle = computed;
+    context.fillRect(0, 0, 1, 1);
+    const [r = 0, g = 0, b = 0] = context.getImageData(0, 0, 1, 1).data;
+    return `#${[r, g, b].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+  };
+}
 
 /** How far an inherits arc is mixed toward white, off the composition azure. */
 const INHERITS_MIX = 0.4;
@@ -1618,7 +1687,7 @@ function World({ palette, span }: { palette: Palette; span: number }) {
       {/* Fog, the ground's own fade and the sky below the horizon all end on this one
           colour, or the far ground ends in a ring instead of dissolving. */}
       <fog args={[colours.horizon, 1, 2]} attach="fog" ref={fog} />
-      <hemisphereLight args={["#a8e8ff", "#101c1e", 0.7]} />
+      <hemisphereLight args={[palette.sky, "#101c1e", 0.7]} />
       <directionalLight
         castShadow
         color="#ffeef0"
@@ -1630,11 +1699,11 @@ function World({ palette, span }: { palette: Palette; span: number }) {
         shadow-radius={3}
       />
       <directionalLight
-        color="#6fffe0"
+        color={palette.rim}
         intensity={0.85}
         position={[-14, 8, -12]}
       />
-      <directionalLight color="#cdeee5" intensity={0.55} ref={head} />
+      <directionalLight color={palette.head} intensity={0.55} ref={head} />
       <group ref={sky}>
         <mesh frustumCulled={false} renderOrder={-2}>
           <sphereGeometry args={[1, 32, 16]} />
@@ -2581,7 +2650,7 @@ export default function Scene({
 }) {
   const host = useRef<HTMLElement>(null);
   const cameraFlight = useRef<CameraFlight | null>(null);
-  const [palette, setPalette] = useState<Palette | null>(null);
+  const palette = useScenePalette(host);
   const [hovered, setHovered] = useHover();
 
   const reducedMotion = useSyncExternalStore(
@@ -2890,11 +2959,29 @@ export default function Scene({
   // which is kept per placement map and edge list, so this routes nothing again.
   // The fingers stand on the city's boards, so a focus, which lays the
   // neighbourhood out over them, shows none.
+  // The layers that are off still draw on a hover or a selection, so their traces
+  // go to the names as well, for the board under a print a lit line runs through.
   const boardMarks = useMemo(() => {
-    const routes = planRoutes(routed.placementsById, drawnEdges)
-      .routes.filter(({ edge }) => active.has(LAYER_OF[edge.kind]))
-      .map(({ edge, points }) => ({ from: edge.from, to: edge.to, points }));
-    return boardMarksOf(routes, routed.placementsById, boards, focus === null);
+    const routes = planRoutes(routed.placementsById, drawnEdges).routes.map(
+      ({ edge, points }) => ({
+        from: edge.from,
+        to: edge.to,
+        points,
+        on: active.has(LAYER_OF[edge.kind]),
+      })
+    );
+    return {
+      ...boardMarksOf(
+        routes.filter((route) => route.on),
+        routed.placementsById,
+        boards,
+        focus === null
+      ),
+      offTraces: tracesOf(
+        routes.filter((route) => !route.on),
+        (id) => routed.placementsById.get(id)?.position
+      ),
+    };
   }, [routed, drawnEdges, active, focus, boards]);
 
   const boardColours = useMemo(
@@ -2909,26 +2996,6 @@ export default function Scene({
       ),
     [city, palette]
   );
-
-  // The scene colours are the theme's own tokens, read once from an element inside
-  // the shadow root, so the city and the chrome can never drift apart.
-  useEffect(() => {
-    const style = getComputedStyle(host.current as HTMLElement);
-    const token = (name: string) => style.getPropertyValue(name).trim();
-    setPalette({
-      amber: token("--amber"),
-      azure: token("--azure"),
-      background: token("--background"),
-      bright: token("--phosphor-bright"),
-      dim: token("--phosphor-dim"),
-      land: token("--panel"),
-      mono: token("--font-mono") || "ui-monospace, monospace",
-      phosphor: token("--phosphor"),
-      separator: token("--panel-sunken"),
-      signal: token("--signal"),
-      violet: token("--violet"),
-    });
-  }, []);
 
   return (
     // Focusable, so the flight keys have somewhere to belong: they fly only while
@@ -2982,8 +3049,7 @@ export default function Scene({
           <Buildings
             cells={cells}
             heights={heights}
-            hovered={hovered}
-            neighbours={neighbours}
+            interaction={interaction}
             onFocus={onFocus}
             onHover={setHovered}
             onSelect={onSelect}
@@ -2992,7 +3058,6 @@ export default function Scene({
             plazas={plazas}
             reducedMotion={reducedMotion}
             scale={scale ?? null}
-            selected={selected}
             windows={windows}
           />
           <BuildingOutlines
@@ -3003,6 +3068,7 @@ export default function Scene({
           <BuildingFrames
             heights={heights}
             hovered={hovered}
+            hoveredNeighbours={hoveredNeighbours}
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}
@@ -3121,6 +3187,7 @@ export default function Scene({
             floated={floated}
             interaction={interaction}
             nodesById={nodesById}
+            offTraces={boardMarks.offTraces}
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}

@@ -55,7 +55,10 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "stored", label: "Stored blocks", numeric: true },
 ];
 
-const CELL = "border-line/60 border-b px-2 py-1.5 text-left align-baseline";
+// The outer cells keep the page's own gutter, so the first and last columns do not
+// sit on the edge of the panel.
+const CELL =
+  "border-line/60 border-b px-2 py-1.5 text-left align-baseline first:pl-4 last:pr-4";
 
 /** What each configuration value is called on the page. */
 const SETTING: Record<string, string> = {

@@ -11,6 +11,7 @@ import {
   buildingBox,
   buildPlazaCells,
   connectionsOf,
+  outlines,
   roleOf,
   smootherstep,
 } from "./buildings";
@@ -405,5 +406,16 @@ describe("focus mode's flat plates", () => {
     expect(
       buildFloorCells(nodes, [placement("a", { flatten: 1 })]).heights.get("a")
     ).toBeCloseTo(0.1);
+  });
+});
+
+describe("outlines", () => {
+  it("places the unit outline round each box and skips a missing one", () => {
+    const unit = [-0.5, -0.5, -0.5, 0.5, 0.5, 0.5];
+    const box = { x: 10, y: 2, z: -4, sx: 2, sy: 4, sz: 6 };
+    expect(outlines([box, null, box], unit)).toEqual([
+      9, 0, -7, 11, 4, -1, 9, 0, -7, 11, 4, -1,
+    ]);
+    expect(outlines([null], unit)).toEqual([]);
   });
 });

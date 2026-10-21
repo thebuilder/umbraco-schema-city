@@ -25,6 +25,8 @@ export type PaintState = {
   hovered: string | null;
   /** The buildings left lit, or null when nothing is faded. */
   neighbours: Set<string> | null;
+  /** The hovered building and the ones its lines reach, or null with no hover. */
+  hoveredNeighbours?: Set<string> | null;
   /** Each building's colour on the lens's ramp, empty with no lens on. */
   lens: Map<string, THREE.Color>;
   lensOn: boolean;
@@ -34,6 +36,17 @@ export type PaintState = {
 };
 
 const HOVER_BRIGHTEN = 1.4;
+/**
+ * A building the hovered one connects to, lit a step below the hovered one, so the
+ * far end of each drawn line reads as a building rather than a guess.
+ */
+const HOVER_NEIGHBOUR_BRIGHTEN = 1.25;
+/**
+ * How far the rest of the city recedes while a hover draws its lines and nothing is
+ * selected: well short of the selection's fade, since a hover comes and goes with
+ * the pointer and the city should not blink under it.
+ */
+const HOVER_FADE_MIX = 0.6;
 /** How far a faded building's colour moves toward the void, approximating 20% opacity. */
 const FADE_MIX = 0.8;
 /** The same, for a building focus mode has pressed flat: about 12% opacity. */
@@ -149,6 +162,23 @@ function bodyColour(
   return districtColour(state.district.get(id), colours);
 }
 
+/**
+ * What a hover does to a building other than the hovered one: lights it when a line
+ * of the hover reaches it, and otherwise lets it recede, unless a selection or a
+ * focus already decides what is faded.
+ */
+function hoverPaint(
+  id: string,
+  colours: BuildingColours,
+  state: PaintState,
+  out: THREE.Color
+) {
+  const reached = state.hoveredNeighbours;
+  if (!reached) return;
+  if (reached.has(id)) out.multiplyScalar(HOVER_NEIGHBOUR_BRIGHTEN);
+  else if (!state.neighbours) out.lerp(colours.background, HOVER_FADE_MIX);
+}
+
 /** One part's colour, written into `out` so a repaint allocates nothing per part. */
 export function paintPart(
   kind: PartKind,
@@ -161,6 +191,7 @@ export function paintPart(
   // A lit lid is the page's own colour turned toward white: it renders.
   if (kind === "litLid") out.lerp(colours.marker, 0.1);
   if (id === state.hovered) out.multiplyScalar(HOVER_BRIGHTEN);
+  else hoverPaint(id, colours, state, out);
   // A building pressed flat is further out of the way than a merely faded one, so
   // the focus layout stands on a map rather than in a crowd.
   if (state.neighbours && !state.neighbours.has(id))

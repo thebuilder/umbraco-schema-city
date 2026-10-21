@@ -846,16 +846,28 @@ describe("traces under the prints", () => {
     expect(Math.max(...xs)).toBeCloseTo(print.maxX + 0.05);
   });
 
-  it("clears the board under a print over a trace, unless the trace is lit", () => {
-    const at = traceIndex([road]);
+  it("clears the board under a print over a drawn trace, lit or not", () => {
+    const off = traceIndex([road]);
+    const none = traceIndex([]);
     const rect = printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false);
     const rest = { hovered: null, selected: null };
-    const over = { rect, crosses: true };
-    expect(knockoutAlpha(over, 0.8, at, rest)).toBe(0.8);
-    expect(knockoutAlpha({ rect, crosses: false }, 0.8, at, rest)).toBe(0);
-    expect(knockoutAlpha(undefined, 0.8, at, rest)).toBe(0);
-    expect(knockoutAlpha(over, 0.8, at, { ...rest, hovered: "c" })).toBe(0);
-    expect(knockoutAlpha(over, 0.8, at, { ...rest, selected: "x" })).toBe(0.8);
+    expect(knockoutAlpha({ rect, crosses: true }, 0.8, none, rest)).toBe(0.8);
+    expect(
+      knockoutAlpha({ rect, crosses: true }, 0.8, none, {
+        ...rest,
+        hovered: "c",
+      })
+    ).toBe(0.8);
+    expect(knockoutAlpha({ rect, crosses: false }, 0.8, none, rest)).toBe(0);
+    expect(knockoutAlpha(undefined, 0.8, off, rest)).toBe(0);
+    // A layer that is off draws only the traces of the hovered or selected type.
+    expect(knockoutAlpha({ rect, crosses: false }, 0.8, off, rest)).toBe(0);
+    expect(
+      knockoutAlpha({ rect, crosses: false }, 0.8, off, {
+        ...rest,
+        selected: "p",
+      })
+    ).toBe(0.8);
   });
 
   it("lays a knockout a little inside the print's lines and past its ends", () => {

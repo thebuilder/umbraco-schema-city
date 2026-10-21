@@ -22,6 +22,14 @@ type ColumnSort = "usage" | "name";
 const LABEL = "font-sans font-medium text-label text-xs";
 const CELL = "border-line/60 border-r border-b";
 
+/**
+ * Up to this many columns, the names lie flat and wrap: a few columns can afford a
+ * readable width each. Past it, a flat header would make every row as wide as the
+ * names, so they slant at 45 degrees instead, which still reads without turning
+ * your head the way the old vertical names asked for.
+ */
+const FLAT_COLUMNS = 8;
+
 function Switch<Value extends string>({
   label,
   value,
@@ -226,6 +234,7 @@ function Grid<Cell>({
     ? data.rows.filter((row) => matched.has(row.id))
     : data.rows;
   useAnnounceChange(`${rows.length} of ${data.rows.length} types`);
+  const flat = columns.length <= FLAT_COLUMNS;
 
   return (
     <>
@@ -246,44 +255,75 @@ function Grid<Cell>({
                 {/* The corner is sticky both ways so the row names never slide
                     under it. */}
                 <th
-                  className={`${CELL} sticky top-0 left-0 z-30 bg-panel px-2 text-left align-bottom ${LABEL}`}
+                  className={`${CELL} sticky top-0 left-0 bg-panel pr-2 pl-4 text-left align-bottom ${LABEL}`}
                   scope="col"
+                  style={{ zIndex: 30 + columns.length }}
                 >
                   Type
                 </th>
-                {columns.map((column) => {
+                {columns.map((column, index) => {
                   const marked = tag(column);
+                  const name = (
+                    <>
+                      {column.label}
+                      {marked ? (
+                        <span className="text-azure"> · {marked}</span>
+                      ) : null}
+                    </>
+                  );
                   const header = (
                     <>
                       <span className="sr-only">{columnName(column)}</span>
-                      {/* Vertical, so a long editor alias costs height once instead
-                          of width in every row. The key in the detail line keeps
-                          two same-named Data Types apart for the eye only. */}
-                      <span
-                        aria-hidden
-                        className="inline-block rotate-180 text-left [writing-mode:vertical-rl]"
-                      >
-                        <span className="block max-h-48 truncate text-prose text-xs group-hover:text-phosphor group-hover:underline">
-                          {column.label}
-                          {marked ? (
-                            <span className="text-azure"> · {marked}</span>
-                          ) : null}
+                      {flat ? (
+                        // Centred over the marks below it, and nothing cut: the
+                        // detail wraps rather than ending in an ellipsis, and the
+                        // total gets a line of its own so it lines up across the
+                        // row. The key in the detail keeps two same-named Data
+                        // Types apart for the eye only.
+                        <span
+                          aria-hidden
+                          className="flex w-32 flex-col items-center gap-0.5 text-center"
+                        >
+                          <span className="line-clamp-2 text-prose text-xs group-hover:text-phosphor group-hover:underline">
+                            {name}
+                          </span>
+                          <span className="font-mono text-2xs text-faint wrap-anywhere">
+                            {column.detail}
+                          </span>
+                          <span className="font-mono text-2xs text-label">
+                            {column.total}
+                          </span>
                         </span>
-                        <span className="block max-h-48 truncate font-mono text-2xs text-faint">
-                          {column.detail} · {column.total}
+                      ) : (
+                        // One line, since a second line slants off to the left of
+                        // its column. The detail is on hover instead.
+                        <span
+                          aria-hidden
+                          className="absolute bottom-2 left-1/2 block w-44 origin-bottom-left -rotate-45 truncate text-left text-prose text-xs group-hover:text-phosphor group-hover:underline"
+                          title={`${column.detail} · ${column.total}`}
+                        >
+                          {name}
+                          <span className="font-mono text-2xs text-faint">
+                            {" "}
+                            · {column.total}
+                          </span>
                         </span>
-                      </span>
+                      )}
                     </>
                   );
                   return (
                     <th
-                      className={`${CELL} sticky top-0 z-20 bg-panel px-1 py-2 align-bottom font-normal`}
+                      className={`${CELL} sticky top-0 bg-panel align-bottom font-normal ${flat ? "px-2 py-2" : "h-36 min-w-8 px-1"}`}
                       key={column.id}
                       scope="col"
+                      // A slanted name runs up over the headers to its right, so
+                      // each one sits above the next, or their backgrounds would
+                      // cut it off.
+                      style={{ zIndex: 20 + columns.length - index }}
                     >
                       {onColumn ? (
                         <button
-                          className="group"
+                          className={`group ${flat ? "" : "absolute inset-0"}`}
                           onClick={() => onColumn(column.id)}
                           type="button"
                         >
@@ -295,6 +335,14 @@ function Grid<Cell>({
                     </th>
                   );
                 })}
+                {flat ? null : (
+                  // Room for the last names to finish their slant.
+                  <th
+                    aria-hidden
+                    className="sticky top-0 w-32 min-w-32 bg-panel"
+                    style={{ zIndex: 20 }}
+                  />
+                )}
               </tr>
             </thead>
             <tbody>
@@ -308,7 +356,7 @@ function Grid<Cell>({
                     onClick={() => onSelect(row.id)}
                   >
                     <th
-                      className={`${CELL} sticky left-0 z-10 max-w-64 px-2 py-1 text-left font-normal ${
+                      className={`${CELL} sticky left-0 z-10 max-w-64 py-1 pr-2 pl-4 text-left font-normal ${
                         on ? "bg-accent" : "bg-background"
                       }`}
                       scope="row"

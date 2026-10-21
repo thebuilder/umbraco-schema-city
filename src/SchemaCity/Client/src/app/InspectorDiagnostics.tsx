@@ -106,7 +106,10 @@ function Check({
       {why ? (
         <div className="mt-1.5 space-y-1 text-faint text-xs" id={whyId}>
           <p>{KIND_EXPLANATION[finding.kind]}</p>
-          <p>What to do: {KIND_NEXT_STEP[finding.kind]}</p>
+          <p>
+            <span className="block font-medium text-label">Next step</span>
+            {KIND_NEXT_STEP[finding.kind]}
+          </p>
         </div>
       ) : null}
       <FindingRelations

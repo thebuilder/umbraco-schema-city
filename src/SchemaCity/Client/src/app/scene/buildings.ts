@@ -495,6 +495,28 @@ export function buildingBox(
   };
 }
 
+/**
+ * One unit outline, `unit` as x, y, z triples round the origin, placed round each
+ * box in turn, for frames drawn in a single line geometry. A missing box, a building
+ * pressed flat, draws nothing.
+ */
+export function outlines(
+  boxes: readonly (Box | null)[],
+  unit: ArrayLike<number>
+): number[] {
+  const positions: number[] = [];
+  for (const box of boxes) {
+    if (!box) continue;
+    for (let i = 0; i < unit.length; i += 3)
+      positions.push(
+        box.x + (unit[i] as number) * box.sx,
+        box.y + (unit[i + 1] as number) * box.sy,
+        box.z + (unit[i + 2] as number) * box.sz
+      );
+  }
+  return positions;
+}
+
 /** How much of its height a building keeps: 1 at rest, `PLATE_HEIGHT` when flat. */
 function squashOf(flatten: number, height: number): number {
   if (flatten <= 0 || height <= 0) return 1;
