@@ -25,7 +25,13 @@ import { type DecisionStore, splitReviewed } from "../model/review";
 import { searchNodes } from "../model/search";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { citySummary, LiveRegion, plural, useHandOff } from "./a11y";
-import { AppFooter, AppHeader, LAYER_LABEL, PickFirst } from "./Chrome";
+import {
+  AppFooter,
+  AppHeader,
+  LAYER_LABEL,
+  PhosphorMenu,
+  PickFirst,
+} from "./Chrome";
 import {
   ComparisonLegend,
   ComparisonTools,
@@ -615,6 +621,7 @@ export function App({
               }}
               open={comparisonOpen}
             />
+            <PhosphorMenu />
             <Help onOpenChange={setHelpOpen} open={helpOpen} />
           </AppHeader>
 

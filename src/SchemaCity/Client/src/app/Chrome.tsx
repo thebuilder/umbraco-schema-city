@@ -1,12 +1,23 @@
 // The app's own chrome: the header over the view and the footer under it. The header
 // holds what works on the whole schema; the footer says how fresh the snapshot is and
 // holds the City's own tools, which mean nothing over a list.
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -33,6 +44,7 @@ import { plural, SEARCH_KEY, useAnnounce } from "./a11y";
 import { snapshotTimes } from "./Findings";
 import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
+import { appRoot, PHOSPHORS, type Phosphor, usePhosphor } from "./phosphor";
 import { LAYERS, type Layer } from "./scene/layers";
 import { LENS_LABEL, LENSES, type Lens } from "./scene/lens";
 import type { View } from "./url";
@@ -94,6 +106,63 @@ export function AppHeader({
         </div>
       </div>
     </section>
+  );
+}
+
+/** A square of the phosphor's own colour, glowing a little, as Afterglow draws it. */
+const Swatch = ({ color }: { color: string }) => (
+  <span
+    aria-hidden
+    className="size-3 shrink-0 bg-(--swatch) shadow-[0_0_8px_var(--swatch)]"
+    style={{ "--swatch": color } as CSSProperties}
+  />
+);
+
+/**
+ * The phosphor the screen glows in, as a swatch in the header. Afterglow's presets,
+ * with the current one named for a screen reader on the trigger. It sets the choice
+ * on the app's root itself, before paint, so App only has to place it; the city
+ * watches that attribute for the colours its canvas cannot take from CSS.
+ */
+export function PhosphorMenu() {
+  const { value, onChange } = usePhosphor();
+  const anchor = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    appRoot(anchor.current)?.setAttribute("data-phosphor", value);
+  }, [value]);
+  const active =
+    PHOSPHORS.find((phosphor) => phosphor.value === value) ?? PHOSPHORS[0];
+  return (
+    <span className="contents" ref={anchor}>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={`Phosphor: ${active.label}`}
+          render={<Button data-trigger size="sm" variant="outline" />}
+        >
+          <Swatch color={active.color} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          {/* A group label sits inside its Group, or Base UI throws at open time. */}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Phosphor</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              onValueChange={(next) => onChange(next as Phosphor)}
+              value={value}
+            >
+              {PHOSPHORS.map((phosphor) => (
+                <DropdownMenuRadioItem
+                  key={phosphor.value}
+                  value={phosphor.value}
+                >
+                  <Swatch color={phosphor.color} />
+                  {phosphor.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </span>
   );
 }
 
