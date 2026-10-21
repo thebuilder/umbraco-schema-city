@@ -2959,11 +2959,29 @@ export default function Scene({
   // which is kept per placement map and edge list, so this routes nothing again.
   // The fingers stand on the city's boards, so a focus, which lays the
   // neighbourhood out over them, shows none.
+  // The layers that are off still draw on a hover or a selection, so their traces
+  // go to the names as well, for the board under a print a lit line runs through.
   const boardMarks = useMemo(() => {
-    const routes = planRoutes(routed.placementsById, drawnEdges)
-      .routes.filter(({ edge }) => active.has(LAYER_OF[edge.kind]))
-      .map(({ edge, points }) => ({ from: edge.from, to: edge.to, points }));
-    return boardMarksOf(routes, routed.placementsById, boards, focus === null);
+    const routes = planRoutes(routed.placementsById, drawnEdges).routes.map(
+      ({ edge, points }) => ({
+        from: edge.from,
+        to: edge.to,
+        points,
+        on: active.has(LAYER_OF[edge.kind]),
+      })
+    );
+    return {
+      ...boardMarksOf(
+        routes.filter((route) => route.on),
+        routed.placementsById,
+        boards,
+        focus === null
+      ),
+      offTraces: tracesOf(
+        routes.filter((route) => !route.on),
+        (id) => routed.placementsById.get(id)?.position
+      ),
+    };
   }, [routed, drawnEdges, active, focus, boards]);
 
   const boardColours = useMemo(
@@ -3170,6 +3188,7 @@ export default function Scene({
             floated={floated}
             interaction={interaction}
             nodesById={nodesById}
+            offTraces={boardMarks.offTraces}
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}

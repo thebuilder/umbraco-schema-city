@@ -401,8 +401,8 @@ type Inputs = {
   geometry: THREE.BufferGeometry;
   courtyards: THREE.BufferGeometry;
   knockouts: THREE.BufferGeometry;
-  /** The drawn traces through a rectangle on the board. */
-  traceAt: (rect: Rect) => Trace[];
+  /** The ground traces of the layers that are off, through a rectangle. */
+  offTraceAt: (rect: Rect) => Trace[];
   /** Every building where it stands now, in the city's order the courtyards follow. */
   standing: Placement[];
   /** Every building where the solution placed it, in the same order. */
@@ -583,13 +583,12 @@ function shownKnockout(
   alpha: number
 ): number {
   if (inputs.onPlaza.has(one.id)) return 0;
-  return knockoutAlpha(spot, alpha, inputs.traceAt, inputs.interaction);
+  return knockoutAlpha(spot, alpha, inputs.offTraceAt, inputs.interaction);
 }
 
 /**
  * Writes the knockout in slot `slot`: under the print when it lies over a trace, at
- * `alpha`, and gone otherwise. A trace the hover or the selection lights keeps its
- * print's knockout off, so the lit path shows the whole way.
+ * `alpha`, and gone otherwise.
  */
 function writeKnockout(
   inputs: Inputs,
@@ -922,17 +921,19 @@ function useRepaint(
 
 /**
  * Where every name prints, solved once per settled layout. Only a new layout, new
- * traces or new usage solve it again, so a camera move never moves a name.
+ * traces or new usage solve it again, so a camera move never moves a name. The
+ * traces of the layers that are off are only indexed, for the knockouts.
  */
 function useSolution(
   cityPlacements: readonly Placement[],
   settledById: Map<string, Placement>,
   atlas: ReturnType<typeof useNameMesh>["atlas"],
   usage: UsageReport | undefined,
-  traces: readonly Trace[],
+  traces: { on: readonly Trace[]; off: readonly Trace[] },
   edges: ReadonlyMap<string, Edge> | undefined
 ) {
-  const traceAt = useMemo(() => traceIndex(traces), [traces]);
+  const traceAt = useMemo(() => traceIndex(traces.on), [traces.on]);
+  const offTraceAt = useMemo(() => traceIndex(traces.off), [traces.off]);
   const settled = useMemo(
     () =>
       cityPlacements.map(
@@ -951,7 +952,7 @@ function useSolution(
       ),
     [settled, atlas, usage, traceAt, edges]
   );
-  return { traceAt, settled, solution };
+  return { settled, solution, offTraceAt };
 }
 
 export function BoardLabels({
@@ -965,6 +966,7 @@ export function BoardLabels({
   palette,
   reducedMotion,
   traces,
+  offTraces,
   boardColours,
   textScale,
   boards,
@@ -985,6 +987,12 @@ export function BoardLabels({
   reducedMotion: boolean;
   /** The ground traces of the layers drawn now, which a print keeps off where it can. */
   traces: readonly Trace[];
+  /**
+   * The ground traces of the layers that are off. A hover or a selection still draws
+   * the ones that touch its type, and a print over one clears the board under it.
+   * They never move a print, so a click does not shuffle the names.
+   */
+  offTraces: readonly Trace[];
   /** Each board's colour by district id, for the bare board under a print. */
   boardColours: Map<string, THREE.Color>;
   /** How many times the usual pixels a board targets for its print size, 1.4 when presenting. */
@@ -1008,12 +1016,12 @@ export function BoardLabels({
     cityPlacements,
     boardColours
   );
-  const { traceAt, settled, solution } = useSolution(
+  const { settled, solution, offTraceAt } = useSolution(
     cityPlacements,
     settledById,
     atlas,
     usage,
-    traces,
+    { on: traces, off: offTraces },
     boards.edges
   );
 
@@ -1023,7 +1031,7 @@ export function BoardLabels({
       geometry,
       courtyards,
       knockouts,
-      traceAt,
+      offTraceAt,
       // A building the screen has not reached yet, for the one render a new schema
       // takes, stands where the city put it.
       standing: cityPlacements.map(
@@ -1043,7 +1051,7 @@ export function BoardLabels({
       geometry,
       courtyards,
       knockouts,
-      traceAt,
+      offTraceAt,
       cityPlacements,
       placementsById,
       settled,
