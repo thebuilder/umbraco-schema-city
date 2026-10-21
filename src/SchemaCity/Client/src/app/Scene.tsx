@@ -3049,8 +3049,7 @@ export default function Scene({
           <Buildings
             cells={cells}
             heights={heights}
-            hovered={hovered}
-            neighbours={neighbours}
+            interaction={interaction}
             onFocus={onFocus}
             onHover={setHovered}
             onSelect={onSelect}
@@ -3059,7 +3058,6 @@ export default function Scene({
             plazas={plazas}
             reducedMotion={reducedMotion}
             scale={scale ?? null}
-            selected={selected}
             windows={windows}
           />
           <BuildingOutlines
@@ -3070,6 +3068,7 @@ export default function Scene({
           <BuildingFrames
             heights={heights}
             hovered={hovered}
+            hoveredNeighbours={hoveredNeighbours}
             palette={palette}
             placementsById={placementsById}
             reducedMotion={reducedMotion}

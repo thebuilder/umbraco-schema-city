@@ -104,6 +104,22 @@ describe("paintPart", () => {
     expect(faded.g).toBeCloseTo(plain.g * 0.2);
     expect(flat.g).toBeLessThan(faded.g);
   });
+
+  it("lights what a hover's lines reach, a step below the hovered one, and lets the rest recede", () => {
+    const g = (id: string, extra: Partial<PaintState>) =>
+      paintPart("own", id, colours, state(extra), new THREE.Color()).g;
+    const hover = {
+      hovered: "page",
+      hoveredNeighbours: new Set(["page", "near"]),
+    };
+    const plain = g("near", {});
+    expect(g("near", hover)).toBeGreaterThan(plain);
+    expect(g("near", hover)).toBeLessThan(g("page", hover));
+    expect(g("far", hover)).toBeLessThan(plain);
+    // A selection already decides what is faded, so the hover leaves the rest alone.
+    const selected = { ...hover, neighbours: new Set(["far"]) };
+    expect(g("far", selected)).toBeCloseTo(plain);
+  });
 });
 
 describe("change layer", () => {
