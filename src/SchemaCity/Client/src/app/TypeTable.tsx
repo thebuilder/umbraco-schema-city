@@ -12,6 +12,7 @@ import {
 } from "react";
 import { Input } from "@/components/ui/input";
 import type { ChangeGroups, ChangeKind } from "../model/changes";
+import { storedByElementType } from "../model/data-types";
 import type { Finding } from "../model/findings";
 import { contentCountOf, type Role, roleOf } from "../model/inspector";
 import { neighbourhoods } from "../model/neighbourhood";
@@ -37,6 +38,11 @@ export type TypeRow = {
    * a 0 there would read as unused.
    */
   usage: number | null;
+  /**
+   * Stored blocks of an Element Type, its counterpart to Content, so an Element
+   * Type's row has a count too. Null for a page or before the block count arrives.
+   */
+  blocks: number | null;
   /** How the type changed against the baseline, while one is loaded. */
   change?: ChangeKind | "none";
 };
@@ -65,6 +71,7 @@ export function typeRows(
     new Map(graph.nodes.map((node) => [node.id, node])),
     graph.edges ?? []
   );
+  const stored = usage?.blocks ? storedByElementType(usage) : null;
 
   return graph.nodes.map((node) => ({
     id: node.id,
@@ -76,6 +83,8 @@ export function typeRows(
     composed: node.composedPropertyCount,
     children: children.get(node.id) ?? 0,
     usage: countOf(node.id) ?? null,
+    blocks:
+      stored && node.isElement ? (stored.get(node.id)?.blocks ?? 0) : null,
     ...(kinds ? { change: kinds.get(node.id) ?? "none" } : {}),
   }));
 }
@@ -271,6 +280,7 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: "composed", label: "Composed", numeric: true },
   { key: "children", label: "Allowed children", numeric: true },
   { key: "usage", label: "Content", numeric: true },
+  { key: "blocks", label: "Blocks", numeric: true },
   { key: "change", label: "Change" },
 ];
 
@@ -384,11 +394,16 @@ type Compare = { baseline: SchemaGraph; changes: ChangeGroups };
  */
 export const CompareContext = createContext<Compare | null>(null);
 
-/** The columns that have something to say: Content with usage, Change with a baseline. */
+/**
+ * The columns that have something to say: Content with usage, Blocks once the
+ * usage report has counted them, Change with a baseline.
+ */
 const columnsFor = (usage: UsageReport | undefined, compare: Compare | null) =>
   COLUMNS.filter(
     (column) =>
-      (column.key !== "usage" || usage) && (column.key !== "change" || compare)
+      (column.key !== "usage" || usage) &&
+      (column.key !== "blocks" || usage?.blocks) &&
+      (column.key !== "change" || compare)
   );
 
 /**
@@ -573,6 +588,7 @@ export function TypeTable({
                   <Count on={on} value={row.composed} />
                   <Count on={on} value={row.children} />
                   {usage ? <Count on={on} value={row.usage} /> : null}
+                  {usage?.blocks ? <Count on={on} value={row.blocks} /> : null}
                   <ChangeCell change={row.change} />
                 </tr>
               );

@@ -240,39 +240,48 @@ function Unreachable({
     (entry) => matched === null || matched.has(entry.id)
   );
   const excluded = exclusionLine(tree.excluded);
+  // The note on Element Types is about the whole tree, so it comes last and on its
+  // own. Under the heading it read as that section's explanation, and under an empty
+  // "Not reachable from any root 0" the heading had nothing else to head.
+  const note = excluded ? (
+    <p className="mt-6 text-label text-xs">{excluded}</p>
+  ) : null;
+  if (tree.unreachable.length === 0) return note;
   return (
-    <section className="mt-6">
-      <Heading count={tree.unreachable.length}>
-        Not reachable from any root
-      </Heading>
-      {excluded ? <p className="mb-2 text-label text-xs">{excluded}</p> : null}
-      <ul>
-        {shown.map((entry) => (
-          <li
-            className={`flex flex-wrap items-center gap-x-2 gap-y-1 py-1 pr-2 pl-1 ${ROW(entry.id === marks.selected)}`}
-            key={entry.id}
-          >
-            <TypeName id={entry.id} marks={marks} />
-            <span className="text-label text-xs">
-              {entry.parents.length === 0
-                ? "no allowed parent"
-                : "allowed under"}
-            </span>
-            {entry.parents.length > 0 ? (
-              <TypeChips
-                chips={chips(entry.parents, marks.names, marks.countOf)}
-                limit={4}
-                onSelect={marks.onSelect}
+    <>
+      <section className="mt-6">
+        <Heading count={tree.unreachable.length}>
+          Not reachable from any root
+        </Heading>
+        <ul>
+          {shown.map((entry) => (
+            <li
+              className={`flex flex-wrap items-center gap-x-2 gap-y-1 py-1 pr-2 pl-1 ${ROW(entry.id === marks.selected)}`}
+              key={entry.id}
+            >
+              <TypeName id={entry.id} marks={marks} />
+              <span className="text-label text-xs">
+                {entry.parents.length === 0
+                  ? "no allowed parent"
+                  : "allowed under"}
+              </span>
+              {entry.parents.length > 0 ? (
+                <TypeChips
+                  chips={chips(entry.parents, marks.names, marks.countOf)}
+                  limit={4}
+                  onSelect={marks.onSelect}
+                />
+              ) : null}
+              <Count
+                on={entry.id === marks.selected}
+                value={marks.countOf(entry.id)}
               />
-            ) : null}
-            <Count
-              on={entry.id === marks.selected}
-              value={marks.countOf(entry.id)}
-            />
-          </li>
-        ))}
-      </ul>
-    </section>
+            </li>
+          ))}
+        </ul>
+      </section>
+      {note}
+    </>
   );
 }
 

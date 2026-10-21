@@ -60,6 +60,7 @@ test("a row carries what the table shows about a type", () => {
     // Two allowed children, and the block edge is not one of them.
     children: 2,
     usage: null,
+    blocks: null,
   });
   expect(rows[1].role).toBe("element");
 });
@@ -84,6 +85,38 @@ test("usage is a count when the report is in, and absent when it is not", () => 
   // Card is an Element Type: it never holds content of its own, so it shows no
   // count rather than a 0 that reads as unused, as the inspector chips do.
   expect(typeRows(graph, usage).map((row) => row.usage)).toEqual([12, null, 0]);
+});
+
+test("an Element Type counts its stored blocks, once the usage report has them", () => {
+  const usage: UsageReport = {
+    generatedAt: "",
+    byType: {},
+    references: [],
+    blocks: {
+      partial: false,
+      valuesRead: 2,
+      unreadable: 0,
+      byDataType: [
+        {
+          dataTypeId: "body",
+          values: 2,
+          items: 2,
+          elements: [
+            { elementTypeId: "card", content: 4, settings: 1, items: 2 },
+          ],
+        },
+      ],
+    },
+  };
+  // Pages have Content instead, so their Blocks stay empty rather than 0.
+  expect(typeRows(graph, usage).map((row) => row.blocks)).toEqual([
+    null,
+    5,
+    null,
+  ]);
+  expect(
+    typeRows(graph, { ...usage, blocks: undefined }).map((row) => row.blocks)
+  ).toEqual([null, null, null]);
 });
 
 test("clicking a header sorts by it, and clicking it again turns it round", () => {
