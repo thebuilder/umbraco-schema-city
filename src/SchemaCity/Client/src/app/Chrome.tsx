@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 import type { SchemaGraph, UsageReport } from "../model/types";
 import { plural, SEARCH_KEY, useAnnounce } from "./a11y";
-import { snapshotDate } from "./Findings";
+import { snapshotTimes } from "./Findings";
 import { Legend } from "./Legend";
 import type { Grouping } from "./layout/city";
 import { LAYERS, type Layer } from "./scene/layers";
@@ -98,39 +98,25 @@ export function AppHeader({
 }
 
 /**
- * "08:41" on the day the snapshot was taken, which in the backoffice is nearly
- * always, since it is read when the workspace opens, and "2026-09-01" on any other.
- * The Findings drawer has both halves when the exact minute matters.
- */
-const stamp = (iso: string | undefined, today: string) => {
-  const at = snapshotDate(iso);
-  if (!at) return null;
-  return at.startsWith(today) ? at.slice(11) : at.slice(0, 10);
-};
-
-/**
- * What the footer says about the snapshot the city is drawn from, as "86 types",
- * "schema read 09:12" and "usage 09:13". A date a snapshot does not really have is
- * left out, and usage says when it is still on its way or never came.
+ * What the footer says about the snapshot the city is drawn from: "86 types", and
+ * usage only while it is on its way or when it never came. The times are left out:
+ * the schema is cached until a type or Data Type changes, so its date read as stale
+ * when it meant unchanged, and usage is at most a minute old. Both stay on hover
+ * here, and in full in the Findings drawer and every export.
  */
 export function snapshotParts(
   graph: SchemaGraph,
   usage: UsageReport | undefined,
-  pending: boolean,
-  today = snapshotDate(new Date().toISOString())?.slice(0, 10) ?? ""
+  pending: boolean
 ) {
-  const read = stamp(graph.generatedAt, today);
-  const counted = stamp(usage?.generatedAt, today);
   const usageText = usage
-    ? counted && `usage ${counted}`
+    ? null
     : pending
       ? "usage loading"
       : "usage unavailable";
-  return [
-    plural(graph.nodes.length, "type"),
-    read && `schema read ${read}`,
-    usageText,
-  ].filter(Boolean);
+  return [plural(graph.nodes.length, "type"), usageText].filter(
+    (part): part is string => part !== null
+  );
 }
 
 function SnapshotStatus({
@@ -143,7 +129,10 @@ function SnapshotStatus({
   usagePending?: boolean;
 }) {
   return (
-    <p className="flex min-w-0 flex-wrap items-center gap-x-2 text-2xs text-label">
+    <p
+      className="flex min-w-0 flex-wrap items-center gap-x-2 text-2xs text-label"
+      title={snapshotTimes(graph, usage) || undefined}
+    >
       {snapshotParts(graph, usage, usagePending).join(" · ")}
       {usage?.blocks?.partial ? (
         <span className="text-amber">

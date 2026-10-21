@@ -88,9 +88,9 @@ const GROUPS: Record<Direction, GroupSpec[]> = {
       label: "Give it properties",
       first: ["inherits", "composes"],
     },
-    { key: "blocks", label: "Offered as its blocks", first: ["block"] },
+    { key: "blocks", label: "Blocks it offers", first: ["block"] },
     { key: "children", label: "Allowed under it", first: ["allowsChild"] },
-    { key: "picks", label: "Its pickers allow", first: ["picker"] },
+    { key: "picks", label: "Types its pickers allow", first: ["picker"] },
   ],
 };
 

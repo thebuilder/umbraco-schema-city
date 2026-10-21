@@ -137,7 +137,10 @@ const decisionText = ({ reason, decidedBy, decidedAt }: Decision) =>
 
 // Quiet until hovered: the review is a secondary action next to the links that
 // go somewhere, which keep the green.
-const LINK = "px-1 py-0.5 text-faint text-xs hover:text-prose hover:underline";
+// Phosphor, like the inspector's other text actions: in faint grey, Mark as
+// intentional read as disabled.
+const LINK =
+  "px-1 py-0.5 text-phosphor text-xs hover:text-phosphor-bright hover:underline";
 
 /**
  * A finding's review status and the one action it allows: mark as intentional with

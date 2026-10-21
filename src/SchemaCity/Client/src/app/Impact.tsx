@@ -1,11 +1,10 @@
 // The impact trace: what a change to one type reaches, as a summary in the inspector
 // and as a full page with its controls, the property alias check and the exports.
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Toggle } from "@/components/ui/toggle";
-import { dayOf } from "../model/dates";
 import {
   type AliasImpact,
   aliasImpact,
@@ -70,6 +69,20 @@ const DIRECTIONS: { value: Direction; label: string }[] = [
 const throughOf = (row: ImpactRow) => {
   const path = row.paths[0] ?? [];
   return path.length > 1 ? path[path.length - 2]?.id : undefined;
+};
+
+/**
+ * "via Curated content module", the type the first path arrives through, which says
+ * how a row is reached where "indirect, 2 steps" only said how far. A longer path
+ * names its step count too, since the Path column is a long way to the right.
+ */
+const viaLine = (row: ImpactRow, nameOf: (id: string) => string) => {
+  const through = throughOf(row);
+  const steps = row.paths[0]?.length ?? 0;
+  if (!through) return `${steps.toString()} steps`;
+  return steps > 2
+    ? `via ${nameOf(through)}, ${steps.toString()} steps`
+    : `via ${nameOf(through)}`;
 };
 
 /** Template names, the first `limit` of them, as the chips cut a long list. */
@@ -221,6 +234,12 @@ function Controls({
             size="sm"
             variant="outline"
           >
+            {/* A box that fills, because with all four on by default an on toggle
+                looked like any outline button and off had to be found by clicking. */}
+            <span
+              aria-hidden
+              className={`size-2 shrink-0 border border-current ${relations.includes(relation) ? "bg-current" : ""}`}
+            />
             {RELATION_LABEL[relation]}
           </Toggle>
         ))}
@@ -238,14 +257,25 @@ function Controls({
 
 const CELL = "border-line/60 border-b px-2 py-1.5 text-left align-baseline";
 
-function RowContent({ row }: { row: ImpactRow }) {
+/** The groups a type is in for its properties, where a block count says nothing. */
+const COMPOSITION_GROUPS: GroupKey[] = ["receivers", "sources"];
+
+/**
+ * "31 items", "4 blocks" or "none of its own", one unit per row in one face. An
+ * Element Type reached as a composition, like Page Meta, has no blocks because it is
+ * not used as one, so "0 blocks" there read as unused while 31 pages carry it.
+ */
+function RowContent({ row, group }: { row: ImpactRow; group: GroupKey }) {
   if (row.content !== undefined)
     return (
       <span className={row.content === 0 ? "text-faint" : "text-prose"}>
-        {row.content.toLocaleString()}
+        {plural(row.content, "item")}
       </span>
     );
-  if (row.blocks !== undefined)
+  if (
+    row.blocks !== undefined &&
+    !(row.blocks === 0 && COMPOSITION_GROUPS.includes(group))
+  )
     return (
       <span className={row.blocks === 0 ? "text-faint" : "text-prose"}>
         {plural(row.blocks, "block")}
@@ -303,14 +333,12 @@ function GroupTable({
                 <span className="block truncate font-mono text-2xs text-faint">
                   {row.alias}
                 </span>
-                <span className="block text-2xs text-label">
-                  {row.direct
-                    ? "direct"
-                    : `indirect, ${(row.paths[0]?.length ?? 0).toString()} steps`}
+                <span className="block truncate text-2xs text-label">
+                  {row.direct ? "direct" : viaLine(row, nameOf)}
                 </span>
               </td>
-              <td className={`${CELL} font-mono`}>
-                <RowContent row={row} />
+              <td className={CELL}>
+                <RowContent group={group.key} row={row} />
               </td>
               <td className={`${CELL} text-prose`}>
                 {words(row.paths[0] ?? [])}
@@ -437,6 +465,9 @@ function AliasCheck({
   );
 }
 
+/** How long "Copied 24 lines of Markdown" stays. */
+const COPIED_MS = 4000;
+
 /**
  * Copies the Markdown, or, where the clipboard is refused (an insecure origin, a
  * denied permission), shows it selected in a box so the keyboard copy still works.
@@ -446,6 +477,13 @@ function CopyMarkdown({ text }: { text: () => string }) {
   const [status, setStatus] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
   useAnnounceChange(status || null);
+  // A confirmation, not a state of the page: left up, it still said "Copied" when the
+  // reader came back to a different trace. The fallback's message stays with its box.
+  useEffect(() => {
+    if (!status || fallback !== null) return;
+    const timer = setTimeout(() => setStatus(""), COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [status, fallback]);
   const copy = async () => {
     const markdown = text();
     try {
@@ -599,11 +637,10 @@ function Actions({
  */
 function Results({
   impact,
-  graph,
   usage,
   nameOf,
   onSelect,
-}: Pick<TraceProps, "graph" | "usage" | "onSelect"> & {
+}: Pick<TraceProps, "usage" | "onSelect"> & {
   impact: Impact;
   nameOf: (id: string) => string;
 }) {
@@ -611,9 +648,12 @@ function Results({
     impact.relations.length === 0
       ? "Switch on a relationship to trace it."
       : "Nothing is reached along the chosen relationships.";
+  // The snapshot dates are in the exports and the Findings drawer. Here they
+  // repeated under every trace, and a schema date reads as stale when it only
+  // means nothing changed since.
   const counted = usage
-    ? `usage counted ${dayOf(usage.generatedAt) ?? "undated"}.`
-    : "usage not loaded, so content counts are missing.";
+    ? ""
+    : " Usage has not loaded, so content counts are missing.";
   return (
     <>
       {impact.groups.length === 0 ? (
@@ -632,7 +672,7 @@ function Results({
       ))}
       <TemplateList impact={impact} nameOf={nameOf} />
       <p className="pt-3 text-faint text-xs">
-        {EVIDENCE} Schema read {dayOf(graph.generatedAt) ?? "undated"},{" "}
+        {EVIDENCE}
         {counted}
       </p>
     </>
@@ -707,7 +747,6 @@ function TracePage(props: TraceProps) {
             result={aliasResult}
           />
           <Results
-            graph={graph}
             impact={impact}
             nameOf={nameOf}
             onSelect={onSelect}

@@ -63,6 +63,17 @@ export function snapshotDate(iso: string | undefined): string | null {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }
 
+/** "Schema read 2026-10-20 17:43, usage counted 2026-10-21 19:27", or less. */
+export function snapshotTimes(graph: SchemaGraph, usage?: UsageReport) {
+  return [
+    ["Schema read", snapshotDate(graph.generatedAt)],
+    ["usage counted", snapshotDate(usage?.generatedAt)],
+  ]
+    .filter(([, date]) => date !== null)
+    .map(([what, date]) => `${what} ${date}`)
+    .join(", ");
+}
+
 /**
  * One finding. The group above it carries the kind and what it means, so the row
  * is the type and what is particular to it. Clicking selects the type, which for a
@@ -183,7 +194,8 @@ function Group({
       </summary>
       <p className="px-3 pb-2 text-label text-xs">{KIND_EXPLANATION[kind]}</p>
       <p className="px-3 pb-2 text-label text-xs">
-        What to do: {KIND_NEXT_STEP[kind]}
+        <span className="block font-medium text-prose">Next step</span>
+        {KIND_NEXT_STEP[kind]}
       </p>
       <div className="border-line/40 border-t bg-panel">
         {rows.map((finding) => (
@@ -199,6 +211,18 @@ function Group({
       </div>
     </details>
   );
+}
+
+/**
+ * What follows the problem count: " and 10 notes to review." after problems, " 12
+ * notes to review." after "No problems.", and the end of the sentence otherwise.
+ * Problems lead, because "12 findings, 0 reviewed, 12 open, 0 open problems" made the
+ * reader add up four numbers to learn nothing needed fixing.
+ */
+function notesLine(problems: number, notes: number) {
+  if (problems > 0)
+    return notes > 0 ? ` and ${plural(notes, "note")} to review.` : " to fix.";
+  return notes > 0 ? ` ${plural(notes, "note")} to review.` : " Nothing open.";
 }
 
 /**
@@ -225,10 +249,6 @@ function Header({
 }) {
   const problems = problemCount(open);
   const reviewed = findings.length - open.length;
-  const dates = [
-    ["Schema read", snapshotDate(graph.generatedAt)],
-    ["usage counted", snapshotDate(usage?.generatedAt)],
-  ].filter(([, date]) => date !== null);
   return (
     <div className="border-line border-b px-4 pt-4 pb-3">
       <SheetTitle className="font-sans font-semibold text-[17px] text-foreground">
@@ -236,14 +256,16 @@ function Header({
       </SheetTitle>
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <p className="text-label">
-          {plural(findings.length, "finding")}, {reviewed.toLocaleString()}{" "}
-          reviewed, {open.length.toLocaleString()} open,{" "}
-          <span className={problems > 0 ? "text-signal" : ""}>
-            {plural(problems, "open problem")}
-          </span>
+          {problems > 0 ? (
+            <span className="text-signal">{plural(problems, "problem")}</span>
+          ) : (
+            "No problems."
+          )}
+          {notesLine(problems, open.length - problems)}
+          {reviewed > 0 ? ` ${reviewed.toLocaleString()} reviewed.` : null}
           {shown === findings.length || shown === open.length
             ? null
-            : `, ${shown} shown`}
+            : ` ${shown.toLocaleString()} shown.`}
         </p>
         <Button
           className={READING}
@@ -255,7 +277,7 @@ function Header({
         </Button>
       </div>
       <p className="mt-1 text-faint text-xs empty:hidden">
-        {dates.map(([what, date]) => `${what} ${date}`).join(", ")}
+        {snapshotTimes(graph, usage)}
       </p>
       {usage ? null : (
         <p className="mt-1 text-faint text-xs">
