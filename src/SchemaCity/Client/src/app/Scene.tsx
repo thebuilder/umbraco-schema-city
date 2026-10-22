@@ -124,7 +124,6 @@ import {
   LABEL_HEIGHT_PX,
   labelAnchors,
   pickLabels,
-  visibleLabelIds,
 } from "./scene/labels";
 import {
   type Anchor,
@@ -902,7 +901,7 @@ function RoadIntroTrace({
   );
 }
 
-/** Above the highest render order a building, roof icon or board print draws at. */
+/** Above every building and roof icon, and under the board prints, which read over a link. */
 const LINK_RENDER_ORDER = 2;
 
 /** Screen-space line material with the same per-segment alpha as the schema geometry. */
@@ -1057,9 +1056,9 @@ function LinkStrokes({
   const material = useMemo(createLinkMaterial, []);
   const lines = useMemo(() => {
     const next = new LineSegments2(geometry, material);
-    // After every transparent building, roof and print. The lines write no depth, so
+    // After every transparent building and roof. The lines write no depth, so
     // a glass floor or a plate's icon sorted after them painted over a link that runs
-    // above it, and the link read as cut. Drawn last, they are still hidden behind
+    // above it, and the link read as cut. Drawn after them, they are still hidden behind
     // whatever solid stands in front of them.
     next.renderOrder = LINK_RENDER_ORDER;
     return next;
@@ -1163,17 +1162,12 @@ const LABEL_CLASS =
  * `pickLabels` keeps the best ranked ones that do not land on each other, and drops
  * the rest. District names are not candidates: they are printed on the ground.
  *
- * Every type's name is printed on the board as well, wherever it fits. A related
- * type whose whole name its board prints legibly at the board's current size gets
- * no floating label, so the screen never says one name twice. That set changes only
- * when a board changes size or a name fades in or out, never with a pan. The hovered
- * and selected types' own prints are left off the board while their floating labels
- * show, through `floated`; every other print stays put.
- *
- * ponytail: the board only knows its print reads, not that it is on screen or that
- * no building stands in front of it. A related type whose print is hidden behind a
- * tall building shows its name nowhere until the camera moves; a depth read of the
- * print's anchor is the upgrade if that turns up.
+ * Every type's name is printed on the board as well, wherever it fits, so only the
+ * hovered type floats one. Boxes for a selection and its neighbours sat over the
+ * very prints and links they named, and made the picture harder to read. The hovered
+ * type's own print is left off the board while its label shows, through `floated`;
+ * every other print stays put. A print the board reads whole keeps a ranked-down
+ * candidate from floating, should neighbours become candidates again.
  *
  * The layer is built and written to by hand rather than through React, because
  * this runs inside the frame loop and forty spans that only ever change their
@@ -1185,9 +1179,6 @@ function Labels({
   heights,
   selected,
   hovered,
-  hoveredNeighbours,
-  neighbours,
-  focusNeighbours,
   floated,
   reducedMotion,
   textScale,
@@ -1197,9 +1188,6 @@ function Labels({
   heights: Map<string, number>;
   selected: string | null;
   hovered: string | null;
-  hoveredNeighbours: Set<string> | null;
-  neighbours: Set<string> | null;
-  focusNeighbours: Set<string> | null;
   /**
    * Written here every repaint: the types that have a floating label now. Read here:
    * the types whose whole name the board prints.
@@ -1222,32 +1210,17 @@ function Labels({
   const framedAt = useRef(new THREE.Matrix4());
   const printedSeen = useRef(-1);
 
-  const candidates = useMemo(() => {
-    const ids = visibleLabelIds({
-      hovered,
-      selected,
-      neighbours,
-      hoveredNeighbours,
-      focusNeighbours,
-    });
-
-    return labelAnchors(ids, {
-      nodesById,
-      placementsById,
-      heights,
-      selected,
-      hovered,
-    });
-  }, [
-    hovered,
-    selected,
-    hoveredNeighbours,
-    neighbours,
-    focusNeighbours,
-    nodesById,
-    placementsById,
-    heights,
-  ]);
+  const candidates = useMemo(
+    () =>
+      labelAnchors(new Set(hovered ? [hovered] : []), {
+        nodesById,
+        placementsById,
+        heights,
+        selected,
+        hovered,
+      }),
+    [hovered, selected, nodesById, placementsById, heights]
+  );
 
   useEffect(() => {
     dirty.current = true;
@@ -3169,11 +3142,8 @@ export default function Scene({
               rather than the last one's. */}
           <Labels
             floated={floated}
-            focusNeighbours={focusNeighbours}
             heights={heights}
             hovered={hovered}
-            hoveredNeighbours={hoveredNeighbours}
-            neighbours={neighbours}
             nodesById={nodesById}
             placementsById={placementsById}
             reducedMotion={reducedMotion}

@@ -1082,9 +1082,10 @@ export function BoardLabels({
         frustumCulled={false}
         geometry={geometry}
         material={material}
-        // After the boards and the traces, which pass under it, and before glass
-        // and the roof icons.
-        renderOrder={0.5}
+        // Last of all, after the links at 2 as well. The print writes no depth and
+        // the links draw over whatever went before them, so a link running above a
+        // name crossed it out. Solid buildings still hide a print behind them.
+        renderOrder={2.5}
       />
     </>
   );
