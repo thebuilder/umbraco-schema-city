@@ -1075,8 +1075,9 @@ export function BoardLabels({
         geometry={knockouts}
         material={knockoutMaterial}
         receiveShadow
-        // Over the traces, under the print it clears the board for.
-        renderOrder={0.4}
+        // Over the traces and the links at 2, under the print it clears the board
+        // for, so a lit link passes under the patch rather than across it.
+        renderOrder={2.4}
       />
       <mesh
         frustumCulled={false}
