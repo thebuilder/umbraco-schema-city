@@ -452,6 +452,8 @@ export type Interaction = {
   /** The selection's or the focus's lit set, or null when nothing is lit. */
   neighbours: Set<string> | null;
   hoveredNeighbours: Set<string> | null;
+  /** The types standing on the focus island, or null outside a focus. */
+  island?: ReadonlySet<string> | null;
 };
 
 /**
@@ -931,13 +933,20 @@ export function traceIndex(traces: readonly Trace[]): (rect: Rect) => Trace[] {
  * name on a map.
  */
 export function knockoutAlpha(
+  id: string,
   spot: { rect: Rect; crosses: boolean } | undefined,
   alpha: number,
   offTraceAt: (rect: Rect) => readonly Trace[],
-  now: { hovered: string | null; selected: string | null }
+  now: {
+    hovered: string | null;
+    selected: string | null;
+    island?: ReadonlySet<string> | null;
+  }
 ): number {
   if (!spot) return 0;
-  if (spot.crosses) return alpha;
+  // On the island every name gets one, or the few a lit line happens to cross read
+  // as marked out from the rest.
+  if (spot.crosses || now.island?.has(id)) return alpha;
   const lit = (id: string) => id === now.hovered || id === now.selected;
   return offTraceAt(spot.rect).some((trace) => lit(trace.from) || lit(trace.to))
     ? alpha

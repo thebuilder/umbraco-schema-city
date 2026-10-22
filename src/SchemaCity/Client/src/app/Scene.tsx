@@ -2877,8 +2877,14 @@ export default function Scene({
     []
   );
   const interaction = useMemo(
-    () => ({ hovered, selected, neighbours, hoveredNeighbours }),
-    [hovered, selected, neighbours, hoveredNeighbours]
+    () => ({
+      hovered,
+      selected,
+      neighbours,
+      hoveredNeighbours,
+      island: focusNeighbours,
+    }),
+    [hovered, selected, neighbours, hoveredNeighbours, focusNeighbours]
   );
   // Pins and roles come from the edges alone, so a focus tween does not recount them.
   const connections = useMemo(() => connectionsOf(graph.edges ?? []), [graph]);

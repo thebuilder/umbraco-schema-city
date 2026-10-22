@@ -583,7 +583,13 @@ function shownKnockout(
   alpha: number
 ): number {
   if (inputs.onPlaza.has(one.id)) return 0;
-  return knockoutAlpha(spot, alpha, inputs.offTraceAt, inputs.interaction);
+  return knockoutAlpha(
+    one.id,
+    spot,
+    alpha,
+    inputs.offTraceAt,
+    inputs.interaction
+  );
 }
 
 /**
