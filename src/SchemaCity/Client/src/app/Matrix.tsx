@@ -210,7 +210,9 @@ function Counted({ name, total }: { name: ReactNode; total: number }) {
  * looks the same from one schema to the next and a column is only as wide as its
  * marks. Each name gets a lane: the column's own borders, leaned over and carried
  * up to the top of the header, so it is boxed in and still lines up with its
- * marks. The lane is also what you click.
+ * marks. The lane is also what you click, and what lights the name. The cell's
+ * box stays upright, so above the lanes to its left it covers bare header, and a
+ * hover on the cell would light a name the pointer is nowhere near.
  */
 function SlantedHeader({
   column,
@@ -220,10 +222,10 @@ function SlantedHeader({
   first,
   zIndex,
 }: HeaderProps & { first: boolean; zIndex: number }) {
-  const lane = `absolute inset-0 origin-bottom-left -skew-x-45 border-line/60 border-r ${first ? "border-l" : ""}`;
+  const lane = `peer absolute inset-0 origin-bottom-left -skew-x-45 border-line/60 border-r ${first ? "border-l" : ""}`;
   return (
     <th
-      className="group sticky top-0 h-40 min-w-8 border-line/60 border-b bg-panel p-0 align-bottom font-normal"
+      className="sticky top-0 h-40 min-w-8 border-line/60 border-b bg-panel p-0 align-bottom font-normal"
       scope="col"
       style={{ zIndex }}
     >
@@ -246,7 +248,7 @@ function SlantedHeader({
           lane. */}
       <span
         aria-hidden
-        className="pointer-events-none absolute bottom-0 left-1/2 block w-52 origin-left translate-y-1/2 -rotate-45 truncate pl-3 text-left text-prose text-xs leading-5 group-hover:text-phosphor group-hover:underline"
+        className="pointer-events-none absolute bottom-0 left-1/2 block w-52 origin-left translate-y-1/2 -rotate-45 truncate pl-3 text-left text-prose text-xs leading-5 peer-hover:text-phosphor peer-hover:underline"
       >
         <Counted name={name} total={column.total} />
       </span>

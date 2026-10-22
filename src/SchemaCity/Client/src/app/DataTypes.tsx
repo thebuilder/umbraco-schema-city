@@ -83,6 +83,18 @@ export type DataTypesProps = {
   roleOf: (node: SchemaNode) => Role;
 };
 
+/**
+ * Scrolls the list alone so the row sits halfway down it. scrollIntoView scrolls
+ * every ancestor that can scroll as well, and in the backoffice one of those is
+ * Umbraco's own layout, which slid its header out of view.
+ */
+function centreInList(list: HTMLElement | null | undefined, row: HTMLElement) {
+  if (!list) return;
+  const offset =
+    row.getBoundingClientRect().top - list.getBoundingClientRect().top;
+  list.scrollTop += offset - (list.clientHeight - row.offsetHeight) / 2;
+}
+
 export function DataTypes(props: DataTypesProps) {
   const { graph, usage, findings, selected, onChoose } = props;
   const [query, setQuery] = useState("");
@@ -111,10 +123,10 @@ export function DataTypes(props: DataTypesProps) {
   // A link from elsewhere chooses a row that can be far down the list.
   const list = useRef<HTMLTableElement>(null);
   useEffect(() => {
-    if (selected)
-      list.current
-        ?.querySelector('[aria-current="true"]')
-        ?.scrollIntoView({ block: "center" });
+    const row = selected
+      ? list.current?.querySelector<HTMLElement>('[aria-current="true"]')
+      : null;
+    if (row) centreInList(list.current?.parentElement, row);
   }, [selected]);
 
   useAnnounceChange(`${shown.length} of ${rows.length} Data Types`);

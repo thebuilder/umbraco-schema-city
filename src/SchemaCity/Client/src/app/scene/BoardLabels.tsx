@@ -583,7 +583,13 @@ function shownKnockout(
   alpha: number
 ): number {
   if (inputs.onPlaza.has(one.id)) return 0;
-  return knockoutAlpha(spot, alpha, inputs.offTraceAt, inputs.interaction);
+  return knockoutAlpha(
+    one.id,
+    spot,
+    alpha,
+    inputs.offTraceAt,
+    inputs.interaction
+  );
 }
 
 /**
@@ -1075,16 +1081,18 @@ export function BoardLabels({
         geometry={knockouts}
         material={knockoutMaterial}
         receiveShadow
-        // Over the traces, under the print it clears the board for.
-        renderOrder={0.4}
+        // Over the traces and the links at 2, under the print it clears the board
+        // for, so a lit link passes under the patch rather than across it.
+        renderOrder={2.4}
       />
       <mesh
         frustumCulled={false}
         geometry={geometry}
         material={material}
-        // After the boards and the traces, which pass under it, and before glass
-        // and the roof icons.
-        renderOrder={0.5}
+        // Last of all, after the links at 2 as well. The print writes no depth and
+        // the links draw over whatever went before them, so a link running above a
+        // name crossed it out. Solid buildings still hide a print behind them.
+        renderOrder={2.5}
       />
     </>
   );

@@ -851,23 +851,41 @@ describe("traces under the prints", () => {
     const none = traceIndex([]);
     const rect = printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false);
     const rest = { hovered: null, selected: null };
-    expect(knockoutAlpha({ rect, crosses: true }, 0.8, none, rest)).toBe(0.8);
+    expect(knockoutAlpha("x", { rect, crosses: true }, 0.8, none, rest)).toBe(
+      0.8
+    );
     expect(
-      knockoutAlpha({ rect, crosses: true }, 0.8, none, {
+      knockoutAlpha("x", { rect, crosses: true }, 0.8, none, {
         ...rest,
         hovered: "c",
       })
     ).toBe(0.8);
-    expect(knockoutAlpha({ rect, crosses: false }, 0.8, none, rest)).toBe(0);
-    expect(knockoutAlpha(undefined, 0.8, off, rest)).toBe(0);
+    expect(knockoutAlpha("x", { rect, crosses: false }, 0.8, none, rest)).toBe(
+      0
+    );
+    expect(knockoutAlpha("x", undefined, 0.8, off, rest)).toBe(0);
     // A layer that is off draws only the traces of the hovered or selected type.
-    expect(knockoutAlpha({ rect, crosses: false }, 0.8, off, rest)).toBe(0);
+    expect(knockoutAlpha("x", { rect, crosses: false }, 0.8, off, rest)).toBe(
+      0
+    );
     expect(
-      knockoutAlpha({ rect, crosses: false }, 0.8, off, {
+      knockoutAlpha("x", { rect, crosses: false }, 0.8, off, {
         ...rest,
         selected: "p",
       })
     ).toBe(0.8);
+  });
+
+  it("clears the board under every print on the focus island", () => {
+    const rect = printRect({ x: 0, z: 0 }, 4, 6, 2, "front", false);
+    const focus = { hovered: null, selected: "p", island: new Set(["x"]) };
+    const none = traceIndex([]);
+    expect(knockoutAlpha("x", { rect, crosses: false }, 0.8, none, focus)).toBe(
+      0.8
+    );
+    expect(knockoutAlpha("y", { rect, crosses: false }, 0.8, none, focus)).toBe(
+      0
+    );
   });
 
   it("lays a knockout a little inside the print's lines and past its ends", () => {

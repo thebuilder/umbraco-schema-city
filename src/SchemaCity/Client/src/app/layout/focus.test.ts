@@ -303,8 +303,9 @@ describe("layoutFocus", () => {
     expect(moved.length).toBe(43);
     // The buildings themselves, before the island's padding around them. It was 65
     // until the smallest footprint grew from 2.4 to 3.2, and the depth grew to about
-    // 81 once every row kept a strip in front of it for its names.
-    expect(bounds.maxX - bounds.minX - ISLAND_PAD * 2).toBeLessThan(72);
+    // 81 once every row kept a strip in front of it for its names. The width grew
+    // from about 66 to 78 once a row left room for two names side by side.
+    expect(bounds.maxX - bounds.minX - ISLAND_PAD * 2).toBeLessThan(80);
     expect(bounds.maxZ - bounds.minZ - ISLAND_PAD * 2).toBeLessThan(84);
   });
 

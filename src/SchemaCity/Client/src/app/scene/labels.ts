@@ -120,34 +120,6 @@ export function pickLabels(
   return kept;
 }
 
-/** Names appear through interaction; the idle overview has no persistent markers. */
-export function visibleLabelIds({
-  hovered,
-  selected,
-  neighbours,
-  hoveredNeighbours,
-  focusNeighbours,
-}: {
-  hovered: string | null;
-  selected: string | null;
-  neighbours: Set<string> | null;
-  hoveredNeighbours: Set<string> | null;
-  focusNeighbours: Set<string> | null;
-}): Set<string> {
-  const ids = new Set<string>();
-  if (hovered) ids.add(hovered);
-  for (const id of hoveredNeighbours ?? []) {
-    if (!focusNeighbours || focusNeighbours.has(id)) ids.add(id);
-  }
-  if (focusNeighbours) {
-    for (const id of focusNeighbours) ids.add(id);
-  } else if (selected) {
-    ids.add(selected);
-  }
-  for (const id of neighbours ?? []) ids.add(id);
-  return ids;
-}
-
 /** World-space anchors; projection and DOM updates stay in the renderer. */
 export function labelAnchors(
   ids: Set<string>,
