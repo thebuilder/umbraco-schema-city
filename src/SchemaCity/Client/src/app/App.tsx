@@ -515,13 +515,14 @@ export function App({
   // whole layout with it. The lists you are reading are what you fly between.
   const followLink = (id: string) => (focus ? enterFocus(id) : setSelected(id));
 
-  // Every Data Type name in the app links here: its page, with the drawers that
-  // can hold such a link closed so the page is what you see.
+  // Every Data Type name in the app links here: its page, with the drawers and
+  // the inspector that can hold such a link closed so the page is what you see.
   const dataTypeLinks = useMemo(
     () => ({
       open: (id: string) => {
         setFindingsOpen(false);
         setComparisonOpen(false);
+        putDown();
         setDataType(id);
         setView("datatypes");
       },
@@ -683,7 +684,14 @@ export function App({
                     }}
                     dataTypes={{
                       selected: dataType,
-                      onChoose: setDataType,
+                      // One detail at a time: a Data Type chosen from the list
+                      // closes the inspector, and a type opened from a Data Type
+                      // takes the place of its details until it closes.
+                      onChoose: (id) => {
+                        putDown();
+                        setDataType(id);
+                      },
+                      covered: Boolean(selectedNode),
                       onOpenDataType,
                       onShowInCity: (id) =>
                         showInCity(
