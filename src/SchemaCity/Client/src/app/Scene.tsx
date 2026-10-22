@@ -919,10 +919,16 @@ const linkRenderOrder = (layer: Exclude<Layer, "structure">) =>
 const LINK_WIDTH = 1.2;
 
 /**
- * Pixels a click may land beside a line and still pick it, so thinning the links
- * did not also make them harder to hit than at their old width.
+ * Lets a click land half a pixel beside a link and still pick it, so thinning the
+ * links did not also make them harder to hit than at their old width.
  */
-const LINK_PICK = { threshold: 0.5 };
+function LinkPick() {
+  const raycaster = useThree((state) => state.raycaster);
+  useEffect(() => {
+    raycaster.params.Line2 = { threshold: 0.5 };
+  }, [raycaster]);
+  return null;
+}
 
 /** Screen-space line material with the same per-segment alpha as the schema geometry. */
 function createLinkMaterial(): LineMaterial {
@@ -1077,10 +1083,6 @@ function LinkStrokes({
     return next;
   }, [positions]);
   const material = useMemo(createLinkMaterial, []);
-  const raycaster = useThree((state) => state.raycaster);
-  useEffect(() => {
-    raycaster.params.Line2 = LINK_PICK;
-  }, [raycaster]);
   const lines = useMemo(() => {
     const next = new LineSegments2(geometry, material);
     next.renderOrder = renderOrder;
@@ -3034,6 +3036,7 @@ export default function Scene({
           shadows="percentage"
         >
           <ReleaseResources />
+          <LinkPick />
           <RedrawOnRender />
           <SkipOpening />
           <BootProgress onPhase={setBootPhase} reducedMotion={reducedMotion} />
