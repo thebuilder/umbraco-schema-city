@@ -901,8 +901,16 @@ function RoadIntroTrace({
   );
 }
 
-/** Above every building and roof icon, and under the board prints, which read over a link. */
-const LINK_RENDER_ORDER = 2;
+/**
+ * Where a link layer draws. The composition arcs go after every building, roof and
+ * board print: they write no depth, so a glass floor or a plate's icon sorted after
+ * them painted over an arc that runs above it, and the arc read as cut. The block and
+ * reference links run along the street instead, so they go before the board prints,
+ * which read over them, and before the glass, which tints them like anything else
+ * behind it. Either way a link is still hidden behind whatever solid stands in front.
+ */
+const linkRenderOrder = (layer: Exclude<Layer, "structure">) =>
+  layer === "compositions" ? 2 : 0.45;
 
 /** Screen-space line material with the same per-segment alpha as the schema geometry. */
 function createLinkMaterial(): LineMaterial {
@@ -1026,6 +1034,7 @@ function Links({
         positions={positions}
         ranges={ranges}
         reducedMotion={reducedMotion}
+        renderOrder={linkRenderOrder(layer)}
         visible={visible}
       />
     </>
@@ -1038,6 +1047,7 @@ function LinkStrokes({
   ranges,
   positions,
   reducedMotion,
+  renderOrder,
   visible,
   onPick,
 }: {
@@ -1045,6 +1055,7 @@ function LinkStrokes({
   ranges: { edges: SchemaEdge[]; start: number; count: number }[];
   positions: Float32Array;
   reducedMotion: boolean;
+  renderOrder: number;
   visible: boolean;
   onPick: PickConnection;
 }) {
@@ -1056,13 +1067,9 @@ function LinkStrokes({
   const material = useMemo(createLinkMaterial, []);
   const lines = useMemo(() => {
     const next = new LineSegments2(geometry, material);
-    // After every transparent building and roof. The lines write no depth, so
-    // a glass floor or a plate's icon sorted after them painted over a link that runs
-    // above it, and the link read as cut. Drawn after them, they are still hidden behind
-    // whatever solid stands in front of them.
-    next.renderOrder = LINK_RENDER_ORDER;
+    next.renderOrder = renderOrder;
     return next;
-  }, [geometry, material]);
+  }, [geometry, material, renderOrder]);
   const materialRef = useRef<LineMaterial>(material);
   const linesRef = useRef<LineSegments2>(null);
   useLayerReveal(

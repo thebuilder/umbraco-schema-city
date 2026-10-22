@@ -31,6 +31,7 @@ import {
   fadeToward,
   fitName,
   fittedFontPx,
+  followed,
   footprintRect,
   KNOCKOUT_VERTICES,
   knockout,
@@ -364,6 +365,37 @@ describe("level of detail", () => {
     expect(
       boardTextPx(0.5, 1000, { x: 0, y: -1, z: 5 }, { x: 0, y: 0, z: 0 })
     ).toBe(0);
+  });
+});
+
+describe("followed", () => {
+  const rest = {
+    hovered: null,
+    selected: null,
+    neighbours: null,
+    hoveredNeighbours: null,
+  };
+
+  it("follows the selection, what it lights and the focus island, not the hover", () => {
+    const now = {
+      ...rest,
+      hovered: "h",
+      selected: "s",
+      neighbours: new Set(["n"]),
+      hoveredNeighbours: new Set(["hn"]),
+      island: new Set(["i"]),
+    };
+    expect(["s", "n", "i"].map((id) => followed(id, now))).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(["h", "hn", "x"].map((id) => followed(id, now))).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(followed("a", rest)).toBe(false);
   });
 });
 
@@ -1494,6 +1526,17 @@ describe("stepName", () => {
     expect(stepName(fades, solution, 0, at(6.2), still)).toBe(2);
     expect(stepName(fades, solution, 0, at(5.9), still)).toBe(-1);
     expect(fades.presence[2]).toBe(0);
+  });
+
+  it("prints a followed name however small it reads", () => {
+    const fades = newFades(1);
+    fades.tiers.set("d", 2);
+    const far = { ...name, perEm: 1 };
+    const still = { flipped: false, step: 1 };
+    expect(stepName(fades, solution, 0, far, still)).toBe(-1);
+    expect(stepName(fades, solution, 0, { ...far, always: true }, still)).toBe(
+      2
+    );
   });
 
   it("shows nothing on a board the camera has not sized yet", () => {

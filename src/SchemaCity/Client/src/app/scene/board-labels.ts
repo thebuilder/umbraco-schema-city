@@ -456,6 +456,12 @@ export type Interaction = {
   island?: ReadonlySet<string> | null;
 };
 
+/** Whether `id` is the selection, or lit by it or by the focus. */
+export const followed = (id: string, now: Interaction): boolean =>
+  id === now.selected ||
+  now.neighbours?.has(id) === true ||
+  now.island?.has(id) === true;
+
 /**
  * How much of its strength a name keeps under the hover and the selection: all of
  * it at rest, for the hovered and selected types and for a related type, and
@@ -1534,8 +1540,18 @@ export const placedAt = (
   id: string
 ): Placed | undefined => solution.placed[flipped ? 1 : 0]?.[level]?.get(id);
 
-/** One name as a repaint sees it: pixels per unit of print at its ground, its sizes. */
-export type NameView = { id: string; perEm: number; ems: readonly number[] };
+/**
+ * One name as a repaint sees it: pixels per unit of print at its ground, its sizes,
+ * and whether it prints however small it reads. A name the selection or the focus
+ * lights is one the reader is following, so it prints on its plate even far off,
+ * rather than vanishing or floating in a box over the city.
+ */
+export type NameView = {
+  id: string;
+  perEm: number;
+  ems: readonly number[];
+  always?: boolean;
+};
 
 /** Whether size `k` of a name reads at `px`, kept between repaints for the band. */
 function readsAt(fades: Fades, k: number, px: number): boolean {
@@ -1569,7 +1585,9 @@ export function stepName(
   let shown = -1;
   for (let level = 0; level < LEVELS; level++) {
     const k = slot * LEVELS + level;
-    const reads = readsAt(fades, k, name.perEm * (name.ems[level] as number));
+    const reads =
+      readsAt(fades, k, name.perEm * (name.ems[level] as number)) ||
+      name.always === true;
     const show =
       reads &&
       level === tier &&
