@@ -1,4 +1,5 @@
-import { use, useRef, useState } from "react";
+import { ChevronRightIcon } from "lucide-react";
+import { use, useId, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -77,7 +78,9 @@ export function snapshotTimes(graph: SchemaGraph, usage?: UsageReport) {
 /**
  * One finding. The group above it carries the kind and what it means, so the row
  * is the type and what is particular to it. Clicking selects the type, which for a
- * broken block reference is the host: the missing Element Type has no building. A
+ * broken block reference is the host: the missing Element Type has no building. The
+ * name is green and a chevron ends the row, the way every other link that goes
+ * somewhere reads, since a plain name read as text nobody thought to click. A
  * finding about a Data Type alone opens that Data Type's page instead, and the Data
  * Types a type's finding names are links under it. Its review status and action
  * sit at the bottom.
@@ -99,16 +102,22 @@ function Row({
   return (
     <div className="border-line/40 border-t first:border-t-0">
       <button
-        className="group block w-full px-3 py-1.5 text-left hover:bg-accent/50"
+        className="group flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent/50"
         onClick={() =>
           nodeId ? onSelect(nodeId) : onDataType(dataTypeIds[0] ?? "")
         }
         type="button"
       >
-        <span className="block truncate text-prose group-hover:text-phosphor">
-          {name}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-phosphor group-hover:text-phosphor-bright group-hover:underline">
+            {name}
+          </span>
+          <span className="block text-label text-xs">{finding.summary}</span>
         </span>
-        <span className="block text-label text-xs">{finding.summary}</span>
+        <ChevronRightIcon
+          aria-hidden
+          className="size-4 shrink-0 text-faint group-hover:text-phosphor"
+        />
       </button>
       {nodeId && dataTypeIds.length > 0 ? (
         <p className="flex flex-wrap gap-x-2 px-3 pb-1.5 text-faint text-xs">
@@ -159,9 +168,10 @@ const TONE: Record<
 };
 
 /**
- * The findings of one kind under a header that says once what they mean. Problems
- * start open and notes closed; picking a note's chip opens it, since that is a
- * request to read it.
+ * The findings of one kind under a header. Problems start open and notes closed;
+ * picking a note's chip opens it, since that is a request to read it. What the kind
+ * means and what to do wait behind Why?, as on the inspector's check cards, so an
+ * open group leads with its types rather than a paragraph above them.
  */
 function Group({
   kind,
@@ -183,33 +193,67 @@ function Group({
   const tone = TONE[rows[0]?.severity ?? "note"];
   const links = use(DataTypeLinks);
   const nameOf = (finding: Finding) => subjectName(finding, nodesById, links);
+  const [expanded, setExpanded] = useState(open);
+  const [why, setWhy] = useState(false);
+  // A chip picked later opens the group, as the open attribute did on a details
+  // element. Unpicking it leaves the group as the reader left it.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setExpanded(true);
+  }
+  const rowsId = useId();
+  const whyId = useId();
   return (
-    <details className={`border-l-2 bg-muted ${tone.border}`} open={open}>
-      <summary className="flex cursor-pointer items-baseline gap-2 px-3 pt-2.5 pb-1">
-        <span className={`font-semibold ${tone.text}`}>
-          {FINDING_LABEL[kind]}
-        </span>
-        <span className="font-mono text-2xs text-faint">{rows.length}</span>
-        <span className={`ml-auto text-xs ${tone.text}`}>{tone.word}</span>
-      </summary>
-      <p className="px-3 pb-2 text-label text-xs">{KIND_EXPLANATION[kind]}</p>
-      <p className="px-3 pb-2 text-label text-xs">
-        <span className="block font-medium text-prose">Next step</span>
-        {KIND_NEXT_STEP[kind]}
-      </p>
-      <div className="border-line/40 border-t bg-panel">
-        {rows.map((finding) => (
-          <Row
-            finding={finding}
-            key={finding.id}
-            name={nameOf(finding)}
-            onDataType={onDataType}
-            onReviewed={onReviewed}
-            onSelect={onSelect}
-          />
-        ))}
+    <section className={`border-l-2 bg-muted ${tone.border}`}>
+      <div className="flex items-baseline gap-2 px-3 py-2.5">
+        <button
+          aria-controls={rowsId}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-baseline gap-2 text-left"
+          onClick={() => setExpanded(!expanded)}
+          type="button"
+        >
+          <span className={`font-semibold ${tone.text}`}>
+            {FINDING_LABEL[kind]}
+          </span>
+          <span className="font-mono text-2xs text-faint">{rows.length}</span>
+          <span className={`ml-auto text-xs ${tone.text}`}>{tone.word}</span>
+        </button>
+        <button
+          aria-controls={whyId}
+          aria-expanded={why}
+          className="shrink-0 text-faint text-xs hover:text-prose"
+          onClick={() => setWhy(!why)}
+          type="button"
+        >
+          {why ? "Hide" : "Why?"}
+        </button>
       </div>
-    </details>
+      {why ? (
+        <div className="space-y-2 px-3 pb-2.5 text-label text-xs" id={whyId}>
+          <p>{KIND_EXPLANATION[kind]}</p>
+          <p>
+            <span className="block font-medium text-prose">Next step</span>
+            {KIND_NEXT_STEP[kind]}
+          </p>
+        </div>
+      ) : null}
+      {expanded ? (
+        <div className="border-line/40 border-t bg-panel" id={rowsId}>
+          {rows.map((finding) => (
+            <Row
+              finding={finding}
+              key={finding.id}
+              name={nameOf(finding)}
+              onDataType={onDataType}
+              onReviewed={onReviewed}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
