@@ -1,15 +1,18 @@
-// The Legend button and what it opens: how to read a building and a line, basics
-// first, for someone who has never seen the city. Kept out of App so the toolbar
+// The Legend button and the window it opens: how to read a building and a line,
+// basics first, in as few words as each mark needs. Kept out of App so the toolbar
 // there only places the button.
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { XIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+
+/** What a press or a focus elsewhere sends, which leaves the window open. */
+const STAYS_OPEN_ON = new Set<string>(["outside-press", "focus-out"]);
 
 /** One edge style, drawn the way the scene draws it. */
 function EdgeMark({
@@ -59,39 +62,40 @@ function Title({ children }: { children: ReactNode }) {
   );
 }
 
-const LIST = "mt-2 space-y-1.5 text-muted-foreground text-xs";
+const LIST = "mt-1.5 space-y-1 text-muted-foreground text-xs";
 
 /**
  * Every mark differs by shape as well as colour, so no two rows can be mistaken for
  * each other: a solid block, a glass outline, a flat board, a lit top edge, a dot.
+ * The words never name a colour, since a phosphor preset can move every one of
+ * them; the mark beside each row is drawn in whatever the theme makes it.
  */
 function Key() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3.5">
       <section>
-        <Title>Reading the city</Title>
+        <Title>Buildings</Title>
         <ul className={LIST}>
           <Row mark={<span className="size-3 bg-phosphor" />}>
-            One building is one Document Type.
+            A Document Type
+          </Row>
+          <Row mark={<span className="h-2 w-3 bg-amber" />}>
+            An Element Type, a block
+          </Row>
+          <Row
+            mark={<span className="size-3 border border-azure bg-azure/25" />}
+          >
+            Glass: a composition's properties
+          </Row>
+          <Row mark={<span className="size-3 border-2 border-signal" />}>
+            Selected
           </Row>
           <Row
             mark={
               <span className="h-2 w-6 border border-line-strong bg-panel-raised" />
             }
           >
-            A board is a group of types.
-          </Row>
-          <Row mark={<span className="h-2 w-3 bg-amber" />}>
-            Gold buildings are Element Types, the blocks editors add inside
-            content.
-          </Row>
-          <Row
-            mark={<span className="size-3 border border-azure bg-azure/25" />}
-          >
-            Glass slabs come from compositions, shared groups of properties.
-          </Row>
-          <Row mark={<span className="size-3 border-2 border-signal" />}>
-            A pink outline is the type you selected.
+            A board: a group of types
           </Row>
         </ul>
       </section>
@@ -107,67 +111,34 @@ function Key() {
               />
             }
           >
-            White: can be created under, in the arrow's direction.
+            Can be created under
           </Row>
           <Row
             mark={<EdgeMark className="text-azure" d="M1 11 Q13 -1 25 11" />}
           >
-            Blue: composes or inherits. Inheriting is the paler blue.
+            Composes. Paler: inherits
           </Row>
           <Row mark={<EdgeMark className="text-amber" d="M1 1 Q13 13 25 1" />}>
-            Gold: offered as a block.
+            Offered as a block
           </Row>
           <Row mark={<EdgeMark className="text-violet" d="M1 6 H25" dashed />}>
-            Violet, dashed: picked by a picker.
+            Picked by a picker
           </Row>
         </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          Hover or select a building to light up its own lines, even on layers
-          that are switched off. White lines are the rules for what can be
-          created, not the content tree itself.
+        <p className="mt-1.5 text-faint text-xs">
+          Hover or select a building to light its lines.
         </p>
       </section>
 
       <section>
-        <Title>Boards</Title>
-        <ul className={LIST}>
-          <Row mark={<span className="h-2 w-5 border border-phosphor-dim" />}>
-            A thin outline frames each type and its printed name.
-          </Row>
-          <Row mark={<span className="h-3 w-1.5 bg-[#d9b24a]/70" />}>
-            Gold fingers on a board's edge are lines leaving for another board,
-            one finger per line.
-          </Row>
-          <Row
-            mark={
-              <span className="size-2 rounded-full border-2 border-[#c8823a]/70" />
-            }
-          >
-            A small ring marks where a line turns a corner.
-          </Row>
-          <Row mark={<span className="size-3 bg-phosphor-dim/40" />}>
-            A lighter patch holds the Element Types one block editor offers.
-          </Row>
-        </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          Group: Structure gives each root, and everything editors can create
-          under it, its own board, with each parent beside its children. Boards
-          for compositions, Element Types and types no root reaches sit next to
-          them. Group: Folders follows the Document Type folders instead. Names
-          are printed where they fit; the full name is in the inspector.
-        </p>
-      </section>
-
-      <section>
-        <Title>Details</Title>
+        <Title>On a building</Title>
         <ul className={LIST}>
           <Row
             mark={
               <span className="h-3 w-4 border-line border-y bg-phosphor/40" />
             }
           >
-            Each slab is one property group; a thin board between slabs is where
-            a new tab starts. Lit windows are properties.
+            Slab: a property group. Windows: properties
           </Row>
           <Row
             mark={
@@ -178,15 +149,14 @@ function Key() {
               </span>
             }
           >
-            Pins along the base count direct connections, one side each for
-            allowed parents, allowed children, links out and links in.
+            Pins: direct connections
           </Row>
           <Row
             mark={
               <span className="size-3 border-phosphor-bright border-t-[3px] bg-phosphor-dim" />
             }
           >
-            A lit lid means the type has a template.
+            Lit lid: has a template
           </Row>
           <Row
             mark={
@@ -195,31 +165,55 @@ function Key() {
               </span>
             }
           >
-            A dot on the roof: it varies by culture. A second dot: by segment.
+            Roof dots: varies by culture, then segment
           </Row>
           <Row
             mark={<span className="h-1.5 w-6 rounded-full bg-phosphor-dim" />}
           >
-            A flat disc under a building marks a type allowed at the root.
+            Disc: allowed at the root
           </Row>
         </ul>
-        <p className="mt-2 text-muted-foreground text-xs">
-          A wider building has more properties of its own. Height is not a
-          complexity score. A lens recolours every building by what it measures,
-          gold ones included.
+        <p className="mt-1.5 text-faint text-xs">
+          Wider means more properties of its own.
         </p>
+      </section>
+
+      <section>
+        <Title>On a board</Title>
+        <ul className={LIST}>
+          <Row mark={<span className="h-3 w-1.5 bg-[#d9b24a]/70" />}>
+            Edge fingers: lines to another board
+          </Row>
+          <Row
+            mark={
+              <span className="size-2 rounded-full border-2 border-[#c8823a]/70" />
+            }
+          >
+            Ring: a line turns a corner
+          </Row>
+          <Row mark={<span className="size-3 bg-phosphor-dim/40" />}>
+            Patch: one block editor's Element Types
+          </Row>
+        </ul>
       </section>
     </div>
   );
 }
 
 /**
- * The toolbar's Legend button. The panel scrolls inside a capped height and closes
- * with its own button or Escape, so it never has to cover the city to be read.
+ * The toolbar's Legend button and the window it opens. The window stays open while
+ * you work the city, since a key is read alongside what it explains, and closes
+ * only with its own button, the Legend button again, or Escape.
  */
 export function Legend() {
+  const [open, setOpen] = useState(false);
   return (
-    <Popover>
+    <Popover
+      onOpenChange={(next, { reason }) => {
+        if (next || !STAYS_OPEN_ON.has(reason)) setOpen(next);
+      }}
+      open={open}
+    >
       <PopoverTrigger
         render={<Button data-trigger size="sm" variant="outline" />}
       >
@@ -227,17 +221,23 @@ export function Legend() {
       </PopoverTrigger>
       <PopoverContent
         aria-label="Legend"
-        className="relative max-h-[min(32rem,calc(100vh-8rem))] w-80 overflow-y-auto p-0 text-sm"
+        className="flex max-h-[min(30rem,calc(100vh-8rem))] w-80 flex-col p-0"
+        initialFocus={false}
       >
-        <PopoverPrimitive.Close
-          aria-label="Close the legend"
-          className="absolute top-2 right-2 text-phosphor-dim hover:text-phosphor-bright"
-        >
-          <XIcon className="size-4" />
-        </PopoverPrimitive.Close>
+        <div className="flex min-h-7 shrink-0 items-center justify-between border-line border-b bg-secondary px-2 py-1">
+          <h2 className="font-semibold text-1xs text-phosphor-bright uppercase tracking-terminal-lg">
+            Legend
+          </h2>
+          <PopoverPrimitive.Close
+            aria-label="Close the legend"
+            className="grid size-[0.9rem] place-items-center border border-line bg-panel text-phosphor-dim hover:border-line-strong hover:text-phosphor-bright"
+          >
+            <XIcon className="size-2.5" />
+          </PopoverPrimitive.Close>
+        </div>
         {/* Focusable because it scrolls once the window is short. */}
         <div
-          className="p-4 pr-8 focus-visible:outline-offset-[-4px]"
+          className="min-h-0 overflow-y-auto p-3 focus-visible:outline-offset-[-4px]"
           // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable pane has to be reachable by keyboard.
           tabIndex={0}
         >
