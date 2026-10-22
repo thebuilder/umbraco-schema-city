@@ -214,6 +214,11 @@ function Group({
           onClick={() => setExpanded(!expanded)}
           type="button"
         >
+          {/* Notes start closed, so the header has to say it opens. */}
+          <ChevronRightIcon
+            aria-hidden
+            className={`size-3.5 shrink-0 self-center text-faint transition-transform motion-reduce:transition-none ${expanded ? "rotate-90" : ""}`}
+          />
           <span className={`font-semibold ${tone.text}`}>
             {FINDING_LABEL[kind]}
           </span>
