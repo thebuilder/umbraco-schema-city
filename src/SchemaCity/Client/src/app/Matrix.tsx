@@ -22,14 +22,6 @@ type ColumnSort = "usage" | "name";
 const LABEL = "font-sans font-medium text-label text-xs";
 const CELL = "border-line/60 border-r border-b";
 
-/**
- * Up to this many columns, the names lie flat and wrap: a few columns can afford a
- * readable width each. Past it, a flat header would make every row as wide as the
- * names, so they slant at 45 degrees instead, which still reads without turning
- * your head the way the old vertical names asked for.
- */
-const FLAT_COLUMNS = 8;
-
 function Switch<Value extends string>({
   label,
   value,
@@ -214,50 +206,11 @@ function Counted({ name, total }: { name: ReactNode; total: number }) {
 }
 
 /**
- * Centred over the marks below it, the name and how many types use the column,
- * the way the inspector counts a group. The alias or editor waits on hover: it
- * tells two same-named columns apart, which is rare, and on every column it was
- * the line that made the header busy.
- */
-function FlatHeader({ column, name, said, onColumn }: HeaderProps) {
-  const header = (
-    <>
-      <span className="sr-only">{said}</span>
-      <span
-        aria-hidden
-        className="block w-32 text-center"
-        title={column.detail}
-      >
-        <span className="line-clamp-2 text-prose text-xs group-hover:text-phosphor group-hover:underline">
-          <Counted name={name} total={column.total} />
-        </span>
-      </span>
-    </>
-  );
-  return (
-    <th
-      className={`${CELL} sticky top-0 bg-panel px-2 py-2 align-bottom font-normal`}
-      scope="col"
-    >
-      {onColumn ? (
-        <button
-          className="group"
-          onClick={() => onColumn(column.id)}
-          type="button"
-        >
-          {header}
-        </button>
-      ) : (
-        header
-      )}
-    </th>
-  );
-}
-
-/**
- * A slanted name gets a lane: the column's own borders, leaned over at 45 degrees
- * and carried up to the top of the header, so each name is boxed in and still
- * lines up with its marks. The lane is also what you click.
+ * Every column name slants at 45 degrees, however few there are, so the matrix
+ * looks the same from one schema to the next and a column is only as wide as its
+ * marks. Each name gets a lane: the column's own borders, leaned over and carried
+ * up to the top of the header, so it is boxed in and still lines up with its
+ * marks. The lane is also what you click.
  */
 function SlantedHeader({
   column,
@@ -270,7 +223,7 @@ function SlantedHeader({
   const lane = `absolute inset-0 origin-bottom-left -skew-x-45 border-line/60 border-r ${first ? "border-l" : ""}`;
   return (
     <th
-      className="group sticky top-0 h-36 min-w-8 border-line/60 border-b bg-panel p-0 align-bottom font-normal"
+      className="group sticky top-0 h-40 min-w-8 border-line/60 border-b bg-panel p-0 align-bottom font-normal"
       scope="col"
       style={{ zIndex }}
     >
@@ -293,7 +246,7 @@ function SlantedHeader({
           lane. */}
       <span
         aria-hidden
-        className="pointer-events-none absolute bottom-0 left-1/2 block w-48 origin-left translate-y-1/2 -rotate-45 truncate pl-3 text-left text-prose text-xs leading-5 group-hover:text-phosphor group-hover:underline"
+        className="pointer-events-none absolute bottom-0 left-1/2 block w-52 origin-left translate-y-1/2 -rotate-45 truncate pl-3 text-left text-prose text-xs leading-5 group-hover:text-phosphor group-hover:underline"
       >
         <Counted name={name} total={column.total} />
       </span>
@@ -341,7 +294,6 @@ function Grid<Cell>({
     ? data.rows.filter((row) => matched.has(row.id))
     : data.rows;
   useAnnounceChange(`${rows.length} of ${data.rows.length} types`);
-  const flat = columns.length <= FLAT_COLUMNS;
 
   return (
     <>
@@ -383,9 +335,7 @@ function Grid<Cell>({
                     said: columnName(column),
                     onColumn,
                   };
-                  return flat ? (
-                    <FlatHeader key={column.id} {...header} />
-                  ) : (
+                  return (
                     <SlantedHeader
                       key={column.id}
                       {...header}
@@ -397,15 +347,13 @@ function Grid<Cell>({
                     />
                   );
                 })}
-                {flat ? null : (
-                  // Room for the last lanes to finish their lean, which takes as
-                  // much width as the header is tall.
-                  <th
-                    aria-hidden
-                    className="sticky top-0 w-36 min-w-36 border-line/60 border-b bg-panel"
-                    style={{ zIndex: 20 }}
-                  />
-                )}
+                {/* Room for the last lanes to finish their lean, which takes as
+                    much width as the header is tall. */}
+                <th
+                  aria-hidden
+                  className="sticky top-0 w-40 min-w-40 border-line/60 border-b bg-panel"
+                  style={{ zIndex: 20 }}
+                />
               </tr>
             </thead>
             <tbody>
