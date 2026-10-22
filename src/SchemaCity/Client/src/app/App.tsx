@@ -149,6 +149,15 @@ function LensLegend({
 // rather than with the workspace element.
 const Scene = lazy(() => import("./Scene"));
 
+/**
+ * The view's room for the open inspector. On the Data Types page the inspector
+ * slides over the Data Type's details instead: a type opened from them sits on top
+ * of where you came from, and the list beside them keeps its width.
+ */
+function viewInset(open: boolean, view: View, inset: string): string {
+  return open && view !== "datatypes" ? inset : "";
+}
+
 export function App({
   graph,
   usage,
@@ -670,9 +679,9 @@ export function App({
               their own, so the inspector sits above both on a plain z-10. */}
             {flat ? (
               // The inspector is an overlay, so the view is inset by its width while
-              // it is open rather than sliding under it.
+              // it is open rather than sliding under it, except on Data Types.
               <div
-                className={`absolute inset-0 isolate pb-(--caption-space) outline-none [zoom:var(--present,1)] ${selectedNode ? panelInset : ""}`}
+                className={`absolute inset-0 isolate pb-(--caption-space) outline-none [zoom:var(--present,1)] ${viewInset(Boolean(selectedNode), view, panelInset)}`}
                 data-focus-home
                 tabIndex={-1}
               >
@@ -684,14 +693,12 @@ export function App({
                     }}
                     dataTypes={{
                       selected: dataType,
-                      // One detail at a time: a Data Type chosen from the list
-                      // closes the inspector, and a type opened from a Data Type
-                      // takes the place of its details until it closes.
+                      // A Data Type chosen from the list closes the inspector, so
+                      // its details are what you see.
                       onChoose: (id) => {
                         putDown();
                         setDataType(id);
                       },
-                      covered: Boolean(selectedNode),
                       onOpenDataType,
                       onShowInCity: (id) =>
                         showInCity(

@@ -248,7 +248,7 @@ type FlatViewProps = {
   /** What the Data Types view needs beyond the lists' props. */
   dataTypes: Pick<
     DataTypesProps,
-    "selected" | "onChoose" | "onOpenDataType" | "onShowInCity" | "covered"
+    "selected" | "onChoose" | "onOpenDataType" | "onShowInCity"
   >;
   view: View;
   graph: SchemaGraph;

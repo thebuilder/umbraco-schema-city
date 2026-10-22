@@ -2,7 +2,6 @@
 // page beside it with what it offers, what uses it and the blocks content stores in
 // it. Below 760 px of room the page goes under the table instead.
 import {
-  type ReactNode,
   type RefObject,
   use,
   useEffect,
@@ -82,12 +81,6 @@ export type DataTypesProps = {
   onOpenDataType?: (id: string) => void;
   onShowInCity: (id: string) => void;
   roleOf: (node: SchemaNode) => Role;
-  /**
-   * The inspector is open beside the page. It takes the place of the Data Type's
-   * own details until it closes, so the page never shows two detail panes and
-   * the list keeps its width.
-   */
-  covered?: boolean;
 };
 
 export function DataTypes(props: DataTypesProps) {
@@ -143,10 +136,7 @@ export function DataTypes(props: DataTypesProps) {
         shown={shown.length}
         total={rows.length}
       />
-      <Split
-        covered={props.covered}
-        detail={<DetailPane {...props} chosen={chosen} flagged={flagged} />}
-      >
+      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] @min-[760px]:grid-cols-2 @min-[760px]:grid-rows-1">
         <Scroller label="Data Type list">
           <table className="w-full border-collapse" ref={list}>
             <caption className="sr-only">
@@ -173,59 +163,27 @@ export function DataTypes(props: DataTypesProps) {
             </p>
           ) : null}
         </Scroller>
-      </Split>
+        <section
+          aria-label="Data Type details"
+          className="min-h-0 overflow-auto border-line border-t bg-panel focus-visible:outline-offset-[-2px] @min-[760px]:border-t-0 @min-[760px]:border-l"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region has to be reachable by keyboard.
+          tabIndex={0}
+        >
+          {chosen ? (
+            <Detail
+              {...props}
+              dataType={chosen}
+              findings={flagged.get(chosen.id) ?? []}
+            />
+          ) : (
+            <p className="px-4 py-6 text-label text-xs">
+              Choose a Data Type to see its editor, what it offers, what uses it
+              and the blocks content stores in it.
+            </p>
+          )}
+        </section>
+      </div>
     </div>
-  );
-}
-
-/** The list, and the details beside it or below it unless the inspector covers them. */
-function Split({
-  covered,
-  detail,
-  children,
-}: {
-  covered?: boolean;
-  detail: ReactNode;
-  children: ReactNode;
-}) {
-  if (covered) return <div className="grid min-h-0 flex-1">{children}</div>;
-  return (
-    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] @min-[760px]:grid-cols-2 @min-[760px]:grid-rows-1">
-      {children}
-      {detail}
-    </div>
-  );
-}
-
-/** The chosen Data Type beside the list, or a line on what choosing one shows. */
-function DetailPane({
-  chosen,
-  flagged,
-  ...props
-}: DataTypesProps & {
-  chosen?: DataTypeRow;
-  flagged: ReadonlyMap<string, Finding[]>;
-}) {
-  return (
-    <section
-      aria-label="Data Type details"
-      className="min-h-0 overflow-auto border-line border-t bg-panel focus-visible:outline-offset-[-2px] @min-[760px]:border-t-0 @min-[760px]:border-l"
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region has to be reachable by keyboard.
-      tabIndex={0}
-    >
-      {chosen ? (
-        <Detail
-          {...props}
-          dataType={chosen}
-          findings={flagged.get(chosen.id) ?? []}
-        />
-      ) : (
-        <p className="px-4 py-6 text-label text-xs">
-          Choose a Data Type to see its editor, what it offers, what uses it and
-          the blocks content stores in it.
-        </p>
-      )}
-    </section>
   );
 }
 
