@@ -62,7 +62,7 @@ function Title({ children }: { children: ReactNode }) {
   );
 }
 
-const LIST = "mt-1.5 space-y-1 text-muted-foreground text-xs";
+const LIST = "mt-2 space-y-2.5 text-muted-foreground text-xs leading-snug";
 
 /**
  * Every mark differs by shape as well as colour, so no two rows can be mistaken for
@@ -72,7 +72,7 @@ const LIST = "mt-1.5 space-y-1 text-muted-foreground text-xs";
  */
 function Key() {
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-5">
       <section>
         <Title>Buildings</Title>
         <ul className={LIST}>
@@ -125,7 +125,7 @@ function Key() {
             Picked by a picker
           </Row>
         </ul>
-        <p className="mt-1.5 text-faint text-xs">
+        <p className="mt-2.5 text-faint text-xs leading-snug">
           Hover or select a building to light its lines.
         </p>
       </section>
@@ -173,7 +173,7 @@ function Key() {
             Disc: allowed at the root
           </Row>
         </ul>
-        <p className="mt-1.5 text-faint text-xs">
+        <p className="mt-2.5 text-faint text-xs leading-snug">
           Wider means more properties of its own.
         </p>
       </section>
