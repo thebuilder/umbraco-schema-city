@@ -2531,14 +2531,17 @@ function boardMarksOf(
  * The focus the city shows. A link that opens on a focus builds the city first and
  * gathers the neighbourhood once the opening is done, the way a click on Focus does,
  * rather than building straight into the focus layout. Back from a 2D view the city
- * keeps its pose instead, and any other focus shows at once.
+ * keeps its pose instead, and any other focus shows at once. So does a focus when
+ * the opening is skipped: the Relationships tab is there to show the neighbourhood,
+ * and watching it gather on every visit read as the page settling.
  */
 function useLinkedFocus(
   asked: string | null,
   graph: object,
   boot: BootPhase
 ): string | null {
-  const [linked] = useState(() => (kept.has(graph) ? null : asked));
+  const skipped = use(OpeningSkipped);
+  const [linked] = useState(() => (kept.has(graph) || skipped ? null : asked));
   return linked !== null && linked === asked && boot !== "done" ? null : asked;
 }
 
