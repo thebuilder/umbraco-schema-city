@@ -193,15 +193,8 @@ function Group({
   const tone = TONE[rows[0]?.severity ?? "note"];
   const links = use(DataTypeLinks);
   const nameOf = (finding: Finding) => subjectName(finding, nodesById, links);
-  const [expanded, setExpanded] = useState(open);
+  const [expanded, setExpanded] = useOpenWhenAsked(open);
   const [why, setWhy] = useState(false);
-  // A chip picked later opens the group, as the open attribute did on a details
-  // element. Unpicking it leaves the group as the reader left it.
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    if (open) setExpanded(true);
-  }
   const rowsId = useId();
   const whyId = useId();
   return (
@@ -235,15 +228,7 @@ function Group({
           {why ? "Hide" : "Why?"}
         </button>
       </div>
-      {why ? (
-        <div className="space-y-2 px-3 pb-2.5 text-label text-xs" id={whyId}>
-          <p>{KIND_EXPLANATION[kind]}</p>
-          <p>
-            <span className="block font-medium text-prose">Next step</span>
-            {KIND_NEXT_STEP[kind]}
-          </p>
-        </div>
-      ) : null}
+      {why ? <KindWhy id={whyId} kind={kind} /> : null}
       {expanded ? (
         <div className="border-line/40 border-t bg-panel" id={rowsId}>
           {rows.map((finding) => (
@@ -259,6 +244,34 @@ function Group({
         </div>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * A group's open state, which also opens when `open` turns true later, as the open
+ * attribute did on a details element: picking a chip is a request to read the
+ * group. Unpicking it leaves the group as the reader left it.
+ */
+function useOpenWhenAsked(open: boolean) {
+  const [expanded, setExpanded] = useState(open);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setExpanded(true);
+  }
+  return [expanded, setExpanded] as const;
+}
+
+/** What a kind means and what to do about it, behind the group's Why?. */
+function KindWhy({ id, kind }: { id: string; kind: FindingKind }) {
+  return (
+    <div className="space-y-2 px-3 pb-2.5 text-label text-xs" id={id}>
+      <p>{KIND_EXPLANATION[kind]}</p>
+      <p>
+        <span className="block font-medium text-prose">Next step</span>
+        {KIND_NEXT_STEP[kind]}
+      </p>
+    </div>
   );
 }
 
