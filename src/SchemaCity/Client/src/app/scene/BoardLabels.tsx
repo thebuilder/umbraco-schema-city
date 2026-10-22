@@ -19,6 +19,7 @@ import {
   FADE_SECONDS,
   type Fades,
   fittedFontPx,
+  followed,
   type Interaction,
   KNOCKOUT_VERTICES,
   knockout,
@@ -542,6 +543,7 @@ function writeName(
   NOW.id = one.id;
   NOW.perEm = pxPerEmAt(one, frame);
   NOW.ems = inputs.atlas.sizes.get(one.id)?.ems ?? NO_EMS;
+  NOW.always = followed(one.id, inputs.interaction);
   const shown = stepName(frame.fades, inputs.solution, slot, NOW, frame);
   hideName(inputs, one.id);
   for (let level = 0; level < LEVELS; level++)
@@ -1081,18 +1083,17 @@ export function BoardLabels({
         geometry={knockouts}
         material={knockoutMaterial}
         receiveShadow
-        // Over the traces and the links at 2, under the print it clears the board
-        // for, so a lit link passes under the patch rather than across it.
-        renderOrder={2.4}
+        // Over the traces and the street links at 0.45, under the print it clears
+        // the board for, so a lit link passes under the patch rather than across it.
+        renderOrder={0.47}
       />
       <mesh
         frustumCulled={false}
         geometry={geometry}
         material={material}
-        // Last of all, after the links at 2 as well. The print writes no depth and
-        // the links draw over whatever went before them, so a link running above a
-        // name crossed it out. Solid buildings still hide a print behind them.
-        renderOrder={2.5}
+        // After the boards, the traces and the street links, which pass under it,
+        // and before glass, the roof icons and the composition arcs, which pass over.
+        renderOrder={0.5}
       />
     </>
   );
