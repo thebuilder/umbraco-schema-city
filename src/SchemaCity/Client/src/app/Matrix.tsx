@@ -275,23 +275,22 @@ function Grid<Cell>({
                     <>
                       <span className="sr-only">{columnName(column)}</span>
                       {flat ? (
-                        // Centred over the marks below it, and nothing cut: the
-                        // detail wraps rather than ending in an ellipsis, and the
-                        // total gets a line of its own so it lines up across the
-                        // row. The key in the detail keeps two same-named Data
-                        // Types apart for the eye only.
+                        // Centred over the marks below it, the name and how many
+                        // types use the column, the way the inspector counts a
+                        // group. The alias or editor waits on hover: it tells two
+                        // same-named columns apart, which is rare, and on every
+                        // column it was the line that made the header busy.
                         <span
                           aria-hidden
-                          className="flex w-32 flex-col items-center gap-0.5 text-center"
+                          className="block w-32 text-center"
+                          title={column.detail}
                         >
                           <span className="line-clamp-2 text-prose text-xs group-hover:text-phosphor group-hover:underline">
                             {name}
-                          </span>
-                          <span className="font-mono text-2xs text-faint wrap-anywhere">
-                            {column.detail}
-                          </span>
-                          <span className="font-mono text-2xs text-label">
-                            {column.total}
+                            <span className="font-mono text-2xs text-faint">
+                              {" "}
+                              {column.total}
+                            </span>
                           </span>
                         </span>
                       ) : (
@@ -300,12 +299,12 @@ function Grid<Cell>({
                         <span
                           aria-hidden
                           className="absolute bottom-2 left-1/2 block w-44 origin-bottom-left -rotate-45 truncate text-left text-prose text-xs group-hover:text-phosphor group-hover:underline"
-                          title={`${column.detail} · ${column.total}`}
+                          title={column.detail}
                         >
                           {name}
                           <span className="font-mono text-2xs text-faint">
                             {" "}
-                            · {column.total}
+                            {column.total}
                           </span>
                         </span>
                       )}

@@ -26,7 +26,13 @@
   --font-mono: var(--afterglow-font-mono, ui-monospace, monospace);
   --font-sans: var(--afterglow-font-sans, ui-sans-serif, sans-serif);
   --text-1xs: 0.6875rem;
-  --text-2xs: 0.625rem;
+  /*
+   * Reading text sits a step above Tailwind's 12px: names, counts and sentences in
+   * the list, the matrix, Findings and the inspector are read rather than glanced
+   * at, and 12px was small for that. 2xs follows, as the mono detail beside it.
+   */
+  --text-xs: 0.8125rem;
+  --text-2xs: 0.6875rem;
   --text-3xs: 0.5625rem;
   --text-4xs: 0.55rem;
   --tracking-terminal: 0.1em;
