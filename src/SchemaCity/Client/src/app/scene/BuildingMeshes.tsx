@@ -655,6 +655,14 @@ function HitTargets({
   );
 }
 
+/**
+ * Where the frames draw: after the board prints at 0.5, which write no depth and
+ * would otherwise paint over a frame's lower edges where a name lies beside its
+ * building, and before the glass at 1, which tints a frame's far edges like
+ * anything else behind it. A solid in front still hides a frame.
+ */
+const FRAME_RENDER_ORDER = 0.55;
+
 /** A unit box's twelve edges as line segment ends, read once and kept as plain data. */
 const OUTLINE_POSITIONS = (() => {
   const box = new THREE.BoxGeometry();
@@ -692,7 +700,7 @@ function BuildingFrame({
   const lines = useMemo(() => {
     const geometry = new LineSegmentsGeometry();
     geometry.setPositions(OUTLINE_POSITIONS);
-    return new LineSegments2(
+    const next = new LineSegments2(
       geometry,
       new LineMaterial({
         color: colour,
@@ -704,6 +712,8 @@ function BuildingFrame({
         toneMapped: false,
       })
     );
+    next.renderOrder = FRAME_RENDER_ORDER;
+    return next;
   }, [colour, width, opacity]);
   useEffect(
     () => () => {
@@ -751,22 +761,22 @@ function ReachedFrames({
   heights: Map<string, number>;
   reducedMotion: boolean;
 }) {
-  const lines = useMemo(
-    () =>
-      new LineSegments2(
-        new LineSegmentsGeometry(),
-        new LineMaterial({
-          color: colour,
-          linewidth: 1,
-          worldUnits: false,
-          transparent: true,
-          opacity: 0.6,
-          depthWrite: false,
-          toneMapped: false,
-        })
-      ),
-    [colour]
-  );
+  const lines = useMemo(() => {
+    const next = new LineSegments2(
+      new LineSegmentsGeometry(),
+      new LineMaterial({
+        color: colour,
+        linewidth: 1,
+        worldUnits: false,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+        toneMapped: false,
+      })
+    );
+    next.renderOrder = FRAME_RENDER_ORDER;
+    return next;
+  }, [colour]);
   useEffect(
     () => () => {
       lines.geometry.dispose();

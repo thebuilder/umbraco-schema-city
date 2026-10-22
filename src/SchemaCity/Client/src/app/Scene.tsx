@@ -912,6 +912,18 @@ function RoadIntroTrace({
 const linkRenderOrder = (layer: Exclude<Layer, "structure">) =>
   layer === "compositions" ? 2 : 0.45;
 
+/**
+ * How wide a link draws, in pixels. At 1.7 a selection's fan of thirty-odd arcs
+ * merged into one band near the hub; at 1.2 each arc still reads as its own strand.
+ */
+const LINK_WIDTH = 1.2;
+
+/**
+ * Pixels a click may land beside a line and still pick it, so thinning the links
+ * did not also make them harder to hit than at their old width.
+ */
+const LINK_PICK = { threshold: 0.5 };
+
 /** Screen-space line material with the same per-segment alpha as the schema geometry. */
 function createLinkMaterial(): LineMaterial {
   const next = new LineMaterial({
@@ -920,7 +932,7 @@ function createLinkMaterial(): LineMaterial {
     opacity: 0,
     transparent: true,
     vertexColors: true,
-    linewidth: 1.7,
+    linewidth: LINK_WIDTH,
     worldUnits: false,
   });
   next.onBeforeCompile = (shader) => {
@@ -1065,6 +1077,10 @@ function LinkStrokes({
     return next;
   }, [positions]);
   const material = useMemo(createLinkMaterial, []);
+  const raycaster = useThree((state) => state.raycaster);
+  useEffect(() => {
+    raycaster.params.Line2 = LINK_PICK;
+  }, [raycaster]);
   const lines = useMemo(() => {
     const next = new LineSegments2(geometry, material);
     next.renderOrder = renderOrder;
