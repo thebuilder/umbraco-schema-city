@@ -26,14 +26,19 @@ import {
  */
 export const FOCUS_STREET = 9;
 
-/** Ground between two buildings in a row. */
-const GAP = 3;
 /**
- * Ground between two rows, and between two bands: the gap, and the strip a name
- * prints on in front of its building, as the city leaves. Without it a name in an
- * inner row fell behind the next row's buildings.
+ * Ground between two buildings in a row. At three units two neighbours' names met in
+ * the middle, and one of them went behind its building instead of in front; four and
+ * a half gives most names room, and wider pushed whole groups round the compass.
  */
-const ROW_GAP = GAP + LABEL_STRIP;
+const GAP = 4.5;
+/**
+ * Ground between two rows, and between two bands: three units, and the strip a name
+ * prints on in front of its building, as the city leaves. Without it a name in an
+ * inner row fell behind the next row's buildings. The rows keep the narrower gap,
+ * since a name runs along a row, not across it.
+ */
+const ROW_GAP = 3 + LABEL_STRIP;
 /** Half the angle a ring of parents spans, so an arc covers 120 degrees. */
 const ARC_HALF = Math.PI / 3;
 /** Footprint of an id the city never placed, which only a stale edge can be. */

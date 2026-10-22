@@ -947,7 +947,7 @@ export function knockoutAlpha(
   // On the island every name gets one, or the few a lit line happens to cross read
   // as marked out from the rest.
   if (spot.crosses || now.island?.has(id)) return alpha;
-  const lit = (id: string) => id === now.hovered || id === now.selected;
+  const lit = (end: string) => end === now.hovered || end === now.selected;
   return offTraceAt(spot.rect).some((trace) => lit(trace.from) || lit(trace.to))
     ? alpha
     : 0;
