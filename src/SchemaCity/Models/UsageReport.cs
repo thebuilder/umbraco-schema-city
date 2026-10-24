@@ -4,7 +4,7 @@ namespace SchemaCity.Models;
 
 /// <summary>
 /// What the content actually does, per Document Type. Mirrored by UsageReport in
-/// Client/src/model/types.ts, which is the contract. Property names here have to keep matching it.
+/// Client/core/src/model/types.ts, which is the contract. Property names here have to keep matching it.
 /// ByType is keyed by Document Type key, the same string SchemaNode.Id carries, and holds a row for
 /// every Document Type, so a type with no content reads as zeros rather than as a missing key.
 /// Blocks is omitted only by callers that did not count them; the endpoint always sends it.

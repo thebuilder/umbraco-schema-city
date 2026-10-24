@@ -1,0 +1,5 @@
+{
+  // For the shadcn CLI, run from ui/ to pull registry components: it reads the "@"
+  // alias from here. Type checking runs from Client/ over every package.
+  "extends": "../tsconfig.json"
+}

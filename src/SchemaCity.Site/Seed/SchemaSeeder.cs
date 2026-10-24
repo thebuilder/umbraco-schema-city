@@ -892,7 +892,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
     // ---------------------------------------------------------------- fixture export
 
     /// <summary>
-    /// Writes what the two endpoints return to Client/dev/fixtures/medium.json and
+    /// Writes what the two endpoints return to Client/core/fixtures/medium.json and
     /// medium-usage.json, so the dev harness renders a real schema and its real counts. The two
     /// timestamps are pinned to <see cref="FixtureDate"/>, otherwise every boot would rewrite the
     /// files and dirty the working tree. LastEdited is pinned per row rather than in the seeder, because fixing the real dates
@@ -917,7 +917,7 @@ public sealed class SchemaSeeder : INotificationAsyncHandler<UmbracoApplicationS
             return;
         }
 
-        string directory = Path.Combine(clientRoot, "dev", "fixtures");
+        string directory = Path.Combine(clientRoot, "core", "fixtures");
         Directory.CreateDirectory(directory);
 
         // What the graph endpoint returns, read from the services and not from _editors: that field

@@ -45,7 +45,7 @@ properties, so the usage report has stored blocks to count; several offered Elem
 as Element Card, are never stored. Reset the demo database to seed again.
 
 Every Development boot writes `medium.json` and `medium-usage.json` to
-`src/SchemaCity/Client/dev/fixtures/` for the dev harness, unless the database was seeded by an
+`src/SchemaCity/Client/core/fixtures/` for the dev harness, unless the database was seeded by an
 older seed version: the site type carries the version in its description, and a mismatch logs a
 warning and leaves the fixtures alone. Their timestamps are pinned to
 2026-09-01 12:00 UTC, so a boot alone does not change the files. Their contents reflect the demo
@@ -53,16 +53,17 @@ installation, including any edits made in its backoffice.
 
 ## Client harness
 
-The harness renders the same client against fixture JSON without starting Umbraco. Install its
-dependencies and start Vite from the client directory:
+The harness renders the same client against fixture JSON without starting Umbraco. Install the
+workspace from the repository root and start Vite from the client directory:
 
 ```bash
+pnpm install
 cd src/SchemaCity/Client
-npm ci
-npm run dev
+pnpm dev
 ```
 
-Open http://localhost:5173. The harness uses the checked-in small, medium and pathological fixtures.
+Open http://localhost:5173 for the flat map, or run `pnpm dev:city` for the 3D city. The harness
+uses the checked-in small, medium and pathological fixtures.
 
 ## API routes
 
@@ -70,6 +71,7 @@ The backoffice calls these endpoints from the Settings section. All of them requ
 Umbraco Settings section permission:
 
 - `GET /umbraco/management/api/v1/schema-city/graph`
+- `GET /umbraco/management/api/v1/schema-city/settings`
 - `GET /umbraco/management/api/v1/schema-city/usage`
 - `GET /umbraco/management/api/v1/schema-city/decisions`
 - `PUT /umbraco/management/api/v1/schema-city/decisions/{findingId}` with `{ "reason", "fingerprint" }`

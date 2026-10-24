@@ -1,0 +1,23 @@
+{
+  "name": "@schema-city/city",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.tsx"
+  },
+  "dependencies": {
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.1",
+    "@schema-city/core": "workspace:*",
+    "@schema-city/ui": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

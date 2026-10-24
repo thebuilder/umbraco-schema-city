@@ -23,6 +23,12 @@ Restart the site and open **Settings > Advanced > Schema City**. Every Document 
 gets a **Relationships** tab that opens the city focused on that type.
 Set `"SchemaCity": { "RelationshipsTab": false }` in `appsettings.json` to leave that tab out.
 
+It comes in two looks over the same panels. The **flat map** is a diagram in the backoffice's own
+colours and type, which follows the user's light or dark theme. The **3D city** is the same schema
+as buildings, in a green terminal look. The map is the default; to use the city instead, set
+`"SchemaCity": { "Variant": "City" }`, which applies to every user. Earlier versions had only the
+city, so after an upgrade users open on the map unless the site sets that.
+
 | Requirement | Version |
 | --- | --- |
 | Umbraco | 17 or 18, tested on 17.6.2 and 18.1.1 |

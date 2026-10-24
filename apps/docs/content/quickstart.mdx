@@ -23,7 +23,7 @@ Restart the site. The package needs no migration and adds nothing to your schema
 
 ## Open the city
 
-Open **Settings > Advanced > Schema City**. The city opens on a raised view of the whole schema, with a board for each type allowed at root.
+Open **Settings > Advanced > Schema City**. It opens as a flat map: a card for each type, grouped as the city groups them. A site can show the 3D city instead, which opens on a raised view of the whole schema with a board for each type allowed at root; see below.
 
 Every Document Type editor also gets a **Relationships** tab. It opens the city focused on that type and its neighbours.
 
@@ -40,6 +40,20 @@ The tab is on by default. To leave it out of the Document Type editor, set `Rela
 ```
 
 The city under **Settings > Advanced** stays either way. As with any appsettings value, an environment variable can set it too: `SchemaCity__RelationshipsTab=false`.
+
+## Use the 3D city
+
+The flat map is what every user sees. To show the city instead, set `Variant` to `City`:
+
+```json appsettings.json
+{
+  "SchemaCity": {
+    "Variant": "City"
+  }
+}
+```
+
+It applies to every user. Earlier versions had only the city, so after an upgrade users open on the map unless the site sets this. The environment variable is `SchemaCity__Variant=City`.
 
 ## First steps
 

@@ -1,0 +1,15 @@
+{
+  "name": "@schema-city/backoffice",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "@schema-city/city": "workspace:*",
+    "@schema-city/clean": "workspace:*",
+    "@schema-city/core": "workspace:*",
+    "@schema-city/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@umbraco-cms/backoffice": "catalog:"
+  }
+}

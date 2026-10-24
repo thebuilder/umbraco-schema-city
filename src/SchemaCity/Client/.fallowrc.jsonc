@@ -1,20 +1,22 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-  // The two Lit wrappers Umbraco loads and the element they share, whose lifecycle
-  // methods Lit calls, the fixture harness and its scripts, and the tests.
-  "entry": [
-    "src/entry-workspace.tsx",
-    "src/entry-document-type-view.tsx",
-    "src/schema-city-element.tsx",
-    "dev/main.tsx",
-    "dev/*.mjs",
-    "**/*.test.ts"
-  ],
+  // Fallow finds the entries, the variants, the harnesses and the tests through the
+  // Vite and Vitest configs. These two it cannot: the element whose lifecycle
+  // methods Lit calls, and the fixture scripts run by hand with node.
+  "entry": ["backoffice/src/schema-city-element.ts", "*/dev/*.mjs"],
+  // The packages' "exports" maps make every core and ui module a package entry, and
+  // an entry's exports count as used unless this asks for them to be checked.
+  "includeEntryExports": true,
   "ignoreDependencies": [
     // The host serves the backoffice at runtime; the build marks it external.
     "@umbraco-cms/backoffice"
   ],
-  // Registry copy-in from the afterglow shadcn registry. The unused half of a
-  // component's API is upstream's, and npx shadcn add writes it back anyway.
-  "ignoreExports": [{ "file": "src/app/components/ui/*.tsx", "exports": ["*"] }]
+  "ignoreExports": [
+    // Registry copy-in from the afterglow shadcn registry. The unused half of a
+    // component's API is upstream's, and npx shadcn add writes it back anyway.
+    { "file": "ui/src/components/ui/*.tsx", "exports": ["*"] },
+    // Config files export their config for the tool that reads them.
+    { "file": "**/vite*.ts", "exports": ["default"] },
+    { "file": "vitest.config.ts", "exports": ["default"] }
+  ]
 }

@@ -13,14 +13,25 @@
     },
     {
       "name": "harness",
-      "runtimeExecutable": "npm",
+      "runtimeExecutable": "pnpm",
       "runtimeArgs": [
-        "run",
-        "dev",
-        "--prefix",
-        "src/SchemaCity/Client"
+        "--dir",
+        "src/SchemaCity/Client",
+        "dev"
       ],
       "port": 5173
+    },
+    {
+      "name": "harness-city",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "src/SchemaCity/Client",
+        "dev:city",
+        "--port",
+        "5174"
+      ],
+      "port": 5174
     }
   ]
 }
