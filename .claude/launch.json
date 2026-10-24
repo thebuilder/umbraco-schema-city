@@ -32,6 +32,30 @@
         "5174"
       ],
       "port": 5174
+    },
+    {
+      "name": "demo-dist",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5310",
+        "-d",
+        "src/SchemaCity/Client/dist"
+      ],
+      "port": 5310
+    },
+    {
+      "name": "docs-dist",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5320",
+        "-d",
+        "apps/docs/dist"
+      ],
+      "port": 5320
     }
   ]
 }

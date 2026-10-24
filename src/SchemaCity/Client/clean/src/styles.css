@@ -899,3 +899,26 @@
   background: rgb(0 0 0 / 0.16);
   backdrop-filter: none;
 }
+
+/* Presenting: no toolbar (its display above outranks the `hidden` utility), the
+   lens key as a pill in the corner it leaves, and cards without their property
+   count, so names at presentation size keep their two lines and the size bar still
+   says how big each type is. */
+[data-present] .board .board-toolbar {
+  display: none;
+}
+
+[data-present] [data-ui="lens-key"]:not(.board-toolbar *) {
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  padding: 0.375rem 0.75rem;
+  color: var(--label);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+[data-present] .board .board-detail {
+  display: none;
+}

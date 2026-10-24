@@ -17,8 +17,12 @@
   "IssueTrackerUrl": "https://github.com/thebuilder/umbraco-schema-city/issues",
   "Screenshots": [
     {
-      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png",
-      "Caption": "One building per Document Type, on a board for each root beside boards for Compositions, Elements and Unreachable, with traces for allowed children, compositions, block targets and picker references."
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/map.png",
+      "Caption": "A card per Document Type, in a district for each root beside Compositions, Elements and Unreachable, with lines for allowed children, compositions, block targets and picker references."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/cards.png",
+      "Caption": "Each card shows its icon, name, property count and a size bar with a segment per property group."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png",
@@ -34,7 +38,7 @@
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/lens.png",
-      "Caption": "Colour the city by content count, published share, cultures, incoming references or unused types."
+      "Caption": "Colour the cards by content count, published share, cultures, incoming references or unused types."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/impact.png",
@@ -62,11 +66,15 @@
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/list.png",
-      "Caption": "Every type in a sortable table, with no 3D canvas."
+      "Caption": "Every type in a sortable table."
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/present.png",
       "Caption": "Presentation mode for showing the schema to a room."
+    },
+    {
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png",
+      "Caption": "Or turn on the 3D city: a building per Document Type on a circuit board for each root."
     }
   ],
   "Tags": [

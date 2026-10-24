@@ -4,7 +4,7 @@ export const schemaCityPackage = defineUmbracoPackage({
   id: "thebuilder.schemacity",
   name: "Schema City",
   summary:
-    "Shows your Document Types as a city in the backoffice, with the links between them, and flags schema problems before they ship.",
+    "Shows your Document Types as a map in the backoffice, or as a city in 3D, with the links between them, and flags schema problems before they ship.",
   links: {
     docs: "https://schema-city.thebuilder.dk",
     nuget: "https://www.nuget.org/packages/TheBuilder.SchemaCity",

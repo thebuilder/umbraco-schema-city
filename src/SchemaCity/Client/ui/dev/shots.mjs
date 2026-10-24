@@ -1,13 +1,16 @@
-// Captures the README and marketplace screenshots from the dev harness over CDP.
+// Captures the docs, README and marketplace screenshots from a dev harness over CDP.
+// The map is the default, so the panels are shot on the map; the City's three
+// camera shots are for its own docs page.
 //
-//   pnpm dev:city --host 127.0.0.1 --port 5206
+//   pnpm dev --host 127.0.0.1 --port 5206          (or pnpm dev:city for VARIANT=city)
 //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
 //     --remote-debugging-port=9333 --hide-scrollbars --user-data-dir=/tmp/schema-city-shots
-//   node city/dev/shots.mjs ../../../docs/screenshots [name...]
+//   node ui/dev/shots.mjs ../../../docs/screenshots [name...]
+//   VARIANT=city node ui/dev/shots.mjs ../../../docs/screenshots
 //
 // Every shot starts from a fresh navigation, because the app reads the query string
-// once on mount. `medium.json` is the harness's first fixture, so it is the one the
-// picker already has, and its usage report loads with it.
+// once on mount. The harness opens on the medium schema, the seeded demo, and its
+// usage report loads with it.
 import { readFileSync, writeFileSync } from "node:fs";
 import { plannedBaseline } from "@schema-city/core/fixtures/planned-baseline.ts";
 import { quantise } from "./quantise.mjs";
@@ -17,6 +20,8 @@ const out = process.argv[2] ?? ".";
 const only = process.argv.slice(3);
 const HARNESS = process.env.HARNESS ?? "http://127.0.0.1:5206/";
 const CDP = process.env.CDP ?? "http://127.0.0.1:9333";
+/** Which harness HARNESS serves: "clean", the default, or "city". */
+const VARIANT = process.env.VARIANT ?? "clean";
 const ALL_LAYERS = "structure,compositions,blocks,references";
 
 const targets = await (await fetch(`${CDP}/json/list`)).json();
@@ -132,16 +137,49 @@ async function wheel([x, y], ticks) {
   }
 }
 
+/**
+ * A shot with a `variant` is taken only on that one; every other shot is a panel
+ * the two share, taken on the map.
+ */
 const shots = [
+  // The whole map on the default layer, nothing selected.
+  { name: "map", variant: "clean", query: "?layers=structure" },
+  // Closer in on the Site district, where the cards' icons, names, property
+  // counts and size bars read, and the lines between them.
+  {
+    name: "cards",
+    variant: "clean",
+    query: "?layers=structure",
+    async after() {
+      await run(`(async () => {
+        const board = document.querySelector(".board");
+        if (!board) return "miss";
+        board.focus();
+        const press = async (key, times) => {
+          for (let at = 0; at < times; at++) {
+            board.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+            await new Promise((resolve) => setTimeout(resolve, 450));
+          }
+        };
+        // In two steps, then up and across to the top of the Site district.
+        await press("=", 2);
+        await press("ArrowUp", 2);
+        await press("ArrowRight", 3);
+        return "ok";
+      })()`);
+      await wait(800);
+    },
+  },
   // The whole city on the default layer, nothing selected. All four layers at once
   // is a hairball at this width: the compositions fan alone crosses the frame a
   // hundred times and the districts under it stop reading. free-camera is the shot
   // that shows the other three.
-  { name: "city", query: "?layers=structure" },
+  { name: "city", variant: "city", query: "?layers=structure" },
   // Closer in on Site's neighbourhoods, where the printed names come out whole and
   // the courtyards, vias and gold fingers on the boards can be read.
   {
     name: "names",
+    variant: "city",
     query: "?layers=structure",
     async after() {
       await wheel([700, 430], 14);
@@ -260,6 +298,7 @@ const shots = [
   // the horizon.
   {
     name: "free-camera",
+    variant: "city",
     query: `?layers=${ALL_LAYERS}`,
     async after() {
       await orbit([800, 640], [900, 470]);
@@ -269,8 +308,8 @@ const shots = [
 ];
 
 await send("Page.enable");
-// The harness's sample picker in the footer is scaffolding, not product, so it
-// stays out of the shots. Injected on every navigation, before the app mounts, so the scene measures
+// The harness's sample picker in the footer and its data switch are scaffolding,
+// not product, so they stay out of the shots. Injected on every navigation, before the app mounts, so the scene measures
 // the viewport it is actually photographed at.
 await send("Page.addScriptToEvaluateOnNewDocument", {
   // The first-visit hint is for people, not for the README, so every shot is a
@@ -278,7 +317,7 @@ await send("Page.addScriptToEvaluateOnNewDocument", {
   source: `try { localStorage.setItem("schema-city:hint-seen", "1"); } catch {}
   document.addEventListener("DOMContentLoaded", () => {
     const style = document.createElement("style");
-    style.textContent = ".demo-picker { display: none }";
+    style.textContent = ".demo-picker { display: none !important }";
     document.head.append(style);
   });`,
 });
@@ -300,6 +339,7 @@ await send("Emulation.setDeviceMetricsOverride", {
 });
 
 for (const shot of shots) {
+  if ((shot.variant ?? "clean") !== VARIANT) continue;
   if (only.length > 0 && !only.includes(shot.name)) continue;
   // biome-ignore lint/performance/noAwaitInLoops: one browser, so the shots are taken one at a time.
   await send("Page.navigate", { url: HARNESS + shot.query });

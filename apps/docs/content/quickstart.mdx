@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Install Schema City and open your content model as a city in the Umbraco backoffice.
+description: Install Schema City and open your content model as a map in the Umbraco backoffice.
 seo:
   image: /og/quickstart.png
 ---
@@ -21,11 +21,11 @@ dotnet add package TheBuilder.SchemaCity
 
 Restart the site. The package needs no migration and adds nothing to your schema.
 
-## Open the city
+## Open the map
 
-Open **Settings > Advanced > Schema City**. It opens as a flat map: a card for each type, grouped as the city groups them. A site can show the 3D city instead, which opens on a raised view of the whole schema with a board for each type allowed at root; see below.
+Open **Settings > Advanced > Schema City**. It opens on the map: a card for each type, in a district for each type allowed at root, framed at a zoom where names read. A big schema opens at its top left, and the **Overview** in the bottom-right corner shows the rest.
 
-Every Document Type editor also gets a **Relationships** tab. It opens the city focused on that type and its neighbours.
+Every Document Type editor also gets a **Relationships** tab. It opens the map focused on that type and its neighbours.
 
 ## Turn off the Relationships tab
 
@@ -39,21 +39,11 @@ The tab is on by default. To leave it out of the Document Type editor, set `Rela
 }
 ```
 
-The city under **Settings > Advanced** stays either way. As with any appsettings value, an environment variable can set it too: `SchemaCity__RelationshipsTab=false`.
+Schema City under **Settings > Advanced** stays either way. As with any appsettings value, an environment variable can set it too: `SchemaCity__RelationshipsTab=false`.
 
 ## Use the 3D city
 
-The flat map is what every user sees. To show the city instead, set `Variant` to `City`:
-
-```json appsettings.json
-{
-  "SchemaCity": {
-    "Variant": "City"
-  }
-}
-```
-
-It applies to every user. Earlier versions had only the city, so after an upgrade users open on the map unless the site sets this. The environment variable is `SchemaCity__Variant=City`.
+To show the schema as a 3D city instead of the map, set `"SchemaCity": { "Variant": "City" }` in `appsettings.json`. It applies to every user. See [Use the 3D city](/3d-city).
 
 ## First steps
 
@@ -62,7 +52,7 @@ It applies to every user. Earlier versions had only the city, so after an upgrad
     Press <kbd>⌘</kbd> <kbd>K</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd> and search by name, alias or property alias.
   </Step>
   <Step title="Look at its neighbourhood">
-    Click its building to open the inspector, then double-click it to focus on the types it connects to.
+    Click its card to open the inspector, then double-click the card to focus on the types it connects to.
   </Step>
   <Step title="Check the schema">
     Open **Findings** in the header to see what the checks flag across the schema. See [Review findings](/findings).
@@ -72,6 +62,6 @@ It applies to every user. Earlier versions had only the city, so after an upgrad
   </Step>
 </Steps>
 
-Press <kbd>?</kbd> for every control, or read [Navigate the city](/navigation).
+Press <kbd>?</kbd> for every control, or read [Navigate the map](/navigation).
 
 To look around before you install, [try the demo](https://schema-city-demo.thebuilder.dk). It runs in the browser with a sample schema and needs no Umbraco install.

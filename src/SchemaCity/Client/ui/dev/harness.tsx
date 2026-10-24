@@ -128,6 +128,8 @@ function SamplePicker({ path, refocus }: { path: string; refocus: boolean }) {
  * demo schema, the worst realistic one, none, one type, and 300. It swaps the
  * fixture where the app gets it, so it tests the app and not the switch. The choice
  * lives in the path (`/worst-case`), which the app's own URL writes leave alone.
+ * The public demo is a production build of this page and gets neither the switch
+ * nor the paths: a static host has no page at `/worst-case` to reload.
  */
 const DATASETS = [
   ["medium", "Demo"],
@@ -145,6 +147,7 @@ function DataSwitch({ current }: { current: string }) {
   return (
     <fieldset
       aria-label="Data under test"
+      className="demo-picker"
       style={{
         position: "fixed",
         bottom: 56,
@@ -184,9 +187,9 @@ function DataSwitch({ current }: { current: string }) {
   );
 }
 
-const switchRoot = createRoot(
-  document.body.appendChild(document.createElement("div"))
-);
+const switchRoot = import.meta.env.DEV
+  ? createRoot(document.body.appendChild(document.createElement("div")))
+  : null;
 
 const container = document.querySelector("#app") as HTMLElement;
 let mounted: MountedApp | undefined;
@@ -204,8 +207,11 @@ async function show(path: string, refocus = false) {
   const report = usage ? ((await usage()) as UsageReport) : undefined;
   if (latest !== path) return;
   // The app mounts on the path it finds, so the dataset goes there first.
-  history.replaceState(null, "", `/${nameOf(path)}${location.search}`);
-  switchRoot.render(<DataSwitch current={nameOf(path)} />);
+  if (switchRoot) {
+    const at = `${import.meta.env.BASE_URL}${nameOf(path)}${location.search}`;
+    history.replaceState(null, "", at);
+    switchRoot.render(<DataSwitch current={nameOf(path)} />);
+  }
   mounted?.unmount();
   mounted = mount(container);
   mounted.render({
