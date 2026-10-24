@@ -31,13 +31,13 @@ let settings: Promise<Variant> | undefined;
 /**
  * The variant appsettings opens on, asked once per page: it cannot change without a
  * restart, and the Relationships tab is created again for every Document Type
- * opened. The flat map when the endpoint cannot say.
+ * opened. The city plan when the endpoint cannot say.
  */
 const defaultVariant = (host: SchemaCityElement) => {
   settings ??= tryExecute(host, getSettings(), {
     disableNotifications: true,
   }).then(({ data, error }) => {
-    // A failed call is asked again next time rather than pinning the flat map on a
+    // A failed call is asked again next time rather than pinning the city plan on a
     // site that set the City.
     if (error) settings = undefined;
     return isVariant(data?.variant) ? data.variant : "clean";
@@ -47,7 +47,7 @@ const defaultVariant = (host: SchemaCityElement) => {
 
 /**
  * Each variant's bundle, built with these entries and loaded only when asked for,
- * so the City's three.js never loads with the flat map. The bundler names and
+ * so the City's three.js never loads with the city plan. The bundler names and
  * wires the chunks, so they carry content hashes and resolve from this module, not
  * from the entries Umbraco requests with its `?umb__rnd=` query: the workspace and
  * the Relationships tab share one copy of each variant and its React.

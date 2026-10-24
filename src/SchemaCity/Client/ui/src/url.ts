@@ -15,9 +15,9 @@ import {
 import { LENSES, type Lens } from "@schema-city/core/scene/lens";
 
 /**
- * Which view is on screen. `city` is the 3D map and the rest are the 2D views that
- * replace the canvas. One value rather than a flag each, because those views have no
- * camera and the camera has no table.
+ * Which view is on screen. `city` is the canvas, the 3D city or the city plan,
+ * and the rest are the 2D views that replace it. One value rather than a flag each,
+ * because those views have no canvas and the canvas has no table.
  */
 export type View =
   | "city"

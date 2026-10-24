@@ -199,7 +199,7 @@ export function untangle(
     ({ from, to, kind }) =>
       kind !== "inherits" && from !== to && rowOf.has(from) && rowOf.has(to)
   );
-  // Structure is what the map draws first, so its lines decide the order; a
+  // Structure is what the plan draws first, so its lines decide the order; a
   // district with none, such as the Elements, is ordered by the rest.
   const structure = inside.filter(({ kind }) => kind === "allowedChild");
   const near = new Map<string, string[]>();
@@ -708,7 +708,7 @@ export function keyMove(press: KeyPress): KeyMove {
   const { key } = press;
   const step = press.shiftKey ? 160 : 80;
   // A held key repeats faster than a glide ends, and each new glide starting from the
-  // half-way view made the map crawl, so a repeat steps without one.
+  // half-way view made the plan crawl, so a repeat steps without one.
   const duration = press.repeat ? 0 : 120;
   const pan = PAN[key];
   if (pan) return { pan: { x: pan.x * step, y: pan.y * step }, duration };

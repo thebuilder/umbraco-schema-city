@@ -85,7 +85,7 @@ export function comparisonCity(
 /**
  * The city both stages draw: the baseline's layout with the current schema on it
  * while comparing, the schema's own otherwise. One function, so the City and the
- * flat map place a type the same way and switching keeps it where it was.
+ * city plan place a type the same way.
  */
 export function stageCity(
   graph: SchemaGraph,

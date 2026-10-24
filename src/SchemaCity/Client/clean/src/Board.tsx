@@ -92,7 +92,7 @@ const DOUBLE_CLICK_MS = 350;
  */
 const READ_ZOOM = 0.55;
 /**
- * A view move's length, none when the reader asks for reduced motion: the map then
+ * A view move's length, none when the reader asks for reduced motion: the plan then
  * jumps to the new view rather than gliding there, as the City places its camera.
  */
 const glide = (duration: number) => ({
@@ -447,7 +447,7 @@ function useBoardEdges(
   );
 }
 
-/** The band the map's floating toolbar takes at the top of the board. */
+/** The band the plan's floating toolbar takes at the top of the board. */
 const TOOLBAR_BAND = 56;
 
 /**
@@ -490,7 +490,7 @@ function frameBoard(
  *
  * The board's box changes size too, when presentation goes full screen or the
  * backoffice's sidebar folds, and it fits again then, unless the reader has moved
- * the map since, which would throw their view away. Returns the handlers that tell
+ * the plan since, which would throw their view away. Returns the handlers that tell
  * a reader's move from the board's own.
  */
 function useFraming(
@@ -530,7 +530,7 @@ function useFraming(
         frameBoard(flow, area, layout, props, 0);
     });
     observer.observe(area);
-    // The Overview moves the map with no event of its own (see below).
+    // The Overview moves the plan with no event of its own (see below).
     const onOverview = (event: Event) => {
       if ((event.target as Element).closest(".react-flow__minimap"))
         moved.current = true;
@@ -675,7 +675,7 @@ function BoardOverlays({
 }
 
 /**
- * The map's tools, floating over the top of the board. A board too narrow for them
+ * The plan's tools, floating over the top of the board. A board too narrow for them
  * in one row, as beside the docked panel on a small screen, folds them into one
  * button (styles.css), as the footer does for the City.
  */
@@ -834,7 +834,7 @@ function BoardView(props: StageProps) {
   return (
     // The board is where the keyboard goes back to when the inspector closes, and a
     // type picked on it keeps focus here rather than on the inspector (a11y.tsx),
-    // so the arrow keys keep moving the map. A named region, as the City's is.
+    // so the arrow keys keep moving the plan. A named region, as the City's is.
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Enter arrives from the focused card inside, which is the interactive element.
     <section
       aria-label="City plan of the schema. Arrow keys pan, plus and minus zoom. Press ? for all controls."

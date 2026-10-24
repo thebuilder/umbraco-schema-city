@@ -62,7 +62,7 @@ cd src/SchemaCity/Client
 pnpm dev
 ```
 
-Open http://localhost:5173 for the flat map, or run `pnpm dev:city` for the 3D city. The harness
+Open http://localhost:5173 for the city plan, or run `pnpm dev:city` for the 3D city. The harness
 uses the checked-in small, medium and pathological fixtures.
 
 ## API routes

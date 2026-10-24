@@ -11,16 +11,15 @@ public sealed class SchemaCityOptions
     public const string SectionName = "SchemaCity";
 
     /// <summary>
-    /// Whether the Document Type editor gets the Relationships tab. On by default. The city
+    /// Whether the Document Type editor gets the Relationships tab. On by default. Schema City
     /// under Settings, Advanced stays either way.
     /// </summary>
     public bool RelationshipsTab { get; set; } = true;
 
     /// <summary>
-    /// Which look opens for a user who has not picked one: <c>Clean</c>, the flat map in the
-    /// backoffice's own style, or <c>City</c>, the 3D city. Case does not matter, and any other
-    /// value opens on the flat map. Each user can switch from the app's header, and that choice
-    /// is kept in their browser.
+    /// Which look every user opens on, the Relationships tab included: <c>Clean</c>, the city
+    /// plan in the backoffice's own style, or <c>City</c>, the 3D city. Case does not matter, and
+    /// any other value opens on the city plan. There is no per-user switch.
     /// </summary>
     /// <remarks>
     /// A string rather than an enum: the binder throws on a value an enum does not name, and

@@ -64,9 +64,9 @@ export type KeyRow = { keys: string[]; does: string };
 /**
  * The words that differ between the variants, and the parts of Help and the Legend
  * only the stage can write. Each variant's mount() provides them, so a shared panel
- * can say "building" in the City and "card" on the map. Phrases are written out
- * whole rather than built from the name, since "in the city" and "on the map" do not
- * follow from "City" and "Map".
+ * can say "building" in the City and "card" on the plan. Phrases are written out
+ * whole rather than built from the name, since "in the city" and "on the plan" do not
+ * follow from "City" and "Plan".
  */
 export type StageCopy = {
   /** The view's name in the switcher and in "back to the city": "City" or "Plan". */
@@ -99,7 +99,7 @@ export type Stage = {
   copy: StageCopy;
   tools?: ReactNode;
   /**
-   * Whether the canvas draws its own tools (StageProps.toolbar), as the flat map's
+   * Whether the canvas draws its own tools (StageProps.toolbar), as the plan's
    * floating toolbar does, rather than the footer holding them.
    */
   toolsOnCanvas?: boolean;

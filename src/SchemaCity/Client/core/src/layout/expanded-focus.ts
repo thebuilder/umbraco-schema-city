@@ -84,7 +84,7 @@ export function expandFocusLayout(
 
 /**
  * A focus `depth` steps out: the neighbourhood gathered round `focus`, then one band
- * more per further step. Both stages call it, so the City and the flat map gather
+ * more per further step. Both stages call it, so the City and the city plan gather
  * the same types in the same places.
  */
 export function focusedLayout(

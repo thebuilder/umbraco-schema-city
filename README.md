@@ -25,7 +25,8 @@ Set `"SchemaCity": { "RelationshipsTab": false }` in `appsettings.json` to leave
 
 The city plan is a flat, zoomable diagram in the backoffice's own colours and type, which follows
 the user's light or dark theme. Just for fun, there is also a glowing 3D version of the same city
-([demo](https://schema-city-demo.thebuilder.dk/city/)).
+([demo](https://schema-city-demo.thebuilder.dk/city/)). Set `"SchemaCity": { "Variant": "City" }`
+to show it to every user instead. See [The 3D city](https://schema-city.thebuilder.dk/3d-city).
 
 | Requirement | Version |
 | --- | --- |

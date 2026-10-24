@@ -140,7 +140,7 @@
     var(--uui-color-surface, #fff)
   );
   --selection-text: var(--uui-color-text, #000);
-  /* Rounder than the backoffice's 3px: the map and its panels read as a calm
+  /* Rounder than the backoffice's 3px: the plan and its panels read as a calm
      workbench beside the backoffice rather than as more of its forms. */
   --radius: 6px;
   /* Hover and the selected row in the lists: a tint of Umbraco's selected colour, as
@@ -352,7 +352,7 @@
   height: 40%;
 }
 
-/* The map's tools float over its top edge, inside the board, so they keep clear of
+/* The plan's tools float over its top edge, inside the board, so they keep clear of
    the docked panel, the overview and the focus note. */
 /* Its display comes from the `flex` utility on it, so `in-data-present:hidden`
    can win while presenting. */
@@ -374,7 +374,7 @@
     0 4px 12px rgb(0 0 0 / 0.06);
 }
 
-/* The lens key belongs to the Lens picker, so it sits in the map's toolbar right
+/* The lens key belongs to the Lens picker, so it sits in the plan's toolbar right
    after it (Board's BoardToolbar) and nowhere else. */
 [data-ui="lens-key"] {
   display: none;
@@ -428,7 +428,7 @@
 
 /* ── The workbench ───────────────────────────────────────────────────────────
    The shared components carry data-ui hooks that the City ignores; these rules
-   give the flat map its own reading order. Space and weight separate things here
+   give the city plan its own reading order. Space and weight separate things here
    before lines and boxes do. */
 
 /* The header: the views as a segmented control, and search as the field it is. */
@@ -893,7 +893,7 @@
   display: none;
 }
 
-/* Panels over the app dim it a little and leave it sharp: the map behind a drawer
+/* Panels over the app dim it a little and leave it sharp: the plan behind a drawer
    is context, not noise to blur away. */
 [data-slot="sheet-overlay"],
 [data-slot="dialog-overlay"] {

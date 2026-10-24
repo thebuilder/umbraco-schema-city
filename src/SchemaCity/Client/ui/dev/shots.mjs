@@ -1,5 +1,5 @@
 // Captures the docs, README and marketplace screenshots from a dev harness over CDP.
-// The map is the default, so the panels are shot on the map; the City's three
+// The city plan is the default, so the panels are shot on the plan; the City's three
 // camera shots are for its own docs page.
 //
 //   pnpm dev --host 127.0.0.1 --port 5206          (or pnpm dev:city for VARIANT=city)
@@ -139,7 +139,7 @@ async function wheel([x, y], ticks) {
 
 /**
  * A shot with a `variant` is taken only on that one; every other shot is a panel
- * the two share, taken on the map.
+ * the two share, taken on the plan.
  */
 const shots = [
   // The whole city plan on the default layer, nothing selected.

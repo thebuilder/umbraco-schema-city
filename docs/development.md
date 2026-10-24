@@ -87,7 +87,8 @@ pnpm preview:demo
 ```
 
 This writes the city plan to `Client/dist` and the City to `Client/dist/city`, each with the same
-fixtures the dev server uses, so the demo opens on the city plan and the City is at `/city/`. The docs link both.
+fixtures the dev server uses, so the demo opens on the city plan and the City is at `/city/`. The
+docs link both.
 Only the dev server shows the harness's data switch (Demo, Worst case, Empty, One, 300 types).
 It does not need an Umbraco server, API credentials, or a database. Editor links still log to the
 console because the demo has no backoffice.

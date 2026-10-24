@@ -1,4 +1,4 @@
-// The clean variant: the shared panels around a flat, zoomable map, in the
+// The clean variant: the shared panels around a flat, zoomable city plan, in the
 // backoffice's own colours and type.
 import { App } from "@schema-city/ui/App.tsx";
 import { mountWith } from "@schema-city/ui/mount.tsx";
