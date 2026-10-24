@@ -354,8 +354,9 @@
 
 /* The map's tools float over its top edge, inside the board, so they keep clear of
    the docked panel, the overview and the focus note. */
+/* Its display comes from the `flex` utility on it, so `in-data-present:hidden`
+   can win while presenting. */
 .board .board-toolbar {
-  display: flex;
   gap: 0.5rem;
   align-items: center;
   justify-content: center;
@@ -900,14 +901,10 @@
   backdrop-filter: none;
 }
 
-/* Presenting: no toolbar (its display above outranks the `hidden` utility), the
-   lens key as a pill in the corner it leaves, and cards without their property
-   count, so names at presentation size keep their two lines and the size bar still
-   says how big each type is. */
-[data-present] .board .board-toolbar {
-  display: none;
-}
-
+/* Presenting: the toolbar hides (in-data-present:hidden on it), the lens key moves
+   to the corner it leaves as a pill, and cards drop their property count, so names
+   at presentation size keep their two lines and the size bar still says how big
+   each type is. A removed card keeps its caption, the only text that says so. */
 [data-present] [data-ui="lens-key"]:not(.board-toolbar *) {
   top: 1rem;
   left: 1rem;
@@ -919,6 +916,6 @@
   border-radius: 999px;
 }
 
-[data-present] .board .board-detail {
+[data-present] .board .board-card:not([data-state="removed"]) .board-detail {
   display: none;
 }

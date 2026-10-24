@@ -165,7 +165,17 @@ const shots = [
         await press("=", 2);
         await press("ArrowUp", 2);
         await press("ArrowRight", 3);
-        return "ok";
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        // The moves are tuned to the medium schema at this size. If a layout change
+        // has moved the Site district's name out of the top of the frame, say so
+        // rather than write a shot of the wrong place.
+        const site = [...document.querySelectorAll(".board-frame-name")].find(
+          (name) => name.textContent.startsWith("Site")
+        );
+        const at = site?.getBoundingClientRect();
+        const framed =
+          at && at.top > 0 && at.top < innerHeight / 3 && at.left > 0 && at.right < innerWidth;
+        return framed ? "ok" : "miss";
       })()`);
       await wait(800);
     },

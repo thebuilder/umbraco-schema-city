@@ -683,7 +683,7 @@ function BoardToolbar({ children }: { children: ReactNode }) {
   return (
     <Panel
       aria-label="Map tools"
-      className="board-toolbar in-data-present:hidden"
+      className="board-toolbar flex in-data-present:hidden"
       position="top-left"
       role="group"
     >
