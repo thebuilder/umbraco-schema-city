@@ -380,6 +380,15 @@ test("a card's size bar has a segment per group, as long as its properties", () 
   const big = sizeBar({ groups: [group("a", 30), group("b", 30)] });
   expect(big.reduce((sum, segment) => sum + segment.share, 0)).toBeCloseTo(1);
   expect(sizeBar({ groups: [] })).toEqual([]);
+  // Past twelve groups the bar is two stretches, own and composed.
+  const many = sizeBar({
+    groups: [
+      ...Array.from({ length: 12 }, (_, at) => group(`own${at}`, 2)),
+      group("seo", 4, "seo"),
+    ],
+  });
+  expect(many.map((segment) => segment.id)).toEqual(["own", "composed"]);
+  expect(many[0].share).toBeCloseTo(24 / 32);
   expect(sizeOf({ groups: [group("a", 1)] })).toBe("1 group · 1 property");
   const home = medium.nodes.find((node) => node.id === homeId);
   expect(home && sizeOf(home)).toBe("7 groups · 26 properties");

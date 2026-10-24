@@ -117,6 +117,16 @@ export function usageLine(state: UsageState): string {
   }
 }
 
+/**
+ * The cultures content of a type is stored in. Past three the count leads, so a
+ * narrow cell still says how many when the list itself is cut short.
+ */
+function culturesOf(cultures: string[]): string {
+  if (cultures.length === 0) return "none";
+  const list = cultures.join(", ");
+  return cultures.length > 3 ? `${cultures.length} cultures: ${list}` : list;
+}
+
 /** A type's own usage as label and value rows. */
 export function directUsageRows(usage: TypeUsage): [string, string][] {
   return [
@@ -124,10 +134,7 @@ export function directUsageRows(usage: TypeUsage): [string, string][] {
     ["Drafts", usage.drafts.toLocaleString()],
     ["Trashed", usage.trashed.toLocaleString()],
     ["Root instances", usage.rootInstances.toLocaleString()],
-    [
-      "Cultures",
-      usage.cultures.length > 0 ? usage.cultures.join(", ") : "none",
-    ],
+    ["Cultures", culturesOf(usage.cultures)],
     // An epoch date is a placeholder, not an edit, so it reads as unknown.
     [
       "Last edited",

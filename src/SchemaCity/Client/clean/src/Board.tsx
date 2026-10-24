@@ -190,7 +190,7 @@ function IconTile({
           }}
         />
       ) : (
-        node.name.charAt(0).toUpperCase()
+        (Array.from(node.name)[0] ?? "").toUpperCase()
       )}
     </span>
   );
@@ -228,7 +228,7 @@ const TypeCard = memo(function CardBody({ data }: NodeProps<Node<CardData>>) {
         tile={tile}
       />
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="board-name truncate font-semibold text-foreground text-xs leading-tight">
+        <span className="board-name line-clamp-2 font-semibold text-foreground text-xs leading-tight">
           {node.name}
         </span>
         <span className="board-detail truncate text-2xs text-label leading-tight">
@@ -272,7 +272,10 @@ const DistrictFrame = memo(function FrameBody({
   // board is zoomed out (styles.css), so the districts still read at an overview.
   return (
     <div className="board-frame pointer-events-none relative h-full rounded-lg border border-line">
-      <p className="board-frame-name absolute bottom-full left-0 max-w-full truncate pb-1 font-semibold text-foreground">
+      <p
+        className="board-frame-name pointer-events-auto absolute bottom-full left-0 max-w-full truncate pb-1 font-semibold text-foreground"
+        title={`${data.name}, ${data.count}`}
+      >
         {data.name}
         <span className="ml-1.5 font-normal text-label">{data.count}</span>
       </p>

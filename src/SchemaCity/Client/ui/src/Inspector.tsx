@@ -97,11 +97,12 @@ function Glyph({ node, svg }: { node: SchemaNode; svg?: string }) {
         WebkitMaskSize: "contain",
       }
     : undefined;
+  // Whole characters, so a name that starts with an emoji keeps it whole.
   const initials = node.name
     .split(WORDS)
-    .map((word) => word[0])
-    .join("")
+    .map((word) => Array.from(word)[0] ?? "")
     .slice(0, 2)
+    .join("")
     .toUpperCase();
   return (
     <span
@@ -272,15 +273,19 @@ export function Inspector({
             {/* Focusable from script only, so opening the panel or following a
                 link inside it can put the reader on the type's name. */}
             <h2
-              className="truncate font-semibold text-[17px] text-foreground leading-tight outline-none"
+              className="line-clamp-3 font-semibold text-[17px] text-foreground leading-tight outline-none [overflow-wrap:anywhere]"
               data-inspector-heading=""
               ref={heading}
               tabIndex={-1}
+              title={node.name}
             >
               {node.name}
             </h2>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span className="truncate font-mono text-faint text-xs">
+              <span
+                className="truncate font-mono text-faint text-xs"
+                title={node.alias}
+              >
                 {node.alias}
               </span>
               <RoleBadges node={node} role={kind} />

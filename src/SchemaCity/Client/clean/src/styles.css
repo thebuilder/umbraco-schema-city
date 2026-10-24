@@ -260,8 +260,9 @@
   font-size: calc(
     var(--text-xs) *
     var(--board-text, 1) /
-    clamp(0.75, var(--zoom), 1)
+    clamp(0.85, var(--zoom), 1)
   );
+  line-height: 1.15;
 }
 
 /* A district's name keeps its size on screen as the board zooms out, down to
@@ -307,6 +308,9 @@
     20px
   );
   line-height: 1.15;
+  /* A single long word, as Danish and German compounds are, breaks rather than
+     losing its second line to an ellipsis. */
+  overflow-wrap: anywhere;
   white-space: normal;
 }
 
@@ -319,6 +323,8 @@
 }
 
 .board[data-zoom="label"] .board-name {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
   font-size: min(calc(10px * var(--board-text, 1) / var(--zoom)), 38px);
   line-height: 1.15;
 }
@@ -488,24 +494,21 @@
 /* The header keeps one row: the views hold their size and Search gives way first,
    down to its word and key. Only a very narrow workspace wraps it. */
 [data-schema-city] [data-ui="header-row"] {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 [data-schema-city] [data-ui="header-row"] > :is(h1, [data-ui="view-switcher"]) {
   flex-shrink: 0;
 }
 
+/* The actions ask for room for Search at its narrowest beside Findings, Compare and
+   Help. Given that, they share the views' row and Search takes what is left; short
+   of it, as at 200% zoom, they wrap below rather than slide under the views. */
 [data-schema-city] [data-ui="header-actions"] {
-  flex: 1 1 auto;
+  flex: 1 1 22rem;
   flex-wrap: nowrap;
   justify-content: flex-end;
   min-width: 0;
-}
-
-@container (width < 640px) {
-  [data-schema-city] [data-ui="header-row"] {
-    flex-wrap: wrap;
-  }
 }
 
 [data-schema-city] [data-ui="search"] {
@@ -814,9 +817,16 @@
   padding-block: 0.625rem;
 }
 
-/* The name may wrap; the rest of a row keeps each value on one line. */
-[data-ui="table"] :is(th, td:not(:first-child)) {
+/* The name may wrap, and the alias breaks anywhere when it must, so neither pushes
+   the counts off the table; the rest of a row keeps each value on one line. */
+[data-ui="table"] :is(thead th, td) {
   white-space: nowrap;
+}
+
+[data-ui="table"] td:nth-child(2) {
+  min-width: 8rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 [data-ui="table"] tbody tr {

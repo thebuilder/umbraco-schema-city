@@ -41,6 +41,8 @@ export function DataTypeLink({
         event.stopPropagation();
         links.open(id);
       }}
+      // It truncates where the row is narrow, so the whole name is on hover.
+      title={typeof name === "string" ? name : undefined}
       type="button"
     >
       {name}

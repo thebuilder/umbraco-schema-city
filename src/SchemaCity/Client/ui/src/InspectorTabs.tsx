@@ -67,7 +67,9 @@ export function Values({ rows }: { rows: [string, string][] }) {
       {rows.map(([label, value]) => (
         <Fragment key={label}>
           <dt className="text-label text-xs">{label}</dt>
-          <dd className="truncate font-mono text-prose text-xs">{value}</dd>
+          <dd className="truncate font-mono text-prose text-xs" title={value}>
+            {value}
+          </dd>
         </Fragment>
       ))}
     </dl>
@@ -338,7 +340,7 @@ export function Connections({
           renderFields={(fields) =>
             fields.map((field) => (
               <div className="mb-2.5 last:mb-0" key={field.propertyAlias}>
-                <p className="mb-1 truncate font-mono text-label text-xs">
+                <p className="mb-1 font-mono text-label text-xs [overflow-wrap:anywhere]">
                   {field.propertyAlias}
                   {field.dataType && field.dataTypeId ? (
                     <span className="font-sans text-faint">

@@ -146,6 +146,12 @@ describe("directUsageRows", () => {
       })
     ).toContainEqual(["Last edited", "2026-09-03"]);
     expect(directUsageRows(used(3))).toContainEqual(["Cultures", "none"]);
+    expect(
+      directUsageRows({ ...used(3), cultures: ["da-DK", "sv-SE"] })
+    ).toContainEqual(["Cultures", "da-DK, sv-SE"]);
+    expect(
+      directUsageRows({ ...used(3), cultures: ["da", "sv", "nb", "fi"] })
+    ).toContainEqual(["Cultures", "4 cultures: da, sv, nb, fi"]);
     expect(directUsageRows(used(3))).toContainEqual(["Last edited", "never"]);
     expect(
       directUsageRows({ ...used(3), lastEdited: "1970-01-01T00:00:00" })

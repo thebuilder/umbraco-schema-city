@@ -50,7 +50,8 @@ function MapLegend() {
             }
           >
             Size: a segment per property group, as long as its properties; a
-            faint one comes from a composition
+            faint one comes from a composition. Past twelve groups, one solid
+            bar
           </LegendRow>
           <LegendRow
             mark={<span className="size-3 rounded-sm ring-2 ring-phosphor" />}

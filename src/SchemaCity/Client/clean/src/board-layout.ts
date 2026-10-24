@@ -21,8 +21,8 @@ import { LAYER_OF, type Layer } from "@schema-city/core/scene/layers";
 import type { Ramp } from "@schema-city/core/scene/lens";
 
 export const CARD_WIDTH = 224;
-/** Tall enough for a name on two lines over the size bar, when zoomed out. */
-export const CARD_HEIGHT = 64;
+/** Tall enough for a name on two lines over its caption and size bar. */
+export const CARD_HEIGHT = 68;
 const GAP_X = 20;
 const GAP_Y = 36;
 /** Cards a row holds before it wraps, so a type with forty children stays on screen. */
@@ -614,6 +614,8 @@ export function litLast<Edge extends { from: string; to: string }>(
  */
 /** Properties that fill a card's size bar: a little over the largest real types. */
 const BAR_CAP = 32;
+/** Groups a bar still draws one by one; past this the gaps would outweigh them. */
+const BAR_SEGMENTS = 12;
 
 /**
  * A card's size bar, the flat board's stand-in for the City's floors and footprint:
@@ -621,14 +623,28 @@ const BAR_CAP = 32;
  * bar's length says how big the type is and its segments how many groups. A group
  * from a composition is marked, as the City draws composed floors apart. An empty
  * group still shows as a sliver. Past BAR_CAP the bar fills the card and the
- * segments share it.
+ * segments share it. Past BAR_SEGMENTS groups the gaps between them would read as a
+ * dotted line, so the bar draws two stretches, own and composed, and the tooltip
+ * says how many groups.
  */
 export function sizeBar(node: Pick<SchemaNode, "groups">) {
-  const segments = (node.groups ?? []).map((group) => ({
+  const groups = node.groups ?? [];
+  const each = groups.map((group) => ({
     id: group.id,
     share: Math.max(group.properties.length, 0.5) / BAR_CAP,
     composed: group.fromCompositionId !== null,
   }));
+  const segments =
+    each.length > BAR_SEGMENTS
+      ? [false, true].flatMap((composed) => {
+          const share = each
+            .filter((segment) => segment.composed === composed)
+            .reduce((sum, segment) => sum + segment.share, 0);
+          return share > 0
+            ? [{ id: composed ? "composed" : "own", share, composed }]
+            : [];
+        })
+      : each;
   const total = segments.reduce((sum, segment) => sum + segment.share, 0);
   return total > 1
     ? segments.map((segment) => ({ ...segment, share: segment.share / total }))
