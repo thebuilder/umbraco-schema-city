@@ -10,11 +10,10 @@
   "files": {
     "includes": [
       // Fixture graphs, rewritten from the seeded site on every Development boot.
-      "!dev/fixtures",
+      "!core/fixtures/*.json",
       // Registry copy-in from the afterglow shadcn registry. `npx shadcn add` overwrites
       // these files wholesale, so any fix made here is lost on the next component pull.
-      "!src/app/components/ui",
-      "!package-lock.json"
+      "!ui/src/components/ui"
     ]
   },
   "linter": {

@@ -1,6 +1,6 @@
 ---
 title: Investigate a type
-description: Search, hover, select and focus on a Document Type, and read the boards, buildings and names in the city.
+description: Search, hover, select and focus on a Document Type, and read its card, size bar and lines on the city plan.
 seo:
   image: /og/investigate-a-type.png
 ---
@@ -12,13 +12,13 @@ Most questions about a type start the same way: find it, see what it connects to
     Press <kbd>⌘</kbd> <kbd>K</kbd> or <kbd>Ctrl</kbd> <kbd>K</kbd>, or use **Search**, and type a name, alias or property alias.
   </Step>
   <Step title="Hover it">
-    The building shows its direct connections, and the names of unrelated types dim.
+    With nothing selected, its lines light up and the cards it is not joined to fade.
   </Step>
   <Step title="Select it">
-    Click the building to keep its connections visible and open the inspector.
+    Click the card to keep its lines lit and open the inspector beside the plan.
   </Step>
   <Step title="Focus on it">
-    Double-click the building, or press <kbd>Enter</kbd>, to bring its neighbours together. See [Focus on a neighbourhood](#focus-on-a-neighbourhood).
+    Double-click the card, or press <kbd>Enter</kbd>, to bring its neighbours together. See [Focus on a neighbourhood](#focus-on-a-neighbourhood).
   </Step>
 </Steps>
 
@@ -39,39 +39,29 @@ Click a related type to select it instead. The number on a type chip is how many
 
 To see what a connection means, click it, or use **Explain connections** at the end of the Connections tab.
 
-## Read the boards and buildings
+## Read the cards and lines
 
-The city is drawn as circuit boards. Each board is a district of related types, and each building on it is a type.
+Each type is a card in a district. The districts are soft grey trays, each named above with how many types it holds.
 
 | What you see | What it means |
 | --- | --- |
-| A bigger building | More properties. The side grows with the square root of the count, so a few large types do not push the city apart. |
-| A slab | One property group. A thin board between slabs marks where a new tab starts. |
-| Lit windows | The group's properties |
-| Translucent azure slabs | Groups that come from a composition. A composition nothing creates content from is made of these alone. |
-| A low amber block | An Element Type |
-| Pins along the base | Direct connections. Allowed parents are on the north edge, allowed children on the south, links out on the east and links in on the west. |
-| A lit lid | The type has a template |
-| A dot on the roof | The type varies by culture. A second dot means it varies by segment too. |
-| A gold strip on a board's edge | A lane of traces leaving for another board |
-| A small ring on a trace | A point where the trace turns |
+| The icon | The type's own icon from Umbraco, on a tile whose tint tells pages, compositions and Element Types apart |
+| The line under the name | How many properties the type has, its own and from compositions. An Element Type says Element first. |
+| The size bar along the card's foot | One segment per property group, each as long as the group's properties, so a longer bar is a bigger type. Segments from a composition are fainter. Past 12 groups the bar is one solid stretch. |
+| A line between cards | A connection, in the colour of its layer. Blocks are dotted and picker references dashed. |
+| A ring round a card | The selected type |
 
-**Legend** in the footer lists these too.
+Hover a card for its full name and its size, as "N groups · N properties". **Legend** in the toolbar lists the cards and lines too.
 
-## Read the names on the boards
+Lines curve from row to row and stay faint until you hover or select a card. Then that card's lines light up and everything it is not joined to fades. The cards in each row are ordered so that as few lines cross as possible.
 
-Each type's name is printed on the board beside its building. From the overview, most names are already readable, and the floating label and the inspector always have the full name.
+Zoomed out, a card shows less, down to a tile with only its size bar. See [Zoom out](/navigation#zoom-out).
 
-- Where names would collide, larger types and types with more content print first. Move closer and the rest appear.
-- Names stay put while you pan, orbit and hover.
-- A long name wraps onto two lines, then drops words its board already says, such as "Element" on the Elements board. It is never cut inside a word, and never shortened so far that it could be confused with another name on the same board.
-- A name too small to read fades out, and fades back in as you come closer.
-
-![Closer in on the Site board, with whole printed names, rings where traces turn and a gold strip where traces leave for the Microsite board.](../../../docs/screenshots/names.png)
+![Closer in on the Site district, where each card shows its icon or initial, name, property count and size bar, joined by structure lines.](../../../docs/screenshots/cards.png)
 
 ## Switch connection layers
 
-**Layers** in the footer, or the keys <kbd>1</kbd> to <kbd>4</kbd>, choose which connections the city draws. Hovering or selecting a type always shows its direct connections, including those on layers you have switched off.
+**Layers** in the toolbar, or the keys <kbd>1</kbd> to <kbd>4</kbd>, choose which connections the plan draws. Structure is on by default. Hovering or selecting a card lights its lines on the layers that are on. In the 3D city, it shows direct connections on every layer, including those switched off.
 
 | Layer | Key | Relationship |
 | --- | --- | --- |
@@ -82,11 +72,12 @@ Each type's name is printed on the board beside its building. From the overview,
 
 ## Focus on a neighbourhood
 
-Focus gathers the selected type and its neighbours in one place. To focus, double-click a building, press <kbd>Enter</kbd> with a type selected, or choose **Focus** in the inspector.
+Focus shows the selected type and its neighbours on their own. To focus, double-click a card, press <kbd>Enter</kbd> with a type selected, or choose **Focus** in the inspector.
 
-- **Expand one step** adds the next ring of connected types, and leaves the ones already there in place.
-- Closing the inspector, or clicking bare ground, clears the selection but keeps the neighbourhood on screen. A small card in the corner then names the focused type: click the name to select it again, or choose **Leave focus**.
+- A note in the bottom-left corner of the plan names the type the neighbourhood is gathered round.
+- **Expand one step** adds the next ring of connected types.
+- Closing the inspector, or clicking empty space, clears the selection but keeps the neighbourhood on screen. A small card in the top-right corner then names the focused type: click the name to select it again, or choose **Leave focus**.
 - **Leave focus** in the inspector or on that card, <kbd>Esc</kbd>, <kbd>Home</kbd> or **Show all** leave focus. With a type selected, the first <kbd>Esc</kbd> leaves focus and the second clears the selection.
 - While focus is on, List, Tree and Matrix show only the focused types, with a line above them offering **Show all**.
 
-![Home in focus mode with its neighbouring types, direct connections and the inspector.](../../../docs/screenshots/focus.png)
+![Home in focus mode with its neighbouring types and their lines, and the inspector docked beside the plan.](../../../docs/screenshots/focus.png)

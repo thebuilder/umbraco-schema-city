@@ -1,0 +1,16 @@
+{
+  "name": "@schema-city/core",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./fixtures/*": "./fixtures/*",
+    "./*": "./src/*.ts"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "3.1.1"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}

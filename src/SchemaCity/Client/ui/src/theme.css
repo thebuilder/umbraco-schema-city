@@ -1,0 +1,149 @@
+/* What both variants share: the colour roles the panels are written in, the reading
+   sizes and the focus rule. Each variant's stylesheet imports this after
+   Tailwind and sets the roles' values, plus fonts, motion and effects, its own way.
+   A utility a variant gives no value, like shadow-glow or animate-flicker in the
+   clean one, generates nothing there, so the panels can use them freely. */
+
+@theme inline {
+  --text-1xs: 0.6875rem;
+  /*
+   * Reading text sits two steps above Tailwind's 12px: names, counts and sentences
+   * in the list, the matrix, Findings and the inspector are read rather than
+   * glanced at, and 12px was small for that. 2xs follows, as the mono detail
+   * beside it. Both in rem, so they grow with the browser's own text size.
+   */
+  --text-xs: 0.875rem;
+  --text-2xs: 0.75rem;
+  --text-3xs: 0.5625rem;
+  --text-4xs: 0.55rem;
+  --color-amber: var(--amber);
+  --color-azure: var(--azure);
+  --color-ember: var(--ember);
+  --color-faint: var(--faint);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-label: var(--label);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-panel: var(--panel);
+  --color-panel-raised: var(--panel-raised);
+  --color-panel-sunken: var(--panel-sunken);
+  --color-phosphor: var(--phosphor);
+  --color-phosphor-bright: var(--phosphor-bright);
+  --color-phosphor-dim: var(--phosphor-dim);
+  --color-prose: var(--prose);
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-structure: var(--structure);
+  --color-violet: var(--violet);
+  --color-void: var(--void);
+  --color-window-bevel-dark: var(--window-bevel-dark);
+  --color-window-bevel-light: var(--window-bevel-light);
+  --color-window-border: var(--window-border);
+  --color-window-close: var(--window-close);
+  --color-window-collapse: var(--window-collapse);
+  --color-window-control: var(--window-control);
+  --color-window-footer: var(--window-footer);
+  --color-window-footer-text: var(--window-footer-text);
+  --color-window-grip: var(--window-grip);
+  --color-window-inset: var(--window-inset);
+  --color-window-rule: var(--window-rule);
+  --color-window-surface: var(--window-surface);
+  --color-window-text: var(--window-text);
+  --color-window-text-muted: var(--window-text-muted);
+  --color-window-titlebar-dark: var(--window-titlebar-dark);
+  --color-window-titlebar-light: var(--window-titlebar-light);
+  --color-window-zoom: var(--window-zoom);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-background: var(--background);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-foreground: var(--foreground);
+  --color-info: var(--info);
+  --color-input: var(--input);
+  --color-metric: var(--metric);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-warning: var(--warning);
+}
+
+:is(
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="checkbox"],
+  [data-slot="radio-group-item"],
+  [data-slot="switch"],
+  /* The select trigger is left out on purpose: its border change alone was too
+     faint to find, so it takes the same 2 px outline as every button. */
+  [data-slot="command-input"],
+  [data-slot="input-otp"]
+):focus-visible,
+:is([data-slot="prompt"], [data-slot="shell-prompt"]) input:focus-visible {
+  outline-style: none;
+}
+
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline-style: solid;
+}
+
+@layer base {
+  /* Selected text and the focus outline read roles, so each variant sets them: the
+     City's signal pink and bright phosphor, the backoffice's own in clean. */
+  ::selection {
+    color: var(--selection-text, #fff);
+    background: var(--selection, var(--signal));
+  }
+  :where(
+    a,
+    button,
+    input,
+    textarea,
+    select,
+    summary,
+    [tabindex]
+  ):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+  * {
+    border-color: var(--border);
+  }
+}
+
+/* Matched by substring rather than by name, because the classes that animate are
+   variants such as data-open:animate-fade-in, which a list of .animate-* names
+   never matched, so dialogs and the findings sheet kept moving. The popups' own
+   transitions go too. */
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-"],
+  [data-slot$="-content"],
+  [data-slot$="-overlay"] {
+    transition: none !important;
+    animation: none !important;
+  }
+}

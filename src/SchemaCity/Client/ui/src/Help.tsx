@@ -1,0 +1,258 @@
+import { Fragment } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
+import {
+  type KeyRow as Row,
+  type StageCopy,
+  useStageCopy,
+  useToolsOnCanvas,
+} from "./stage";
+
+/**
+ * Every binding the app has, the stage's own from its copy. The toolbar prints the one
+ * shortcut a first-time reader needs, Search, and the button that opens this page is
+ * drawn as the key that opens it. The rest live here rather than competing with the
+ * view.
+ */
+const groupsFor = (
+  copy: StageCopy,
+  toolsOnCanvas: boolean
+): { title: string; rows: Row[] }[] => {
+  const place = `the ${copy.noun}`;
+  return [
+    { title: "Mouse", rows: copy.mouse },
+    { title: "Navigation", rows: copy.navigation },
+    {
+      title: "Keys",
+      rows: [
+        { keys: ["Enter"], does: `Focus the selected ${copy.item}` },
+        {
+          keys: ["Esc"],
+          does: "Leave focus, then clear the selection. While presenting, close Details, then leave presentation",
+        },
+        { keys: ["⌘K", "Ctrl K"], does: "Search types and property aliases" },
+        {
+          keys: ["1", "2", "3", "4"],
+          does: "Toggle Structure, Compositions, Blocks, References",
+        },
+        { keys: ["L"], does: `List view, or back to ${place}` },
+        { keys: ["T"], does: `Creation tree view, or back to ${place}` },
+        { keys: ["M"], does: `Matrix view, or back to ${place}` },
+        {
+          keys: ["E"],
+          does: "The selected type's Editor page, or back to the view it came from",
+        },
+        {
+          keys: ["I"],
+          does: "The selected type's Impact page, or back to the view it came from",
+        },
+        {
+          keys: ["P"],
+          does: "Present: full screen, larger type, and a caption card for the selected type",
+        },
+        { keys: ["?"], does: "Show this page" },
+      ],
+    },
+    {
+      title: "Where things are",
+      rows: [
+        {
+          keys: ["Header"],
+          does: `The views over the whole schema, ${copy.name}, List, Tree, Matrix and Data Types, then Search, Findings, Compare and this page`,
+        },
+        {
+          keys: ["Inspector"],
+          does: "The pages about one type, Editor and Impact, open from its Editor view and Impact buttons. A line over the page leads back to the view you came from",
+        },
+        {
+          keys: ["Footer"],
+          does: toolsOnCanvas
+            ? "When the schema and the usage were read, and Present"
+            : `When the schema and the usage were read, the ${copy.name}'s own tools, and Present`,
+        },
+      ],
+    },
+    {
+      title: "Objects",
+      rows: [
+        {
+          keys: ["Focus"],
+          does: "The inspector's Focus button lays the neighbourhood out around a type",
+        },
+        { keys: ["Open in editor"], does: "Opens the Document Type editor" },
+        {
+          keys: ["Editor view"],
+          does: "In the inspector: the type's tabs, groups and properties as an editor sees them",
+        },
+        { keys: ["Findings"], does: "Opens the drawer of problems and notes" },
+        {
+          keys: ["Data Types"],
+          does: "Lists every Data Type with what uses it, what it offers and the blocks content stores in it. Any Data Type name opens it here",
+        },
+        {
+          keys: [copy.show],
+          does: "Lights the types that use a Data Type, or the types an impact trace reaches. Clear over the canvas ends it",
+        },
+        {
+          keys: ["Impact"],
+          does: "In the inspector: traces what a change to the type or one of its properties reaches, with each path in words, and copies it as Markdown or saves it as CSV",
+        },
+        {
+          keys: ["Layers", "Group", "Lens"],
+          does: toolsOnCanvas
+            ? `In the toolbar over the ${copy.noun}: which relationships are drawn, how the districts are cut, and a recolouring by usage`
+            : `In the footer, ${copy.where}: which relationships are drawn, how the districts are cut, and a recolouring by usage. Narrow, they fold into ${copy.name} tools`,
+        },
+        {
+          keys: ["Compare"],
+          does: "Exports this schema, or imports a snapshot as a baseline and lists what changed since",
+        },
+      ],
+    },
+  ];
+};
+
+function GroupTitle({ children }: { children: string }) {
+  return (
+    <h3
+      className="mb-1.5 font-bold text-3xs text-phosphor uppercase tracking-terminal-xl"
+      data-ui="help-title"
+    >
+      <span aria-hidden className="text-phosphor-dim">
+        ──{" "}
+      </span>
+      {children}
+    </h3>
+  );
+}
+
+/**
+ * The control reference, and the toolbar button that opens it. Controlled, because
+ * `?` opens it from the app's keyboard handler as well as this button.
+ *
+ * No tooltip on the button, for the reason the Search button has none: a tooltip's
+ * exit animation plays over the dialog opening.
+ */
+export function Help({
+  onOpenChange,
+  open,
+}: {
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+}) {
+  const copy = useStageCopy();
+  const toolsOnCanvas = useToolsOnCanvas();
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      {/* An icon button, because the backoffice toolbar is narrow and a word plus a
+          key costs four times the width of the glyph. The ? is both the label and
+          the key that opens the same dialog. */}
+      <DialogTrigger
+        aria-label="Control reference"
+        render={
+          <Button
+            className="text-xs"
+            data-trigger
+            size="icon-sm"
+            variant="outline"
+          />
+        }
+      >
+        ?
+      </DialogTrigger>
+      <DialogContent className="gap-0 p-0 sm:max-w-2xl" showCloseButton={false}>
+        <div className="flex items-center justify-between gap-4 border-line border-b px-4 py-3">
+          <DialogTitle className="text-sm uppercase tracking-terminal-lg">
+            Schema City · Control reference
+          </DialogTitle>
+          {/* The key that closes it, drawn as the key it is. The Kbd inside takes no
+              pointer events, so the click lands on the button around it. */}
+          <DialogClose
+            aria-label="Close the control reference"
+            className="shrink-0 cursor-pointer outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <Kbd>ESC</Kbd>
+          </DialogClose>
+        </div>
+
+        {/* Focusable because it scrolls: a pane a mouse can reach a keyboard must
+            too. Borrowed from fsn's help screen, along with the group rules. */}
+        <section
+          aria-label="Controls, findings and snapshots"
+          className="max-h-[60vh] overflow-y-auto bg-panel-sunken px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-ring"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable pane has to be reachable by keyboard.
+          tabIndex={0}
+        >
+          {groupsFor(copy, toolsOnCanvas).map((group) => (
+            <section className="mt-5 first:mt-0" key={group.title}>
+              <GroupTitle>{group.title}</GroupTitle>
+              <dl className="grid grid-cols-1 gap-x-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                {group.rows.map((row) => (
+                  <Fragment key={row.does}>
+                    {/* The keys wrap as a group rather than stretching the column:
+                        four of them are still one binding. */}
+                    <dt className="flex flex-wrap items-start gap-1 pt-1.5">
+                      {row.keys.map((key) => (
+                        <Kbd key={key}>{key}</Kbd>
+                      ))}
+                    </dt>
+                    <dd className="pb-1.5 text-muted-foreground text-xs leading-relaxed sm:pt-1.5">
+                      {row.does}
+                    </dd>
+                  </Fragment>
+                ))}
+              </dl>
+            </section>
+          ))}
+          <section className="mt-5">
+            <GroupTitle>Findings and snapshots</GroupTitle>
+            <div className="space-y-1.5 pt-1.5 text-muted-foreground text-xs leading-relaxed">
+              <p>
+                A finding is something a check noticed in the schema: a problem,
+                such as a block editor that lists a deleted Element Type, or a
+                note worth a look, such as a tab with too many properties. It is
+                a reason to investigate, not an instruction to delete.
+              </p>
+              <p>
+                Mark as intentional records why a finding is deliberate, with
+                your name and the date, and Hide reviewed takes it out of the
+                drawer. Everywhere else a reviewed finding goes quiet: a hollow
+                grey dot in the List, the Tree and the Data Types list, counts
+                and the problem mark for open findings only, and its check
+                greyed out after the open ones. The Unused lens and the Editor
+                page's flags ignore it. The decision belongs to the type as it
+                is now: change the type and the finding opens again, marked as
+                reopened. Decisions are kept in Umbraco's key-value table, apart
+                from the schema, and Undo removes one.
+              </p>
+              <p>
+                The schema is read when the page loads. Content usage is a
+                separate snapshot that the server keeps for one minute. It
+                counts the content items of each type, published, drafts and
+                trashed items included, and the references between them. The
+                footer and the Findings drawer say when each was taken.
+              </p>
+              <p>
+                Compare lists causes: the types with an edit of their own. The
+                types that only changed because of one, such as every type
+                composing a composition that lost a property, are its side
+                effects and sit under it. Mark the causes you planned, then Show
+                unplanned only leaves the ones nobody asked for. While a
+                baseline is loaded the {copy.noun} colours {copy.item}s by
+                change, side effects quieter than causes, and the List gets a
+                Change column. Comparing never changes Umbraco.
+              </p>
+            </div>
+          </section>
+        </section>
+      </DialogContent>
+    </Dialog>
+  );
+}

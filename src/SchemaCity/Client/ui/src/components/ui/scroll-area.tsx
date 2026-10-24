@@ -1,0 +1,65 @@
+"use client";
+
+import { ScrollArea as ScrollAreaPrimitive } from "@base-ui/react/scroll-area";
+
+import { cn } from "@/lib/utils";
+
+function ScrollArea({
+  className,
+  children,
+  viewport,
+  ...props
+}: ScrollAreaPrimitive.Root.Props & {
+  /** Props for the viewport, such as the name it is read by or a tabpanel role. */
+  viewport?: ScrollAreaPrimitive.Viewport.Props;
+}) {
+  return (
+    <ScrollAreaPrimitive.Root
+      className={cn("relative", className)}
+      data-slot="scroll-area"
+      {...props}
+    >
+      <ScrollAreaPrimitive.Viewport
+        className="size-full overscroll-contain rounded-none outline-none focus-visible:outline-2 focus-visible:outline-ring"
+        data-slot="scroll-area-viewport"
+        // Patched: base-ui sets tabIndex once from whether the content overflowed, and
+        // a tab change that adds overflow later never updates it, so a keyboard could
+        // not scroll the longer tab. Always a tab stop instead, named by the caller.
+        role="region"
+        tabIndex={0}
+        {...viewport}
+      >
+        {children}
+      </ScrollAreaPrimitive.Viewport>
+      <ScrollBar />
+      <ScrollAreaPrimitive.Corner />
+    </ScrollAreaPrimitive.Root>
+  );
+}
+
+function ScrollBar({
+  className,
+  orientation = "vertical",
+  ...props
+}: ScrollAreaPrimitive.Scrollbar.Props) {
+  return (
+    <ScrollAreaPrimitive.Scrollbar
+      className={cn(
+        "flex touch-none select-none bg-phosphor/5 p-px transition-opacity",
+        orientation === "vertical" && "h-full w-2 border-line border-l",
+        orientation === "horizontal" && "h-2 flex-col border-line border-t",
+        className
+      )}
+      data-slot="scroll-area-scrollbar"
+      orientation={orientation}
+      {...props}
+    >
+      <ScrollAreaPrimitive.Thumb
+        className="relative flex-1 rounded-none bg-phosphor-dim transition-colors hover:bg-phosphor"
+        data-slot="scroll-area-thumb"
+      />
+    </ScrollAreaPrimitive.Scrollbar>
+  );
+}
+
+export { ScrollArea, ScrollBar };

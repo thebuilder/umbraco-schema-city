@@ -13,6 +13,6 @@ export default defineOgConfig({
   root: {
     title: "Schema City for Umbraco",
     description:
-      "See your Umbraco content model as a city in the backoffice, and catch schema problems before they ship.",
+      "See your Umbraco content model from above, as a city plan in the backoffice, and catch schema problems before they ship.",
   },
 });

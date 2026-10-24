@@ -151,7 +151,7 @@ public class UsageCollectorTests
         }
 
         Assert.NotNull(directory);
-        string fixtures = Path.Combine(directory.FullName, "src", "SchemaCity", "Client", "dev", "fixtures");
+        string fixtures = Path.Combine(directory.FullName, "src", "SchemaCity", "Client", "core", "fixtures");
 
         JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
         UsageReport usage = JsonSerializer.Deserialize<UsageReport>(

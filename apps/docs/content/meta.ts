@@ -15,6 +15,7 @@ export default defineMeta({
     "compare",
     "layout",
     "present",
+    "3d-city",
     "license",
   ],
 });

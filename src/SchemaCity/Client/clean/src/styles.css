@@ -1,0 +1,921 @@
+@import "tailwindcss";
+@import "../../ui/src/theme.css";
+@import "@xyflow/react/dist/style.css";
+
+/* Automatic detection starts at the Vite root, which is dev/ for the harness and
+   Client/ for the build. Naming the sources keeps both scans identical, and the
+   shared panels live in the ui package. */
+@source "../";
+@source "../../ui";
+
+/* The clean look: the backoffice's own type, corners and shadows, and quick plain
+   motion. No glow, scanlines or terminal tracking: those utilities get no value
+   here, so the classes the shared panels carry for them generate nothing. */
+@theme inline {
+  --font-heading: var(--font-sans);
+  /* The panels set aliases and the command palette in mono, which in the backoffice
+     reads as a different app. Everything takes Umbraco's own face. */
+  --font-mono: var(--uui-font-family, "Lato", sans-serif);
+  --font-sans: var(--uui-font-family, "Lato", sans-serif);
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.5);
+  --shadow-panel: var(--uui-shadow-depth-3);
+  /* The afterglow sizes below 12px (the view switcher, the help headings) are
+     smaller than anything the backoffice sets, so here they bottom out at 12px. */
+  --text-3xs: 0.75rem;
+  --text-4xs: 0.75rem;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --animate-open: clean-fade-in 140ms var(--ease-out);
+  --animate-close: clean-fade-out 100ms ease-in forwards;
+  --animate-fade-in: clean-fade-in 140ms var(--ease-out);
+  --animate-fade-out: clean-fade-out 100ms ease-in forwards;
+  --animate-slide-in-bottom: clean-slide-in-bottom 200ms var(--ease-out);
+  --animate-slide-in-left: clean-slide-in-left 200ms var(--ease-out);
+  --animate-slide-in-right: clean-slide-in-right 200ms var(--ease-out);
+  --animate-slide-in-top: clean-slide-in-top 200ms var(--ease-out);
+  --animate-slide-out-bottom: clean-slide-in-bottom 150ms ease-in reverse
+    forwards;
+  --animate-slide-out-left: clean-slide-in-left 150ms ease-in reverse forwards;
+  --animate-slide-out-right: clean-slide-in-right 150ms ease-in reverse forwards;
+  --animate-slide-out-top: clean-slide-in-top 150ms ease-in reverse forwards;
+  --animate-select-fold-in-down: clean-fade-in 120ms var(--ease-out);
+  --animate-select-fold-in-up: clean-fade-in 120ms var(--ease-out);
+  --animate-select-fold-out-down: clean-fade-out 90ms ease-in forwards;
+  --animate-select-fold-out-up: clean-fade-out 90ms ease-in forwards;
+  @keyframes clean-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes clean-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes clean-slide-in-bottom {
+    from {
+      transform: translateY(1rem);
+      opacity: 0;
+    }
+  }
+  @keyframes clean-slide-in-left {
+    from {
+      transform: translateX(-1rem);
+      opacity: 0;
+    }
+  }
+  @keyframes clean-slide-in-right {
+    from {
+      transform: translateX(1rem);
+      opacity: 0;
+    }
+  }
+  @keyframes clean-slide-in-top {
+    from {
+      transform: translateY(-1rem);
+      opacity: 0;
+    }
+  }
+}
+
+/* Every role from Umbraco's --uui-* tokens, which the backoffice sets on its document
+   and the shadow root inherits, so light, dark and high contrast follow the user's
+   theme. The fallbacks are the light theme's, for a page without the tokens. The
+   relation colours are mixed a third of the way to the text colour, which darkens
+   them on a light surface and lightens them on a dark one, so they read on both. */
+:host,
+:root {
+  --text-mix: var(--uui-color-text, #000);
+  --amber: color-mix(in oklab, #e08a2a 70%, var(--text-mix));
+  --azure: color-mix(in oklab, #3879ff 75%, var(--text-mix));
+  --violet: color-mix(in oklab, #8d6be0 75%, var(--text-mix));
+  --signal: var(--uui-color-danger, #df2a5d);
+  --signal-soft: color-mix(in oklab, var(--signal) 80%, var(--panel));
+  /* The accent is also text on buttons and badges, and Umbraco's dark selected blue
+     is 2:1 on a dark surface, so it takes half the text colour too. */
+  --phosphor: color-mix(
+    in oklab,
+    var(--uui-color-selected, #283a97) 50%,
+    var(--text-mix)
+  );
+  --phosphor-bright: var(--uui-color-text, #000);
+  --phosphor-dim: color-mix(
+    in oklab,
+    var(--uui-color-text-alt, #2e2d2f) 72%,
+    var(--uui-color-surface, #fff)
+  );
+  --prose: var(--uui-color-text, #000);
+  --label: color-mix(
+    in oklab,
+    var(--uui-color-text-alt, #2e2d2f) 80%,
+    var(--uui-color-surface, #fff)
+  );
+  --faint: color-mix(
+    in oklab,
+    var(--uui-color-text-alt, #2e2d2f) 72%,
+    var(--uui-color-surface, #fff)
+  );
+  /* A mid grey rather than near-black, so a hub's lit lines, twenty at once, do
+     not outweigh the cards they join. */
+  --structure: color-mix(
+    in oklab,
+    var(--uui-color-text, #000) 58%,
+    var(--uui-color-surface, #fff)
+  );
+  --line: var(--uui-color-border, #d8d7d9);
+  --line-strong: var(--uui-color-border-emphasis, #a1a1a1);
+  --panel: var(--uui-color-surface, #fff);
+  --panel-raised: var(--uui-color-surface, #fff);
+  --panel-sunken: var(--uui-color-surface-alt, #f3f3f5);
+  --void: var(--uui-color-background, #f3f3f5);
+  --background: var(--uui-color-background, #f3f3f5);
+  --foreground: var(--uui-color-text, #000);
+  --border: var(--uui-color-border, #d8d7d9);
+  --input: var(--uui-color-border, #d8d7d9);
+  --ring: var(--uui-color-focus, #3879ff);
+  --selection: color-mix(
+    in oklab,
+    var(--uui-color-focus, #3879ff) 30%,
+    var(--uui-color-surface, #fff)
+  );
+  --selection-text: var(--uui-color-text, #000);
+  /* Rounder than the backoffice's 3px: the plan and its panels read as a calm
+     workbench beside the backoffice rather than as more of its forms. */
+  --radius: 6px;
+  /* Hover and the selected row in the lists: a tint of Umbraco's selected colour, as
+     the backoffice marks a current item, rather than a grey a step off the panel. */
+  --accent: color-mix(
+    in oklab,
+    var(--uui-color-selected, #283a97) 12%,
+    var(--uui-color-surface, #fff)
+  );
+  --accent-foreground: var(--uui-color-interactive-emphasis, #3544b1);
+  --card: var(--uui-color-surface, #fff);
+  --card-foreground: var(--uui-color-text, #000);
+  --popover: var(--uui-color-surface, #fff);
+  --popover-foreground: var(--uui-color-text, #000);
+  --primary: var(--uui-color-default, #283a97);
+  --primary-foreground: var(--uui-color-default-contrast, #fff);
+  --secondary: var(--uui-color-surface-alt, #f3f3f5);
+  --secondary-foreground: var(--uui-color-interactive, #1b264f);
+  --muted: var(--uui-color-surface-alt, #f3f3f5);
+  --muted-foreground: var(--label);
+  --destructive: var(--uui-color-danger, #df2a5d);
+  --destructive-foreground: var(--uui-color-danger-contrast, #fff);
+  --warning: var(--uui-color-warning, #fad634);
+  --info: var(--azure);
+  --scrim: rgb(0 0 0 / 0.35);
+
+  /* React Flow's own parts, in the same roles. */
+  --xy-background-color: var(--background);
+  --xy-background-pattern-color: color-mix(
+    in oklab,
+    var(--line) 70%,
+    transparent
+  );
+  --xy-minimap-background-color: var(--panel);
+  --xy-minimap-mask-background-color: color-mix(
+    in oklab,
+    var(--background) 70%,
+    transparent
+  );
+  --xy-minimap-mask-stroke-color: var(--line-strong);
+}
+
+/* The shared components were cut for the afterglow look, which is square and set in
+   capitals. Unlayered, so these win over the utilities without editing the
+   registry copies. */
+[data-schema-city] .uppercase {
+  text-transform: none;
+}
+
+[data-schema-city] .rounded-none {
+  border-radius: var(--radius);
+}
+
+/* Umbraco sets a workspace's bars white over its grey, and its boxes on the grey as
+   white sheets with a soft shadow. The header and footer are the bars; each list
+   and page is a sheet (Sheet in Views.tsx), and everything on it takes its white. */
+[data-schema-city] .stage-bar {
+  background: var(--panel);
+}
+
+[data-schema-city] .stage-sheet {
+  --background: var(--panel);
+  margin: 1rem;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) * 2);
+  box-shadow: var(--uui-shadow-depth-1, 0 1px 3px rgb(0 0 0 / 0.12));
+}
+
+/* The panels set counts in mono so their digits line up; in Umbraco's face they
+   need tabular figures to do the same. */
+[data-schema-city] .font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.board {
+  --zoom: 1;
+  container-type: inline-size;
+}
+
+/* The inspector docks beside the board rather than over it, so the board narrows by
+   the panel's width while it is open (the widths Inspector.tsx gives the panel).
+   Below 760px the panel covers the board, as there is no room for both. */
+@container (width >= 760px) {
+  .board[data-docked] {
+    width: calc(100% - 340px);
+  }
+}
+
+@container (width >= 1024px) {
+  .board[data-docked] {
+    width: calc(100% - 520px);
+  }
+}
+
+.board .react-flow__node-card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.board .react-flow__minimap {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* Below 900px the overview would cover a fifth of the board it summarises. */
+@container (width < 900px) {
+  .board .react-flow__minimap {
+    display: none;
+  }
+}
+
+/* A card's name keeps its size on screen as the board zooms out to three quarters,
+   the way district names do. */
+.board .board-name {
+  font-size: calc(
+    var(--text-xs) *
+    var(--board-text, 1) /
+    clamp(0.85, var(--zoom), 1)
+  );
+  line-height: 1.15;
+}
+
+/* A district's name keeps its size on screen as the board zooms out, down to
+   a fifth of full size, so the districts still read when every card is a speck. */
+.board .board-frame-name {
+  font-size: calc(var(--text-xs) / clamp(0.18, var(--zoom), 1));
+  line-height: 1.25;
+}
+
+/* A district is a soft tray the cards sit in, not an outline around them. */
+.board .board-frame {
+  background: color-mix(in oklab, var(--foreground) 3.5%, transparent);
+  border-color: transparent;
+  border-radius: 1rem;
+}
+
+/* A card's size bar keeps 3px on screen as the board zooms out, 4px close up, and
+   its gaps likewise, so the segments still count from a distance. */
+.board .board-size {
+  --bar: color-mix(in oklab, var(--foreground) 55%, transparent);
+  --bar-composed: color-mix(in oklab, var(--foreground) 22%, transparent);
+  gap: calc(1.5px / clamp(0.2, var(--zoom), 1));
+  height: max(4px, calc(3px / clamp(0.2, var(--zoom), 1)));
+}
+
+/* Zoomed out, a card's caption and icon are a few pixels tall, so it shows its
+   name alone (zoomBand in board-layout.ts), centred and on up to two lines. The
+   name holds 12px on screen while two lines still fit the card, then shrinks
+   with it. */
+.board[data-zoom="name"] .board-card {
+  justify-content: center;
+  padding-bottom: calc(3px / var(--zoom) + 8px);
+  text-align: center;
+}
+
+.board[data-zoom="name"] .board-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-size: min(
+    calc(var(--text-2xs) * var(--board-text, 1) / var(--zoom)),
+    20px
+  );
+  line-height: 1.15;
+  /* A single long word, as Danish and German compounds are, breaks rather than
+     losing its second line to an ellipsis. */
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* Further out the name takes one line, held at 10px on screen and cut short with
+   an ellipsis where the card is too narrow; the tooltip has it whole. */
+.board[data-zoom="label"] .board-card {
+  justify-content: center;
+  padding-bottom: calc(3px / var(--zoom) + 6px);
+  text-align: center;
+}
+
+.board[data-zoom="label"] .board-name {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  font-size: min(calc(10px * var(--board-text, 1) / var(--zoom)), 38px);
+  line-height: 1.15;
+}
+
+.board:is([data-zoom="name"], [data-zoom="label"]) .board-icon,
+.board:is([data-zoom="name"], [data-zoom="label"]) .board-detail {
+  display: none;
+}
+
+/* Furthest out the name has no room either, so the card is a tile of its colour
+   with its size bar, and the name moves to the tooltip and the inspector. */
+.board[data-zoom="tile"] .board-card {
+  background: var(--tile);
+}
+
+.board[data-zoom="tile"] .board-card > :not(.board-size) {
+  visibility: hidden;
+}
+
+/* On a tile the bar is all there is, so it takes the middle of it, darker. */
+.board[data-zoom="tile"] .board-size {
+  --bar: color-mix(in oklab, var(--foreground) 70%, transparent);
+  --bar-composed: color-mix(in oklab, var(--foreground) 32%, transparent);
+  bottom: 30%;
+  height: 40%;
+}
+
+/* The plan's tools float over its top edge, inside the board, so they keep clear of
+   the docked panel, the overview and the focus note. */
+/* Its display comes from the `flex` utility on it, so `in-data-present:hidden`
+   can win while presenting. */
+.board .board-toolbar {
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  /* React Flow centres the panel from the board's middle, which left it half the
+     board to fill and wrapped it. At its own width it keeps one row, and a board
+     too narrow for that row gets the folded button instead. */
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  padding: 0.375rem 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) + 6px);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 4px 12px rgb(0 0 0 / 0.06);
+}
+
+/* The lens key belongs to the Lens picker, so it sits in the plan's toolbar right
+   after it (Board's BoardToolbar) and nowhere else. */
+[data-ui="lens-key"] {
+  display: none;
+}
+
+.board .board-toolbar [data-ui="lens-key"] {
+  position: static;
+  display: flex;
+  order: 1;
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  color: var(--label);
+  background: none;
+  border: 0;
+}
+
+/* Layers, Group and Lens, then the key, then Legend and Reset view. */
+.board .board-tools > :nth-child(n + 4):not([data-ui="lens-key"]) {
+  order: 2;
+}
+
+.board .board-tools {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.board .board-tools-fold {
+  display: none;
+}
+
+@container (width < 760px) {
+  .board .board-tools {
+    display: none;
+  }
+
+  .board .board-tools-fold {
+    display: inline-flex;
+  }
+}
+
+.board .board-note {
+  padding: 0.25rem 0.75rem;
+  font-size: var(--text-2xs);
+  color: var(--label);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--uui-shadow-depth-1);
+}
+
+/* ── The workbench ───────────────────────────────────────────────────────────
+   The shared components carry data-ui hooks that the City ignores; these rules
+   give the city plan its own reading order. Space and weight separate things here
+   before lines and boxes do. */
+
+/* The header: the views as a segmented control, and search as the field it is. */
+/* Every segmented control as one: the choices on a quiet tray, the chosen one
+   lifted as a white key. The shared ones sit on a 1px dark backing that showed at
+   the corners once the buttons were rounded, so the backing goes. */
+[data-schema-city]
+:is(
+  [data-ui="view-switcher"],
+  [data-ui="segmented"],
+  [data-slot="toggle-group"]
+) {
+  gap: 2px;
+  padding: 3px;
+  background: var(--muted);
+  border-radius: calc(var(--radius) + 3px);
+}
+
+[data-schema-city]
+  :is(
+    [data-ui="view-switcher"],
+    [data-ui="segmented"],
+    [data-slot="toggle-group"]
+  )
+  > button {
+  height: 1.75rem;
+  font-weight: 600;
+  color: var(--label);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+
+[data-schema-city]
+  :is(
+    [data-ui="view-switcher"],
+    [data-ui="segmented"],
+    [data-slot="toggle-group"]
+  )
+  > button:hover {
+  color: var(--foreground);
+}
+
+[data-schema-city]
+  :is(
+    [data-ui="view-switcher"],
+    [data-ui="segmented"],
+    [data-slot="toggle-group"]
+  )
+  > button:is([aria-checked="true"], [data-pressed]) {
+  color: var(--foreground);
+  background: var(--panel);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+[data-schema-city] .stage-bar h1 {
+  font-size: 0.9375rem;
+  color: var(--foreground);
+}
+
+/* The header keeps one row: the views hold their size and Search gives way first,
+   down to its word and key. Only a very narrow workspace wraps it. */
+[data-schema-city] [data-ui="header-row"] {
+  flex-wrap: wrap;
+}
+
+[data-schema-city] [data-ui="header-row"] > :is(h1, [data-ui="view-switcher"]) {
+  flex-shrink: 0;
+}
+
+/* The actions ask for room for Search at its narrowest beside Findings, Compare and
+   Help. Given that, they share the views' row and Search takes what is left; short
+   of it, as at 200% zoom, they wrap below rather than slide under the views. */
+[data-schema-city] [data-ui="header-actions"] {
+  flex: 1 1 22rem;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+[data-schema-city] [data-ui="search"] {
+  flex: 0 1 15rem;
+  justify-content: space-between;
+  min-width: 6.5rem;
+  font-weight: 400;
+  color: var(--label);
+  background: var(--muted);
+  border: 1px solid transparent;
+  box-shadow: none;
+}
+
+[data-schema-city] [data-ui="search"]:hover {
+  color: var(--foreground);
+  border-color: var(--line);
+}
+
+/* The inspector docks beside the board, so it needs an edge, not a shadow; below
+   760px it covers the board again and takes its shadow back. */
+[data-ui="inspector"] {
+  font-size: 0.875rem;
+  border-left-color: var(--line);
+  box-shadow: none;
+}
+
+@container (width < 760px) {
+  [data-ui="inspector"] {
+    box-shadow: var(--shadow-panel);
+  }
+}
+
+[data-ui="inspector-header"] {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 0;
+}
+
+@container (width < 1024px) {
+  [data-ui="inspector-header"] {
+    padding-inline: 1rem;
+  }
+}
+
+[data-ui="inspector-header"] h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+[data-ui="glyph"] {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 0.875rem;
+  background: color-mix(in oklab, var(--role) 14%, var(--panel));
+  border: 0;
+  border-radius: calc(var(--radius) + 4px);
+}
+
+[data-ui="glyph"] > span {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+[data-ui="usage-line"] {
+  margin-top: 0.875rem;
+  color: var(--prose);
+}
+
+/* The tabs slide sideways when the narrow panel cannot hold all four, rather than
+   running past its edge. */
+[data-ui="tabs"] {
+  gap: 0.25rem;
+  padding-inline: 1rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+/* On the narrow panel the row fades at its right edge, so a tab out of view reads
+   as more to scroll to rather than as the end. */
+@container (width < 1024px) {
+  [data-ui="tabs"] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent);
+  }
+}
+
+[data-ui="tabs"] [role="tab"] {
+  flex-shrink: 0;
+  padding: 0.625rem 0.5rem;
+  margin-bottom: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+[data-ui="tabs"] [role="tab"][aria-selected="true"] {
+  color: var(--foreground);
+  border-bottom-color: var(--accent-foreground);
+}
+
+[data-ui="inspector"] [role="tabpanel"] {
+  padding-inline: 0.5rem;
+}
+
+/* Sections apart by space and a hairline, headings in the text colour with their
+   count as a quiet pill. */
+[data-ui="section"] {
+  padding-block: 1.25rem 0.5rem;
+  border-bottom: 0;
+}
+
+[data-ui="section"] + [data-ui="section"] {
+  border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+}
+
+[data-ui="heading"] {
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+[data-ui="heading"] > [aria-hidden] {
+  border-radius: 50%;
+}
+
+[data-ui="heading"] > .font-mono {
+  padding-inline: 0.4375rem;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  color: var(--label);
+  background: var(--muted);
+  border-radius: 999px;
+}
+
+[data-ui="muted"] {
+  font-size: 0.8125rem;
+  color: var(--label);
+}
+
+[data-ui="caption"] {
+  padding-top: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--faint);
+}
+
+/* Usage as a compact grid, two values to a column, label over value. */
+[data-ui="values"] {
+  grid-template-rows: repeat(4, auto);
+  grid-template-columns: none;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 0 1rem;
+}
+
+[data-ui="values"] dt {
+  font-size: 0.75rem;
+  color: var(--label);
+}
+
+[data-ui="values"] dd {
+  margin-bottom: 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* Types as pills. */
+[data-ui="chips"] {
+  gap: 0.375rem;
+}
+
+[data-ui="chip"] {
+  padding: 0.1875rem 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--prose);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  transition:
+    background-color 120ms,
+    border-color 120ms;
+}
+
+[data-ui="chip"]:hover {
+  color: var(--foreground);
+  background: var(--accent);
+  border-color: var(--accent-foreground);
+}
+
+[data-ui="chip"] > .font-mono {
+  font-size: 0.75rem;
+  color: var(--faint);
+}
+
+/* The Findings filters as pills, and each kind's group as a plain bordered card:
+   its label keeps the problem colour, so the border need not shout too. */
+[data-ui="filters"] {
+  gap: 0.375rem;
+}
+
+[data-ui="filter"] {
+  padding: 0.1875rem 0.625rem;
+  font-size: 0.8125rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+[data-ui="filter"][aria-pressed="true"] {
+  color: var(--foreground);
+  background: var(--accent);
+  border-color: var(--accent-foreground);
+}
+
+[data-ui="finding-group"] {
+  overflow: hidden;
+  background: var(--panel);
+  border-color: var(--line);
+  border-radius: calc(var(--radius) + 4px);
+}
+
+/* Checks as rows marked by a dot: filled pink for a problem, grey for a note, a
+   ring once reviewed. */
+[data-ui="check"] {
+  position: relative;
+  padding: 0.75rem 0 0.75rem 1.25rem;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+[data-ui="check"] + [data-ui="check"] {
+  border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+}
+
+[data-ui="check"]::before {
+  position: absolute;
+  top: 1.1875rem;
+  left: 0.125rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  content: "";
+  background: var(--faint);
+  border-radius: 50%;
+}
+
+[data-ui="check"][data-severity="problem"]::before {
+  background: var(--signal);
+}
+
+[data-ui="check"][data-reviewed]::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--faint);
+}
+
+[data-ui="check-title"] {
+  font-weight: 700;
+}
+
+/* The lists and pages: a roomier toolbar, the filter as a search field, and tables
+   whose header steps back and whose rows have room to breathe. */
+[data-ui="view-toolbar"] {
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+}
+
+/* The field's placeholder says what it filters, so its label is for screen
+   readers only here. */
+[data-ui="filter-field"] > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+[data-ui="filter-field"] input {
+  width: 18rem;
+  height: 2.25rem;
+  padding-left: 2rem;
+  font-size: 0.875rem;
+  background: var(--muted)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E")
+    no-repeat 0.625rem center;
+  border-color: transparent;
+  border-radius: calc(var(--radius) + 2px);
+}
+
+[data-ui="filter-field"] input:focus-visible {
+  background-color: var(--panel);
+  border-color: var(--ring);
+}
+
+[data-ui="table"] th {
+  padding-block: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--label);
+  background: var(--panel);
+  border-bottom-color: var(--line);
+}
+
+[data-ui="table"] td {
+  padding-block: 0.625rem;
+}
+
+/* The name may wrap, and the alias breaks anywhere when it must, so neither pushes
+   the counts off the table; the rest of a row keeps each value on one line. */
+[data-ui="table"] :is(thead th, td) {
+  white-space: nowrap;
+}
+
+[data-ui="table"] td:nth-child(2) {
+  min-width: 8rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+[data-ui="table"] tbody tr {
+  transition: background-color 100ms;
+}
+
+[data-ui="table"] tbody tr:not([aria-current]):hover {
+  background: var(--muted);
+}
+
+[data-ui="table"] td:first-child {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+[data-ui="swatch"] {
+  border-radius: 50%;
+}
+
+/* The Tree's rows at a reading height, the name in the text colour. */
+[data-ui="tree-row"] {
+  min-height: 2.25rem;
+  font-size: 0.875rem;
+}
+
+/* Popovers and the Legend window: the panel's own surface, a soft edge, and a
+   header in the text's own size rather than a terminal title bar. */
+[data-slot="popover-content"] {
+  border-color: var(--line);
+  border-radius: calc(var(--radius) + 4px);
+}
+
+[data-ui="window-head"] {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem 0.5rem 1rem;
+  background: var(--panel);
+}
+
+[data-ui="window-head"] h2 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+[data-ui="window-head"] button {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-color: transparent;
+  border-radius: var(--radius);
+}
+
+[data-ui="window-head"] button:hover {
+  background: var(--muted);
+}
+
+/* Help's group titles as plain headings, without the terminal rule before them. */
+[data-ui="help-title"] {
+  font-size: 0.8125rem;
+  color: var(--foreground);
+}
+
+[data-ui="help-title"] > [aria-hidden] {
+  display: none;
+}
+
+/* Panels over the app dim it a little and leave it sharp: the plan behind a drawer
+   is context, not noise to blur away. */
+[data-slot="sheet-overlay"],
+[data-slot="dialog-overlay"] {
+  background: rgb(0 0 0 / 0.16);
+  backdrop-filter: none;
+}
+
+/* Presenting: the toolbar hides (in-data-present:hidden on it), the lens key moves
+   to the corner it leaves as a pill, and cards drop their property count, so names
+   at presentation size keep their two lines and the size bar still says how big
+   each type is. A removed card keeps its caption, the only text that says so. */
+[data-present] [data-ui="lens-key"]:not(.board-toolbar *) {
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  padding: 0.375rem 0.75rem;
+  color: var(--label);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+[data-present] .board .board-card:not([data-state="removed"]) .board-detail {
+  display: none;
+}
