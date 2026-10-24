@@ -1,21 +1,21 @@
 ---
 title: Schema City for Umbraco
-description: See your Umbraco content model as a map in the backoffice, or as a city in 3D, and catch schema problems before they ship.
+description: See your Umbraco content model from above, as a city plan in the backoffice, and catch schema problems before they ship.
 sidebar:
   label: Overview
 seo:
   image: /og/overview.png
 ---
 
-Schema City shows your Umbraco content model as a map, right in the backoffice. Each Document Type is a card, grouped into districts by where editors can create it. Lines between cards show allowed children, compositions, block targets and picker references. Use it to understand a schema before you change it.
+Schema City shows your Umbraco content model from above, as a city plan right in the backoffice. Each Document Type is a card, grouped into districts by where editors can create it. Lines between cards show allowed children, compositions, block targets and picker references. Use it to understand a schema before you change it.
 
 **[Try the demo](https://schema-city-demo.thebuilder.dk)** in your browser. It needs no Umbraco install.
 
-![The demo schema on the map with structure lines on: the Site district with Compositions, Microsite, Unreachable and Settings around it, and the Overview in the corner.](../../../docs/screenshots/map.png)
+![The demo schema as a city plan with structure lines on: the Site district with Compositions, Microsite, Unreachable and Settings around it, and the Overview in the corner.](../../../docs/screenshots/plan.png)
 
-## How the map shows your schema
+## How the plan shows your schema
 
-| On the map | In your schema |
+| On the plan | In your schema |
 | --- | --- |
 | District | A type allowed at root and everything it can create. Compositions, Element Types and unreachable types get a district each. |
 | Card | A Document Type or Element Type, with its icon, name and property count |
@@ -33,7 +33,7 @@ Schema City never changes your Document Types, Data Types or content. The only t
 - **See what content uses.** Colour the cards by content count, published share, cultures, incoming references or unused types. See [Check content usage](/content-usage).
 - **Know what a change will touch.** Impact lists every type a change reaches, with the path to each one and its content count. See [Trace the impact of a change](/impact).
 - **Compare environments.** Export a snapshot of the schema, then compare against it later or against another environment. See [Compare schema snapshots](/compare).
-- **Read the schema without the map.** List, Tree, Matrix, Editor and Data Types show it as tables, a tree and pages, and work from the keyboard. See [Move between views](/views).
+- **Read the schema without the plan.** List, Tree, Matrix, Editor and Data Types show it as tables, a tree and pages, and work from the keyboard. See [Move between views](/views).
 - **Show it to a room.** Presentation mode fills the screen with larger names, and a caption card replaces the inspector. See [Present the schema](/present).
 
 ## Good to know
@@ -43,6 +43,6 @@ Schema City never changes your Document Types, Data Types or content. The only t
 - Decisions on findings are stored in Umbraco's `umbracoKeyValue` table, so the package needs no migration. Every user with Settings access sees the same decisions.
 - The screenshots come from the demo, which has 86 types with problems planted on purpose. They show the app without the backoffice around it.
 
-## Prefer it in 3D?
+## Just for fun
 
-Schema City can draw the same schema as a 3D city instead, with a board for each district, a building for each type and a floor for each property group. A site turns it on for every user with one setting. See [Use the 3D city](/3d-city).
+There is also a glowing, over-the-top 3D version of the same city, with buildings, floors and a camera you can fly. It is there for demos and for fun. See [The 3D city](/3d-city).

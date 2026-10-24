@@ -130,7 +130,7 @@ const Touching = createContext<string | null>(null);
  */
 const ARIA_LABELS = {
   "node.a11yDescription.default":
-    "Enter selects the type, and Enter again focuses it. Arrow keys move the map. Search finds any type.",
+    "Enter selects the type, and Enter again focuses it. Arrow keys move the plan. Search finds any type.",
 };
 
 /**
@@ -682,7 +682,7 @@ function BoardOverlays({
 function BoardToolbar({ children }: { children: ReactNode }) {
   return (
     <Panel
-      aria-label="Map tools"
+      aria-label="Plan tools"
       className="board-toolbar flex in-data-present:hidden"
       position="top-left"
       role="group"
@@ -699,10 +699,10 @@ function BoardToolbar({ children }: { children: ReactNode }) {
             />
           }
         >
-          Map tools
+          Plan tools
         </PopoverTrigger>
         <PopoverContent
-          aria-label="Map tools"
+          aria-label="Plan tools"
           className="flex w-64 flex-col items-start gap-3 p-3"
         >
           {children}
@@ -837,7 +837,7 @@ function BoardView(props: StageProps) {
     // so the arrow keys keep moving the map. A named region, as the City's is.
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Enter arrives from the focused card inside, which is the interactive element.
     <section
-      aria-label="Schema map. Arrow keys pan, plus and minus zoom. Press ? for all controls."
+      aria-label="City plan of the schema. Arrow keys pan, plus and minus zoom. Press ? for all controls."
       className="board h-full w-full outline-none focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-[-2px]"
       data-docked={props.inspectorOpen ? "" : undefined}
       data-focus-home
@@ -851,7 +851,7 @@ function BoardView(props: StageProps) {
     >
       <Touching value={props.selected ?? hovered}>
         <ReactFlow
-          aria-label="Schema map"
+          aria-label="City plan"
           ariaLabelConfig={ARIA_LABELS}
           deleteKeyCode={null}
           edges={edges}

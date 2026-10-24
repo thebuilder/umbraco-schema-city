@@ -1,4 +1,4 @@
-// How the shared panels talk about the flat map: its name, what one type is on it,
+// How the shared panels talk about the city plan: its name, what one type is on it,
 // the mouse and keys the board takes, and the legend for cards and lines.
 import {
   EdgeMark,
@@ -19,7 +19,7 @@ const ARROW = "M1 6 H23 M18 2 L23 6 L18 10";
  * Every mark is a card or a line drawn as the board draws it, and the words never
  * name a colour, since the backoffice theme sets every one of them.
  */
-function MapLegend() {
+function PlanLegend() {
   return (
     <div className="space-y-5">
       <section>
@@ -102,16 +102,16 @@ function MapLegend() {
   );
 }
 
-export const MAP_COPY: StageCopy = {
-  name: "Map",
-  noun: "map",
-  where: "on the Map",
-  show: "Show on map",
-  loading: "Loading the map…",
+export const PLAN_COPY: StageCopy = {
+  name: "Plan",
+  noun: "plan",
+  where: "on the Plan",
+  show: "Show on plan",
+  loading: "Loading the plan…",
   item: "card",
-  kind: "Flat map",
+  kind: "City plan",
   mouse: [
-    { keys: ["Drag"], does: "Move the map" },
+    { keys: ["Drag"], does: "Move the plan" },
     {
       keys: ["Scroll", "Pinch"],
       does: "Zoom toward the point under the cursor, or away",
@@ -127,20 +127,20 @@ export const MAP_COPY: StageCopy = {
     { keys: ["Double click"], does: "Focus a card" },
     {
       keys: ["Overview"],
-      does: "Drag or scroll the small map in the corner to move around the whole schema",
+      does: "Drag or scroll the small plan in the corner to move around the whole schema",
     },
   ],
   navigation: [
     {
       keys: ["←", "↑", "↓", "→"],
-      does: "Move the map, unless a list, field or panel has the keyboard",
+      does: "Move the plan, unless a list, field or panel has the keyboard",
     },
     { keys: ["+", "-"], does: "Zoom in and out" },
     { keys: ["Shift"], does: "Hold with the arrows to move twice as far" },
     {
       keys: ["Home"],
-      does: "Frame the whole map, or leave focus. Reset view in the toolbar does the same",
+      does: "Frame the whole plan, or leave focus. Reset view in the toolbar does the same",
     },
   ],
-  legend: <MapLegend />,
+  legend: <PlanLegend />,
 };

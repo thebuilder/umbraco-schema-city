@@ -1,28 +1,28 @@
 ---
 title: Move between views
-description: Switch between the Map, List, Tree, Matrix and Editor views, most of which show the schema without the map.
+description: Switch between the Plan, List, Tree, Matrix and Editor views, most of which show the schema without the city plan.
 seo:
   image: /og/views.png
 ---
 
-Schema City shows the same schema in several views. Every view except Map shows it as tables, a tree or a page rather than on the map, and the chosen view is kept in the URL, so a link opens where you left off.
+Schema City shows the same schema in several views. Every view except Plan shows it as tables, a tree or a page rather than on the city plan, and the chosen view is kept in the URL, so a link opens where you left off.
 
 | View | What it shows | Key |
 | --- | --- | --- |
-| Map | The schema as cards and lines. See [Investigate a type](/investigate-a-type). | |
+| Plan | The schema as a city plan of cards and lines. See [Investigate a type](/investigate-a-type). | |
 | [List](#use-the-list-view) | Every type in a sortable table | <kbd>L</kbd> |
 | [Tree](#follow-the-creation-tree) | What an editor can create under each root | <kbd>T</kbd> |
 | [Matrix](#compare-types-in-a-matrix) | Which types use which compositions and Data Types | <kbd>M</kbd> |
 | [Data Types](/data-types) | Every Data Type, with what uses it | |
 
-L, T and M toggle back to the map when pressed again. In the 3D city, the first view is called City.
+L, T and M toggle back to the plan when pressed again. In the 3D city, the first view is called City.
 
 Two more pages are about one type rather than the whole schema. Select a type and press <kbd>E</kbd> for its [Editor](#read-a-type-as-an-editor-sees-it) page or <kbd>I</kbd> for its [Impact](/impact) page, or use **Editor view** and **Impact** in the inspector. A line above the page names the type and leads back to the view you came from, with the selection kept. With nothing selected, E and I say "Pick a type first". A link to one of these pages opens it on the same type.
 
 ## Where things are
 
 - **The header** holds the view switcher, then **Search**, **Findings**, **Compare** and the control reference.
-- **The map toolbar**, over the top-left corner of the map, holds the map's own tools: **Layers**, **Group**, **Lens**, **Legend** and **Reset view**. See [Use the map toolbar](/navigation#use-the-map-toolbar). In the 3D city they are in the footer instead.
+- **The plan's toolbar**, over the top-left corner of the plan, holds its own tools: **Layers**, **Group**, **Lens**, **Legend** and **Reset view**. See [Use the toolbar](/navigation#use-the-toolbar). In the 3D city they are in the footer instead.
 - **The footer** says how many types the schema has, and, on hover, when the schema and the usage were read. It says "usage loading" while that request is still out.
 - **Present** is in the footer in every view. See [Present the schema](/present).
 

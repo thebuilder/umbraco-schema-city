@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Install Schema City and open your content model as a map in the Umbraco backoffice.
+description: Install Schema City and open your content model as a city plan in the Umbraco backoffice.
 seo:
   image: /og/quickstart.png
 ---
@@ -21,11 +21,11 @@ dotnet add package TheBuilder.SchemaCity
 
 Restart the site. The package needs no migration and adds nothing to your schema.
 
-## Open the map
+## Open the city plan
 
-Open **Settings > Advanced > Schema City**. It opens on the map: a card for each type, in a district for each type allowed at root, framed at a zoom where names read. A big schema opens at its top left, and the **Overview** in the bottom-right corner shows the rest.
+Open **Settings > Advanced > Schema City**. It opens on the city plan: a card for each type, in a district for each type allowed at root, framed at a zoom where names read. A big schema opens at its top left, and the **Overview** in the bottom-right corner shows the rest.
 
-Every Document Type editor also gets a **Relationships** tab. It opens the map focused on that type and its neighbours.
+Every Document Type editor also gets a **Relationships** tab. It opens the plan focused on that type and its neighbours.
 
 ## Turn off the Relationships tab
 
@@ -40,10 +40,6 @@ The tab is on by default. To leave it out of the Document Type editor, set `Rela
 ```
 
 Schema City under **Settings > Advanced** stays either way. As with any appsettings value, an environment variable can set it too: `SchemaCity__RelationshipsTab=false`.
-
-## Use the 3D city
-
-To show the schema as a 3D city instead of the map, set `"SchemaCity": { "Variant": "City" }` in `appsettings.json`. It applies to every user. See [Use the 3D city](/3d-city).
 
 ## First steps
 
@@ -62,6 +58,6 @@ To show the schema as a 3D city instead of the map, set `"SchemaCity": { "Varian
   </Step>
 </Steps>
 
-Press <kbd>?</kbd> for every control, or read [Navigate the map](/navigation).
+Press <kbd>?</kbd> for every control, or read [Navigate the city plan](/navigation).
 
 To look around before you install, [try the demo](https://schema-city-demo.thebuilder.dk). It runs in the browser with a sample schema and needs no Umbraco install.

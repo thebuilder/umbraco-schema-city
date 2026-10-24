@@ -183,7 +183,7 @@ export class SchemaCityElement extends UmbElementMixin(LitElement) {
 
   #failed(variant: Variant, error: unknown) {
     console.error(`Schema City: the ${variant} bundle did not load.`, error);
-    const name = variant === "city" ? "3D city" : "flat map";
+    const name = variant === "city" ? "3D city" : "city plan";
     this.#bundleError = `The ${name} did not load. Reload the page to try again.`;
     this.requestUpdate();
   }

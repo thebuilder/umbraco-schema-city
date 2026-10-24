@@ -6,7 +6,7 @@ import { schemaCityPackage } from "./umbraco-package";
 export default defineConfig({
   title: schemaCityPackage.name,
   description:
-    "See your Umbraco content model as a map in the backoffice, or as a city in 3D, and catch schema problems before they ship.",
+    "See your Umbraco content model from above, as a city plan in the backoffice, and catch schema problems before they ship.",
   logo: {
     image: "/logo-mark.svg",
     text: "Schema City",

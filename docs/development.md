@@ -35,7 +35,7 @@ variants load. three.js is reached only through the City's lazy `Scene` and Reac
 through the clean variant's lazy `Board`, so the clean variant never downloads three.js.
 
 `SchemaCity:Variant` in appsettings picks the variant every user opens on: `Clean` by default, or
-`City`. Any other value opens on the flat map rather than failing. There is no per-user switch.
+`City`. Any other value opens on the city plan rather than failing. There is no per-user switch.
 
 ## Work on the client
 
@@ -86,8 +86,8 @@ pnpm build:demo
 pnpm preview:demo
 ```
 
-This writes the map to `Client/dist` and the City to `Client/dist/city`, each with the same fixtures
-the dev server uses, so the demo opens on the map and the City is at `/city/`. The docs link both.
+This writes the city plan to `Client/dist` and the City to `Client/dist/city`, each with the same
+fixtures the dev server uses, so the demo opens on the city plan and the City is at `/city/`. The docs link both.
 Only the dev server shows the harness's data switch (Demo, Worst case, Empty, One, 300 types).
 It does not need an Umbraco server, API credentials, or a database. Editor links still log to the
 console because the demo has no backoffice.
@@ -231,13 +231,13 @@ manifest. It uploads the package as the `TheBuilder.SchemaCity-package` artifact
 ## Refresh README screenshots
 
 `ui/dev/shots.mjs` captures them over CDP from a running harness; its header has the commands. The
-map is the default, so every panel is shot on the map with `pnpm dev`; run it again with
+city plan is the default, so every panel is shot on the plan with `pnpm dev`; run it again with
 `VARIANT=city` against `pnpm dev:city` for the City's own three shots (`city.png`, `names.png` and
 `free-camera.png`). The harness opens on the medium schema, and the script hides the sample picker
 and the data switch, which belong to the demo page, not the extension. Do not alter schema values
 for screenshots.
 
 Save images under `docs/screenshots/` and update the README captions to describe what they show.
-The README shows `map.png`, `focus.png`, `findings.png`, `lens.png`, `impact.png`, `compare.png`
+The README shows `plan.png`, `focus.png`, `findings.png`, `lens.png`, `impact.png`, `compare.png`
 and `tree.png`. The docs site in `apps/docs` and `umbraco-marketplace.json` use most of the rest. The
 README uses absolute image URLs so images also work when it is included in a NuGet package.

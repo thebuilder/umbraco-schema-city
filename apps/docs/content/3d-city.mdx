@@ -1,11 +1,11 @@
 ---
-title: Use the 3D city
-description: Turn on the 3D city, read its boards, buildings and floors, and move its camera.
+title: The 3D city
+description: "Schema City's over-the-top extra: the same schema as a glowing 3D city, for demos and for fun."
 seo:
   image: /og/3d-city.png
 ---
 
-The 3D city is Schema City's original look. It draws the same schema as a three.js city in a green terminal style, with the same panels around it: the inspector, List, Tree, Matrix, Data Types, Findings, Compare, Impact, Editor and Present. The map is the default, so the city is something a site turns on.
+Before the city plan, Schema City was a city: buildings on glowing circuit boards, traces arcing between them, and a camera that flies in when it opens. It is the same schema, more fun to show a room than to work in. It still works in full, with the same panels around it: the inspector, List, Tree, Matrix, Data Types, Findings, Compare, Impact, Editor and Present. A site can switch it on with one setting.
 
 **[Try the City demo](https://schema-city-demo.thebuilder.dk/city/)** in your browser. It needs no Umbraco install.
 
@@ -27,12 +27,12 @@ The environment variable is `SchemaCity__Variant=City`.
 
 - It applies to every user. There is no per-user switch.
 - The Relationships tab in the Document Type editor shows the city too.
-- `Clean` is the default and shows the map. Any other value also shows the map.
-- Earlier versions had only the city, so after an upgrade users open on the map unless the site sets this.
+- `Clean` is the default and shows the city plan. Any other value also shows the plan.
+- Earlier versions had only the city, so after an upgrade users open on the city plan unless the site sets this.
 
 The city needs WebGL. Where the browser cannot start it, the canvas says so and the header and the other views keep working.
 
-## How the city maps to your schema
+## How the city shows your schema
 
 | In the city | In your schema |
 | --- | --- |
@@ -57,7 +57,7 @@ From there you can orbit, pan, move toward any point and come down to street lev
 | Move faster | Hold <kbd>Shift</kbd> with a movement key |
 | Reframe the city or leave focus | <kbd>Home</kbd>, or **Reset view** in the footer |
 
-The keys that work in both looks, such as Search, the layers and the views, are on [Navigate the map](/navigation#keys-in-every-view). Press <kbd>?</kbd> in the city for its full list.
+The keys that work in both looks, such as Search, the layers and the views, are on [Navigate the city plan](/navigation#keys-in-every-view). Press <kbd>?</kbd> in the city for its full list.
 
 ![The city seen from low over the ground, after the camera has come down with the free camera controls.](../../../docs/screenshots/free-camera.png)
 

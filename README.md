@@ -1,14 +1,14 @@
 # Schema City
 
-See your Umbraco content model as a map in the backoffice, or as a city in 3D. Each Document
-Type is a card, grouped into districts by where editors can create it. Lines between cards show
-allowed children, compositions, block targets and picker references. Use it to understand a
-schema before you change it.
+See your Umbraco content model from above, as a city plan in the backoffice, and catch schema
+problems before they ship. Each Document Type is a card, grouped into districts by where editors
+can create it. Lines between cards show allowed children, compositions, block targets and picker
+references. Use it to understand a schema before you change it.
 
 **[Try the demo](https://schema-city-demo.thebuilder.dk)** in your browser. It needs no Umbraco
 install.
 
-![The demo schema on the map with structure lines on: the Site district with Compositions, Microsite, Unreachable and Settings around it, and the Overview in the corner.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/map.png)
+![The demo schema as a city plan with structure lines on: the Site district with Compositions, Microsite, Unreachable and Settings around it, and the Overview in the corner.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/plan.png)
 
 Schema City never changes your Document Types, Data Types or content. The only thing it writes is
 the decisions you record on findings.
@@ -20,15 +20,12 @@ dotnet add package TheBuilder.SchemaCity
 ```
 
 Restart the site and open **Settings > Advanced > Schema City**. Every Document Type editor also
-gets a **Relationships** tab that opens the map focused on that type.
+gets a **Relationships** tab that opens the city plan focused on that type.
 Set `"SchemaCity": { "RelationshipsTab": false }` in `appsettings.json` to leave that tab out.
 
-It comes in two looks over the same panels. The **map** is the default: a flat, zoomable diagram
-in the backoffice's own colours and type, which follows the user's light or dark theme. The
-**3D city** draws the same schema as buildings on circuit boards, in a green terminal look. To use
-the city instead, set `"SchemaCity": { "Variant": "City" }`, which applies to every user and to
-the Relationships tab. Earlier versions had only the city, so after an upgrade users open on the
-map unless the site sets that. [Try the City demo](https://schema-city-demo.thebuilder.dk/city/).
+The city plan is a flat, zoomable diagram in the backoffice's own colours and type, which follows
+the user's light or dark theme. Just for fun, there is also a glowing 3D version of the same city
+([demo](https://schema-city-demo.thebuilder.dk/city/)).
 
 | Requirement | Version |
 | --- | --- |
@@ -44,7 +41,7 @@ Search by name, alias or property alias with `⌘K` / `Ctrl+K`. Hover a card to 
 connects to. Click it to open the inspector with its properties, compositions, parents, children
 and block targets. Double-click to focus on a type and its neighbours.
 
-![Home in focus mode with its neighbouring types and their lines, and the inspector docked beside the map.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png)
+![Home in focus mode with its neighbouring types and their lines, and the inspector docked beside the plan.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/focus.png)
 
 ### Catch problems before they ship
 
@@ -80,9 +77,9 @@ the types it affected under it. Tick off what you planned and see what nobody as
 
 ![A comparison with four causes, three marked planned, and one opened on its side effects.](https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/compare.png)
 
-### Read the schema without the map
+### Read the schema without the plan
 
-List, Tree, Matrix and Editor show the schema without the map and work from the keyboard:
+List, Tree, Matrix and Editor show the schema without the city plan and work from the keyboard:
 
 - **List** is every type in a sortable table.
 - **Tree** shows what editors can create under each root, and which types they cannot reach.
@@ -114,7 +111,7 @@ card replaces the inspector.
 | Search | `⌘K` / `Ctrl+K` |
 | Focus the selected type | Enter |
 | Leave focus, then clear the selection | Escape |
-| Reframe the map | Home |
+| Reframe the city plan | Home |
 | List, Tree, Matrix | L, T, M |
 | Editor or Impact for the selected type | E, I |
 | Presentation mode | P |

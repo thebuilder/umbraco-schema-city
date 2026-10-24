@@ -142,8 +142,8 @@ async function wheel([x, y], ticks) {
  * the two share, taken on the map.
  */
 const shots = [
-  // The whole map on the default layer, nothing selected.
-  { name: "map", variant: "clean", query: "?layers=structure" },
+  // The whole city plan on the default layer, nothing selected.
+  { name: "plan", variant: "clean", query: "?layers=structure" },
   // Closer in on the Site district, where the cards' icons, names, property
   // counts and size bars read, and the lines between them.
   {

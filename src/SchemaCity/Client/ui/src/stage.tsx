@@ -69,9 +69,9 @@ export type KeyRow = { keys: string[]; does: string };
  * follow from "City" and "Map".
  */
 export type StageCopy = {
-  /** The view's name in the switcher and in "back to the city": "City" or "Map". */
+  /** The view's name in the switcher and in "back to the city": "City" or "Plan". */
   name: string;
-  /** The stage as a common noun, as in "back to the city": "city" or "map". */
+  /** The stage as a common noun, as in "back to the city": "city" or "plan". */
   noun: string;
   /** Where things are on the stage, as in "lit in the City": "in the City". */
   where: string;

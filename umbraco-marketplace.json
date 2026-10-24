@@ -17,7 +17,7 @@
   "IssueTrackerUrl": "https://github.com/thebuilder/umbraco-schema-city/issues",
   "Screenshots": [
     {
-      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/map.png",
+      "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/plan.png",
       "Caption": "A card per Document Type, in a district for each root beside Compositions, Elements and Unreachable, with lines for allowed children, compositions, block targets and picker references."
     },
     {
@@ -74,7 +74,7 @@
     },
     {
       "ImageUrl": "https://raw.githubusercontent.com/thebuilder/umbraco-schema-city/main/docs/screenshots/city.png",
-      "Caption": "Or turn on the 3D city: a building per Document Type on a circuit board for each root."
+      "Caption": "And for fun: the same schema as a glowing 3D city."
     }
   ],
   "Tags": [
