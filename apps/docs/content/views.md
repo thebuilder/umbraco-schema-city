@@ -56,6 +56,8 @@ Matrix has two grids.
 
 **Data Types** shows how many of each type's own properties use each Data Type. Each column is headed by the Data Type name, with the property editor alias and the start of the Data Type key below it, so two Data Types with similar names can be told apart. Rows are sorted by name, and columns sort by usage or by name.
 
+Click a row's name to select that type. Click a column header to select that composition, or to open that Data Type's page.
+
 ![The compositions matrix, with Seo Composition used by most page types.](../../../docs/screenshots/matrix.png)
 
 ## Read a type as an editor sees it
