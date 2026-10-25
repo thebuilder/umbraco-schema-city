@@ -682,7 +682,7 @@ function BoardOverlays({
 function BoardToolbar({ children }: { children: ReactNode }) {
   return (
     <Panel
-      aria-label="Plan tools"
+      aria-label="City plan tools"
       className="board-toolbar flex in-data-present:hidden"
       position="top-left"
       role="group"
@@ -699,10 +699,10 @@ function BoardToolbar({ children }: { children: ReactNode }) {
             />
           }
         >
-          Plan tools
+          City plan tools
         </PopoverTrigger>
         <PopoverContent
-          aria-label="Plan tools"
+          aria-label="City plan tools"
           className="flex w-64 flex-col items-start gap-3 p-3"
         >
           {children}

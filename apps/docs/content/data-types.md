@@ -28,7 +28,7 @@ The page shows the editor's UI alias, its editor alias and its key. **Open in ed
 - Used by lists every type with a property on it, with the property aliases, the composition a composed one comes from and the type's content count. Choose a type to open it in the inspector.
 - The page ends with the stored block totals, a few configuration values such as a block list's limits, and the findings about the Data Type.
 
-**Show on plan** switches to the city plan and lights the cards that use the Data Type. **Clear**, in the key that says what is lit, ends it, and so does choosing a lens. In the 3D city the button is **Show in city**.
+**Show on city plan** switches to the city plan and lights the cards that use the Data Type. **Clear**, in the key that says what is lit, ends it, and so does choosing a lens. In the 3D city the button is **Show in city**.
 
 Stored blocks are counted with the usage snapshot. The count covers the latest version of every document outside the recycle bin, published or draft, nested blocks included. It reads the stored JSON directly and stops after 50,000 values or five seconds. The page then says the numbers are a lower bound. Media and member values are not counted.
 

@@ -46,7 +46,7 @@ The 3D city has its own camera controls. See [The 3D city](/3d-city#move-the-cam
 
 ## Use the toolbar
 
-The toolbar floats over the top-left corner of the plan. It holds **Layers**, **Group** and **Lens**, then the lens's colour key while a lens is on, then **Legend** and **Reset view**. Where the plan is narrower than about 760 px, they fold into one **Plan tools** button. The toolbar hides while you present.
+The toolbar floats over the top-left corner of the plan. It holds **Layers**, **Group** and **Lens**, then the lens's colour key while a lens is on, then **Legend** and **Reset view**. Where the plan is narrower than about 760 px, they fold into one **City plan tools** button. The toolbar hides while you present.
 
 - **Layers** chooses which connections the plan draws. See [Switch connection layers](/investigate-a-type#switch-connection-layers).
 - **Group** chooses how the plan is cut into districts. See [Lay out the city plan](/layout).

@@ -103,10 +103,10 @@ function PlanLegend() {
 }
 
 export const PLAN_COPY: StageCopy = {
-  name: "Plan",
+  name: "City plan",
   noun: "plan",
-  where: "on the Plan",
-  show: "Show on plan",
+  where: "on the city plan",
+  show: "Show on city plan",
   loading: "Loading the plan…",
   item: "card",
   kind: "City plan",

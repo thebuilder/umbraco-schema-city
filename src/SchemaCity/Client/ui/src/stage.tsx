@@ -66,10 +66,10 @@ export type KeyRow = { keys: string[]; does: string };
  * only the stage can write. Each variant's mount() provides them, so a shared panel
  * can say "building" in the City and "card" on the plan. Phrases are written out
  * whole rather than built from the name, since "in the city" and "on the plan" do not
- * follow from "City" and "Plan".
+ * follow from "City" and "City plan".
  */
 export type StageCopy = {
-  /** The view's name in the switcher and in "back to the city": "City" or "Plan". */
+  /** The view's name in the switcher and in "back to the city": "City" or "City plan". */
   name: string;
   /** The stage as a common noun, as in "back to the city": "city" or "plan". */
   noun: string;

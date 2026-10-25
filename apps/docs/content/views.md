@@ -1,15 +1,15 @@
 ---
 title: Move between views
-description: Switch between the Plan, List, Tree, Matrix and Editor views, most of which show the schema without the city plan.
+description: Switch between the City plan, List, Tree, Matrix and Editor views, most of which show the schema without the city plan.
 seo:
   image: /og/views.png
 ---
 
-Schema City shows the same schema in several views. Every view except Plan shows it as tables, a tree or a page rather than on the city plan, and the chosen view is kept in the URL, so a link opens where you left off.
+Schema City shows the same schema in several views. Every view except City plan shows it as tables, a tree or a page rather than on the city plan, and the chosen view is kept in the URL, so a link opens where you left off.
 
 | View | What it shows | Key |
 | --- | --- | --- |
-| Plan | The schema as a city plan of cards and lines. See [Investigate a type](/investigate-a-type). | |
+| City plan | The schema as cards and lines. See [Investigate a type](/investigate-a-type). | |
 | [List](#use-the-list-view) | Every type in a sortable table | <kbd>L</kbd> |
 | [Tree](#follow-the-creation-tree) | What an editor can create under each root | <kbd>T</kbd> |
 | [Matrix](#compare-types-in-a-matrix) | Which types use which compositions and Data Types | <kbd>M</kbd> |
