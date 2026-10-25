@@ -559,6 +559,29 @@
   line-height: 1.25;
 }
 
+/* The role, Root and culture variance read as one quiet line after the alias, a
+   dot between each, rather than a row of boxed tags under the name. Plain words in
+   the label colour: the glyph's tint already says the role, and a coloured word
+   here read as a link. */
+[data-ui="inspector-header"] [data-slot="badge"] {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--label);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  overflow: visible;
+}
+
+[data-ui="inspector-header"] [data-slot="badge"]::before {
+  content: "·";
+  margin-right: 0.375rem;
+  color: var(--faint);
+}
+
 [data-ui="glyph"] {
   width: 2.5rem;
   height: 2.5rem;
@@ -810,8 +833,13 @@
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--label);
-  background: var(--panel);
   border-bottom-color: var(--line);
+}
+
+/* Only the header row is opaque, for its sticky place over the scrolled rows. A
+   row's own name cell is a th too, and takes the row's hover and selection. */
+[data-ui="table"] thead th {
+  background: var(--panel);
 }
 
 [data-ui="table"] td {

@@ -162,6 +162,7 @@ export function Matrix({
               composition. The column total counts the types that use it.
             </>
           }
+          onColumn={onSelect}
           onSelect={onSelect}
           says={compositionSays}
           selected={selected}
@@ -226,7 +227,7 @@ function SlantedHeader({
   first,
   zIndex,
 }: HeaderProps & { first: boolean; zIndex: number }) {
-  const lane = `peer absolute inset-0 origin-bottom-left -skew-x-45 border-line/60 border-r ${first ? "border-l" : ""}`;
+  const lane = `absolute inset-0 origin-bottom-left -skew-x-45 border-line/60 border-r ${first ? "border-l" : ""}`;
   return (
     <th
       className="sticky top-0 h-40 min-w-8 border-line/60 border-b bg-panel p-0 align-bottom font-normal"
@@ -235,7 +236,7 @@ function SlantedHeader({
     >
       {onColumn ? (
         <button
-          className={`${lane} hover:bg-accent/50`}
+          className={`${lane} peer hover:bg-accent/50`}
           onClick={() => onColumn(column.id)}
           title={column.detail}
           type="button"
@@ -283,7 +284,7 @@ function Grid<Cell>({
   columnName: (column: MatrixColumn) => string;
   /** A short word printed on a column header, such as "parent". */
   tag?: (column: MatrixColumn) => string | null;
-  /** Given, a column header is a link, as a Data Type header is to its page. */
+  /** Given, a column header is a link: a composition selects its type, a Data Type opens its page. */
   onColumn?: (id: string) => void;
   columnSort: ColumnSort;
   matched: ReadonlySet<string> | null;
