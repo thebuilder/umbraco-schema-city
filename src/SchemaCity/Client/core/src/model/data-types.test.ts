@@ -6,6 +6,7 @@ import {
   dataTypeIndex,
   dataTypeUsers,
   matchDataTypes,
+  nameAddsTo,
   storedByElementType,
 } from "./data-types";
 import { sortRows } from "./sort-rows";
@@ -213,4 +214,18 @@ it("filters by name, editor or key and sorts by any column", () => {
     "blocks",
   ]);
   expect(sortRows(rows, "editor", true)[0]?.id).toBe("blocks");
+});
+
+describe("nameAddsTo", () => {
+  it("shows a property's name only when it says more than its alias", () => {
+    expect(nameAddsTo("articleField02", "Article Field02")).toBe(false);
+    expect(nameAddsTo("seo_title", "SEO title")).toBe(false);
+    expect(
+      nameAddsTo(
+        "metaDescription",
+        "Meta description (shown in search results)"
+      )
+    ).toBe(true);
+    expect(nameAddsTo("heroImage", "Banner")).toBe(true);
+  });
 });

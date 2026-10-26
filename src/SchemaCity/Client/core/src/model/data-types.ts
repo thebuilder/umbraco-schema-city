@@ -243,3 +243,14 @@ export function matchDataTypes(
       )
   );
 }
+
+/**
+ * Whether a property's name says more than its alias. Most names are the alias
+ * spaced out ("articleField02", "Article Field02"), and printing both doubled every
+ * line; a name such as "Meta description (shown in search results)" adds to it.
+ */
+export const nameAddsTo = (alias: string, name: string) => {
+  const bare = (text: string) =>
+    text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  return bare(name) !== bare(alias);
+};

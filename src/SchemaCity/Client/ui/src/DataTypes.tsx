@@ -11,6 +11,7 @@ import {
   dataTypeUsers,
   isBlockEditor,
   matchDataTypes,
+  nameAddsTo,
   storedTotals,
 } from "@schema-city/core/model/data-types";
 import type { Finding } from "@schema-city/core/model/findings";
@@ -608,7 +609,8 @@ function UsedBy({
               >
                 {node.name}
               </button>
-              <RoleKey role={roleOf(node)} />
+              {/* Nearly every user is a page, so only the other roles say so. */}
+              {roleOf(node) === "page" ? null : <RoleKey role={roleOf(node)} />}
               <ContentCount count={countOf(node.id)} />
             </div>
             <ul className="mt-0.5 pl-3">
@@ -617,8 +619,12 @@ function UsedBy({
                   className="flex flex-wrap items-baseline gap-x-2 text-xs"
                   key={`${property.fromCompositionId ?? ""}:${property.alias}`}
                 >
-                  <span className="font-mono text-label">{property.alias}</span>
-                  <span className="text-faint">{property.name}</span>
+                  <span className="font-mono text-label" title={property.name}>
+                    {property.alias}
+                  </span>
+                  {nameAddsTo(property.alias, property.name) ? (
+                    <span className="text-faint">{property.name}</span>
+                  ) : null}
                   {property.fromCompositionId ? (
                     <FromComposition
                       id={property.fromCompositionId}
