@@ -183,6 +183,16 @@ function sentSample() {
   return sample;
 }
 
+/** What the demo page puts in the app's footer: the sample, and the other look. */
+function DemoFooter({ path, refocus }: { path: string; refocus: boolean }) {
+  return (
+    <>
+      <SamplePicker path={path} refocus={refocus} />
+      {import.meta.env.DEV ? null : <LookLink look={pageLook} path={path} />}
+    </>
+  );
+}
+
 const container = document.querySelector("#app") as HTMLElement;
 let mounted: MountedApp | undefined;
 let mount: VariantModule["mount"];
@@ -208,12 +218,7 @@ async function show(path: string, refocus = false) {
   mounted = mount(container);
   mounted.render({
     decisions: demoDecisions,
-    footer: (
-      <>
-        <SamplePicker path={path} refocus={refocus} />
-        {import.meta.env.DEV ? null : <LookLink look={pageLook} path={path} />}
-      </>
-    ),
+    footer: <DemoFooter path={path} refocus={refocus} />,
     graph,
     icons,
     onOpenDataType: (id) => console.log("schema-city: open Data Type", id),
