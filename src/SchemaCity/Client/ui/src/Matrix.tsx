@@ -150,16 +150,21 @@ export function Matrix({
           matched={matched}
           note={
             <>
-              <span aria-hidden className="text-azure">
-                ●
-              </span>{" "}
-              composed directly,{" "}
-              <span aria-hidden className="text-azure/70">
-                ○
-              </span>{" "}
-              through another composition. A column marked parent is a type
-              others inherit from, which Umbraco records as a direct
-              composition. The column total counts the types that use it.
+              <span className="block">
+                <span aria-hidden className="text-azure">
+                  ●
+                </span>{" "}
+                composed directly
+              </span>
+              <span className="block">
+                <span aria-hidden className="text-azure/70">
+                  ○
+                </span>{" "}
+                through another composition
+              </span>
+              <span className="block">
+                <span className="text-azure">parent</span> inherited from
+              </span>
             </>
           }
           onColumn={onSelect}
@@ -178,7 +183,7 @@ export function Matrix({
           data={dataTypes}
           empty="No type has properties of its own."
           matched={matched}
-          note="Counts each type's own properties. A composed property counts once, on the composition that declares it, so the column total is the number of properties using that Data Type."
+          note="Each type's own properties. A composed property counts on its composition."
           onColumn={links?.open}
           onSelect={onSelect}
           says={(row, column, count) =>
@@ -303,122 +308,128 @@ function Grid<Cell>({
   useAnnounceChange(`${rows.length} of ${data.rows.length} types`);
 
   return (
-    <>
-      <p
-        className="border-line border-b px-4 py-1.5 text-label text-xs"
-        data-ui="matrix-note"
-      >
-        {note} <span className="font-mono">{rows.length}</span> of{" "}
-        <span className="font-mono">{data.rows.length}</span> types.
-      </p>
-      <Scroller label="Matrix">
-        {data.rows.length === 0 ? (
-          <p className="px-4 py-6 text-faint text-xs">{empty}</p>
-        ) : (
-          <table className="border-separate border-spacing-0" data-ui="matrix">
-            <caption className="sr-only">
-              Types by column. Choosing a row opens the type in the inspector.
-            </caption>
-            <thead>
-              <tr>
-                {/* The corner is sticky both ways so the row names never slide
+    <Scroller label="Matrix">
+      {data.rows.length === 0 ? (
+        <p className="px-4 py-6 text-faint text-xs">{empty}</p>
+      ) : (
+        <table className="border-separate border-spacing-0" data-ui="matrix">
+          <caption className="sr-only">
+            Types by column. {note} Choosing a row opens the type in the
+            inspector.
+          </caption>
+          <thead>
+            <tr>
+              {/* The corner is sticky both ways so the row names never slide
                     under it. */}
-                <th
-                  className={`${CELL} sticky top-0 left-0 bg-panel pr-2 pl-4 text-left align-bottom ${LABEL}`}
-                  scope="col"
-                  style={{ zIndex: 30 + columns.length }}
-                >
-                  Type
-                </th>
-                {columns.map((column, index) => {
-                  const marked = tag(column);
-                  const header = {
-                    column,
-                    name: (
-                      <>
-                        {column.label}
-                        {marked ? (
-                          <span className="text-azure"> · {marked}</span>
-                        ) : null}
-                      </>
-                    ),
-                    said: columnName(column),
-                    onColumn,
-                  };
-                  return (
-                    <SlantedHeader
-                      key={column.id}
-                      {...header}
-                      first={index === 0}
-                      // A lane leans over the headers to its right, so each one
-                      // sits above the next, or their backgrounds would cut it
-                      // off.
-                      zIndex={20 + columns.length - index}
-                    />
-                  );
-                })}
-                {/* Room for the last lanes to finish their lean, which takes as
-                    much width as the header is tall. */}
-                <th
+              <th
+                className={`${CELL} sticky top-0 left-0 bg-panel pr-2 pl-4 text-left align-bottom ${LABEL}`}
+                scope="col"
+                style={{ zIndex: 30 + columns.length }}
+              >
+                {/* The key fills the corner's empty height, beside the names it
+                      explains, rather than a strip over the grid. The caption
+                      gives it to a screen reader once. */}
+                <div
                   aria-hidden
-                  className="sticky top-0 w-40 min-w-40 border-line/60 border-b bg-panel"
-                  style={{ zIndex: 20 }}
-                />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const cells = data.cells.get(row.id);
-                const on = row.id === selected;
+                  className={`${READING} mb-3 w-56 whitespace-normal font-normal text-faint text-xs`}
+                  data-ui="matrix-key"
+                >
+                  {note}
+                  <span className="mt-1.5 block">
+                    <span className="font-mono">{rows.length}</span> of{" "}
+                    <span className="font-mono">{data.rows.length}</span> types
+                  </span>
+                </div>
+                Type
+              </th>
+              {columns.map((column, index) => {
+                const marked = tag(column);
+                const header = {
+                  column,
+                  name: (
+                    <>
+                      {column.label}
+                      {marked ? (
+                        <span className="text-azure"> · {marked}</span>
+                      ) : null}
+                    </>
+                  ),
+                  said: columnName(column),
+                  onColumn,
+                };
                 return (
-                  <tr
-                    className={on ? "bg-accent" : "hover:bg-accent/50"}
-                    key={row.id}
-                    onClick={() => onSelect(row.id)}
-                  >
-                    <th
-                      className={`${CELL} sticky left-0 z-10 max-w-64 py-1 pr-2 pl-4 text-left font-normal ${
-                        on ? "bg-accent" : "bg-background"
-                      }`}
-                      scope="row"
-                    >
-                      <button
-                        className={`block max-w-full truncate text-left hover:text-phosphor hover:underline ${on ? "text-phosphor-bright" : "text-prose"}`}
-                        onClick={() => onSelect(row.id)}
-                        title={row.alias}
-                        type="button"
-                      >
-                        {row.name}
-                      </button>
-                    </th>
-                    {columns.map((column) => {
-                      const value = cells?.get(column.id);
-                      const said =
-                        value === undefined
-                          ? undefined
-                          : says(row, column, value);
-                      return (
-                        <td
-                          className={`${CELL} min-w-7 px-1 text-center`}
-                          key={column.id}
-                          title={said}
-                        >
-                          {value === undefined ? null : (
-                            <>
-                              <span aria-hidden>{cell(value)}</span>
-                              <span className="sr-only">{said}</span>
-                            </>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
+                  <SlantedHeader
+                    key={column.id}
+                    {...header}
+                    first={index === 0}
+                    // A lane leans over the headers to its right, so each one
+                    // sits above the next, or their backgrounds would cut it
+                    // off.
+                    zIndex={20 + columns.length - index}
+                  />
                 );
               })}
-            </tbody>
-          </table>
-        )}
-      </Scroller>
-    </>
+              {/* Room for the last lanes to finish their lean, which takes as
+                    much width as the header is tall. */}
+              <th
+                aria-hidden
+                className="sticky top-0 w-40 min-w-40 border-line/60 border-b bg-panel"
+                style={{ zIndex: 20 }}
+              />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const cells = data.cells.get(row.id);
+              const on = row.id === selected;
+              return (
+                <tr
+                  className={on ? "bg-accent" : "hover:bg-accent/50"}
+                  key={row.id}
+                  onClick={() => onSelect(row.id)}
+                >
+                  <th
+                    className={`${CELL} sticky left-0 z-10 max-w-64 py-1 pr-2 pl-4 text-left font-normal ${
+                      on ? "bg-accent" : "bg-background"
+                    }`}
+                    scope="row"
+                  >
+                    <button
+                      className={`block max-w-full truncate text-left hover:text-phosphor hover:underline ${on ? "text-phosphor-bright" : "text-prose"}`}
+                      onClick={() => onSelect(row.id)}
+                      title={row.alias}
+                      type="button"
+                    >
+                      {row.name}
+                    </button>
+                  </th>
+                  {columns.map((column) => {
+                    const value = cells?.get(column.id);
+                    const said =
+                      value === undefined
+                        ? undefined
+                        : says(row, column, value);
+                    return (
+                      <td
+                        className={`${CELL} min-w-7 px-1 text-center`}
+                        key={column.id}
+                        title={said}
+                      >
+                        {value === undefined ? null : (
+                          <>
+                            <span aria-hidden>{cell(value)}</span>
+                            <span className="sr-only">{said}</span>
+                          </>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </Scroller>
   );
 }

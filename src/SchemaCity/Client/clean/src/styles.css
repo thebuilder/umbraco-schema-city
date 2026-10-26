@@ -644,6 +644,9 @@
 [data-ui="section"] {
   --tint: var(--panel);
   --rel: var(--foreground);
+  /* Counts beside a heading and on a token: the link colour pulled toward the text
+     colour, so it holds 4.5:1 on the tint. Grey where the section has no colour. */
+  --rel-ink: var(--label);
 
   padding: 1rem 1rem 0.875rem;
   margin-block: 0.625rem;
@@ -652,25 +655,29 @@
   border-radius: 12px;
 }
 
-/* A section with no heading is a line of its own, such as what a type has none of,
-   and stays off a surface. */
-[data-ui="section"]:not(:has([data-ui="heading"])):has(> [data-ui="muted"]) {
-  padding-block: 0.5rem;
+/* A section with no heading is a line of its own, such as a tab's lead or what a
+   type has none of, and stays off a surface. */
+[data-ui="section"]:not(:has([data-ui="heading"])) {
+  padding: 0.25rem 1rem;
+  margin-block: 0.75rem 0;
   background: none;
 }
 
 [data-ui="section"]:has([data-trace="compositions"]) {
   --rel: var(--azure);
+  --rel-ink: color-mix(in oklab, var(--azure) 62%, var(--foreground));
   --tint: color-mix(in oklab, var(--azure) 13%, var(--panel));
 }
 
 [data-ui="section"]:has([data-trace="blocks"]) {
   --rel: var(--amber);
+  --rel-ink: color-mix(in oklab, var(--amber) 62%, var(--foreground));
   --tint: color-mix(in oklab, var(--amber) 15%, var(--panel));
 }
 
 [data-ui="section"]:has([data-trace="references"]) {
   --rel: var(--violet);
+  --rel-ink: color-mix(in oklab, var(--violet) 62%, var(--foreground));
   --tint: color-mix(in oklab, var(--violet) 13%, var(--panel));
 }
 
@@ -691,7 +698,7 @@
   font-size: 0.8125rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: color-mix(in oklab, var(--rel, var(--foreground)) 55%, var(--panel));
+  color: var(--rel-ink, var(--label));
 }
 
 /* Notes, empty states and caveats are footnotes: small, faint and short in line,
@@ -704,12 +711,15 @@
   color: var(--faint);
 }
 
+/* Inset as far as the text in the sections, so a plain line and the caption under
+   it read as one set of footnotes on one edge. */
 [data-ui="caption"] {
-  padding: 1rem 0.25rem 0.5rem;
+  padding: 0.5rem 1rem 0.75rem;
 }
 
-[data-ui="matrix-note"] {
+[data-ui="matrix-key"] {
   font-size: 0.75rem;
+  line-height: 1.45;
   color: var(--faint);
 }
 
@@ -768,7 +778,7 @@
 [data-ui="chip"] > .font-mono {
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
-  color: color-mix(in oklab, var(--rel, var(--foreground)) 60%, var(--panel));
+  color: var(--rel-ink, var(--label));
 }
 
 /* The panel's links: the one blue for things to click, underlined on hover. */
@@ -841,6 +851,20 @@ button:is([data-variant="outline"], [data-variant="default"]):is(
   background: none;
   border: 0;
   border-radius: 0;
+}
+
+/* The heading's own margin already parts it from the list, and the section pads
+   the foot, so the first and last checks drop that side of their padding. */
+[data-ui="check"]:first-child {
+  padding-top: 0;
+}
+
+[data-ui="check"]:first-child::before {
+  top: 0.4375rem;
+}
+
+[data-ui="check"]:last-child {
+  padding-bottom: 0;
 }
 
 [data-ui="check"] + [data-ui="check"] {

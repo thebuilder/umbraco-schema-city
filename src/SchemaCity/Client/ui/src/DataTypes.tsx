@@ -602,7 +602,7 @@ function UsedBy({
           >
             <div className="flex flex-wrap items-baseline gap-x-2">
               <button
-                className="text-left text-prose hover:text-phosphor hover:underline"
+                className="text-left font-semibold text-phosphor hover:underline"
                 onClick={() => onSelect(node.id)}
                 type="button"
               >
@@ -620,11 +620,11 @@ function UsedBy({
                   <span className="font-mono text-label">{property.alias}</span>
                   <span className="text-faint">{property.name}</span>
                   {property.fromCompositionId ? (
-                    <span className="text-azure">
-                      from{" "}
-                      {nodesById.get(property.fromCompositionId)?.name ??
-                        "a deleted type"}
-                    </span>
+                    <FromComposition
+                      id={property.fromCompositionId}
+                      name={nodesById.get(property.fromCompositionId)?.name}
+                      onSelect={onSelect}
+                    />
                   ) : null}
                 </li>
               ))}
@@ -634,6 +634,34 @@ function UsedBy({
       </ul>
       {others ? <Muted>{others}</Muted> : null}
     </>
+  );
+}
+
+/** Where a composed property comes from, the composition as a link to it. */
+function FromComposition({
+  id,
+  name,
+  onSelect,
+}: {
+  id: string;
+  name: string | undefined;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <span className="text-faint">
+      from{" "}
+      {name ? (
+        <button
+          className="text-phosphor hover:underline"
+          onClick={() => onSelect(id)}
+          type="button"
+        >
+          {name}
+        </button>
+      ) : (
+        "a deleted type"
+      )}
+    </span>
   );
 }
 

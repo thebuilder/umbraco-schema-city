@@ -115,16 +115,8 @@ export function ImpactSummary({
     <>
       <Section>
         <p className="text-prose">
-          A change reaches {totalsLine(impact.types, impact.content)}, along
-          every relationship at any depth.
+          A change reaches {totalsLine(impact.types, impact.content)}.
         </p>
-        {/* The full page opens from the Impact button above, the one way in. */}
-        <div className="mt-1.5">
-          <Muted>
-            Impact, above, opens the full trace: paths in words, depth, a
-            property alias and exports.
-          </Muted>
-        </div>
       </Section>
       {impact.groups.map((group) => (
         <Section key={group.key}>
