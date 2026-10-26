@@ -566,20 +566,20 @@
 [data-ui="inspector-header"] [data-slot="badge"] {
   height: auto;
   padding: 0;
-  border: 0;
-  background: none;
-  color: var(--label);
+  overflow: visible;
   font-family: inherit;
   font-size: 0.75rem;
   font-weight: 400;
+  color: var(--label);
   letter-spacing: normal;
-  overflow: visible;
+  background: none;
+  border: 0;
 }
 
 [data-ui="inspector-header"] [data-slot="badge"]::before {
-  content: "·";
   margin-right: 0.375rem;
   color: var(--faint);
+  content: "·";
 }
 
 [data-ui="glyph"] {

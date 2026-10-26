@@ -89,7 +89,8 @@ pnpm preview:demo
 This writes the city plan to `Client/dist` and the City to `Client/dist/city`, each with the same
 fixtures the dev server uses, so the demo opens on the city plan and the City is at `/city/`. The
 docs link both.
-Only the dev server shows the harness's data switch (Demo, Worst case, Empty, One, 300 types).
+On the dev server, the footer's Sample schema picker also puts the sample in the path
+(`/worst-case`, `/empty`, `/one`), so a reload keeps the data under test.
 It does not need an Umbraco server, API credentials, or a database. Editor links still log to the
 console because the demo has no backoffice.
 
@@ -234,8 +235,8 @@ manifest. It uploads the package as the `TheBuilder.SchemaCity-package` artifact
 `ui/dev/shots.mjs` captures them over CDP from a running harness; its header has the commands. The
 city plan is the default, so every panel is shot on the plan with `pnpm dev`; run it again with
 `VARIANT=city` against `pnpm dev:city` for the City's own three shots (`city.png`, `names.png` and
-`free-camera.png`). The harness opens on the medium schema, and the script hides the sample picker
-and the data switch, which belong to the demo page, not the extension. Do not alter schema values
+`free-camera.png`). The harness opens on the medium schema, and the script hides the sample picker,
+which belongs to the demo page, not the extension. Do not alter schema values
 for screenshots.
 
 Save images under `docs/screenshots/` and update the README captions to describe what they show.

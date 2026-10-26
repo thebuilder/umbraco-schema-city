@@ -2,7 +2,6 @@
 // the same mount() the backoffice element calls. Each variant's dev/main.tsx starts it.
 import type { Decision, DecisionStore } from "@schema-city/core/model/review";
 import type { SchemaGraph, UsageReport } from "@schema-city/core/model/types";
-import { createRoot } from "react-dom/client";
 import {
   Select,
   SelectContent,
@@ -124,72 +123,14 @@ function SamplePicker({ path, refocus }: { path: string; refocus: boolean }) {
 }
 
 /**
- * DEV ONLY. The data under test, as a switch at the bottom of the page: the seeded
- * demo schema, the worst realistic one, none, one type, and 300. It swaps the
- * fixture where the app gets it, so it tests the app and not the switch. The choice
- * lives in the path (`/worst-case`), which the app's own URL writes leave alone.
- * The public demo is a production build of this page and gets neither the switch
- * nor the paths: a static host has no page at `/worst-case` to reload.
+ * DEV ONLY. The sample in the path (`/worst-case`), which the app's own URL writes
+ * leave alone, so a reload keeps the data under test. The public demo is a
+ * production build of this page and does not: a static host has no page at
+ * `/worst-case` to reload.
  */
-const DATASETS = [
-  ["medium", "Demo"],
-  ["worst-case", "Worst case"],
-  ["empty", "Empty"],
-  ["one", "One"],
-  ["pathological", "300 types"],
-] as const;
-
 const pathOf = (name: string) => `../../core/fixtures/${name}.json`;
 const nameOf = (path: string) =>
   path.slice("../../core/fixtures/".length).replace(JSON_SUFFIX, "");
-
-function DataSwitch({ current }: { current: string }) {
-  return (
-    <fieldset
-      aria-label="Data under test"
-      className="demo-picker"
-      style={{
-        position: "fixed",
-        bottom: 56,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 100,
-        display: "flex",
-        gap: 2,
-        padding: 3,
-        margin: 0,
-        border: 0,
-        background: "#e5e5e5",
-        borderRadius: 999,
-        font: "500 12px system-ui, sans-serif",
-        boxShadow: "0 1px 3px rgb(0 0 0 / 0.15)",
-      }}
-    >
-      {DATASETS.map(([name, label]) => (
-        <button
-          aria-pressed={name === current}
-          key={name}
-          onClick={() => void show(pathOf(name))}
-          style={{
-            padding: "4px 12px",
-            border: 0,
-            borderRadius: 999,
-            color: "#222",
-            background: name === current ? "#fff" : "transparent",
-            cursor: "pointer",
-          }}
-          type="button"
-        >
-          {label}
-        </button>
-      ))}
-    </fieldset>
-  );
-}
-
-const switchRoot = import.meta.env.DEV
-  ? createRoot(document.body.appendChild(document.createElement("div")))
-  : null;
 
 const container = document.querySelector("#app") as HTMLElement;
 let mounted: MountedApp | undefined;
@@ -207,10 +148,9 @@ async function show(path: string, refocus = false) {
   const report = usage ? ((await usage()) as UsageReport) : undefined;
   if (latest !== path) return;
   // The app mounts on the path it finds, so the dataset goes there first.
-  if (switchRoot) {
+  if (import.meta.env.DEV) {
     const at = `${import.meta.env.BASE_URL}${nameOf(path)}${location.search}`;
     history.replaceState(null, "", at);
-    switchRoot.render(<DataSwitch current={nameOf(path)} />);
   }
   mounted?.unmount();
   mounted = mount(container);
@@ -228,6 +168,6 @@ async function show(path: string, refocus = false) {
 export function startHarness(variant: VariantModule) {
   ({ mount } = variant);
   const asked = location.pathname.split("/").filter(Boolean).pop();
-  const known = DATASETS.some(([name]) => name === asked);
+  const known = samples.some((sample) => nameOf(sample) === asked);
   void show(pathOf(known && asked ? asked : "medium"));
 }
