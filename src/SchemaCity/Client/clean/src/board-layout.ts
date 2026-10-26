@@ -24,7 +24,13 @@ export const CARD_WIDTH = 224;
 /** Tall enough for a name on two lines over its caption and size bar. */
 export const CARD_HEIGHT = 68;
 const GAP_X = 20;
+/** Between rows that are not levels, as the focused neighbourhood's are. */
 const GAP_Y = 36;
+/** Between the lines of one level when it wraps, tighter than between levels. */
+const WRAP_GAP = 20;
+/** Above a level's label, and the label's own height, so levels read apart. */
+const LEVEL_GAP = 24;
+export const LEVEL_LABEL = 28;
 /** Cards a row holds before it wraps, so a type with forty children stays on screen. */
 const ROW_LIMIT = 6;
 /** Two placements this close in depth, in layout units, stand in one row. */
@@ -46,16 +52,32 @@ export type Frame = {
   height: number;
 };
 
+/** A district's level: its label and the line it draws across, in the gap above. */
+export type Level = {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+};
+
 export type BoardLayout = {
   cards: Card[];
   frames: Frame[];
+  /** The levels' labels, over the districts laid out by depth. */
+  levels: Level[];
   /** Where the baseline's removed types stood, for their outlines. */
   removed: Card[];
   /** The types on the board: everything, or the focused neighbourhood. */
   shown: ReadonlySet<string> | null;
 };
 
-type Block = { cards: Card[]; width: number; height: number };
+type Block = {
+  cards: Card[];
+  width: number;
+  height: number;
+  levels: { label: string; y: number }[];
+};
 
 const PITCH = CARD_WIDTH + GAP_X;
 /** Down and up the rows this many times, which is where the crossings stop falling. */
@@ -227,12 +249,67 @@ export function untangle(
 }
 
 /**
- * One group of placements as rows of cards: the City's rows, top to bottom, at a
- * card's pitch instead of a street's, each row ordered to cross as few lines as it
- * can (untangle). The City spaces buildings for a camera flying between them, which
- * on a flat sheet left cards a few pixels wide once the whole schema was in view.
+ * Each type's level in its district, as editors create content: the types allowed
+ * at root on the first, then each allowed-child step below them, counted inside the
+ * district. A district with no root, such as the Compositions, is one level and
+ * carries no labels; so is one whose types all stand on one level. A type no root
+ * here leads to stands on a last level of its own. Order within a level is kept.
  */
-function compact(placements: Placement[], edges: readonly SchemaEdge[]): Block {
+export function levelRows(
+  ids: readonly string[],
+  edges: readonly { from: string; to: string; kind: string }[],
+  roots: ReadonlySet<string>
+): { rows: string[][]; labels: string[] | null } {
+  const depth = depthsFrom(
+    ids.filter((id) => roots.has(id)),
+    childrenWithin(ids, edges)
+  );
+  const levels = depth.size === 0 ? 0 : Math.max(...depth.values()) + 1;
+  const rows = Array.from({ length: levels }, (_, level) =>
+    ids.filter((id) => depth.get(id) === level)
+  );
+  const stray = ids.filter((id) => !depth.has(id));
+  if (stray.length > 0) rows.push(stray);
+  if (rows.length < 2) return { rows, labels: null };
+  const labels = rows.map((_, level) => `Level ${level + 1}`);
+  if (stray.length > 0) labels[labels.length - 1] = "Not below a root here";
+  return { rows, labels };
+}
+
+/** Each type's allowed children among `ids`. */
+function childrenWithin(
+  ids: readonly string[],
+  edges: readonly { from: string; to: string; kind: string }[]
+) {
+  const inside = new Set(ids);
+  const children = new Map<string, string[]>();
+  for (const { from, to, kind } of edges)
+    if (kind === "allowedChild" && from !== to && inside.has(to))
+      children.set(from, [...(children.get(from) ?? []), to]);
+  return children;
+}
+
+/** Steps from the nearest start, walking the children breadth first. */
+function depthsFrom(
+  starts: readonly string[],
+  children: ReadonlyMap<string, string[]>
+) {
+  const depth = new Map(starts.map((id) => [id, 0]));
+  let frontier = [...starts];
+  while (frontier.length > 0) {
+    frontier = frontier.flatMap((id) =>
+      (children.get(id) ?? []).filter((child) => {
+        if (depth.has(child)) return false;
+        depth.set(child, (depth.get(id) ?? 0) + 1);
+        return true;
+      })
+    );
+  }
+  return depth;
+}
+
+/** Placements in the City's rows, top to bottom, each row left to right. */
+function cityRows(placements: Placement[]): string[][] {
   const sorted = [...placements].sort(
     (a, b) => a.position.z - b.position.z || a.position.x - b.position.x
   );
@@ -243,37 +320,77 @@ function compact(placements: Placement[], edges: readonly SchemaEdge[]): Block {
       row.push(placement);
     else rows.push([placement]);
   }
-  const byId = new Map(placements.map((at) => [at.id, at]));
-  const lines = untangle(
-    rows.map((row) =>
-      row
-        .sort((a, b) => a.position.x - b.position.x)
-        .map((placement) => placement.id)
-    ),
-    edges
+  return rows.map((row) =>
+    row
+      .sort((a, b) => a.position.x - b.position.x)
+      .map((placement) => placement.id)
+  );
+}
+
+/**
+ * Where each wrapped line stands down the block, and the levels' labels: a line
+ * of the same level as the one before follows close, a new level opens after a
+ * wider gap, under its label when the rows are levels.
+ */
+export function lineTops(
+  lineLevels: readonly number[],
+  labels: readonly string[] | null
+) {
+  const tops: number[] = [];
+  const levels: { label: string; y: number }[] = [];
+  let y = 0;
+  for (const [index, level] of lineLevels.entries()) {
+    const opens = index === 0 || lineLevels[index - 1] !== level;
+    if (index > 0) y += opens ? (labels ? LEVEL_GAP : GAP_Y) : WRAP_GAP;
+    if (opens && labels) {
+      levels.push({ label: labels[level] ?? "", y });
+      y += LEVEL_LABEL;
+    }
+    tops.push(y);
+    y += CARD_HEIGHT;
+  }
+  return { tops, levels, height: y };
+}
+
+/**
+ * Rows of cards at a card's pitch, each row ordered to cross as few lines as it
+ * can (untangle) and wrapped where it is long. The City spaces buildings for a
+ * camera flying between them, which on a flat sheet left cards a few pixels wide
+ * once the whole schema was in view.
+ */
+function compact(
+  rows: string[][],
+  kinds: ReadonlyMap<string, DistrictKind>,
+  edges: readonly SchemaEdge[],
+  labels: string[] | null = null
+): Block {
+  const lines = untangle(rows, edges);
+  const levelOf = new Map(
+    rows.flatMap((row, level) => row.map((id) => [id, level]))
+  );
+  const { tops, levels, height } = lineTops(
+    lines.map((line) => levelOf.get(line[0] ?? "") ?? 0),
+    labels
   );
   const x = across(lines);
   const cards = lines.flatMap((line, index) =>
-    line.flatMap((id) => {
-      const placement = byId.get(id);
-      return placement
-        ? [
-            {
-              id,
-              x: x.get(id) ?? 0,
-              y: index * (CARD_HEIGHT + GAP_Y),
-              kind: placement.districtKind,
-            },
-          ]
-        : [];
-    })
+    line.map((id) => ({
+      id,
+      x: x.get(id) ?? 0,
+      y: tops[index] ?? 0,
+      kind: kinds.get(id) ?? "mixed",
+    }))
   );
   return {
     cards,
     width: Math.max(...lines.map((line) => line.length)) * PITCH - GAP_X,
-    height: lines.length * (CARD_HEIGHT + GAP_Y) - GAP_Y,
+    height,
+    levels,
   };
 }
+
+const kindsOf = (placements: Placement[]) =>
+  new Map(placements.map((at) => [at.id, at.districtKind]));
 
 /**
  * Districts in the City's reading order, top to bottom and left to right, packed
@@ -343,19 +460,31 @@ export function boardLayout({
       focusDepth
     );
     const shown = reachableWithin(graph, focus, focusDepth);
-    const { cards } = compact(
-      laid.filter((at) => shown.has(at.id)),
-      graph.edges ?? []
-    );
-    return { cards, frames: [], removed: [], shown };
+    const held = laid.filter((at) => shown.has(at.id));
+    const { cards } = compact(cityRows(held), kindsOf(held), graph.edges ?? []);
+    return { cards, frames: [], levels: [], removed: [], shown };
   }
 
   const removedIds = new Set(city.removed.map((at) => at.id));
   const all = [...city.placements, ...city.removed];
+  // Levels count allowed-child steps, so they mean something only when districts
+  // are cut by what editors can create. Both schemas' links and roots, so a removed
+  // type keeps the level it stood on.
+  const edges = [...(graph.edges ?? []), ...(baseline?.edges ?? [])];
+  const roots = new Set(
+    [...graph.nodes, ...(baseline?.nodes ?? [])]
+      .filter((node) => node.allowedAsRoot)
+      .map((node) => node.id)
+  );
   const blocks = city.districts.flatMap((district) => {
     const held = all.filter((at) => at.district === district.id);
     if (held.length === 0) return [];
-    const block = compact(held, graph.edges ?? []);
+    const rows = cityRows(held);
+    const { rows: levelled, labels } =
+      grouping === "structure"
+        ? levelRows(rows.flat(), edges, roots)
+        : { rows, labels: null };
+    const block = compact(levelled, kindsOf(held), graph.edges ?? [], labels);
     return [
       {
         ...block,
@@ -376,8 +505,18 @@ export function boardLayout({
   );
   const cards: Card[] = [];
   const frames: Frame[] = [];
+  const levels: Level[] = [];
   for (const block of reading) {
     const corner = cornerOf(block);
+    levels.push(
+      ...block.levels.map((level) => ({
+        id: `level:${block.district.id}:${level.label}`,
+        label: level.label,
+        x: corner.x + FRAME_PAD,
+        y: corner.y + FRAME_PAD + level.y,
+        width: block.width - FRAME_PAD * 2,
+      }))
+    );
     frames.push({
       id: `district:${block.district.id}`,
       name: block.district.name,
@@ -396,6 +535,7 @@ export function boardLayout({
   return {
     cards: cards.filter((card) => !removedIds.has(card.id)),
     frames,
+    levels,
     removed: cards.filter((card) => removedIds.has(card.id)),
     shown: null,
   };
@@ -661,6 +801,14 @@ export function sizeOf(node: Pick<SchemaNode, "groups">): string {
   const plural = (count: number, one: string, many: string) =>
     `${count} ${count === 1 ? one : many}`;
   return `${plural(groups, "group", "groups")} · ${plural(properties, "property", "properties")}`;
+}
+
+/** The count beside a card's size bar, short so the bar keeps its room. */
+export function propsLabel(
+  node: Pick<SchemaNode, "ownPropertyCount" | "composedPropertyCount">
+): string {
+  const count = node.ownPropertyCount + node.composedPropertyCount;
+  return `${count} ${count === 1 ? "prop" : "props"}`;
 }
 
 /** A card's tooltip: its name, and its size under it, for a type still in the schema. */

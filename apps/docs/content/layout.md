@@ -13,7 +13,14 @@ seo:
   - Compositions have their own district, and the types no root can reach go in Unreachable.
 - **Folders** gives each top-level Document Type folder a district.
 
-Inside a district, cards stand in rows of up to six. The cards in each row are ordered so that as few lines cross as possible. The districts are packed into rows of their own, left to right and top to bottom, so the whole plan fits a screen.
+Grouped by structure, a district reads from the top down, as editors create content:
+
+- **Level 1** holds the type allowed at root, **Level 2** what it allows, and so on, one allowed-child step per level. A label and a line mark where each level starts.
+- A level with more than six cards wraps onto more lines, set closer together than the levels.
+- A type that no root in the district leads to stands on a last level, **Not below a root here**.
+- Compositions, Elements and Unreachable have no root, so their cards stand in plain rows, and so do the districts when you group by folder.
+
+Within each level the cards are ordered so that as few lines cross as possible, which puts children under their parents. The districts are packed into rows of their own, left to right and top to bottom, so the whole plan fits a screen.
 
 Outside comparison mode, the same schema always gives the same layout. Adding or removing types, or connections between them, can rearrange the plan. You cannot move cards by hand.
 

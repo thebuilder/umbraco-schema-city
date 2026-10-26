@@ -289,6 +289,46 @@
   height: max(4px, calc(3px / clamp(0.2, var(--zoom), 1)));
 }
 
+/* The count the bar stands for shows where the caption that says it is hidden,
+   at the zoom names are read at, held at 9px on screen. */
+.board .board-count {
+  display: none;
+  font-size: min(calc(9px / var(--zoom)), 15px);
+  font-variant-numeric: tabular-nums;
+}
+
+.board[data-zoom="name"] .board-count {
+  display: block;
+}
+
+/* A level's label sits in the gap above its cards, a hairline running on from
+   it across the district, so a wrapped level reads as one and the next as new. */
+.board .board-level {
+  display: flex;
+  gap: 0.625rem;
+  align-items: center;
+  padding-bottom: 0.25rem;
+  /* 11px on screen down to the zoom names are read at, as the district names
+     hold theirs. */
+  font-size: calc(11px / clamp(0.45, var(--zoom), 1));
+  font-weight: 600;
+  line-height: 1;
+  color: var(--label);
+  letter-spacing: 0.02em;
+}
+
+.board .board-level::after {
+  flex: 1;
+  height: 1px;
+  content: "";
+  background: color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+/* Further out the labels are specks, and the gaps alone part the levels. */
+.board:is([data-zoom="label"], [data-zoom="tile"]) .board-level {
+  visibility: hidden;
+}
+
 /* Zoomed out, a card's caption and icon are a few pixels tall, so it shows its
    name alone (zoomBand in board-layout.ts), centred and on up to two lines. The
    name holds 12px on screen while two lines still fit the card, then shrinks
@@ -341,16 +381,20 @@
   background: var(--tile);
 }
 
-.board[data-zoom="tile"] .board-card > :not(.board-size) {
+.board[data-zoom="tile"] .board-card > :not(.board-foot) {
   visibility: hidden;
 }
 
 /* On a tile the bar is all there is, so it takes the middle of it, darker. */
+.board[data-zoom="tile"] .board-foot {
+  bottom: 30%;
+  height: 40%;
+}
+
 .board[data-zoom="tile"] .board-size {
   --bar: color-mix(in oklab, var(--foreground) 70%, transparent);
   --bar-composed: color-mix(in oklab, var(--foreground) 32%, transparent);
-  bottom: 30%;
-  height: 40%;
+  height: 100%;
 }
 
 /* The plan's tools float over its top edge, inside the board, so they keep clear of

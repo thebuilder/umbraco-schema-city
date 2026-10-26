@@ -17,6 +17,8 @@ import {
   cardTitle,
   inView,
   keyMove,
+  levelRows,
+  lineTops,
   linkPath,
   linkState,
   litLast,
@@ -394,4 +396,58 @@ test("a card's size bar has a segment per group, as long as its properties", () 
   expect(home && sizeOf(home)).toBe("7 groups · 26 properties");
   expect(home && cardTitle(home)).toBe("Home\n7 groups · 26 properties");
   expect(home && cardTitle(home, true)).toBe("Home");
+});
+
+test("a district stands in levels below its root, a stray type on a last level", () => {
+  const edges = [
+    { from: "root", to: "a", kind: "allowedChild" },
+    { from: "root", to: "b", kind: "allowedChild" },
+    { from: "a", to: "deep", kind: "allowedChild" },
+    { from: "b", to: "a", kind: "allowedChild" },
+    { from: "outside", to: "lost", kind: "allowedChild" },
+  ];
+  expect(
+    levelRows(["deep", "b", "a", "root", "lost"], edges, new Set(["root"]))
+  ).toEqual({
+    rows: [["root"], ["b", "a"], ["deep"], ["lost"]],
+    labels: ["Level 1", "Level 2", "Level 3", "Not below a root here"],
+  });
+  // No root, or one level only, gives one row and no labels.
+  expect(levelRows(["x", "y"], edges, new Set())).toEqual({
+    rows: [["x", "y"]],
+    labels: null,
+  });
+  expect(levelRows(["root"], edges, new Set(["root"]))).toEqual({
+    rows: [["root"]],
+    labels: null,
+  });
+});
+
+test("a wrapped level follows close; a new level opens under its label", () => {
+  const { tops, levels, height } = lineTops([0, 1, 1], ["Level 1", "Level 2"]);
+  const labelled = (index: number) => levels[index]?.y ?? Number.NaN;
+  expect(levels.map((level) => level.label)).toEqual(["Level 1", "Level 2"]);
+  // The second level's label sits between the levels, below the first's cards.
+  expect(labelled(1)).toBeGreaterThan((tops[0] ?? 0) + CARD_HEIGHT);
+  const wrapGap = (tops[2] ?? 0) - (tops[1] ?? 0) - CARD_HEIGHT;
+  const levelGap = (tops[1] ?? 0) - (tops[0] ?? 0) - CARD_HEIGHT;
+  expect(wrapGap).toBeLessThan(levelGap);
+  expect(height).toBe((tops[2] ?? 0) + CARD_HEIGHT);
+  // Rows that are not levels carry no labels.
+  expect(lineTops([0, 1], null).levels).toEqual([]);
+});
+
+test("the Site district reads Home on the level under Site", () => {
+  const { cards, levels } = boardLayout({ graph: medium, focus: null });
+  const yOf = (alias: string) =>
+    cards.find(
+      (card) =>
+        card.id === medium.nodes.find((node) => node.alias === alias)?.id
+    )?.y ?? Number.NaN;
+  expect(yOf("home")).toBeGreaterThan(yOf("site"));
+  expect(levels.some((level) => level.label === "Level 2")).toBe(true);
+  // Grouped by folder, districts are not levels.
+  expect(
+    boardLayout({ graph: medium, grouping: "folders", focus: null }).levels
+  ).toEqual([]);
 });

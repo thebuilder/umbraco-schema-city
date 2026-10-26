@@ -66,7 +66,7 @@ Double-click a card, or press <kbd>Enter</kbd> with a type selected, to focus it
 Names stay readable as you zoom out, and each card shows less:
 
 - Close up, a card shows its icon, its name, its property count and its size bar.
-- Further out, it shows its name alone, on up to two lines.
+- Further out, it shows its name on up to two lines, with its property count beside the size bar.
 - Further out again, the name takes one line, cut short where it must be.
 - Furthest out, a card is a tile of its colour with only its size bar. The tooltip and the inspector still have the name.
 

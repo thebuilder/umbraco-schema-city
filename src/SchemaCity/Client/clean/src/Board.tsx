@@ -68,12 +68,15 @@ import {
   keyMove,
   LAYER_DASH,
   LAYER_TOKEN,
+  LEVEL_LABEL,
+  type Level,
   linkPath,
   linkState,
   litBy,
   litLast,
   panelCovers,
   picked,
+  propsLabel,
   rampFill,
   readableView,
   revealCentre,
@@ -235,35 +238,51 @@ const TypeCard = memo(function CardBody({ data }: NodeProps<Node<CardData>>) {
           {cardCaption(node, removed)}
         </span>
       </span>
-      <SizeBar node={node} />
+      <SizeFoot node={node} />
     </div>
   );
 });
 
 /**
  * A card's size along its foot: a segment per property group, as long as its
- * properties (sizeBar), the composed ones fainter. It holds its thickness on screen
- * as the board zooms out, so sizes still compare when the cards are tiles.
+ * properties (sizeBar), the composed ones fainter, then the count it stands for,
+ * so the bar explains itself where the caption is hidden. The bar holds its
+ * thickness on screen as the board zooms out, so sizes still compare when the
+ * cards are tiles.
  */
-function SizeBar({ node }: { node: SchemaNode }) {
+function SizeFoot({ node }: { node: SchemaNode }) {
   const segments = sizeBar(node);
   if (segments.length === 0) return null;
   return (
     <span
       aria-hidden
-      className="board-size absolute inset-x-2.5 bottom-1.5 flex"
+      className="board-foot absolute inset-x-2.5 bottom-1.5 flex items-center gap-1.5"
     >
-      {segments.map((segment) => (
-        <span
-          className="h-full shrink-0 rounded-full bg-(--bar) data-composed:bg-(--bar-composed)"
-          data-composed={segment.composed ? "" : undefined}
-          key={segment.id}
-          style={{ width: `${segment.share * 100}%` }}
-        />
-      ))}
+      <span className="board-size flex min-w-0 flex-1">
+        {segments.map((segment) => (
+          <span
+            className="h-full shrink-0 rounded-full bg-(--bar) data-composed:bg-(--bar-composed)"
+            data-composed={segment.composed ? "" : undefined}
+            key={segment.id}
+            style={{ width: `${segment.share * 100}%` }}
+          />
+        ))}
+      </span>
+      <span className="board-count shrink-0 text-label leading-none">
+        {propsLabel(node)}
+      </span>
     </span>
   );
 }
+
+/** A level's label and its line across the district, in the gap above its cards. */
+const LevelLine = memo(function LevelBody({
+  data,
+}: NodeProps<Node<{ label: string }>>) {
+  return (
+    <div className="board-level pointer-events-none h-full">{data.label}</div>
+  );
+});
 
 const DistrictFrame = memo(function FrameBody({
   data,
@@ -309,7 +328,7 @@ function Link({ source, target, markerEnd, data }: EdgeProps<Edge<LinkData>>) {
   );
 }
 
-const NODE_TYPES = { card: TypeCard, frame: DistrictFrame };
+const NODE_TYPES = { card: TypeCard, frame: DistrictFrame, level: LevelLine };
 const EDGE_TYPES = { link: Link };
 
 const frameNode = (frame: Frame): Node<FrameData> => ({
@@ -327,6 +346,20 @@ const frameNode = (frame: Frame): Node<FrameData> => ({
   zIndex: -1,
   // React Flow gives a node's wrapper pointer events whenever hover handlers are set,
   // which on a frame would swallow the clicks on empty space that clear the selection.
+  style: { pointerEvents: "none" },
+});
+
+const levelNode = (level: Level): Node<{ label: string }> => ({
+  id: level.id,
+  type: "level",
+  position: { x: level.x, y: level.y },
+  width: level.width,
+  height: LEVEL_LABEL,
+  measured: { width: level.width, height: LEVEL_LABEL },
+  data: { label: level.label },
+  selectable: false,
+  focusable: false,
+  zIndex: -1,
   style: { pointerEvents: "none" },
 });
 
@@ -405,7 +438,12 @@ function useBoardNodes(
         ? [cardNode(card, node, { state: "plain", removed: true })]
         : [];
     });
-    return [...layout.frames.map(frameNode), ...removed, ...cards];
+    return [
+      ...layout.frames.map(frameNode),
+      ...layout.levels.map(levelNode),
+      ...removed,
+      ...cards,
+    ];
   }, [layout, nodesById, baselineById, scale, icons, selected, lit]);
 }
 

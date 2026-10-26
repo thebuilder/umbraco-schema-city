@@ -49,9 +49,8 @@ function PlanLegend() {
               </span>
             }
           >
-            Size: a segment per property group, as long as its properties; a
-            faint one comes from a composition. Past twelve groups, one solid
-            bar
+            Size: a segment per property group, as long as its properties, then
+            the property count; a faint segment comes from a composition
           </LegendRow>
           <LegendRow
             mark={<span className="size-3 rounded-sm ring-2 ring-phosphor" />}
@@ -68,7 +67,17 @@ function PlanLegend() {
           <LegendRow
             mark={<span className="h-3 w-6 rounded-md bg-foreground/5" />}
           >
-            A frame: a group of types
+            A district: a root and what it can create
+          </LegendRow>
+          <LegendRow
+            mark={
+              <span className="flex w-6 items-center gap-1">
+                <span className="text-2xs text-label leading-none">1</span>
+                <span className="h-px flex-1 bg-foreground/15" />
+              </span>
+            }
+          >
+            A level: one allowed-child step down from the root
           </LegendRow>
         </ul>
         <p className="mt-2.5 text-faint text-xs leading-snug">
@@ -94,7 +103,7 @@ function PlanLegend() {
         </ul>
         <p className="mt-2.5 text-faint text-xs leading-snug">
           Select a card to light its lines, or hover one while nothing is
-          selected. Zoomed out, a card shows its name alone, and further out
+          selected. Zoomed out, a card shows its name and size, and further out
           only its colour.
         </p>
       </section>

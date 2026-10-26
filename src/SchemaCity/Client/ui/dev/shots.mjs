@@ -161,10 +161,9 @@ const shots = [
             await new Promise((resolve) => setTimeout(resolve, 450));
           }
         };
-        // In two steps, then up and across to the top of the Site district.
+        // In two steps, then across to the top of the Site district.
         await press("=", 2);
-        await press("ArrowUp", 2);
-        await press("ArrowRight", 3);
+        await press("ArrowLeft", 1);
         await new Promise((resolve) => setTimeout(resolve, 400));
         // The moves are tuned to the medium schema at this size. If a layout change
         // has moved the Site district's name out of the top of the frame, say so
