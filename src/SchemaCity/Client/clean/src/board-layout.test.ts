@@ -412,6 +412,17 @@ test("a district stands in levels below its root, a stray type on a last level",
     rows: [["root"], ["b", "a"], ["deep"], ["lost"]],
     labels: ["Level 1", "Level 2", "Level 3", "Not below a root here"],
   });
+  // A parent in another district still counts toward the level.
+  expect(
+    levelRows(
+      ["root", "below"],
+      [
+        { from: "root", to: "elsewhere", kind: "allowedChild" },
+        { from: "elsewhere", to: "below", kind: "allowedChild" },
+      ],
+      new Set(["root"])
+    )
+  ).toEqual({ rows: [["root"], ["below"]], labels: ["Level 1", "Level 3"] });
   // No root, or one level only, gives one row and no labels.
   expect(levelRows(["x", "y"], edges, new Set())).toEqual({
     rows: [["x", "y"]],

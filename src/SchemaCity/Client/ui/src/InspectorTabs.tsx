@@ -340,7 +340,10 @@ export function Connections({
           renderFields={(fields) =>
             fields.map((field) => (
               <div className="mb-2.5 last:mb-0" key={field.propertyAlias}>
-                <p className="mb-1 font-mono text-label text-xs [overflow-wrap:anywhere]">
+                <p
+                  className="mb-1 font-mono text-label text-xs [overflow-wrap:anywhere]"
+                  data-ui="field"
+                >
                   {field.propertyAlias}
                   {field.dataType && field.dataTypeId ? (
                     <span className="font-sans text-faint">

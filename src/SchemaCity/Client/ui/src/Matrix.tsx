@@ -167,6 +167,7 @@ export function Matrix({
               </span>
             </>
           }
+          noteSaid="A filled mark is composed directly, a hollow one through another composition. A column marked parent is a type others inherit from."
           onColumn={onSelect}
           onSelect={onSelect}
           says={compositionSays}
@@ -278,6 +279,7 @@ function Grid<Cell>({
   selected,
   onSelect,
   note,
+  noteSaid,
   empty,
 }: {
   data: MatrixData<Cell>;
@@ -296,6 +298,8 @@ function Grid<Cell>({
   selected: string | null;
   onSelect: (id: string) => void;
   note: ReactNode;
+  /** The key as a screen reader hears it, where `note` is marks and fragments. */
+  noteSaid?: string;
   empty: string;
 }) {
   const columns = useMemo(
@@ -314,8 +318,8 @@ function Grid<Cell>({
       ) : (
         <table className="border-separate border-spacing-0" data-ui="matrix">
           <caption className="sr-only">
-            Types by column. {note} Choosing a row opens the type in the
-            inspector.
+            Types by column. {noteSaid ?? note} Choosing a row opens the type in
+            the inspector.
           </caption>
           <thead>
             <tr>
@@ -331,7 +335,7 @@ function Grid<Cell>({
                       gives it to a screen reader once. */}
                 <div
                   aria-hidden
-                  className={`${READING} mb-3 w-56 whitespace-normal font-normal text-faint text-xs`}
+                  className={`${READING} mb-3 max-w-56 whitespace-normal font-normal text-faint text-xs`}
                   data-ui="matrix-key"
                 >
                   {note}

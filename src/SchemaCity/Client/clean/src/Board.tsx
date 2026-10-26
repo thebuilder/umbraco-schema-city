@@ -778,7 +778,7 @@ const useLayout = ({
 const PRO_OPTIONS = { hideAttribution: true };
 const MINIMAP_STYLE = { width: 160, height: 104 };
 const minimapColour = (node: Node) =>
-  node.type === "frame" ? "transparent" : "var(--line-strong)";
+  node.type === "card" ? "var(--line-strong)" : "transparent";
 
 /**
  * React Flow's handlers, stable across renders. App hands over fresh callbacks each

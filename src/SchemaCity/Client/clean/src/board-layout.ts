@@ -260,31 +260,34 @@ export function levelRows(
   edges: readonly { from: string; to: string; kind: string }[],
   roots: ReadonlySet<string>
 ): { rows: string[][]; labels: string[] | null } {
+  // The walk may pass through types in other districts, so a type whose parent
+  // stands elsewhere still counts its steps from this district's root.
   const depth = depthsFrom(
     ids.filter((id) => roots.has(id)),
-    childrenWithin(ids, edges)
+    allowedChildren(edges)
   );
-  const levels = depth.size === 0 ? 0 : Math.max(...depth.values()) + 1;
-  const rows = Array.from({ length: levels }, (_, level) =>
-    ids.filter((id) => depth.get(id) === level)
-  );
+  const deepest = Math.max(-1, ...ids.map((id) => depth.get(id) ?? -1));
+  const levels = Array.from({ length: deepest + 1 }, (_, level) => ({
+    row: ids.filter((id) => depth.get(id) === level),
+    label: `Level ${level + 1}`,
+  })).filter(({ row }) => row.length > 0);
   const stray = ids.filter((id) => !depth.has(id));
-  if (stray.length > 0) rows.push(stray);
-  if (rows.length < 2) return { rows, labels: null };
-  const labels = rows.map((_, level) => `Level ${level + 1}`);
-  if (stray.length > 0) labels[labels.length - 1] = "Not below a root here";
-  return { rows, labels };
+  if (stray.length > 0)
+    levels.push({ row: stray, label: "Not below a root here" });
+  const rows = levels.map(({ row }) => row);
+  return {
+    rows,
+    labels: rows.length < 2 ? null : levels.map(({ label }) => label),
+  };
 }
 
-/** Each type's allowed children among `ids`. */
-function childrenWithin(
-  ids: readonly string[],
+/** Each type's allowed children. */
+function allowedChildren(
   edges: readonly { from: string; to: string; kind: string }[]
 ) {
-  const inside = new Set(ids);
   const children = new Map<string, string[]>();
   for (const { from, to, kind } of edges)
-    if (kind === "allowedChild" && from !== to && inside.has(to))
+    if (kind === "allowedChild" && from !== to)
       children.set(from, [...(children.get(from) ?? []), to]);
   return children;
 }
@@ -341,7 +344,7 @@ export function lineTops(
   let y = 0;
   for (const [index, level] of lineLevels.entries()) {
     const opens = index === 0 || lineLevels[index - 1] !== level;
-    if (index > 0) y += opens ? (labels ? LEVEL_GAP : GAP_Y) : WRAP_GAP;
+    if (index > 0) y += labels ? (opens ? LEVEL_GAP : WRAP_GAP) : GAP_Y;
     if (opens && labels) {
       levels.push({ label: labels[level] ?? "", y });
       y += LEVEL_LABEL;
@@ -803,11 +806,16 @@ export function sizeOf(node: Pick<SchemaNode, "groups">): string {
   return `${plural(groups, "group", "groups")} · ${plural(properties, "property", "properties")}`;
 }
 
+/** Every property a type has, its own and its compositions'. */
+const propertyCount = (
+  node: Pick<SchemaNode, "ownPropertyCount" | "composedPropertyCount">
+) => node.ownPropertyCount + node.composedPropertyCount;
+
 /** The count beside a card's size bar, short so the bar keeps its room. */
 export function propsLabel(
   node: Pick<SchemaNode, "ownPropertyCount" | "composedPropertyCount">
 ): string {
-  const count = node.ownPropertyCount + node.composedPropertyCount;
+  const count = propertyCount(node);
   return `${count} ${count === 1 ? "prop" : "props"}`;
 }
 
@@ -817,7 +825,7 @@ export const cardTitle = (node: SchemaNode, removed = false) =>
 
 export function cardCaption(node: SchemaNode, removed = false): string {
   if (removed) return "Removed since the baseline";
-  const count = node.ownPropertyCount + node.composedPropertyCount;
+  const count = propertyCount(node);
   const properties = `${count} ${count === 1 ? "property" : "properties"}`;
   return node.isElement ? `Element · ${properties}` : properties;
 }

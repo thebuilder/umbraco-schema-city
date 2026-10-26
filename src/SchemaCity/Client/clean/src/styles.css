@@ -793,6 +793,24 @@
   color: var(--foreground);
 }
 
+/* The property a run of tokens hangs from, as in Block targets: a small heading
+   of its own, so a section reads as a few groups rather than one run. */
+[data-ui="field"] {
+  margin-top: 0.75rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+[data-ui="field"] > span {
+  font-weight: 400;
+}
+
+:first-child > [data-ui="field"] {
+  margin-top: 0;
+}
+
 /* Types as flat tokens, tinted by their section's link colour: data to pick, not
    buttons, so no outline. */
 [data-ui="chips"] {
@@ -841,23 +859,29 @@
 
 /* Secondary buttons as soft filled keys, so they read as actions and not as the
    outlined type tokens or the inputs beside them. Pressed, they take the accent. */
-button:is([data-variant="outline"], [data-variant="default"]) {
+:is([data-slot="button"], [data-slot$="-trigger"]):is(
+  [data-variant="outline"],
+  [data-variant="default"]
+) {
   font-weight: 600;
   color: var(--foreground);
   background: var(--panel-sunken);
   border-color: transparent;
 }
 
-button:is([data-variant="outline"], [data-variant="default"]):hover {
+:is([data-slot="button"], [data-slot$="-trigger"]):is(
+  [data-variant="outline"],
+  [data-variant="default"]
+):hover {
   color: var(--foreground);
   background: color-mix(in oklab, var(--foreground) 8%, var(--panel-sunken));
   border-color: transparent;
 }
 
-button:is([data-variant="outline"], [data-variant="default"]):is(
-  [aria-pressed="true"],
-  [aria-expanded="true"]
-) {
+:is([data-slot="button"], [data-slot$="-trigger"]):is(
+  [data-variant="outline"],
+  [data-variant="default"]
+):is([aria-pressed="true"], [aria-expanded="true"]) {
   color: var(--accent-foreground);
   background: var(--accent);
   border-color: transparent;
