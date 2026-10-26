@@ -927,6 +927,22 @@
   translate: 0 -0.0625rem;
 }
 
+/* The badges' 1.5px top pad sets the afterglow's mono face on its baseline; in
+   this face it sat the figure low, so the box centres it instead. */
+[data-slot="badge"] {
+  padding-top: 0;
+}
+
+/* The Findings button's problem count as the drawer draws a problem: the deeper
+   ink on a soft tint, a pill rather than a red outlined box. */
+[data-slot="badge"][data-variant="signal"] {
+  min-width: 1.25rem;
+  color: var(--signal-ink);
+  background: color-mix(in oklab, var(--signal) 12%, var(--panel));
+  border-color: transparent;
+  border-radius: 999px;
+}
+
 [data-ui="problem-count"] {
   font-weight: 600;
   color: var(--signal-ink);
