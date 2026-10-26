@@ -156,7 +156,9 @@ export function ImpactSummary({
           </p>
         </Section>
       ) : null}
-      <p className="pt-3 text-faint text-xs">{EVIDENCE}</p>
+      <p className="pt-3 text-faint text-xs" data-ui="caption">
+        {EVIDENCE}
+      </p>
     </>
   );
 }

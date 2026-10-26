@@ -304,7 +304,10 @@ function Grid<Cell>({
 
   return (
     <>
-      <p className="border-line border-b px-4 py-1.5 text-label text-xs">
+      <p
+        className="border-line border-b px-4 py-1.5 text-label text-xs"
+        data-ui="matrix-note"
+      >
         {note} <span className="font-mono">{rows.length}</span> of{" "}
         <span className="font-mono">{data.rows.length}</span> types.
       </p>

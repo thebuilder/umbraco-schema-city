@@ -92,11 +92,12 @@
   --violet: color-mix(in oklab, #8d6be0 75%, var(--text-mix));
   --signal: var(--uui-color-danger, #df2a5d);
   --signal-soft: color-mix(in oklab, var(--signal) 80%, var(--panel));
-  /* The accent is also text on buttons and badges, and Umbraco's dark selected blue
-     is 2:1 on a dark surface, so it takes half the text colour too. */
+  /* The one colour for things to click: Umbraco's interactive blue, with a little of
+     the text colour so it holds its contrast on a dark surface too. Half and half
+     made it near-black on white, and links read as text. */
   --phosphor: color-mix(
     in oklab,
-    var(--uui-color-selected, #283a97) 50%,
+    var(--uui-color-interactive-emphasis, #3544b1) 88%,
     var(--text-mix)
   );
   --phosphor-bright: var(--uui-color-text, #000);
@@ -636,50 +637,84 @@
   padding-inline: 0.5rem;
 }
 
-/* Sections apart by space and a hairline, headings in the text colour with their
-   count as a quiet pill. */
+/* Each section is its own soft surface, apart by space rather than hairlines. A
+   section about one kind of link takes that link's colour: the heading in it, and
+   the type tokens tinted from it, so Compositions reads azure and Blocks amber
+   before a word is read. */
 [data-ui="section"] {
-  padding-block: 1.25rem 0.5rem;
-  border-bottom: 0;
+  --tint: var(--panel);
+  --rel: var(--foreground);
+
+  padding: 1rem 1rem 0.875rem;
+  margin-block: 0.625rem;
+  background: var(--panel-sunken);
+  border: 0;
+  border-radius: 12px;
 }
 
-[data-ui="section"] + [data-ui="section"] {
-  border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+/* A section with no heading is a line of its own, such as what a type has none of,
+   and stays off a surface. */
+[data-ui="section"]:not(:has([data-ui="heading"])):has(> [data-ui="muted"]) {
+  padding-block: 0.5rem;
+  background: none;
+}
+
+[data-ui="section"]:has([data-trace="compositions"]) {
+  --rel: var(--azure);
+  --tint: color-mix(in oklab, var(--azure) 13%, var(--panel));
+}
+
+[data-ui="section"]:has([data-trace="blocks"]) {
+  --rel: var(--amber);
+  --tint: color-mix(in oklab, var(--amber) 15%, var(--panel));
+}
+
+[data-ui="section"]:has([data-trace="references"]) {
+  --rel: var(--violet);
+  --tint: color-mix(in oklab, var(--violet) 13%, var(--panel));
 }
 
 [data-ui="heading"] {
   gap: 0.5rem;
   margin-bottom: 0.75rem;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  color: var(--foreground);
+  color: var(--rel, var(--foreground));
 }
 
 [data-ui="heading"] > [aria-hidden] {
   border-radius: 50%;
 }
 
+/* The count as a plain figure beside the heading, not a pill of its own. */
 [data-ui="heading"] > .font-mono {
-  padding-inline: 0.4375rem;
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  color: var(--label);
-  background: var(--muted);
-  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--rel, var(--foreground)) 55%, var(--panel));
 }
 
-[data-ui="muted"] {
-  font-size: 0.8125rem;
-  color: var(--label);
+/* Notes, empty states and caveats are footnotes: small, faint and short in line,
+   under the data rather than level with it. */
+[data-ui="muted"],
+[data-ui="caption"] {
+  max-width: 60ch;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--faint);
 }
 
 [data-ui="caption"] {
-  padding-top: 1.5rem;
+  padding: 1rem 0.25rem 0.5rem;
+}
+
+[data-ui="matrix-note"] {
   font-size: 0.75rem;
   color: var(--faint);
 }
 
-/* Usage as a compact grid, two values to a column, label over value. */
+/* Usage as a compact grid, two values to a column: the figure carries the weight,
+   its label sits small above it. */
 [data-ui="values"] {
   grid-template-rows: repeat(4, auto);
   grid-template-columns: none;
@@ -694,38 +729,81 @@
 }
 
 [data-ui="values"] dd {
-  margin-bottom: 0.625rem;
-  font-size: 0.9375rem;
-  font-weight: 600;
+  margin-bottom: 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--foreground);
 }
 
-/* Types as pills. */
+/* Types as flat tokens, tinted by their section's link colour: data to pick, not
+   buttons, so no outline. */
 [data-ui="chips"] {
   gap: 0.375rem;
 }
 
 [data-ui="chip"] {
-  padding: 0.1875rem 0.625rem;
+  padding: 0.25rem 0.5rem;
   font-size: 0.8125rem;
-  color: var(--prose);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  font-weight: 500;
+  color: var(--foreground);
+  background: var(--tint, var(--panel));
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.04);
   transition:
     background-color 120ms,
-    border-color 120ms;
+    box-shadow 120ms;
 }
 
 [data-ui="chip"]:hover {
   color: var(--foreground);
-  background: var(--accent);
-  border-color: var(--accent-foreground);
+  background: color-mix(
+    in oklab,
+    var(--rel, var(--foreground)) 12%,
+    var(--tint, var(--panel))
+  );
 }
 
 [data-ui="chip"] > .font-mono {
   font-size: 0.75rem;
-  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--rel, var(--foreground)) 60%, var(--panel));
+}
+
+/* The panel's links: the one blue for things to click, underlined on hover. */
+[data-ui="link"] {
+  padding-inline: 0;
+  font-weight: 600;
+}
+
+[data-ui="link"]:hover {
+  color: var(--phosphor);
+  text-underline-offset: 0.2em;
+}
+
+/* Secondary buttons as soft filled keys, so they read as actions and not as the
+   outlined type tokens or the inputs beside them. Pressed, they take the accent. */
+button:is([data-variant="outline"], [data-variant="default"]) {
+  font-weight: 600;
+  color: var(--foreground);
+  background: var(--panel-sunken);
+  border-color: transparent;
+}
+
+button:is([data-variant="outline"], [data-variant="default"]):hover {
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--foreground) 8%, var(--panel-sunken));
+  border-color: transparent;
+}
+
+button:is([data-variant="outline"], [data-variant="default"]):is(
+  [aria-pressed="true"],
+  [aria-expanded="true"]
+) {
+  color: var(--accent-foreground);
+  background: var(--accent);
+  border-color: transparent;
 }
 
 /* The Findings filters as pills, and each kind's group as a plain bordered card:
@@ -946,4 +1024,22 @@
 
 [data-present] .board .board-card:not([data-state="removed"]) .board-detail {
   display: none;
+}
+
+/* The Impact page's relationship toggles as the same soft keys, the on ones in the
+   accent, with a small rounded box that fills when on. */
+[data-slot="toggle"] {
+  font-weight: 600;
+  color: var(--label);
+  background: var(--panel-sunken);
+  border-color: transparent;
+}
+
+[data-slot="toggle"][aria-pressed="true"] {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+[data-slot="toggle"] > [aria-hidden] {
+  border-radius: 2px;
 }

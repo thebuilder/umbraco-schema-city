@@ -186,6 +186,7 @@ export function Heading({
   return (
     <h3
       className="mb-2 flex items-center gap-2 font-semibold text-label text-xs"
+      data-trace={trace}
       data-ui="heading"
     >
       {trace ? (
@@ -218,6 +219,7 @@ export function TextButton({
   return (
     <button
       className="px-1 py-0.5 text-phosphor text-xs hover:text-phosphor-bright hover:underline"
+      data-ui="link"
       onClick={onClick}
       type="button"
     >
