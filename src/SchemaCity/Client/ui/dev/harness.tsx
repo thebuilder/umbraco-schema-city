@@ -132,9 +132,61 @@ const pathOf = (name: string) => `../../core/fixtures/${name}.json`;
 const nameOf = (path: string) =>
   path.slice("../../core/fixtures/".length).replace(JSON_SUFFIX, "");
 
+/** Which look this page is, so the demo can link to the other. */
+type Look = "clean" | "city";
+
+/**
+ * DEMO ONLY. A link to the same sample and view in the other look: the city plan
+ * at the demo's root, the 3D city under /city/. The extension has no such switch,
+ * since a site picks one look in appsettings; the link is for visitors to the demo
+ * page, so it shows in its build only. The dev server runs each look on its own
+ * port, where a relative link would land nowhere. The app's own state is in the
+ * query string, which both looks read; the sample goes along as `sample`.
+ */
+function LookLink({ look, path }: { look: Look; path: string }) {
+  const base = import.meta.env.BASE_URL;
+  const target = () => {
+    const params = new URLSearchParams(location.search);
+    params.set("sample", nameOf(path));
+    const to = look === "clean" ? `${base}city/` : base.replace(CITY_BASE, "");
+    return `${to}?${params}`;
+  };
+  return (
+    <a
+      className="demo-picker shrink-0 text-2xs text-phosphor hover:underline"
+      href={target()}
+      onClick={(event) => {
+        event.preventDefault();
+        location.assign(target());
+      }}
+      title="The extension shows one look per site, which SchemaCity:Variant in appsettings picks."
+    >
+      {look === "clean" ? "View in 3D" : "View the city plan"}
+    </a>
+  );
+}
+
+const CITY_BASE = /city\/$/;
+
+/** The sample another look's link sent, read once and taken off the query string. */
+function sentSample() {
+  const params = new URLSearchParams(location.search);
+  const sample = params.get("sample");
+  if (sample === null) return;
+  params.delete("sample");
+  const query = params.size > 0 ? `?${params}` : "";
+  history.replaceState(
+    null,
+    "",
+    `${location.pathname}${query}${location.hash}`
+  );
+  return sample;
+}
+
 const container = document.querySelector("#app") as HTMLElement;
 let mounted: MountedApp | undefined;
 let mount: VariantModule["mount"];
+let pageLook: Look = "clean";
 
 let latest = "";
 
@@ -156,7 +208,12 @@ async function show(path: string, refocus = false) {
   mounted = mount(container);
   mounted.render({
     decisions: demoDecisions,
-    footer: <SamplePicker path={path} refocus={refocus} />,
+    footer: (
+      <>
+        <SamplePicker path={path} refocus={refocus} />
+        {import.meta.env.DEV ? null : <LookLink look={pageLook} path={path} />}
+      </>
+    ),
     graph,
     icons,
     onOpenDataType: (id) => console.log("schema-city: open Data Type", id),
@@ -165,9 +222,13 @@ async function show(path: string, refocus = false) {
   });
 }
 
-export function startHarness(variant: VariantModule) {
+export function startHarness(variant: VariantModule, which: Look) {
   ({ mount } = variant);
-  const asked = location.pathname.split("/").filter(Boolean).pop();
-  const known = samples.some((sample) => nameOf(sample) === asked);
-  void show(pathOf(known && asked ? asked : "medium"));
+  pageLook = which;
+  const sent = sentSample();
+  const inPath = location.pathname.split("/").filter(Boolean).pop();
+  const known = (name: string | undefined) =>
+    samples.some((sample) => nameOf(sample) === name);
+  const asked = [sent, inPath].find(known);
+  void show(pathOf(asked ?? "medium"));
 }

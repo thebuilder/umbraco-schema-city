@@ -8,4 +8,4 @@ const theme =
     ? import("@umbraco-ui/uui/themes/dark.css")
     : import("@umbraco-ui/uui/themes/light.css");
 await theme;
-startHarness(clean);
+startHarness(clean, "clean");

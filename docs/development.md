@@ -88,7 +88,9 @@ pnpm preview:demo
 
 This writes the city plan to `Client/dist` and the City to `Client/dist/city`, each with the same
 fixtures the dev server uses, so the demo opens on the city plan and the City is at `/city/`. The
-docs link both.
+docs link both, and the demo's footer links each look to the other with the same sample and view
+(`?sample=` carries the sample across). The link is demo chrome: the dev server runs each look on
+its own port and leaves it out, and the extension has no such switch.
 On the dev server, the footer's Sample schema picker also puts the sample in the path
 (`/worst-case`, `/empty`, `/one`), so a reload keeps the data under test.
 It does not need an Umbraco server, API credentials, or a database. Editor links still log to the
