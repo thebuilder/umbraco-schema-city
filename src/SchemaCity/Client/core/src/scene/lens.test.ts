@@ -1,0 +1,173 @@
+import { describe, expect, it } from "vitest";
+import mediumFixture from "../../fixtures/medium.json";
+import mediumUsageFixture from "../../fixtures/medium-usage.json";
+import { findFindings } from "../model/findings";
+import type {
+  SchemaGraph,
+  SchemaNode,
+  TypeUsage,
+  UsageReport,
+} from "../model/types";
+import { highlightScale, lensScale } from "./lens";
+
+const medium = mediumFixture as unknown as SchemaGraph;
+const mediumUsage = mediumUsageFixture as unknown as UsageReport;
+const idOf = (alias: string) =>
+  medium.nodes.find((node) => node.alias === alias)?.id as string;
+
+const node = (alias: string, isElement = false): SchemaNode => ({
+  id: alias,
+  alias,
+  name: alias,
+  icon: "icon-document",
+  iconColor: null,
+  folderId: null,
+  isElement,
+  allowedAsRoot: false,
+  variesByCulture: false,
+  variesBySegment: false,
+  description: null,
+  groups: [],
+  ownPropertyCount: 0,
+  composedPropertyCount: 0,
+  templates: [],
+});
+
+const graph: SchemaGraph = {
+  generatedAt: "2026-09-03T00:00:00Z",
+  folders: [],
+  nodes: [node("home"), node("article"), node("empty"), node("hero", true)],
+  edges: [],
+};
+
+const use = (extra: Partial<TypeUsage>): TypeUsage => ({
+  total: 0,
+  published: 0,
+  drafts: 0,
+  trashed: 0,
+  rootInstances: 0,
+  cultures: [],
+  lastEdited: null,
+  ...extra,
+});
+
+const usage: UsageReport = {
+  generatedAt: "2026-09-03T00:00:00Z",
+  byType: {
+    home: use({ total: 100, published: 100, cultures: ["en-US", "da-DK"] }),
+    article: use({ total: 20, published: 5, cultures: ["en-US"] }),
+    empty: use({}),
+  },
+  references: [
+    { fromType: "home", toType: "article", count: 12 },
+    { fromType: "article", toType: "article", count: 3 },
+  ],
+};
+
+describe("lensScale", () => {
+  it("says nothing with no lens and nothing with no usage", () => {
+    expect(lensScale(graph, usage, "none")).toBeNull();
+    expect(lensScale(graph, undefined, "count")).toBeNull();
+  });
+
+  it("stretches the content count over the values it found", () => {
+    const scale = lensScale(graph, usage, "count");
+    expect(scale?.ramp).toBe("sequential");
+    expect(scale?.t.get("home")).toBe(1);
+    expect(scale?.t.get("article")).toBeCloseTo(0.2);
+    expect(scale?.t.get("empty")).toBe(0);
+    expect([scale?.minLabel, scale?.maxLabel]).toEqual(["0", "100"]);
+  });
+
+  it("leaves Element Types out of every lens about content", () => {
+    for (const lens of [
+      "count",
+      "published",
+      "cultures",
+      "references",
+    ] as const) {
+      expect(lensScale(graph, usage, lens)?.t.has("hero")).toBe(false);
+    }
+  });
+
+  it("puts the published share on a diverging ramp and skips empty types", () => {
+    const scale = lensScale(graph, usage, "published");
+    expect(scale?.ramp).toBe("diverging");
+    expect(scale?.t.get("home")).toBe(1);
+    expect(scale?.t.get("article")).toBeCloseTo(0.25);
+    expect(scale?.t.has("empty")).toBe(false);
+  });
+
+  it("counts cultures", () => {
+    const scale = lensScale(graph, usage, "cultures");
+    expect(scale?.t.get("home")).toBe(1);
+    expect(scale?.t.get("article")).toBeCloseTo(0.5);
+    expect(scale?.maxLabel).toBe("2");
+  });
+
+  it("adds up the references pointing at a type", () => {
+    const scale = lensScale(graph, usage, "references");
+    expect(scale?.t.get("article")).toBe(1);
+    expect(scale?.t.get("home")).toBe(0);
+    expect(scale?.maxLabel).toBe("15");
+  });
+
+  it("marks the types the unused checks flag, and in use what has content or users", () => {
+    const findings = findFindings(medium, mediumUsage);
+    const scale = lensScale(medium, mediumUsage, "unused", findings);
+    expect(scale?.ramp).toBe("binary");
+    expect(scale?.minLabel).toBe("in use");
+    expect(scale?.maxLabel).toBe("unused");
+    // Flagged unusedElementType, so unused even though it holds no content of its own.
+    expect(scale?.t.get(idOf("unusedElementBanner"))).toBe(1);
+    expect(scale?.t.get(idOf("unusedArticleLegacy"))).toBe(1);
+    // Composed by Home and Standard Page, so in use although it has no content.
+    expect(scale?.t.get(idOf("heroComposition"))).toBe(0);
+    expect(scale?.t.get(idOf("home"))).toBe(0);
+    // A dead end is not an unused check, and the lens says nothing about it.
+    expect(scale?.t.has(idOf("deadEndPromo"))).toBe(false);
+    const flagged = findings
+      .filter((f) => f.kind === "unusedType" || f.kind === "unusedElementType")
+      .map((f) => f.nodeId);
+    expect(
+      [...(scale?.t ?? [])]
+        .filter(([, t]) => t === 1)
+        .map(([id]) => id)
+        .sort()
+    ).toEqual([...new Set(flagged)].sort());
+  });
+
+  it("flattens a ramp where every type has the same number", () => {
+    const flat = lensScale({ ...graph, nodes: [node("home")] }, usage, "count");
+    expect(flat?.t.get("home")).toBe(0);
+    expect([flat?.minLabel, flat?.maxLabel]).toEqual(["100", "100"]);
+  });
+});
+
+describe("the lenses on the seeded site's usage report", () => {
+  it("puts article, with 162 items, at the bright end of the content count", () => {
+    const scale = lensScale(medium, mediumUsage, "count");
+    expect(scale?.t.get(idOf("article"))).toBe(1);
+    expect(scale?.maxLabel).toBe("162");
+  });
+
+  it("lights only the two types that vary by culture", () => {
+    const scale = lensScale(medium, mediumUsage, "cultures");
+    const lit = [...(scale?.t ?? [])]
+      .filter(([, t]) => t === 1)
+      .map(([id]) => medium.nodes.find((node) => node.id === id)?.alias)
+      .sort();
+    expect(lit).toEqual(["blogPost", "campaignPage"]);
+  });
+});
+
+it("lights the users of a Data Type and quiets every other building, Element Types too", () => {
+  const scale = highlightScale(graph, new Set(["article", "hero"]));
+  expect(scale.ramp).toBe("binary");
+  expect([...scale.t]).toEqual([
+    ["home", 0],
+    ["article", 1],
+    ["empty", 0],
+    ["hero", 1],
+  ]);
+});

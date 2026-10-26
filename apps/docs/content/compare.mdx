@@ -61,17 +61,19 @@ Tick each cause you planned with its **Planned** box, use **Mark all as planned*
 - **Copy as Markdown** gives a ticket-ready list, with both snapshots' hosts and dates, the totals, each cause ticked when planned, and its side effects nested under it.
 - **Export CSV** gives one row per line, with the cause it belongs to, whether it is the cause's own edit or a side effect, and whether it was planned.
 
-## See the changes in the city
+## See the changes on the city plan
 
-While a baseline is loaded, the city shows a change layer and dims everything else:
+While a baseline is loaded, the plan shows a change layer and dims everything else. Each kind of change gets its own colour, and a key in the bottom-left corner names them with their counts:
 
-- added types are azure
-- types changed by their own edit are amber with a ring
-- side effects are a quieter amber
-- removed types are outlines where they stood
+- added types
+- types changed by their own edit
+- side effects, in a quieter shade of the changed colour
+- removed types, as dashed outlines where they stood
 
-Choosing a lens replaces the change layer until the lens is off again. Show in city, from the Impact page or a Data Type, replaces it until you clear it. The List view gets a Change column, sortable and filterable, with a row for each removed type.
+In the 3D city, a type changed by its own edit also gets a ring.
 
-Matched buildings keep their baseline positions. New types appear on separate added boards.
+Choosing a lens replaces the change layer until the lens is off again. **Show on city plan**, from the Impact page or a Data Type, replaces it until you clear it. The List view gets a Change column, sortable and filterable, with a row for each removed type.
+
+Matched types stay in their baseline districts. A district's levels count allowed-child steps in both schemas, and within a level the plan orders cards by the current schema's lines, so a type can shift when its connections changed. New types appear in separate Added districts. In the 3D city, matched buildings keep their exact baseline positions.
 
 ![Compare against a baseline from before four planned edits, three marked planned, and Press Release open on the types that changed only because it was added.](../../../docs/screenshots/compare.png)

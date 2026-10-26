@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>Schema City demo</title>
+    <link href="./favicon.png" rel="icon" type="image/png">
+    <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--uui-font-family);
+      color: var(--uui-color-text);
+      background: var(--uui-color-background);
+    }
+    </style>
+  </head>
+  <body style="height: 100vh; display: flex; flex-direction: column">
+    <div id="app" style="flex: 1; min-height: 0"></div>
+    <script src="./main.tsx" type="module"></script>
+  </body>
+</html>

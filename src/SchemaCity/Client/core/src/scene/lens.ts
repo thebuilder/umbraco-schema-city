@@ -1,0 +1,205 @@
+// The usage lens: what each building's number is and where that number sits on
+// the lens's ramp. Pure: no three.js, no React, no DOM. Scene.tsx turns the ramp
+// position into a colour from the theme tokens, and the toolbar legend prints the
+// two ends from the same numbers.
+//
+// A node the lens says nothing about is absent from the map, which is every
+// Element Type under every lens about content instances. Scene.tsx paints those
+// phosphor-dim while a lens is on, so the amber end of a ramp never has an amber
+// district beside it to be confused with.
+import type { ChangeKind } from "../model/changes";
+import type { Finding } from "../model/findings";
+import type { SchemaGraph, UsageReport } from "../model/types";
+
+export type Lens =
+  | "none"
+  | "count"
+  | "published"
+  | "cultures"
+  | "references"
+  | "unused";
+
+/** Toolbar order, and the only names the URL accepts. */
+export const LENSES: readonly Lens[] = [
+  "none",
+  "count",
+  "published",
+  "cultures",
+  "references",
+  "unused",
+];
+
+export const LENS_LABEL: Record<Lens, string> = {
+  none: "None",
+  count: "Content count",
+  published: "Published share",
+  cultures: "Cultures",
+  references: "Incoming references",
+  unused: "Unused",
+};
+
+/**
+ * Amber to azure both ways, never phosphor against signal: green against pink is
+ * the worst pair for colour-vision deficiency, and both of those colours already
+ * mean something else in this city.
+ */
+export type Ramp = "sequential" | "diverging" | "binary" | "change";
+
+export type LensScale = {
+  ramp: Ramp;
+  /** Node id to its place on the ramp, 0 to 1. Absent means the lens is silent. */
+  t: Map<string, number>;
+  minLabel: string;
+  maxLabel: string;
+};
+
+/**
+ * The same rules as the findings, so the lens and the drawer never disagree: a type
+ * is unused when an unused check flagged it, and in use when it has content, a type
+ * composes it or a block editor lists it. A dead end or an unreachable chain is
+ * neither, and the lens stays silent about it. App passes open findings only, so a
+ * type marked intentionally unused falls silent too.
+ */
+function unusedScale(
+  graph: SchemaGraph,
+  usage: UsageReport,
+  findings: Finding[]
+): LensScale {
+  const flagged = new Set(
+    findings
+      .filter(
+        (finding) =>
+          finding.kind === "unusedType" || finding.kind === "unusedElementType"
+      )
+      .map((finding) => finding.nodeId)
+  );
+  const used = new Set(
+    (graph.edges ?? [])
+      .filter(
+        (edge) =>
+          (edge.kind === "composition" || edge.kind === "block") &&
+          edge.from !== edge.to
+      )
+      .map((edge) => edge.to)
+  );
+  const t = new Map<string, number>();
+  for (const node of graph.nodes) {
+    if (flagged.has(node.id)) t.set(node.id, 1);
+    else if (used.has(node.id) || (usage.byType[node.id]?.total ?? 0) > 0)
+      t.set(node.id, 0);
+  }
+  return { ramp: "binary", t, minLabel: "in use", maxLabel: "unused" };
+}
+
+/**
+ * Show in city from a Data Type's page: the types in `lit` take the selection's
+ * colour and every other building goes quiet, Element Types included, so the users
+ * stand out wherever they are. The same binary ramp the Unused lens draws.
+ */
+export const highlightScale = (
+  graph: SchemaGraph,
+  lit: ReadonlySet<string>
+): LensScale => ({
+  ramp: "binary",
+  t: new Map(graph.nodes.map((node) => [node.id, lit.has(node.id) ? 1 : 0])),
+  minLabel: "other types",
+  maxLabel: "uses it",
+});
+
+/** Where each kind of change sits on the change ramp. Unchanged types sit at 0. */
+export const CHANGE_STEP: Record<ChangeKind, number> = {
+  added: 1,
+  removed: 1,
+  changed: 0.75,
+  "side effect": 0.5,
+};
+
+/**
+ * The change layer while a baseline is loaded: added, changed by its own edit,
+ * changed only as a side effect, and unchanged, each a step on its own ramp. The
+ * scene draws removed types as outlines, since they have no building.
+ */
+export const changeScale = (
+  graph: SchemaGraph,
+  kinds: ReadonlyMap<string, ChangeKind>
+): LensScale => ({
+  ramp: "change",
+  t: new Map(
+    graph.nodes.map((node) => {
+      const kind = kinds.get(node.id);
+      return [node.id, kind ? CHANGE_STEP[kind] : 0];
+    })
+  ),
+  minLabel: "unchanged",
+  maxLabel: "added",
+});
+
+/**
+ * The scale for one lens, or null when the lens is off or has nothing to say. The
+ * three counting lenses stretch their ramp over the values they actually found, so
+ * a schema where every type has thousands of items still shows a difference.
+ */
+export function lensScale(
+  graph: SchemaGraph,
+  usage: UsageReport | undefined,
+  lens: Lens,
+  findings: Finding[] = []
+): LensScale | null {
+  if (!usage || lens === "none") return null;
+
+  if (lens === "unused") return unusedScale(graph, usage, findings);
+
+  if (lens === "published") {
+    // Diverging around half. A type with no content has no share to show, so it
+    // stays out of the ramp rather than sitting at one end of it.
+    const t = new Map<string, number>();
+    for (const node of graph.nodes) {
+      const found = usage.byType[node.id];
+      if (node.isElement || !found || found.total === 0) continue;
+      t.set(node.id, found.published / found.total);
+    }
+    return {
+      ramp: "diverging",
+      t,
+      minLabel: "0% published",
+      maxLabel: "100% published",
+    };
+  }
+
+  const incoming = new Map<string, number>();
+  if (lens === "references") {
+    for (const reference of usage.references) {
+      incoming.set(
+        reference.toType,
+        (incoming.get(reference.toType) ?? 0) + reference.count
+      );
+    }
+  }
+  const valueFor = (id: string) => {
+    const found = usage.byType[id];
+    if (lens === "count") return found?.total ?? 0;
+    if (lens === "cultures") return found?.cultures.length ?? 0;
+    return incoming.get(id) ?? 0;
+  };
+
+  const values = new Map<string, number>();
+  for (const node of graph.nodes) {
+    if (node.isElement) continue;
+    values.set(node.id, valueFor(node.id));
+  }
+  if (values.size === 0) return null;
+
+  const min = Math.min(...values.values());
+  const max = Math.max(...values.values());
+  const span = max - min;
+  const t = new Map<string, number>();
+  for (const [id, value] of values)
+    t.set(id, span === 0 ? 0 : (value - min) / span);
+
+  return {
+    ramp: "sequential",
+    t,
+    minLabel: min.toLocaleString(),
+    maxLabel: max.toLocaleString(),
+  };
+}

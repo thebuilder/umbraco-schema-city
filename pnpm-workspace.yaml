@@ -1,6 +1,21 @@
-# The extension client in src/SchemaCity/Client uses npm, so only the docs site is a pnpm package.
 packages:
   - apps/docs
+  # The backoffice client: the tooling package and the five packages under it.
+  - src/SchemaCity/Client
+  - src/SchemaCity/Client/*
+# One React for every package, so the shared panels and the app that bundles them
+# resolve the same copy, and one version of each tool.
+catalog:
+  react: 19.3.0
+  react-dom: 19.3.0
+  '@types/react': 19.3.0
+  '@types/react-dom': 19.3.0
+  # The build and test tools, declared by each package that imports them.
+  '@tailwindcss/vite': 4.3.3
+  '@umbraco-cms/backoffice': 17.7.1
+  '@umbraco-ui/uui': 2.1.1
+  vite: 8.3.4
+  vitest: 5.0.4
 allowBuilds:
   # Node's WebGPU backend for vgpu. The hero particles run in the browser, so it isn't needed.
   '@vgpu/adapter-node': false

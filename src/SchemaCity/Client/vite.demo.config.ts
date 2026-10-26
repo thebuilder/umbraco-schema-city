@@ -1,19 +1,5 @@
-import { fileURLToPath } from "node:url";
-import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
+import { demoConfig } from "./vite.shared.ts";
 
-export default defineConfig({
-  root: "dev",
-  plugins: [tailwindcss()],
-  resolve: {
-    alias: { "@": fileURLToPath(new URL("./src/app", import.meta.url)) },
-  },
-  publicDir: false,
-  build: {
-    outDir: "../dist",
-    emptyOutDir: true,
-    sourcemap: false,
-    // As in vite.config.ts: Base UI's "use client" means nothing in the browser.
-    rolldownOptions: { checks: { moduleLevelDirective: false } },
-  },
-});
+// The demo's map, at the root of Client/dist. vite.demo-city.config.ts adds the City.
+export default defineConfig(demoConfig("clean"));

@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-09-01T12:00:00+00:00",
+  "byType": {
+    "efe97ed3-eccb-fe5e-5b79-336f4092e275": {
+      "total": 1,
+      "published": 1,
+      "drafts": 0,
+      "trashed": 0,
+      "rootInstances": 1,
+      "cultures": [
+        "vi-VN"
+      ],
+      "lastEdited": "2026-10-24T08:00:00+00:00"
+    }
+  },
+  "references": [],
+  "blocks": {}
+}

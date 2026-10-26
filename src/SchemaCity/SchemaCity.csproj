@@ -14,14 +14,14 @@
     <Product>SchemaCity</Product>
     <Title>Schema City</Title>
     <!-- Local and CI builds only: a release takes its version from the tag. Keep in step with
-         "version" in Client/public/umbraco-package.json; CI checks they match. -->
+         "version" in Client/backoffice/public/umbraco-package.json; CI checks they match. -->
     <Version>1.0.0</Version>
     <Authors>Daniel Schmidt</Authors>
-    <Description>See your Umbraco content model as a 3D city in the backoffice, with the relationships between Document Types, schema checks, content usage, change impact and snapshot comparison.</Description>
+    <Description>See your Umbraco content model from above, as a city plan in the backoffice, with the relationships between Document Types, schema checks, content usage, change impact and snapshot comparison.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageTags>umbraco umbraco-marketplace backoffice document-types visualisation visualization three.js</PackageTags>
+    <PackageTags>umbraco umbraco-marketplace backoffice document-types visualisation visualization diagram three.js</PackageTags>
     <PackageProjectUrl>https://github.com/thebuilder/umbraco-schema-city</PackageProjectUrl>
     <RepositoryUrl>https://github.com/thebuilder/umbraco-schema-city</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -39,7 +39,7 @@
   <ItemGroup>
     <!-- The client sources are build input, not package content. -->
     <Content Remove="Client\**" />
-    <None Include="Client\public\umbraco-package.json" Pack="false" />
+    <None Include="Client\backoffice\public\umbraco-package.json" Pack="false" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Update="icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
@@ -51,16 +51,18 @@
   <!-- The package ships the built client, so a clean checkout has to build it before the
        static web assets are collected. wwwroot/ is generated and gitignored, and the SDK
        globs Content at evaluation time, before any target runs, so the files Vite has just
-       written are added back to Content here. Set SkipClientBuild=true where npm has
-       already run, as CI does. -->
+       written are added back to Content here. Set SkipClientBuild=true where pnpm has
+       already run, as CI does. pnpm comes with Node through corepack (`corepack enable`). -->
   <Target Name="BuildClient"
           BeforeTargets="ResolveProjectStaticWebAssets"
           Condition="'$(SkipClientBuild)' != 'true' And !Exists('$(MSBuildProjectDirectory)/wwwroot/App_Plugins/SchemaCity/workspace.js')">
     <!-- ponytail: missing output only, not a timestamp comparison against the client
          sources. Editing the client and building only the .NET side leaves stale JS, which
-         is what `npm run watch` is for. Add Inputs/Outputs if that ever bites. -->
-    <Exec Command="npm ci" WorkingDirectory="Client" Condition="!Exists('$(MSBuildProjectDirectory)/Client/node_modules')" />
-    <Exec Command="npm run build" WorkingDirectory="Client" />
+         is what `pnpm watch` is for. Add Inputs/Outputs if that ever bites. -->
+    <!-- The clean variant's own node_modules exists only once the whole workspace is
+         installed. Client/node_modules alone can be left over from the npm client. -->
+    <Exec Command="pnpm install --frozen-lockfile" WorkingDirectory="Client" Condition="!Exists('$(MSBuildProjectDirectory)/Client/clean/node_modules')" />
+    <Exec Command="pnpm build" WorkingDirectory="Client" />
     <ItemGroup>
       <Content Include="wwwroot\**" Exclude="@(Content)" />
     </ItemGroup>

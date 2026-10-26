@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace SchemaCity.Models;
 
 /// <summary>
-/// The whole content model in one payload. Mirrored by SchemaGraph in Client/src/model/types.ts,
+/// The whole content model in one payload. Mirrored by SchemaGraph in Client/core/src/model/types.ts,
 /// which is the contract. Property names here have to keep matching it.
 /// </summary>
 public record SchemaGraph(

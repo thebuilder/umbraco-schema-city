@@ -8,7 +8,7 @@ import HeroParticles from "@thebuilder/umbraco-docs/components/HeroParticles";
 
 import "./_home/home.css";
 
-import cityShot from "../../../docs/screenshots/city.png";
+import planShot from "../../../docs/screenshots/plan.png";
 import findingsShot from "../../../docs/screenshots/findings.png";
 import { schemaCityPackage } from "../umbraco-package";
 
@@ -25,12 +25,12 @@ const marketplaceUrl = schemaCityPackage.links.marketplace;
 const features = [
   {
     title: "Find your way around",
-    body: "Search by name, alias or property alias. Hover a building to see what it connects to, and focus on a type and its neighbours.",
+    body: "Search by name, alias or property alias. Hover a card to see what it connects to, and focus on a type and its neighbours.",
     href: "/investigate-a-type",
   },
   {
     title: "See what content uses",
-    body: "Colour the city by content count, published share, cultures, incoming references or unused types.",
+    body: "Colour the cards by content count, published share, cultures, incoming references or unused types.",
     href: "/content-usage",
   },
   {
@@ -44,8 +44,8 @@ const features = [
     href: "/compare",
   },
   {
-    title: "Read it without the 3D",
-    body: "List, Tree, Matrix, Editor and Data Types work without the city canvas and from the keyboard.",
+    title: "Read it without the plan",
+    body: "List, Tree, Matrix, Editor and Data Types show the schema as tables, a tree and pages, and work from the keyboard.",
     href: "/views",
   },
   {
@@ -56,7 +56,7 @@ const features = [
 ];
 
 const views = [
-  { key: "City", body: "Every Document Type as a building, on a board for each root" },
+  { key: "City plan", body: "Every Document Type as a card, in a district for each root" },
   { key: "List", body: "Every type in a sortable table" },
   { key: "Tree", body: "What editors can create under each root" },
   { key: "Matrix", body: "Types crossed with compositions or Data Types" },
@@ -88,8 +88,8 @@ const views = [
       layout="split"
       eyebrow="Content model visualisation for Umbraco"
       title="See your content model"
-      accent="as a city."
-      description="Each Document Type is a building and each property group a floor. Traces show allowed children, compositions, block targets and picker references, and Findings flags schema problems before they ship."
+      accent="from above."
+      description="Schema City lays your Document Types out as a city plan: a card for each type, a district for each root, and lines for allowed children, compositions, block targets and picker references. Findings flags schema problems before they ship."
       compatibility="Umbraco CMS 17 and 18 · .NET 10"
     >
       <HeroParticles slot="background" logo="/logo-mark.svg" />
@@ -101,9 +101,9 @@ const views = [
       <div class="shell">
         <figure class="screenshot reveal" style="--i: 6">
           <div class="screenshot__bar" aria-hidden="true"><span></span><span></span><span></span></div>
-          {/* The live demo loads only when asked, so the page doesn't start a 3D app on arrival. It isn't focused either, since it takes the arrow keys and Escape. */}
+          {/* The live demo loads only when asked, so the page doesn't start the app on arrival. It isn't focused either, since it takes the arrow keys and Escape. */}
           <div class="demo" data-demo={demoUrl}>
-            <img src={cityShot.src} width={cityShot.width} height={cityShot.height} alt="The city overview, with a circuit board for each root, Site, Microsite and Settings, beside boards for Compositions, Elements and Unreachable" loading="eager" decoding="async" />
+            <img src={planShot.src} width={planShot.width} height={planShot.height} alt="The demo schema as a city plan with structure lines on: the Site district with Compositions, Microsite, Unreachable and Settings around it, and the Overview in the corner" loading="eager" decoding="async" />
             <button class="button button--primary demo__load" type="button">Explore the live demo</button>
           </div>
         </figure>
@@ -147,7 +147,7 @@ const views = [
       <div class="views__copy reveal">
         <span class="rule" aria-hidden="true"></span>
         <h2 id="views-title">One schema, five views</h2>
-        <p>The chosen view is kept in the URL, so a link opens the same view. Every view except City works without the 3D canvas.</p>
+        <p>The chosen view is kept in the URL, so a link opens the same view. Every view except City plan shows the schema as tables, a tree or a page.</p>
         <a class="text-link" href="/views">Move between views <span aria-hidden="true">→</span></a>
       </div>
       <div class="status-list reveal" style="--i: 1">

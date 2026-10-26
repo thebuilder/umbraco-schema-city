@@ -53,19 +53,20 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # Corepack provides pnpm in the next step, so setup-node mustn't look for it to cache.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: src/SchemaCity/Client/package-lock.json
+          package-manager-cache: false
 
-      - run: npm ci
+      - run: corepack enable
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
         working-directory: src/SchemaCity/Client
 
-      - run: npm run lint
-        working-directory: src/SchemaCity/Client
-
-      - run: npm test
+      - run: pnpm test
         working-directory: src/SchemaCity/Client
 
       # Only on a pull request: the gate compares the changed files against the base,
@@ -73,25 +74,25 @@ jobs:
       - name: audit the changed client code
         if: github.event_name == 'pull_request'
         working-directory: src/SchemaCity/Client
-        run: npm run fallow -- --base '${{ github.event.pull_request.base.sha }}' --format github-annotations
+        run: pnpm fallow --base '${{ github.event.pull_request.base.sha }}' --format github-annotations
 
       # Vite copies the manifest from public/ as it is, so a release writes its version in
       # before the client build. It comes after lint, because jq lays the file out its own
       # way and the format check would fail on the stamped copy.
       - name: stamp the release version on the manifest
         if: inputs.package-version != ''
-        working-directory: src/SchemaCity/Client/public
+        working-directory: src/SchemaCity/Client/backoffice/public
         run: |
           jq --arg v "$PACKAGE_VERSION" '.version = $v' umbraco-package.json > manifest.tmp
           mv manifest.tmp umbraco-package.json
 
-      - run: npm run build
+      - run: pnpm build
         working-directory: src/SchemaCity/Client
 
-      - run: npm run build:demo
+      - run: pnpm build:demo
         working-directory: src/SchemaCity/Client
 
-      # npm ran above, so the library's own client build target has nothing to do.
+      # pnpm ran above, so the library's own client build target has nothing to do.
       - run: >-
           dotnet build SchemaCity.sln -c Release -p:UmbracoVersion=${{ matrix.umbraco }}
           -p:SkipClientBuild=true -p:ContinuousIntegrationBuild=true
@@ -113,6 +114,9 @@ jobs:
           test -f "$nupkg"
           list=$(unzip -Z1 "$nupkg")
           grep -qx staticwebassets/App_Plugins/SchemaCity/workspace.js <<<"$list"
+          # Both variants ship: the flat map's board and the City's scene.
+          grep -q '^staticwebassets/App_Plugins/SchemaCity/Board-.*\.js$' <<<"$list"
+          grep -q '^staticwebassets/App_Plugins/SchemaCity/Scene-.*\.js$' <<<"$list"
           grep -qx README.md <<<"$list"
           grep -qx icon.png <<<"$list"
           test -z "$(grep '\.map$' <<<"$list")"
@@ -152,4 +156,5 @@ jobs:
           test "$(code /umbraco)" = 200
           test "$(code /umbraco/management/api/v1/schema-city/graph)" = 401
           test "$(code /umbraco/management/api/v1/schema-city/usage)" = 401
+          test "$(code /umbraco/management/api/v1/schema-city/settings)" = 401
           pkill -f SchemaCity.Site || true
