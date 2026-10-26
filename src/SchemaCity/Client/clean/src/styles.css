@@ -92,6 +92,9 @@
   --violet: color-mix(in oklab, #8d6be0 75%, var(--text-mix));
   --signal: var(--uui-color-danger, #df2a5d);
   --signal-soft: color-mix(in oklab, var(--signal) 80%, var(--panel));
+  /* Problem text: the danger colour pulled toward the text colour, deeper and
+     quieter than the raw pink, which shouted from every heading it coloured. */
+  --signal-ink: color-mix(in oklab, var(--signal) 68%, var(--text-mix));
   /* The one colour for things to click: Umbraco's interactive blue, with a little of
      the text colour so it holds its contrast on a dark surface too. Half and half
      made it near-black on white, and links read as text. */
@@ -867,24 +870,84 @@ button:is([data-variant="outline"], [data-variant="default"]):is(
 }
 
 [data-ui="filter"] {
-  padding: 0.1875rem 0.625rem;
+  padding: 0.25rem 0.625rem;
   font-size: 0.8125rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  font-weight: 500;
+  background: var(--panel-sunken);
+  border: 1px solid transparent;
   border-radius: 999px;
 }
 
-[data-ui="filter"][aria-pressed="true"] {
+[data-ui="filter"]:hover {
   color: var(--foreground);
-  background: var(--accent);
-  border-color: var(--accent-foreground);
+  background: color-mix(in oklab, var(--foreground) 8%, var(--panel-sunken));
+  border-color: transparent;
 }
 
+[data-ui="filter"][aria-pressed="true"] {
+  color: var(--accent-foreground);
+  background: var(--accent);
+  border-color: transparent;
+}
+
+/* A problem among a kind's counts is a small dot, not a red "!". */
+[data-ui="problem-mark"] {
+  display: inline-block;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-left: 0.3125rem;
+  font-size: 0;
+  vertical-align: middle;
+  background: var(--signal-ink);
+  border-radius: 50%;
+  translate: 0 -0.0625rem;
+}
+
+[data-ui="problem-count"] {
+  font-weight: 600;
+  color: var(--signal-ink);
+}
+
+/* Each kind is a soft surface: its title in the text colour, its severity as a
+   small pill, and its findings as one white list inside it. A problem's pill is
+   the only red in the group. */
 [data-ui="finding-group"] {
   overflow: hidden;
+  background: var(--panel-sunken);
+  border: 0;
+  border-radius: 12px;
+}
+
+[data-ui="finding-title"] {
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+[data-ui="severity"] {
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--label);
+  background: color-mix(in oklab, var(--foreground) 7%, var(--panel-sunken));
+  border-radius: 999px;
+}
+
+[data-ui="finding-group"][data-severity="problem"] [data-ui="severity"] {
+  color: var(--signal-ink);
+  background: color-mix(in oklab, var(--signal) 12%, var(--panel));
+}
+
+/* The type a finding is about anchors its row. */
+[data-ui="finding-row"] > button .text-phosphor {
+  font-weight: 600;
+}
+
+[data-ui="finding-rows"] {
+  margin: 0 0.5rem 0.5rem;
   background: var(--panel);
-  border-color: var(--line);
-  border-radius: calc(var(--radius) + 4px);
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
 }
 
 /* Checks as rows marked by a dot: filled pink for a problem, grey for a note, a

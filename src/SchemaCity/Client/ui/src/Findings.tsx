@@ -104,7 +104,10 @@ function Row({
 }) {
   const { nodeId, dataTypeIds = [] } = finding;
   return (
-    <div className="border-line/40 border-t first:border-t-0">
+    <div
+      className="border-line/40 border-t first:border-t-0"
+      data-ui="finding-row"
+    >
       <button
         className="group flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-accent/50"
         onClick={() =>
@@ -204,6 +207,7 @@ function Group({
   return (
     <section
       className={`border bg-muted ${tone.border}`}
+      data-severity={rows[0]?.severity ?? "note"}
       data-ui="finding-group"
     >
       <div className="flex items-baseline gap-2 px-3 py-2.5">
@@ -219,11 +223,16 @@ function Group({
             aria-hidden
             className={`size-3.5 shrink-0 self-center text-faint transition-transform motion-reduce:transition-none ${expanded ? "rotate-90" : ""}`}
           />
-          <span className={`font-semibold ${tone.text}`}>
+          <span
+            className={`font-semibold ${tone.text}`}
+            data-ui="finding-title"
+          >
             {FINDING_LABEL[kind]}
           </span>
           <span className="font-mono text-2xs text-faint">{rows.length}</span>
-          <span className={`ml-auto text-xs ${tone.text}`}>{tone.word}</span>
+          <span className={`ml-auto text-xs ${tone.text}`} data-ui="severity">
+            {tone.word}
+          </span>
         </button>
         <button
           aria-controls={whyId}
@@ -237,7 +246,11 @@ function Group({
       </div>
       {why ? <KindWhy id={whyId} kind={kind} /> : null}
       {expanded ? (
-        <div className="border-line/40 border-t bg-panel" id={rowsId}>
+        <div
+          className="border-line/40 border-t bg-panel"
+          data-ui="finding-rows"
+          id={rowsId}
+        >
           {rows.map((finding) => (
             <Row
               finding={finding}
@@ -326,7 +339,9 @@ function Header({
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <p className="text-label">
           {problems > 0 ? (
-            <span className="text-signal">{plural(problems, "problem")}</span>
+            <span className="text-signal" data-ui="problem-count">
+              {plural(problems, "problem")}
+            </span>
           ) : (
             "No problems."
           )}

@@ -299,7 +299,12 @@ export function SpokenCount({
         >
           {count.toLocaleString()}
           {problem ? (
-            <span className={`font-bold ${tone ?? "text-signal"}`}>!</span>
+            <span
+              className={`font-bold ${tone ?? "text-signal"}`}
+              data-ui="problem-mark"
+            >
+              !
+            </span>
           ) : null}
         </span>
       )}
