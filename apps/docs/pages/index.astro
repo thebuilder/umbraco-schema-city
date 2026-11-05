@@ -86,7 +86,6 @@ const views = [
   <LandingRoot class="home">
     <LandingHero
       layout="split"
-      eyebrow="Content model visualisation for Umbraco"
       title="See your content model"
       accent="from above."
       description="Schema City lays your Document Types out as a city plan: a card for each type, a district for each root, and lines for allowed children, compositions, block targets and picker references. Findings flags schema problems before they ship."
@@ -123,7 +122,6 @@ const views = [
       <div class="feature-grid">
         {features.map((feature, index) => (
           <a class="feature-card reveal" href={feature.href} style={`--i: ${index + 1}`}>
-            <span aria-hidden="true">0{index + 1}</span>
             <h3>{feature.title}</h3>
             <p>{feature.body}</p>
           </a>
