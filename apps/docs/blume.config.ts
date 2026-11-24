@@ -1,6 +1,6 @@
 import { docsTheme } from "@thebuilder/umbraco-docs";
 import { defineConfig } from "blume";
-import { vercel } from "blume/analytics";
+import { script, vercel } from "blume/analytics";
 import { schemaCityPackage } from "./umbraco-package";
 
 export default defineConfig({
@@ -32,7 +32,15 @@ export default defineConfig({
     // Disable Blume's generated /og routes so it cannot overwrite them.
     og: { enabled: false },
   },
-  analytics: [vercel()],
+  analytics: [
+    vercel(),
+    // Pageflock, in the thebuilder workspace, with outbound links, downloads and 404s counted too.
+    script({
+      src: "https://e.pageflock.com/s.auto.js",
+      strategy: "defer",
+      attributes: { "data-site": "schema-city-thebuilder-dk" },
+    }),
+  ],
   // The docs family's shared accent and fonts, so every package site looks alike.
   theme: { ...docsTheme },
   agents: {
